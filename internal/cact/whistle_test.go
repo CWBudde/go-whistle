@@ -229,7 +229,8 @@ func TestWhistleCactMatchesConfig(t *testing.T) {
 	}
 
 	// The encoder and front-end geometry is not in the header but in the
-	// audio manifest, tensor 237. Its first two values are still unexplained.
+	// audio manifest, tensor 237. Its first two values, the magic 0xCAE and
+	// the version 1, are checked by TestWhistleNameMap (F-006).
 	manifest, err := f.FP32(237)
 	if err != nil {
 		t.Fatalf("FP32(237): %v", err)

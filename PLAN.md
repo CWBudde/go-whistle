@@ -178,7 +178,7 @@ k = key_proj(e); v = value_proj(e); v = Σ_j taps[j] · shift_right(v, 3j)
 - **Read the codebooks from the header.** Upstream derives them from `np.random.RandomState(0).randn(400000)`
   (Lloyd-Max), which would otherwise mean porting numpy's MT19937 + Gaussian generator.
 
-Whistle tensor map. It was **derived by value-matching against safetensors and must be verified in Phase 1**:
+Whistle tensor map, verified per tensor in Phase 1 (`cact.WhistleNames()`, `docs/FINDINGS.md` F-006):
 
 | Index   | Contents                                                                                                                                                                     |
 | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -188,7 +188,7 @@ Whistle tensor map. It was **derived by value-matching against safetensors and m
 | 226–227 | `hada_p1`, `hada_p2` FP32 `(512)`, the Hadamard permutations                                                                                                                 |
 | 228–235 | engram sites 3 and 7: tables CQ2 `(73728, 128)`, key_proj, value_proj, taps `(4, 512)`                                                                                       |
 | 236     | decoder final_norm                                                                                                                                                           |
-| 237     | **audio manifest** FP32(13) = `[3246, 1, 8192, 8, 4, 9, 128, 3, 80, 16000, 512, 400, 160]`. The first two values are unknown                                                 |
+| 237     | **audio manifest** FP32(13) = `[3246, 1, 8192, 8, 4, 9, 128, 3, 80, 16000, 512, 400, 160]`: magic 0xCAE, version 1, then config                                              |
 | 238–317 | 8 × cross-attention: cross_norm, q, k, v, gate, out, q_norm, k_norm, post_cross_norm, cross_gate                                                                             |
 | 318     | `pe_gate`                                                                                                                                                                    |
 | 319–662 | 8 encoder layers × 43: six norms, q(384), k(96), v(128), gate, out, q_norm, k_norm, attn_gate, pw1 `(1024,512)`, pw2, dw `(9,512)`, hadamard_mlp_0 (13), hadamard_mlp (13)   |
@@ -251,8 +251,8 @@ either direction.
 
 1. **JAX reference** (`architecture.py` loaded with the safetensors weights). Gives per-block input/output fixtures for
    everything the decoder shares with Needle 3. Float32 against float32, tolerance about 1e-5 (max abs) or cosine ≥ 0.99999.
-2. **safetensors ↔ `.cact`**. Each dequantised `.cact` tensor must match its FP32 twin by cosine. Expect ≥ 0.99 for
-   CQ4 and ≥ 0.95 for CQ2; the exact values are recorded. This checks the CQ path **and** the positional name map.
+2. **safetensors ↔ `.cact`**. Each dequantised `.cact` tensor must match its FP32 twin by cosine. Measured: CQ4
+   0.9943–0.9954, CQ2 0.9319–0.9401 (F-006; the earlier "≥ 0.95 for CQ2" guess was wrong). This checks the CQ path **and** the positional name map.
 3. **Engine** (`needle` CLI / `libneedle3`):
    - `needle_embed` gives encoder output per frame. Target cosine ≥ 0.99, since the engine runs W2A8.
    - `needle_transcribe` gives the final JSON. Target: transcript equality, the same language and timestamps within one frame.
@@ -356,8 +356,32 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       for bit, so the RNG need not be ported. The header holds one codebook for one export group size, which is fine
       for every upstream writer (`docs/FINDINGS.md` F-004). Dequant is eager and single-threaded for now; laziness
       belongs to `internal/weights`.
-- [ ] Tensor name map (index → safetensors name). **Accept:** `scripts/compare_cact.py` (or a Go test) reports a cosine
+- [x] Tensor name map (index → safetensors name). **Accept:** `scripts/compare_cact.py` (or a Go test) reports a cosine
       for all 681 tensors, every tensor passes its threshold, and the map is pinned in a test.
+      (2026-10-09) — `cact.WhistleNames()` (`internal/cact/names.go`) gives every index an upstream-style name
+      (`layer03.q_proj`, `cross03.*`, `enc03.hada_0.d1`, `stem.out`, …), its safetensors source, a layer slice and a
+      transform: reshape, transpose (Flax `(in, out)` → `(out, in)`) or lane-major (mHC φ), or derived.
+      `Entry.Apply` performs the transform and is unit-tested. A brute-force cosine search over all shape-compatible
+      slices and transposes, which assumed no order, found the order: embedding; 8 decoder layers × 27 in exact
+      `_tensors` order; decoder mHC; `hada_p1/p2`; engram sites 3 and 7; `final_norm`; the audio manifest at 237
+      (where `heads.manifest` would go); 8 cross-attentions × 10; `pe_gate`; 8 encoder layers × 43 (six norms in
+      macaron order, attention, pw1/pw2/dw, `hadamard_mlp_0`, `hadamard_mlp`); encoder mHC; `enc.final_norm`; stem;
+      mel bank; tokenizer. All 116 safetensors tensors are used. The map is pinned by the golden
+      `internal/cact/testdata/whistle_names.txt` plus structural invariants.
+      The model-gated `TestWhistleNameMap` logs a 681-row table (cosine, threshold, check) in about 1.5 s. FP16
+      (524): all 458,057 values are the RNE FP16 of the source, and each cosine meets the rounding bound
+      √(1 − ‖h‖²/‖x‖²) (0.99999991–0.99999996). CQ (145 CQ2, 7 CQ4): each record equals a Go `_cq_pack`
+      requantisation of its source bit for bit, except 11 norms that differ by 1 ulp and 16 indices that flip at
+      float32 near-ties (≤ 4e-8 from a decision boundary; the derived tolerance is 1.5e-5). The cosine threshold is
+      cos(Q(src), src) less the angle of 1-ulp norms. Pinned minimum cosines: FP16 0.999999963923, CQ2 0.931853685259,
+      CQ4 0.994312193718. Derived records equal a Go recomputation: `hada_p*` a numpy MT19937 `permutation` port, the
+      mel bank librosa Slaney in float64 rounded once to float32 (bit-exact), the manifest
+      `[0xCAE magic, version 1, config…]` (patched copies show the engine needs both). The tokenizer parses and its
+      sha256 equals F-005's.
+      Every CQ width matches the run's `weight_bits`. Discovery: the Gaussian Lloyd-Max cosine (0.9394) is not a
+      floor, since 143/145 CQ2 fall below it (0.9319–0.9401), so the "≥ 0.95 for CQ2" expectation above was wrong.
+      The `.cact` file holds nothing beyond the checkpoint, its config and two constants (`docs/FINDINGS.md` F-006).
+      The RAW tokenizer has no cosine; its check is the parse plus the hash.
 - [ ] `internal/weights`: one lookup interface over both formats, with lazy dequant and an mmap where the platform allows it.
 - [x] `internal/tokenizer`: load the pieces, scores and types from the RAW blob (format per `export.py`). Decode
       (control/unk skipped, byte fallback, `▁`→space) and `RefTokenizer` encode. **Accept:** round-trip on multilingual
