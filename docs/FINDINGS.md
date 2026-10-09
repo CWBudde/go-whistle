@@ -324,3 +324,82 @@ The test runs in about 1.5 s; `RequantCQ` uses an FWHT and is pinned to the matr
 (magic and version). Every CQ record is a deterministic function of its source, up to float32 rounding ties. A
 safetensors-only load can therefore rebuild the deployment numerics exactly; the derived records need only the
 permutation port and the mel recomputation, both in `internal/cact`'s tests.
+
+## F-009 — Needle 3 block fixtures from the Flax modules (2026-10-10)
+
+**Question.** Can upstream's Flax modules (`architecture.py` @ `af2654dffa`) run as-is with Whistle's safetensors
+parameters, so that their outputs become the Go blocks' reference? How do the Flax paths map onto the module
+parameters, and what does the checkpoint lack? And is PLAN.md's Phase 2 tolerance (1e-5 max abs) achievable?
+
+**Binding.** `scripts/needle_fixtures.py` builds each module's parameter tree with `jax.eval_shape(module.init, …)`.
+It fills each leaf at Flax path `p` from safetensors `<prefix>/<p>`, sliced at the layer for the scanned `[8, …]`
+tensors, and asserts that every shape matches. The prefixes:
+
+| module                               | safetensors prefix                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| `Block`, layer L                     | `stack/layers/block/…[L]`, 27 leaves (exactly `.cact` `layerLL.*`)                   |
+| `MultiHeadAttention` (decoder)       | `stack/layers/block/self_attn/…[L]`                                                  |
+| `MultiHeadAttention` (encoder-style) | `encoder/layers/block/self_attn/…[L]` with `qkv_conv_taps=0`                         |
+| `HadamardMLP`                        | `stack/layers/block/hadamard_mlp/…[L]`                                               |
+| `_ScanBody` (mHC)                    | `stack/layers/block/…[L]`; the `hc` dict from `stack/mhc_*[L]` plus the lane offsets |
+| `Engram`, site s                     | `engrams_s/…` (no layer axis)                                                        |
+| final `ZCRMSNorm`                    | `stack/final_norm/scale`                                                             |
+
+Every parameter the modules declare exists with the exact shape, so nothing is missing. The rest of what they need is
+computed: the RoPE tables (θ = `rope`), `_hada_perms(512)`, the mHC `pre_off`/`post_off` from `lane = eye(4)[L % 4]`,
+the engram hash constants, and the masks. Two config facts are implicit:
+
+- `num_heads` is not in the config. It is the `q_proj` width over `qk_dim`, 384 / 48 = 8.
+- `hashes` (2) is `engram_heads`. It equals `engram_geometry`'s default, `512 // (2 · 128)`.
+
+The only unread checkpoint tensors in the decoder are the cross-attention tensors (`cross_attn/*`, `cross_norm`,
+`post_cross_norm`, `cross_gate`), which upstream's `Block` does not contain. The encoder's attention fits
+`MultiHeadAttention` exactly (q/k norm, gate, GQA 8:2, no taps); its other parts (conv module, macaron FFN) have no
+upstream module.
+
+**Intermediates.** Flax's `capture_intermediates` gives every submodule's output: the projections, `q_norm`/`k_norm`,
+`gate_proj`, the Block's norms, `self_attn` and `hadamard_mlp`, and `value_proj`. Everything in between is recomputed
+in the script from upstream's helpers (`_shift_right`, `_mask_diag`, `apply_rope`, `_kron_apply`, `_hada_perms`,
+`_rms_unit`, `_sinkhorn`, `engram_indices`) in upstream's expression order. Before a file is written, each
+recomputation must reproduce the module's own output, and all do with **0** difference. For the engram gate, which
+lives inside `Block`, the script checks `Block_3(x, engram_kv)` = `Block_3(x + α·v)`.
+
+**Choices.**
+
+- `flash=False` (explicit softmax) is the reference path. `flash=True` uses `jax.nn.dot_product_attention`, which pads
+  qk 48 to 64 and rescales q by √(64/48). It differs by 1.3e-4 at |out| ≤ 329 (4e-7 relative), and it keeps its
+  softmax in float32 even in an x64 run (2.2e-5 from flash=False there). It is mathematically the same attention.
+- `quant=False` throughout. `_aq`, `maybe_quant_query` and `maybe_quant_kv` are then identities.
+- The encoder-style fixture stores the output both without and with RoPE, because U3 is open.
+- The mHC fixture runs layer 0 on the `Stack` lane expand, where every doubly stochastic `h_res` gives the same
+  mix. It also runs layer 1 on four distinct lanes, where the Sinkhorn mix and lane 1's offsets matter. Layer 0's
+  output is then collapsed (lane mean, `final_norm`) to pin `Stack`'s ending. Engram is off, since the site flags at
+  layers 0 and 1 are 0 and `x + 0·…` is exact.
+- Engram ids include a repeated trigram, so the indices repeat: order 2 at t = 7, 8 equals t = 2, 3, and order 3 at
+  t = 8 equals t = 3. They also include the pad id 0. Positions t < order − 1 get a hash over zero padding;
+  `ngram_ok` zeroes their table rows.
+
+**Determinism.** safetensors 0.8.0 serialises `__metadata__` from a Rust `HashMap`. Its key order, and so the file
+bytes, changes from run to run: three runs of the same `save_file` gave three digests. The script rewrites the header
+with the metadata keys sorted. The JSON keeps its length, so the data offsets stay valid. It then reloads the file and
+compares every tensor and the metadata. Two `just needle-fixtures` runs are byte-identical. The seven files total
+1,972,688 bytes and load with `internal/safetensors`: all 89 tensors have the shapes in their `shapes` metadata, and
+the per-tensor sums equal numpy's.
+
+**Tolerance.** PLAN.md's "1e-5 max abs" cannot be met as an absolute bound. With the real weights, the decoder's
+activations are large: `hadamard_mlp` and `block` outputs reach 1.5e3, attention outputs 330 (decoder) and 1.2e3
+(encoder weights), and the mHC stream 1.2e3. `--f64-check` reruns every block in float64. For that rerun,
+`jnp.float32` is mapped to `float64` inside `architecture.py`, because upstream casts to float32 explicitly. The
+float32 fixtures lie up to 1.3e-3 max abs from the float64 values (`block.mlp`). Relative to each tensor's largest
+magnitude, the gap is at most 3.9e-6 (`attention_encoder.gate`, whose max is 1), typically 1e-6. Every cosine is
+≥ 0.999999999999. A float32 Go port has noise of the same order, so the contract in `testdata/needle/README.md` is:
+
+- max |go − fixture| ≤ 1e-5 · max(1, max |fixture|) per tensor;
+- cosine ≥ 0.99999;
+- I64 exactly.
+
+Alternatives considered: a flat 1e-5 absolute bound fails for any float32 implementation, the fixtures included. A
+per-element relative bound breaks down near zero (`probs`, `y − u` cancellations). Cosine alone would miss a
+uniformly wrong scale.
+
+**Not covered.** The Go blocks do not exist yet; the fixtures are the contract for the next Phase 2 branches.
