@@ -1,0 +1,66 @@
+{
+  "language": "en",
+  "text": "Several hundred free state men promptly responded to the summons.",
+  "words": [
+    {
+      "word": "Several",
+      "start": 0.40,
+      "end": 0.80,
+      "probability": 0.992
+    },
+    {
+      "word": "hundred",
+      "start": 0.80,
+      "end": 1.12,
+      "probability": 0.976
+    },
+    {
+      "word": "free",
+      "start": 1.12,
+      "end": 1.36,
+      "probability": 0.532
+    },
+    {
+      "word": "state",
+      "start": 1.36,
+      "end": 1.60,
+      "probability": 0.641
+    },
+    {
+      "word": "men",
+      "start": 1.60,
+      "end": 1.84,
+      "probability": 0.975
+    },
+    {
+      "word": "promptly",
+      "start": 1.84,
+      "end": 2.40,
+      "probability": 0.999
+    },
+    {
+      "word": "responded",
+      "start": 2.40,
+      "end": 3.12,
+      "probability": 0.998
+    },
+    {
+      "word": "to",
+      "start": 3.12,
+      "end": 3.36,
+      "probability": 0.999
+    },
+    {
+      "word": "the",
+      "start": 3.36,
+      "end": 3.44,
+      "probability": 0.995
+    },
+    {
+      "word": "summons.",
+      "start": 3.44,
+      "end": 3.92,
+      "probability": 0.988
+    }
+  ]
+}

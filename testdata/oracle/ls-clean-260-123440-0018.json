@@ -1,0 +1,66 @@
+{
+  "language": "en",
+  "text": "I am very tired of swimming about here. Oh, mouse!\"",
+  "words": [
+    {
+      "word": "I",
+      "start": 0.24,
+      "end": 0.40,
+      "probability": 0.863
+    },
+    {
+      "word": "am",
+      "start": 0.40,
+      "end": 0.56,
+      "probability": 0.993
+    },
+    {
+      "word": "very",
+      "start": 0.56,
+      "end": 0.72,
+      "probability": 0.999
+    },
+    {
+      "word": "tired",
+      "start": 0.72,
+      "end": 1.04,
+      "probability": 1.000
+    },
+    {
+      "word": "of",
+      "start": 1.04,
+      "end": 1.28,
+      "probability": 0.996
+    },
+    {
+      "word": "swimming",
+      "start": 1.28,
+      "end": 1.60,
+      "probability": 0.999
+    },
+    {
+      "word": "about",
+      "start": 1.60,
+      "end": 1.84,
+      "probability": 0.996
+    },
+    {
+      "word": "here.",
+      "start": 1.84,
+      "end": 2.16,
+      "probability": 0.994
+    },
+    {
+      "word": "Oh,",
+      "start": 2.40,
+      "end": 2.72,
+      "probability": 0.845
+    },
+    {
+      "word": "mouse!\"",
+      "start": 2.72,
+      "end": 2.96,
+      "probability": 0.757
+    }
+  ]
+}

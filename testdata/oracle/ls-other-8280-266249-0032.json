@@ -1,0 +1,42 @@
+{
+  "language": "en",
+  "text": "\"No, sir, he is not here.",
+  "words": [
+    {
+      "word": "\"No,",
+      "start": 0.64,
+      "end": 0.88,
+      "probability": 0.778
+    },
+    {
+      "word": "sir,",
+      "start": 0.88,
+      "end": 1.12,
+      "probability": 0.988
+    },
+    {
+      "word": "he",
+      "start": 1.28,
+      "end": 1.36,
+      "probability": 0.968
+    },
+    {
+      "word": "is",
+      "start": 1.36,
+      "end": 1.52,
+      "probability": 0.968
+    },
+    {
+      "word": "not",
+      "start": 1.52,
+      "end": 1.76,
+      "probability": 0.953
+    },
+    {
+      "word": "here.",
+      "start": 1.76,
+      "end": 2.00,
+      "probability": 0.962
+    }
+  ]
+}

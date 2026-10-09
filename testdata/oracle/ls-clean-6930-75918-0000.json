@@ -1,0 +1,54 @@
+{
+  "language": "en",
+  "text": "Concord returned to its place amidst the tents.",
+  "words": [
+    {
+      "word": "Concord",
+      "start": 0.64,
+      "end": 1.12,
+      "probability": 0.920
+    },
+    {
+      "word": "returned",
+      "start": 1.12,
+      "end": 1.60,
+      "probability": 0.936
+    },
+    {
+      "word": "to",
+      "start": 1.60,
+      "end": 1.84,
+      "probability": 0.995
+    },
+    {
+      "word": "its",
+      "start": 1.84,
+      "end": 2.00,
+      "probability": 0.998
+    },
+    {
+      "word": "place",
+      "start": 2.00,
+      "end": 2.24,
+      "probability": 0.998
+    },
+    {
+      "word": "amidst",
+      "start": 2.24,
+      "end": 2.80,
+      "probability": 0.976
+    },
+    {
+      "word": "the",
+      "start": 2.80,
+      "end": 2.96,
+      "probability": 0.995
+    },
+    {
+      "word": "tents.",
+      "start": 2.96,
+      "end": 3.28,
+      "probability": 0.951
+    }
+  ]
+}

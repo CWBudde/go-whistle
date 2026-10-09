@@ -1,0 +1,30 @@
+{
+  "language": "en",
+  "text": "Directed for your master.",
+  "words": [
+    {
+      "word": "Directed",
+      "start": 0.56,
+      "end": 1.12,
+      "probability": 0.893
+    },
+    {
+      "word": "for",
+      "start": 1.12,
+      "end": 1.52,
+      "probability": 0.732
+    },
+    {
+      "word": "your",
+      "start": 1.52,
+      "end": 1.68,
+      "probability": 0.981
+    },
+    {
+      "word": "master.",
+      "start": 1.68,
+      "end": 2.08,
+      "probability": 0.961
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "language": "en",
+  "text": "But there is majesty, and there is no might save in Allah, the glorious, the great.",
+  "words": [
+    {
+      "word": "But",
+      "start": 0.56,
+      "end": 0.80,
+      "probability": 0.940
+    },
+    {
+      "word": "there",
+      "start": 0.80,
+      "end": 0.96,
+      "probability": 0.995
+    },
+    {
+      "word": "is",
+      "start": 0.96,
+      "end": 1.12,
+      "probability": 0.998
+    },
+    {
+      "word": "majesty,",
+      "start": 1.12,
+      "end": 1.76,
+      "probability": 0.969
+    },
+    {
+      "word": "and",
+      "start": 2.16,
+      "end": 2.32,
+      "probability": 0.994
+    },
+    {
+      "word": "there",
+      "start": 2.32,
+      "end": 2.48,
+      "probability": 0.997
+    },
+    {
+      "word": "is",
+      "start": 2.48,
+      "end": 2.64,
+      "probability": 0.990
+    },
+    {
+      "word": "no",
+      "start": 2.64,
+      "end": 2.80,
+      "probability": 0.940
+    },
+    {
+      "word": "might",
+      "start": 2.80,
+      "end": 3.28,
+      "probability": 0.839
+    },
+    {
+      "word": "save",
+      "start": 3.28,
+      "end": 3.60,
+      "probability": 0.989
+    },
+    {
+      "word": "in",
+      "start": 3.60,
+      "end": 3.76,
+      "probability": 0.980
+    },
+    {
+      "word": "Allah,",
+      "start": 3.76,
+      "end": 4.08,
+      "probability": 0.855
+    },
+    {
+      "word": "the",
+      "start": 4.56,
+      "end": 4.64,
+      "probability": 0.953
+    },
+    {
+      "word": "glorious,",
+      "start": 4.64,
+      "end": 5.20,
+      "probability": 0.980
+    },
+    {
+      "word": "the",
+      "start": 5.28,
+      "end": 5.44,
+      "probability": 0.995
+    },
+    {
+      "word": "great.",
+      "start": 5.44,
+      "end": 5.68,
+      "probability": 0.989
+    }
+  ]
+}

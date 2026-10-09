@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: just ci
+    # Linux only: macOS minutes bill at 10x, and the arm64 assembly is exercised in go-pocket-tts.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Setup just
+        uses: extractions/setup-just@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Install prettier
+        run: npm install -g prettier
+
+      # Pinned to the local versions. gofumpt 0.12 needs go >= 1.26, newer than go.mod's go line, and setup-go v7
+      # sets GOTOOLCHAIN=local, so this step alone may fetch a newer toolchain.
+      - name: Install Go formatters
+        env:
+          GOTOOLCHAIN: auto
+        run: |
+          go install mvdan.cc/gofumpt@v0.12.0
+          go install github.com/daixiang0/gci@v0.14.0
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.14.1
+
+      - name: Install shellcheck and treefmt
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          curl -fsSL https://github.com/numtide/treefmt/releases/download/v2.6.0/treefmt_2.6.0_linux_amd64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin treefmt
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.2
+          install-only: true
+
+      # Model-dependent tests skip themselves when models/ is absent, which is always the case here.
+      - name: just ci
+        run: just ci

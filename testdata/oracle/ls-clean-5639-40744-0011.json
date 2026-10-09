@@ -1,0 +1,60 @@
+{
+  "language": "en",
+  "text": "She found a door, but it was locked outside.",
+  "words": [
+    {
+      "word": "She",
+      "start": 0.40,
+      "end": 0.56,
+      "probability": 0.986
+    },
+    {
+      "word": "found",
+      "start": 0.56,
+      "end": 0.80,
+      "probability": 0.995
+    },
+    {
+      "word": "a",
+      "start": 0.80,
+      "end": 0.96,
+      "probability": 0.822
+    },
+    {
+      "word": "door,",
+      "start": 0.96,
+      "end": 1.12,
+      "probability": 0.999
+    },
+    {
+      "word": "but",
+      "start": 1.28,
+      "end": 1.36,
+      "probability": 0.999
+    },
+    {
+      "word": "it",
+      "start": 1.36,
+      "end": 1.44,
+      "probability": 0.998
+    },
+    {
+      "word": "was",
+      "start": 1.44,
+      "end": 1.60,
+      "probability": 0.999
+    },
+    {
+      "word": "locked",
+      "start": 1.60,
+      "end": 1.92,
+      "probability": 0.999
+    },
+    {
+      "word": "outside.",
+      "start": 1.92,
+      "end": 2.32,
+      "probability": 0.974
+    }
+  ]
+}

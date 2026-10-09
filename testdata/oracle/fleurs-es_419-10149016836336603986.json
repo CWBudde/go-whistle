@@ -1,0 +1,60 @@
+{
+  "language": "es",
+  "text": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+  "words": [
+    {
+      "word": "Los",
+      "start": 0.72,
+      "end": 0.96,
+      "probability": 1.000
+    },
+    {
+      "word": "luchadores",
+      "start": 0.96,
+      "end": 1.44,
+      "probability": 1.000
+    },
+    {
+      "word": "compañeros",
+      "start": 1.44,
+      "end": 2.16,
+      "probability": 0.995
+    },
+    {
+      "word": "de",
+      "start": 2.16,
+      "end": 2.24,
+      "probability": 0.853
+    },
+    {
+      "word": "Luna",
+      "start": 2.24,
+      "end": 2.56,
+      "probability": 0.845
+    },
+    {
+      "word": "también",
+      "start": 2.56,
+      "end": 3.12,
+      "probability": 0.994
+    },
+    {
+      "word": "le",
+      "start": 3.12,
+      "end": 3.28,
+      "probability": 0.532
+    },
+    {
+      "word": "rindieron",
+      "start": 3.28,
+      "end": 3.76,
+      "probability": 0.958
+    },
+    {
+      "word": "homenaje.",
+      "start": 3.76,
+      "end": 4.32,
+      "probability": 0.990
+    }
+  ]
+}

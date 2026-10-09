@@ -41,6 +41,22 @@ test-coverage:
 # Run all checks (formatting, linting, tests, tidiness)
 ci: check-formatted test lint check-tidy
 
+# Fetch the pinned Needle 3 engine (test oracle) into engine/<platform>/
+fetch-engine *args:
+    scripts/fetch-engine.sh {{args}}
+
+# Snapshot upstream cactus-compute/needle at the pinned commit into original/needle
+fetch-upstream:
+    scripts/fetch-upstream.sh
+
+# Fetch the oracle clip corpus (LibriSpeech + FLEURS excerpts) into testdata/audio
+oracle-clips:
+    go run -tags oracle ./tools/oracle clips
+
+# Record Needle 3 engine transcripts and embeddings for the corpus into testdata/oracle
+oracle-run:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle run
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html

@@ -1,0 +1,144 @@
+{
+  "language": "fr",
+  "text": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+  "words": [
+    {
+      "word": "Les",
+      "start": 0.24,
+      "end": 0.48,
+      "probability": 0.695
+    },
+    {
+      "word": "deux",
+      "start": 0.48,
+      "end": 0.80,
+      "probability": 0.999
+    },
+    {
+      "word": "composés",
+      "start": 0.80,
+      "end": 1.28,
+      "probability": 0.968
+    },
+    {
+      "word": "réagissent",
+      "start": 1.28,
+      "end": 1.84,
+      "probability": 0.995
+    },
+    {
+      "word": "là",
+      "start": 1.84,
+      "end": 2.00,
+      "probability": 0.995
+    },
+    {
+      "word": "avec",
+      "start": 2.00,
+      "end": 2.24,
+      "probability": 0.997
+    },
+    {
+      "word": "l'autre",
+      "start": 2.24,
+      "end": 2.56,
+      "probability": 0.943
+    },
+    {
+      "word": "pour",
+      "start": 2.56,
+      "end": 2.64,
+      "probability": 0.952
+    },
+    {
+      "word": "former",
+      "start": 2.64,
+      "end": 2.96,
+      "probability": 0.914
+    },
+    {
+      "word": "des",
+      "start": 2.96,
+      "end": 3.12,
+      "probability": 0.914
+    },
+    {
+      "word": "Christos",
+      "start": 3.12,
+      "end": 3.44,
+      "probability": 0.704
+    },
+    {
+      "word": "qui",
+      "start": 3.44,
+      "end": 3.60,
+      "probability": 0.979
+    },
+    {
+      "word": "peuvent",
+      "start": 3.60,
+      "end": 3.84,
+      "probability": 0.867
+    },
+    {
+      "word": "bloquer",
+      "start": 3.84,
+      "end": 4.16,
+      "probability": 0.967
+    },
+    {
+      "word": "la",
+      "start": 4.16,
+      "end": 4.24,
+      "probability": 0.998
+    },
+    {
+      "word": "fonction",
+      "start": 4.24,
+      "end": 4.56,
+      "probability": 0.974
+    },
+    {
+      "word": "régionale",
+      "start": 4.56,
+      "end": 5.04,
+      "probability": 0.921
+    },
+    {
+      "word": "en",
+      "start": 5.04,
+      "end": 5.20,
+      "probability": 0.910
+    },
+    {
+      "word": "déclarer",
+      "start": 5.20,
+      "end": 5.68,
+      "probability": 0.952
+    },
+    {
+      "word": "des",
+      "start": 5.68,
+      "end": 5.76,
+      "probability": 0.684
+    },
+    {
+      "word": "chercheurs",
+      "start": 5.76,
+      "end": 6.16,
+      "probability": 0.997
+    },
+    {
+      "word": "de",
+      "start": 6.16,
+      "end": 6.32,
+      "probability": 0.984
+    },
+    {
+      "word": "l'université.",
+      "start": 6.32,
+      "end": 6.96,
+      "probability": 0.906
+    }
+  ]
+}

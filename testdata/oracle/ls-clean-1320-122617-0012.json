@@ -1,0 +1,162 @@
+{
+  "language": "en",
+  "text": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+  "words": [
+    {
+      "word": "Four",
+      "start": 0.40,
+      "end": 0.64,
+      "probability": 0.875
+    },
+    {
+      "word": "or",
+      "start": 0.64,
+      "end": 0.80,
+      "probability": 0.994
+    },
+    {
+      "word": "five",
+      "start": 0.80,
+      "end": 1.04,
+      "probability": 0.997
+    },
+    {
+      "word": "of",
+      "start": 1.04,
+      "end": 1.20,
+      "probability": 0.999
+    },
+    {
+      "word": "the",
+      "start": 1.20,
+      "end": 1.28,
+      "probability": 0.999
+    },
+    {
+      "word": "latter",
+      "start": 1.28,
+      "end": 1.52,
+      "probability": 0.989
+    },
+    {
+      "word": "only",
+      "start": 1.52,
+      "end": 1.84,
+      "probability": 0.910
+    },
+    {
+      "word": "lingered",
+      "start": 1.84,
+      "end": 2.24,
+      "probability": 0.998
+    },
+    {
+      "word": "about",
+      "start": 2.24,
+      "end": 2.48,
+      "probability": 0.993
+    },
+    {
+      "word": "the",
+      "start": 2.48,
+      "end": 2.64,
+      "probability": 0.999
+    },
+    {
+      "word": "door",
+      "start": 2.64,
+      "end": 2.80,
+      "probability": 1.000
+    },
+    {
+      "word": "of",
+      "start": 2.80,
+      "end": 3.04,
+      "probability": 0.991
+    },
+    {
+      "word": "the",
+      "start": 3.04,
+      "end": 3.12,
+      "probability": 0.997
+    },
+    {
+      "word": "prison",
+      "start": 3.12,
+      "end": 3.44,
+      "probability": 0.973
+    },
+    {
+      "word": "of",
+      "start": 3.44,
+      "end": 3.52,
+      "probability": 0.994
+    },
+    {
+      "word": "Uncas,",
+      "start": 3.52,
+      "end": 3.92,
+      "probability": 0.880
+    },
+    {
+      "word": "wary",
+      "start": 4.16,
+      "end": 4.48,
+      "probability": 0.730
+    },
+    {
+      "word": "but",
+      "start": 4.48,
+      "end": 4.72,
+      "probability": 0.669
+    },
+    {
+      "word": "close",
+      "start": 4.72,
+      "end": 5.04,
+      "probability": 0.993
+    },
+    {
+      "word": "observers",
+      "start": 5.04,
+      "end": 5.68,
+      "probability": 0.997
+    },
+    {
+      "word": "of",
+      "start": 5.68,
+      "end": 5.84,
+      "probability": 0.993
+    },
+    {
+      "word": "the",
+      "start": 5.84,
+      "end": 6.00,
+      "probability": 0.999
+    },
+    {
+      "word": "manner",
+      "start": 6.00,
+      "end": 6.32,
+      "probability": 0.926
+    },
+    {
+      "word": "of",
+      "start": 6.32,
+      "end": 6.40,
+      "probability": 0.998
+    },
+    {
+      "word": "their",
+      "start": 6.40,
+      "end": 6.56,
+      "probability": 0.996
+    },
+    {
+      "word": "captive.",
+      "start": 6.56,
+      "end": 7.04,
+      "probability": 0.998
+    }
+  ]
+}

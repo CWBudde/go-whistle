@@ -263,27 +263,80 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 
 ---
 
-## Phase 0 — Bootstrap
+## Phase 0 — Bootstrap — ✅ DONE (2026-10-09)
 
 - [x] Repo, `go.mod`, `justfile`, `treefmt.toml`, `.golangci.yml`, `AGENTS.md`, `PLAN.md`
-- [ ] GitHub Actions: `just ci` on linux/amd64 and macos/arm64. Model-dependent tests skip when `models/` is absent.
-- [ ] `internal/hub`: a minimal pure-Go Hugging Face downloader. It resolves `revision`, resumes downloads, verifies
+- [x] GitHub Actions: `just ci` on linux/amd64 and macos/arm64. Model-dependent tests skip when `models/` is absent.
+      (2026-10-09) — `.github/workflows/ci.yml` (initially an ubuntu-latest + macos-latest matrix, treefmt 2.6.0,
+      golangci-lint 2.13.2) and a doc-only `whistle` package, without which `go test`/`golangci-lint` fail on an empty
+      module. First run on `CWBudde/go-whistle` PR #1 (run 37953639555): both jobs green, macos 1m37s, ubuntu 1m41s.
+      macOS was then dropped: CI runs ubuntu-latest only, because macOS minutes bill at 10x on a private repo and the
+      arm64 assembly copied from go-pocket-tts is built and tested there.
+- [x] `internal/hub`: a minimal pure-Go Hugging Face downloader. It resolves `revision`, resumes downloads, verifies
       SHA-256 against a committed `models/manifest.lock.json`, and honours `HF_TOKEN`/`HF_HUB_OFFLINE`. Pin
       `whistle.cact`, `checkpoints/whistle.safetensors` and `config.json` at `b358ddad`.
-- [ ] `whistle download` command, with the local layout `models/whistle/{whistle.cact, whistle.safetensors, config.json}`
-- [ ] `scripts/fetch-engine.sh`: fetch the platform `needle` binary and `libneedle3` from `Cactus-Compute/needle3` into
+      (2026-10-09) — the manifest lives in `internal/hub/manifest.lock.json`, embedded with `go:embed`, rather than in
+      `models/manifest.lock.json`: `models/` is git-ignored and an installed binary has no checkout to read from.
+      `b358ddad` is pinned as `b358ddadd89b7a713b5aa131f23032d3cca1b251`; `config.json` is
+      `ac2dbcb9…a3d43` (603 B). `Download` re-resolves the pin, skips verified files, resumes from `<local>.part`
+      via `Range` (206 append, 200 restart, 416 re-verify), and checks size + SHA-256 before the rename.
+      `HF_ENDPOINT` is honoured too. httptest suite plus opt-in `WHISTLE_HUB_LIVE=1` test. Against real HF: all three
+      files verified, and a `.part` truncated to 100 MB resumed to the right `whistle.safetensors` digest.
+- [x] `whistle download` command, with the local layout `models/whistle/{whistle.cact, whistle.safetensors, config.json}`
+      (2026-10-09) — `cmd/whistle` (cobra v1.10.2): `whistle download [--dir models/whistle] [--offline]` drives
+      `hub.Pinned()` + `Client.Download`. Progress goes to stderr, and one `whistle b358ddad ready in <dir>` line goes
+      to stdout. `HF_TOKEN` comes from the environment only (no flag), and `--offline` is OR'd with `HF_HUB_OFFLINE`.
+      Ctrl-C cancels the download and keeps the `.part` file for resume. Tests cover the flags, the pinned layout, a
+      download from a fake Hub, and offline failure without a request. Real run: a fresh download in 22 s with all
+      three digests verified; the re-run and `--offline` only verify.
+- [x] `scripts/fetch-engine.sh`: fetch the platform `needle` binary and `libneedle3` from `Cactus-Compute/needle3` into
       `engine/<platform>/`. Set `NEEDLE_TELEMETRY=0` and `DO_NOT_TRACK=1` for every oracle run.
-- [ ] Snapshot upstream into `original/needle` at `af2654dffa` and set up `uv` (`jax`, `flax`, `safetensors`,
+      (2026-10-09) — `just fetch-engine [--platform …]` for macos-arm64, linux-x86_64 and linux-arm64, pinned to HF
+      revision `2ae11323dc` with a SHA-256 for every file. `libneedle3.{dylib,so}` ships only inside
+      `python/cactus_needle-3.2.0-py3-none-<tag>.whl`, so the script extracts it from there: upstream's `<platform>/`
+      dirs on HF hold only `needle`, the static `libneedle.a` (not fetched) and `needle.h`. `engine/<platform>/` ends
+      up with `needle`, `needle.h`, the wheel, the extracted `libneedle3.{dylib,so}` and a `PIN` file. The CLI has no
+      `--version` and no version string; its upload (`80896a6582`, 2026-10-05) has the same date as the 3.2.0 wheel.
+      Only macos-arm64 was run here.
+- [x] Snapshot upstream into `original/needle` at `af2654dffa` and set up `uv` (`jax`, `flax`, `safetensors`,
       `sentencepiece`, `numpy`) for `scripts/`
-- [ ] `tools/oracle` (build tag `oracle`): run `needle --model … --audio clip.wav --audio-word-timestamps` and
+      (2026-10-09) — `just fetch-upstream` (shallow fetch of the pinned commit, idempotent, HEAD verified);
+      `scripts/pyproject.toml` + `uv.lock` (Python 3.12; resolved jax 0.11.2, flax 0.12.10, numpy 2.5.3).
+- [x] `tools/oracle` (build tag `oracle`): run `needle --model … --audio clip.wav --audio-word-timestamps` and
       `needle_embed`, and write `testdata/oracle/<clip>.{json,embed.safetensors}`.
       **Accept:** fixtures exist for at least 20 English and 2 clips per other language.
+      (2026-10-09) — `just oracle-clips` stream-reads the tarballs and closes them once enough clips are found:
+      LibriSpeech test-clean/test-other from openslr (FLAC decoded with `mewkiz/flac`) and FLEURS `test.tar.gz` at
+      `70bb2e84b9`. It commits 32 clips of 2–8 s as 16-bit WAV (5.5 MB) in `testdata/audio`, with `manifest.json`
+      (archive, member, transcript, sha256) and `ATTRIBUTION.md` (CC BY 4.0). The selection is deterministic:
+      10 clips per LibriSpeech split from 10 speakers (≤ 2 each), and 2 different sentences per de/fr/es/it/nl/pl.
+      `just oracle-run` runs the CLI and gets `needle_embed` from `libneedle3` through purego. It writes
+      `<id>.json` (timing fields dropped) and `<id>.embed.safetensors` (F32 `[frames, 512]`), plus `manifest.json`
+      with the engine and model pins (4.6 MB in total). Count: en 20, de/fr/es/it/nl/pl 2 each. Detected language
+      32/32. A re-run is byte-identical. Embed shape and CLI output are in `docs/FINDINGS.md` F-001/F-002.
+      `testdata/{audio,oracle}` are excluded from treefmt. Only macos-arm64 has been run.
 
 ## Phase 1 — Weights & tokenizer
 
-- [ ] Copy `internal/safetensors` from go-pocket-tts. Parse `__metadata__` `config` and `run` into a typed `Config`.
-- [ ] `internal/cact`: the header (196 B, tag check, all fields), the 28 codebook floats, the 44-byte records, 64-byte
-      aligned blobs, and readers for FP32, FP16 and RAW.
+- [x] Copy `internal/safetensors` from go-pocket-tts. Parse `__metadata__` `config` and `run` into a typed `Config`.
+      (2026-10-09) — copied from go-pocket-tts `9faba38` (Store with F32/F16/BF16/I64 decode and key remapping,
+      `EncodeTensors`/`WriteFile`, `LoadFirstTensor`, plus tests), without the voice-state and Mimi helpers.
+      `Store.Metadata()` exposes the `__metadata__` string map, and non-string values are rejected.
+      `EncodeTensorsWithMetadata` writes one. `Store.Config()` and `Store.Run()` decode strictly: unknown and missing
+      keys are errors, and the training-only keys are kept so the decode is lossless. `Store.Step()` reads the
+      training step. The model-gated `TestWhistleCheckpoint` pins `whistle.safetensors`: 116 F32 tensors, 55,151,433
+      parameters, `embedding/embedding` `[8199, 512]`, `Config` equal to the reference card, `Run` = qapt/kv 8/act 8,
+      and step 25000. Loading still reads the whole file; mmap belongs to `internal/weights`.
+- [x] `internal/cact`: the header (196 B, tag check, all fields), the 28 codebook floats, the 44-byte records, 64-byte
+      aligned blobs, and readers for FP32, FP16 and RAW. (2026-10-09) — `Parse`/`Open` decode the 49-field `Header`
+      and every `Record` with `binary.Decode` and validate the whole directory up front: tag, codebook length, engram
+      order/site counts, pad, ndim and trailing dims, 64-byte alignment, blob order/overlap/EOF, and nbytes per dtype
+      (CQ per `_packed_row_bytes`, ternary included), with overflow-checked sizes. `Codebook(2|3|4)`, `FP32`, `FP16`
+      (FP16 widening copied from `internal/safetensors`), `Float32` and `Raw`; the wrong dtype yields `ErrDType`.
+      Unit tests use a Go encoder that mirrors `_pack_cact`. The model-gated `TestWhistleCact` pins the full header,
+      all 28 codebook floats, the record histogram (FP16 524, FP32 4, CQ2 145, CQ4 7, RAW 1), records 0/226/227/237/
+      679/680, the audio manifest and the 8199-piece tokenizer blob; `TestWhistleCactMatchesConfig` maps the header
+      onto the safetensors config (`docs/FINDINGS.md` F-003).
 - [ ] CQ dequant: the LSB-first bitstream unpack for 2/3/4 bits, the per-group FP16 norm and FWHT-128 (normalised).
       Unit-test it against a tiny tensor packed by a Go port of `export.py` `_cq_pack`.
 - [ ] Tensor name map (index → safetensors name). **Accept:** `scripts/compare_cact.py` (or a Go test) reports a cosine
