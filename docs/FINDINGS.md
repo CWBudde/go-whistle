@@ -325,6 +325,160 @@ The test runs in about 1.5 s; `RequantCQ` uses an FWHT and is pinned to the matr
 safetensors-only load can therefore rebuild the deployment numerics exactly; the derived records need only the
 permutation port and the mel recomputation, both in `internal/cact`'s tests.
 
+## F-007 — One lookup over both formats: interface, derived records, cache and mmap (2026-10-09)
+
+**Question.** Model code must read Whistle's tensors the same way from the deployed `.cact` (CQ2/CQ4, FP16) and from
+the float32 safetensors checkpoint, which Phase 2 uses as its reference. What does the safetensors side serve for the
+five records that have no source (F-006)? What does the cache keep, and for how long? How is the file held, and what
+may a caller keep after `Close`?
+
+**Interface.** `internal/weights` `Source`: `Names`, `Has`, `Shape`, `Tensor(name) ([]float32, []int, error)`, `Raw`
+(byte blobs), `Config`, `Release` and `Close`. `Cact` and `Safetensors` implement it, and `Open` picks one by the `.cact`
+tag. Names are F-006's (`cact.WhistleNames`, or any map passed in `Options.Names`), so model code never sees record
+indices or Flax paths. Both backends return the `.cact` layout: `(out, in)` kernels, a layer slice per block, and
+lane-major mHC φ. The safetensors side gets there through `Entry.Apply`. At open time, each backend checks every
+entry's shape: against its record (`.cact`) or against its source's header shape (safetensors). A wrong map therefore
+fails at once, not on first use, and the check reads no tensor data. `safetensors.Store` gained `Shape(name)` for this.
+
+**Config.** `weights.Config` holds the inference geometry that both formats state, mapped as in F-003. For `.cact` it
+comes from the header plus the audio manifest; the manifest needs the magic and version 1, as the engine does. For
+safetensors it comes from the config, where `Vocab` = `text` + 7, `HadaN` = the next power of two of `dim`, and `Tables`
+= `len(orders)` × `hashes`. The checkpoint config has no head count. `Heads` is the row count of `layer00.q_proj` over
+`qk_dim` (384 / 48 = 8), checked against the source shape at open time. It equals the header's `num_heads`. Left out:
+the token ids (the tokenizer holds them), the KV width (run metadata) and the training keys. Both backends return
+identical `Config` values for Whistle.
+
+**Derived records.** The candidates:
+
+| option                                       | `hada_p*`, mel bank, manifest                         | tokenizer                   |
+| -------------------------------------------- | ----------------------------------------------------- | --------------------------- |
+| recompute in Go                              | exact: F-006 showed each is a function of the config  | impossible: data, no config |
+| typed "not available from this format" error | Phase 2 and 3 would need a `.cact` for a float32 load | honest                      |
+| read the records from a `.cact` beside it    | a hidden second-file dependency                       | same                        |
+
+Winner: the safetensors backend recomputes the permutations (numpy MT19937), the Slaney mel bank (float64, rounded
+once) and the manifest. For the tokenizer, `Raw` returns `ErrUnavailable`, and so does `Tensor` for any derived name it
+cannot recompute. The recomputations moved from `internal/cact`'s tests to `internal/cact/derived.go`. They sit beside
+`WhistleNames`, which defines those records, and stay in a leaf package that the later `needle` and `frontend` packages
+can import without a cycle. On Whistle, all four recomputed records equal the `.cact` ones bit for bit.
+
+**Cache.** The candidates:
+
+- No cache. Every call decodes again; the CQ4 embedding alone takes 15–18 ms to dequantise.
+- A bounded LRU. A model keeps every tensor it loads, so evicting one frees nothing while the model holds it.
+- Unbounded until `Release(name)` or `Close`. **Winner.**
+
+The cached slice is the very slice the model keeps, so while the model lives the cache costs no extra memory. `Release`
+lets code that repacks a tensor (the Phase 9 LUT GEMV) drop the float32 copy. Callers therefore share one slice, which
+they must not modify. A per-name `sync.Once` makes concurrent first calls decode once. An `RWMutex` lets `Close` wait for
+decodes in flight. A decode error stays cached until `Release`. Measured on an Apple M5 Pro: a cached hit takes under
+1 µs. The whole model decodes to 221 MB of float32 in either format, in 0.12–0.14 s from `.cact` and 0.21 s from
+safetensors.
+
+**mmap.** Unix (`//go:build unix`) maps the file read-only and shared with `syscall.Mmap`. Cross-vetting showed
+`syscall.Mmap` builds for linux, darwin, the BSDs, solaris/illumos, aix and android. Elsewhere (windows, js/wasm,
+wasip1, plan9), `mmap_nommap.go` reads the file with `os.ReadFile`. Windows mapping through `CreateFileMapping` is left
+for when it is needed. Empty files, and files the system refuses to map, are read too; `Options.NoMmap` forces the read.
+
+| file (M5 Pro)         | open, mapped | heap after open | open, read | heap after open |
+| --------------------- | ------------ | --------------- | ---------- | --------------- |
+| `whistle.cact`        | 0.4 ms       | +0.1 MB         | 1.6 ms     | +17 MB          |
+| `whistle.safetensors` | 0.6 ms       | +0.2 MB         | 12–23 ms   | +221 MB         |
+
+Decoding everything from the read safetensors file holds 442 MB on the heap, against 221 MB when mapped.
+
+**Aliasing rule.** Nothing handed out aliases the file data. The `.cact` readers allocate (FP16/FP32 widening, CQ
+dequantisation, and `Raw`, which clones). `Store.Tensor` decodes into a new slice and `Apply` copies. Names, metadata
+and the config are copied when the JSON header is decoded. `Close` drops the cache and unmaps; afterwards `Tensor` and
+`Raw` return `ErrClosed`, while every slice handed out stays valid. A test checks that no returned slice lies inside the
+mapping's address range, and reads every slice again after the unmap. Caveat, as for any mmap reader: truncating the
+file under an open source faults the process.
+
+**Cross-format check.** `TestWhistleCrossFormat` covers all 681 names. Shapes are equal for every name and both
+`Config` values are equal. The 4 recomputed records are bit-equal. All 524 FP16 records lie within half an FP16 ulp of
+their source and meet F-006's rounding bound. For CQ, the minimum cosine per type equals F-006's to 1e-9: FP16
+0.999999963923, CQ2 0.931853685259 and CQ4 0.994312193718. Each backend also equals its format's plain reader bit for
+bit (`cact.File`; `Store.Tensor` + `Entry.Apply`), so `TestWhistleNameMap`'s per-record CQ thresholds carry over. The
+test runs in 0.8 s. Gap: this package checks CQ records against F-006's per-width floor, not against a per-record
+requantisation, because the `_cq_pack` port lives in `internal/cact`'s test files.
+
+## F-008 — `internal/tensor` and `internal/ops` copied from go-pocket-tts (2026-10-10)
+
+Nothing here is reverse-engineered. This entry records the copy source, what was kept and dropped, the fallback build
+tag and the tolerances, so later kernel work can tell copied behaviour from go-whistle decisions.
+
+**Source.** `github.com/cwbudde/go-pocket-tts` `internal/runtime/tensor` and `internal/runtime/ops` at `9faba38`.
+Every copied file starts with a comment that names its source file and commit, plus a `Change:` line when the file
+differs. Only the import paths changed in the other files. Fixes can therefore be ported in either direction.
+
+**Kept and dropped.**
+
+| what                                                         | verdict | reason                                                                                                                                       |
+| ------------------------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Tensor`, broadcast, `Narrow`/`Gather`/`Transpose`/`Concat`  | kept    | the generic base; `Gather` is the embedding lookup                                                                                           |
+| `MatMulTransB` (NEON), `DotProduct`, `Axpy` (NEON, AVX2+FMA) | kept    | every linear, attention and conv in Phases 2–5 rests on them                                                                                 |
+| `Linear`, `MatMul`, `Softmax`                                | kept    | projections, scores, the language softmax                                                                                                    |
+| `Attention`, `CausalMask`                                    | kept    | causal with an offset (decoder plus KV cache) and none (encoder, cross-attention)                                                            |
+| `RoPE`                                                       | kept    | but see the RoPE gap below                                                                                                                   |
+| `Conv1D`, `Conv1DLeftPad`, conv worker pool, scratch pool    | kept    | depthwise kernel 9 in the encoder; left padding is the causal form of the Engram taps                                                        |
+| `LayerNorm`                                                  | dropped | every Needle 3 norm is a ZCRMSNorm (scale only, no mean, no bias); the next item builds it                                                   |
+| `MLP` (linear → SiLU → linear)                               | dropped | FlowLM's FFN; Whistle's FFNs are `HadamardMLP`, which brings its own SiLU                                                                    |
+| `AttentionWithPositions`, `AttentionNoContext`               | dropped | Pocket-TTS streaming mask (absolute positions, ring-buffer keys, context window); Whistle re-runs ~1 s chunks and needs only causal + offset |
+| `ConvTranspose1D` and its prepacked variants                 | dropped | Mimi decoder upsampling; Whistle has no transposed conv                                                                                      |
+| `PERFORMANCE.md`, FlowLM/Mimi benchmarks                     | dropped | the benchmarks now use Whistle shapes (375 frames, 8 heads of 48/64, depthwise k 9)                                                          |
+
+**Fallback build tag.** In the source, the fallbacks were selected by architecture alone, so on arm64 and amd64 no
+build could run them. Alternatives: keep that and test only through `*Generic` calls, or add a tag. A custom `noasm`
+tag was rejected in favour of `purego`, the tag the standard library's `crypto` packages and `x/crypto` use for
+this. The asm files now require `<arch> && !purego`, and `dot_noasm.go`, `axpy_noasm.go` (was `axpy_noamd64.go`) and
+`gemm_noasm.go` (was `gemm_noarm64.go`) require `(!amd64 && !arm64) || purego` (gemm: `!arm64 || purego`).
+`go test -tags purego` runs the pure-Go code anywhere.
+
+**Assembly vs fallback.** The six routines are `dotF32NEON`, `axpyF32NEON`, `gemm4x4NEON`, `gemm1x4NEON` (arm64), plus
+`dotF32AVX2` and `axpyF32AVX2` (amd64, only with AVX2 and FMA, detected via `golang.org/x/sys/cpu`). amd64 has no GEMM
+kernel: `MatMulTransB` is the dot loop there. The copied tests check the public functions against float64 references.
+None compared a kernel with its fallback, so `internal/tensor/asm_test.go` does that, for lengths 0–129, 255–257,
+1023/1024 and 4099 at offsets 0–3:
+
+- `dotF32` vs `dotF32Generic`: |Δ| ≤ 2(n+1)·2⁻²⁴·Σ|aᵢbᵢ|, two float32 summation bounds, since the orders differ.
+- `axpyF32` vs `axpyF32Generic`: |Δ| ≤ 2·2⁻²⁴·(|αxᵢ| + |yᵢ| + |result|), one fused vs separate multiply-add. The
+  slack after n stays untouched.
+- `matMulTransB` vs `matMulTransBGeneric`: the dot bound per element over 13 k values × 8 (m, n) shapes. The row gaps of
+  a wider `ldc` stay untouched.
+
+Run on arm64 (Apple M5 Pro, native) and on linux/amd64 under Docker Desktop's emulation, where `useAVX2FMA` was
+`true`. That host has no Rosetta, so `GOARCH=amd64 go test` cannot run natively. All pass in both tag variants. On an
+amd64 CPU without AVX2, or with `purego`, both sides are the fallback and the tests pass trivially.
+
+**Tolerances.** `ops.KernelTolerances` keeps go-pocket-tts' values: 1e-4 abs/rel for matmul, linear and softmax, 0 for
+causal_mask, and 2e-4 for rope, attention and conv1d. The entries for the dropped kernels (`layer_norm`, `mlp`,
+`convtranspose1d`) are gone. `TestKernelTolerancesPinned` pins the map, so any change must come back here. These were
+ONNX parity targets in go-pocket-tts. Nothing in go-whistle uses them yet. They are kernel-level and looser than the
+Phase 2 block acceptance (1e-5 max abs, cosine ≥ 0.99999), which the `needle_fixtures` item enforces on its own.
+
+**Gaps for later items.**
+
+- **RoPE.** `ops.RoPE` rotates _interleaved_ pairs (x₂ⱼ, x₂ⱼ₊₁) with caller-supplied cos/sin tables `[max_seq, dim/2]`.
+  θ is therefore whatever the caller's tables use; there is no θ parameter and no table builder. Needle 3 uses the
+  _half-split_ layout (xⱼ, xⱼ₊₄₈/₂): x1·cos − x2·sin, x2·cos + x1·sin with freqs = 1/θ^(arange(0, hd, 2)/hd), θ = 1e5,
+  hd = 48. Follow-up for the `Attention` item: a half-split variant and a table builder for θ.
+- **GQA.** `Attention` needs q, k and v with equal head counts. Whistle's 8:2 self-attention needs either repeated k/v
+  heads or a head map (kv head = h / 4) in `attention4D`. The scale is 1/√(q depth) = 1/√48, as Needle's is, and v may
+  be wider than q (64 vs 48).
+- **Depthwise convs.** The encoder's kernel-9 depthwise conv is `Conv1D` with groups = channels. That takes the scalar
+  `conv1DGrouped` loop (1.08 ms for 512 × 375 on the M5 Pro), which is correct but not vectorised. The 2-D stem will
+  need a `Conv2D` over (time, mel) with per-axis stride (2, 2), SAME or VALID padding (the Phase 4 hypotheses), groups 1
+  for `stem/w` (1 → 128) and groups 128 for `stem/dw_{1,2}`, with Flax HWIO kernels `[3, 3, 1, 128]`. The pointwise
+  stages are `Linear`. Not built here.
+- **Linear.** `tensor.Linear` runs one `dotF32` per output and does not use `MatMulTransB`'s 4×4 blocks (4.8 ms for the
+  375 × 512 → 384 `q_proj`). Routing it through the GEMM is Phase 9 work.
+
+**Other changes.** `TestSetConvWorkersClamp` passed `maxInt32 + 123`, which overflows a 32-bit `int`, so the package
+did not build on 386 or arm. It now passes the largest `int`. Lint: the copied `//nolint` comments did not cover
+every finding, because go-pocket-tts excluded `cyclop`/`gocognit` by path (`internal/runtime/`). Five functions (three
+kernels, `MatMul` and `prepareConv1D`) gained narrowly scoped `cyclop` or `gocognit` nolints with reasons;
+`.golangci.yml` is unchanged.
+
 ## F-009 — Needle 3 block fixtures from the Flax modules (2026-10-10)
 
 **Question.** Can upstream's Flax modules (`architecture.py` @ `af2654dffa`) run as-is with Whistle's safetensors

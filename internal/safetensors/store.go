@@ -223,6 +223,16 @@ func (s *Store) Has(name string) bool {
 	return ok
 }
 
+// Shape returns a tensor's shape from the header, without decoding its data.
+func (s *Store) Shape(name string) ([]int64, error) {
+	entry, ok := s.entries[name]
+	if !ok {
+		return nil, fmt.Errorf("safetensors: tensor %q not found (available: %s)", name, summarizeNames(s.names))
+	}
+
+	return append([]int64(nil), entry.Shape...), nil
+}
+
 func (s *Store) Tensor(name string) (*Tensor, error) {
 	entry, ok := s.entries[name]
 	if !ok {
