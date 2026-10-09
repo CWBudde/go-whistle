@@ -323,8 +323,16 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       training step. The model-gated `TestWhistleCheckpoint` pins `whistle.safetensors`: 116 F32 tensors, 55,151,433
       parameters, `embedding/embedding` `[8199, 512]`, `Config` equal to the reference card, `Run` = qapt/kv 8/act 8,
       and step 25000. Loading still reads the whole file; mmap belongs to `internal/weights`.
-- [ ] `internal/cact`: the header (196 B, tag check, all fields), the 28 codebook floats, the 44-byte records, 64-byte
-      aligned blobs, and readers for FP32, FP16 and RAW.
+- [x] `internal/cact`: the header (196 B, tag check, all fields), the 28 codebook floats, the 44-byte records, 64-byte
+      aligned blobs, and readers for FP32, FP16 and RAW. (2026-10-09) — `Parse`/`Open` decode the 49-field `Header`
+      and every `Record` with `binary.Decode` and validate the whole directory up front: tag, codebook length, engram
+      order/site counts, pad, ndim and trailing dims, 64-byte alignment, blob order/overlap/EOF, and nbytes per dtype
+      (CQ per `_packed_row_bytes`, ternary included), with overflow-checked sizes. `Codebook(2|3|4)`, `FP32`, `FP16`
+      (FP16 widening copied from `internal/safetensors`), `Float32` and `Raw`; the wrong dtype yields `ErrDType`.
+      Unit tests use a Go encoder that mirrors `_pack_cact`. The model-gated `TestWhistleCact` pins the full header,
+      all 28 codebook floats, the record histogram (FP16 524, FP32 4, CQ2 145, CQ4 7, RAW 1), records 0/226/227/237/
+      679/680, the audio manifest and the 8199-piece tokenizer blob; `TestWhistleCactMatchesConfig` maps the header
+      onto the safetensors config (`docs/FINDINGS.md` F-003).
 - [ ] CQ dequant: the LSB-first bitstream unpack for 2/3/4 bits, the per-group FP16 norm and FWHT-128 (normalised).
       Unit-test it against a tiny tensor packed by a Go port of `export.py` `_cq_pack`.
 - [ ] Tensor name map (index → safetensors name). **Accept:** `scripts/compare_cact.py` (or a Go test) reports a cosine
