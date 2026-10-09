@@ -45,6 +45,10 @@ ci: check-formatted test lint check-tidy
 fetch-engine *args:
     scripts/fetch-engine.sh {{args}}
 
+# Snapshot upstream cactus-compute/needle at the pinned commit into original/needle
+fetch-upstream:
+    scripts/fetch-upstream.sh
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html

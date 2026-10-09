@@ -14,3 +14,6 @@ bin/
 coverage.out
 coverage.html
 *.prof
+
+# uv virtualenvs (scripts/)
+.venv/

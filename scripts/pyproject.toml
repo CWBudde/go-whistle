@@ -1,0 +1,19 @@
+# Python helpers for go-whistle (fixtures, safetensors <-> .cact comparison, WER evaluation).
+# Never a runtime dependency of the Go module. Run with: uv run --project scripts python scripts/<tool>.py
+[project]
+name = "go-whistle-scripts"
+version = "0.0.0"
+description = "Reference fixtures and evaluation tooling for go-whistle"
+requires-python = ">=3.12"
+# Mirrors the `train` extra of cactus-compute/needle at af2654dffa (minus optax, which only training needs).
+dependencies = [
+  "numpy",
+  "jax",
+  "jaxlib",
+  "flax>=0.10.2",
+  "safetensors",
+  "sentencepiece",
+]
+
+[tool.uv]
+package = false
