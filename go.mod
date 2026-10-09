@@ -6,6 +6,7 @@ require (
 	github.com/ebitengine/purego v0.11.1
 	github.com/mewkiz/flac v1.0.14
 	github.com/spf13/cobra v1.10.2
+	golang.org/x/sys v0.40.0
 )
 
 require (
