@@ -521,11 +521,37 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       29–121 ms (soxr 0.5–2 ms). The presets lose 1.7–5.9 dB at 7 kHz, and length 64 lets 8.1 kHz alias at −29 dB.
       Rates with `down` > 16384 (e.g. 47999 Hz) use algo-dsp's ratio approximation; rates below 1 kHz are rejected
       (F-010).
-- [ ] STFT: 400-sample window zero-padded to 512, hop 160 → 257 bins → power → mel from `.cact` tensor 679.
-- [ ] Hypothesis set for what the docs leave open: window (Hann periodic or symmetric), centre padding (reflect, zero
+- [x] STFT: 400-sample window zero-padded to 512, hop 160 → 257 bins → power → mel from `.cact` tensor 679.
+      (2026-10-10) — `internal/frontend` `New(bank, Options)` → `Spectrogram`/`LogMel` (`[frames, 80]`, time × mel).
+      Framing runs on algo-dsp `dsp/stft` `STFT32` with a 512-long custom window holding the `dsp/window` Hann at offset
+      56 (centred, frame i over `[160i − 200, 160i + 200)`) or 96 in frame i+1 (`none`, over `[160i, 160i + 400)`;
+      algo-dsp's own `PadNone` would lose the last frame). Power in float64 from the complex64 bins; the mel product
+      accumulates in float64 over each channel's non-zero bins. `LoadMelBank` reads `audio.mel_filters` `(257, 80)`
+      from a `weights.Source`; the model-gated `TestMelBankBackends` finds `.cact` and safetensors bit-identical to each
+      other and to `cact.SlaneyMel`. Verified for 2 windows × 3 paddings against a float64 direct DFT (max |Δ|/peak
+      ≤ 3.2·10⁻⁷, max relative error ≤ 4.7·10⁻⁵ in bins within 60 dB of the frame peak) and a numpy `rfft` fixture
+      (`just mel-fixture` → `testdata/frontend/stft.safetensors`, 183 KB, byte-identical reruns; ≤ 2.5·10⁻⁷ and
+      ≤ 3.7·10⁻⁵), pinned at 1e-6 / 2e-4. Frame counts: centred `n/160` rounded down (3000 for 30 s), `none`
+      `1 + (n − 400)/160` (2998). Discovery: three round-up stride-2 halvings of `floor(n/160)` reproduce
+      `needle_embed`'s length for all 32 corpus clips and F-001's seven lengths (39/39); `ceil(n/160)`, `n/160 + 1` and
+      the `none` count do not. F-001's `(n + 640)/1280` misses 7 corpus clips and is corrected. Smoke test: all 32
+      clips finite at `[n/160, 80]` under three hypotheses; 30 s takes about 5 ms. Reflect padding needs more than 256
+      samples (`ErrTooShort`), below the engine's 640-sample minimum for one frame (`docs/FINDINGS.md` F-012).
+- [x] Hypothesis set for what the docs leave open: window (Hann periodic or symmetric), centre padding (reflect, zero
       or none), power or magnitude, log flavour (`ln`, `log10`, `log(x + eps)` or `clamp` à la Whisper),
       normalisation (per mel channel over time, global, or none) and the "250–3500 Hz band-limit". Resolve them in Phase 4
       against the encoder oracle, because no mel-level oracle exists.
+      (2026-10-10) — set implemented and tested; **the resolution stays open for Phase 4**. `frontend.Options` has one
+      typed enum per axis (zero value invalid, no default): `Window`, `Padding`, `Spectrum`, `Log` (`ln(max(x, 1e-10))`,
+      `log10`, `ln(x + 2⁻²⁴)`, Whisper's `max(y, max(y) − 8)` then `(y + 4)/4`), `Norm` (`(x − mean)/(std + 1e-5)`,
+      n−1 std, per channel or global), `Band` (`full`; `bins`: FFT bins outside [250, 3500] Hz zeroed before the bank,
+      an ideal pre-filter; `channels`: mel channels with centres outside zeroed, 6–58 stay) and `Preemphasis` (none or
+      0.97). Pre-emphasis was added because NeMo's Conformer preprocessor matches every published constant
+      (512/400/160, Slaney mels with Slaney norm, dither 1e-5, "normalised per channel"); presets `NeMo()` and
+      `Whisper()`. `Variants()` gives all 864 combinations in a stable order, with `String`/`ParseOptions` keys. A unit
+      test per axis shows each value doing what it says; all 864 run finite on a real clip. Not implemented: a bank
+      re-derived over 250–3500 Hz (the shipped bank is full band) and a time-domain band-pass (no stated shape)
+      (`docs/FINDINGS.md` F-012).
 
 ## Phase 4 — Encoder (reverse engineering)
 

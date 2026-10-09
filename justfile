@@ -69,6 +69,10 @@ needle-fixtures *args:
 resample-fixture *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/resample_fixture.py {{args}}
 
+# Regenerate the numpy STFT fixture for internal/frontend (testdata/frontend)
+mel-fixture *args:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/mel_fixture.py {{args}}
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
