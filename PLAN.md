@@ -316,7 +316,7 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       32/32. A re-run is byte-identical. Embed shape and CLI output are in `docs/FINDINGS.md` F-001/F-002.
       `testdata/{audio,oracle}` are excluded from treefmt. Only macos-arm64 has been run.
 
-## Phase 1 — Weights & tokenizer
+## Phase 1 — Weights & tokenizer — ✅ DONE (2026-10-09)
 
 - [x] Copy `internal/safetensors` from go-pocket-tts. Parse `__metadata__` `config` and `run` into a typed `Config`.
       (2026-10-09) — copied from go-pocket-tts `9faba38` (Store with F32/F16/BF16/I64 decode and key remapping,
@@ -382,7 +382,32 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       floor, since 143/145 CQ2 fall below it (0.9319–0.9401), so the "≥ 0.95 for CQ2" expectation above was wrong.
       The `.cact` file holds nothing beyond the checkpoint, its config and two constants (`docs/FINDINGS.md` F-006).
       The RAW tokenizer has no cosine; its check is the parse plus the hash.
-- [ ] `internal/weights`: one lookup interface over both formats, with lazy dequant and an mmap where the platform allows it.
+- [x] `internal/weights`: one lookup interface over both formats, with lazy dequant and an mmap where the platform allows it.
+      **Accept** (set for this item): one interface with a `.cact` and a safetensors backend under the F-006 names;
+      equal shapes for every name, and a model-gated test comparing the backends for every name by the F-006
+      thresholds; nothing dequantised at open, CQ dequantised on first access, cached and safe for concurrent callers
+      (`-race`); a pure-Go mmap with an `os.ReadFile` fallback, both paths identical, `Close` unmaps, and nothing
+      handed out aliases the mapping; a tested decision for the derived records; unit tests on synthetic files.
+      (2026-10-09) — `weights.Source` (`Names`, `Has`, `Shape`, `Tensor(name) ([]float32, []int, error)`, `Raw`,
+      `Config`, `Release`, `Close`) is implemented by `Cact` and `Safetensors`, and `Open` picks one by the `.cact`
+      tag. The safetensors side applies `Entry.Apply`, so both return the `.cact` layout. Both check every entry's
+      shape at open time without reading tensor data; `safetensors.Store.Shape` was added for this. `weights.Config`
+      holds the geometry both formats state (F-003). The safetensors side derives `Heads` from `layer00.q_proj`, and
+      both configs are identical for Whistle. Cache: a per-name `sync.Once`, unbounded until `Release(name)` or
+      `Close`. The cached slice is the one the model keeps, so it costs nothing extra; callers share it read-only.
+      mmap: `syscall.Mmap` behind `//go:build unix`, with `os.ReadFile` in `mmap_nommap.go` (windows, js/wasm,
+      wasip1, plan9) and `Options.NoMmap` to force it. Opening `whistle.safetensors` takes 0.6 ms and +0.2 MB of heap
+      mapped, against 12–23 ms and +221 MB read. Derived records: the safetensors side recomputes `hada_p1/p2`, the
+      mel bank and the manifest; the recomputations moved to `internal/cact/derived.go`. The tokenizer is
+      `ErrUnavailable`, because the checkpoint has none and it is data, not a function of the config. The
+      model-gated `TestWhistleCrossFormat` covers all 681 names: shapes equal, derived records bit-equal, 524 FP16
+      records within half an ulp and above the rounding bound, and per-type minimum cosines equal to F-006 to 1e-9
+      (FP16 0.999999963923, CQ2 0.931853685259, CQ4 0.994312193718). Each backend also equals its plain reader bit
+      for bit, and `OpenCact` decodes 0 tensors. `TestWhistleMmapFallback` finds 680/680 tensors identical mapped and
+      read, per file. Unit tests on synthetic files of both formats cover laziness, 32 concurrent callers, `Release`,
+      close during decode, address-range aliasing and open errors. Gap: CQ records are checked against F-006's
+      per-width floor here; the per-record requantisation threshold stays in `TestWhistleNameMap`, which applies
+      because the backends equal the plain readers (`docs/FINDINGS.md` F-007).
 - [x] `internal/tokenizer`: load the pieces, scores and types from the RAW blob (format per `export.py`). Decode
       (control/unk skipped, byte fallback, `▁`→space) and `RefTokenizer` encode. **Accept:** round-trip on multilingual
       sample text; decode of known id sequences matches `sentencepiece` (fixture from `scripts/`).
