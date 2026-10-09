@@ -210,9 +210,9 @@ func (a *Attention) project(x []float32, t int, tr *attnTrace) (q, k, v []float3
 		return q, k, v
 	}
 
-	q = applyTaps(q, t, qW, a.qTaps, a.taps)
-	k = applyTaps(k, t, kW, a.kTaps, a.taps)
-	v = applyTaps(v, t, vW, a.vTaps, a.taps)
+	q = applyTaps(q, t, qW, a.qTaps, a.taps, 1)
+	k = applyTaps(k, t, kW, a.kTaps, a.taps, 1)
+	v = applyTaps(v, t, vW, a.vTaps, a.taps, 1)
 
 	if tr != nil {
 		tr.qTapped, tr.kTapped, tr.vTapped = slices.Clone(q), slices.Clone(k), slices.Clone(v)
@@ -302,20 +302,23 @@ func (a *Attention) attend(q, k, v []float32, t int, mask Mask, tr *attnTrace) [
 	return out
 }
 
-// applyTaps is the causal tap conv Σ_j taps[j] · shift_right(z, j) over t
-// rows of width values, summed in upstream's order j = 0, 1, …. Upstream
-// also multiplies each shifted term by the mask's j-th diagonal (tap_ok);
-// for the causal mask that is 1 wherever the shift is defined and the
-// shift fills zeros elsewhere, and without a mask there is no factor, so
-// neither changes the sum (docs/FINDINGS.md F-011).
-func applyTaps(z []float32, t, width int, taps []float32, n int) []float32 {
+// applyTaps is the causal tap conv Σ_j taps[j] · shift_right(z, d·j) over
+// t rows of width values, summed in upstream's order j = 0, 1, …, with
+// dilation d (1 for the attention taps, the largest n-gram order for
+// Engram's). Upstream also multiplies each shifted term by the mask's
+// (d·j)-th diagonal (tap_ok); for the causal mask that is 1 wherever the
+// shift is defined and the shift fills zeros elsewhere, and without a mask
+// there is no factor, so neither changes the sum (docs/FINDINGS.md F-011,
+// F-013).
+func applyTaps(z []float32, t, width int, taps []float32, n, dilation int) []float32 {
 	out := make([]float32, len(z))
 
 	for j := range n {
 		tap := taps[j*width : (j+1)*width]
+		s := dilation * j
 
-		for i := j; i < t; i++ {
-			dst, src := out[i*width:(i+1)*width], z[(i-j)*width:(i-j+1)*width]
+		for i := s; i < t; i++ {
+			dst, src := out[i*width:(i+1)*width], z[(i-s)*width:(i-s+1)*width]
 			for c, w := range tap {
 				dst[c] += w * src[c]
 			}
