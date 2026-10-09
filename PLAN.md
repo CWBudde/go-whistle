@@ -337,8 +337,25 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       all 28 codebook floats, the record histogram (FP16 524, FP32 4, CQ2 145, CQ4 7, RAW 1), records 0/226/227/237/
       679/680, the audio manifest and the 8199-piece tokenizer blob; `TestWhistleCactMatchesConfig` maps the header
       onto the safetensors config (`docs/FINDINGS.md` F-003).
-- [ ] CQ dequant: the LSB-first bitstream unpack for 2/3/4 bits, the per-group FP16 norm and FWHT-128 (normalised).
-      Unit-test it against a tiny tensor packed by a Go port of `export.py` `_cq_pack`.
+- [x] CQ dequant: the LSB-first bitstream unpack for 2/3/4 bits, the per-group FP16 norm and FWHT-128 (normalised).
+      Unit-test it against a tiny tensor packed by a Go port of `export.py` `_cq_pack`. (2026-10-09) — `File.CQ`
+      mirrors `_cq_unpack` and returns `[out][in]` without the padding columns. It does the LSB-first unpack (read in
+      8-index chunks), looks up the stored codebook, scales by the FP16 norm and runs an in-place float32 FWHT with
+      1/√group folded into the norm. Groups must be a power of two. 1-bit and ternary (record bits 5, crumbs 3/0/1 →
+      trits 0/1/2) are implemented as upstream does them, but they are only unit-tested because Whistle has none.
+      Crumb 2 and non-power-of-two groups are errors. Unit tests pin hand-computed bitstreams for 1–4 bits and one-hot
+      Sylvester rows. A float64 matrix reference checks `CQ` within the float32 bound γ(log2 g + 3)·Σ|x|/√g. The
+      `_cq_pack` port, generalised to every width, runs a round trip over 7 shapes (groups 8–128, `in` not a multiple
+      of the group, zero rows). Its per-group bound is n·‖levelBound‖ + |n − n16|·‖q‖ + fp32 slack, where
+      `levelBound` is half the codebook cell gap or the overshoot past an end level. The measured relative errors (0.60
+      / 0.34 / 0.17 / 0.09 for 1–4 bits) match Gaussian Lloyd-Max theory, and the bound catches a 5 % scale error.
+      The model-gated `TestWhistleCQ` dequantises all 145 CQ2 and 7 CQ4 tensors (finite, RMS 1e-3…10, max |w| 69.29).
+      It pins row norms and values of tensors 0, 2 and 671 against numpy `_cq_unpack` to 1e-5 of the row norm; the
+      measured gap is about 1e-8. `TestWhistleCQMatchesSafetensors` pins cos(`CQ(0)`, `embedding/embedding`) at
+      0.99537221, with a worst row of 0.98980336. Discovery: the header codebooks equal `_cq_codebook_np(b, 128)` bit
+      for bit, so the RNG need not be ported. The header holds one codebook for one export group size, which is fine
+      for every upstream writer (`docs/FINDINGS.md` F-004). Dequant is eager and single-threaded for now; laziness
+      belongs to `internal/weights`.
 - [ ] Tensor name map (index → safetensors name). **Accept:** `scripts/compare_cact.py` (or a Go test) reports a cosine
       for all 681 tensors, every tensor passes its threshold, and the map is pinned in a test.
 - [ ] `internal/weights`: one lookup interface over both formats, with lazy dequant and an mmap where the platform allows it.

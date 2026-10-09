@@ -244,3 +244,185 @@ func TestWhistleCactMatchesConfig(t *testing.T) {
 		t.Errorf("manifest[2:] = %v, want config text..hop %v", manifest[2:], want)
 	}
 }
+
+// TestWhistleCQ dequantises every CQ tensor of whistle.cact @ b358ddad. The
+// pinned values come from export.py _cq_unpack run in numpy on the same file
+// (docs/FINDINGS.md F-004). Both sides are float32 but round differently:
+// numpy's matmul sums a group in up to 128 steps, so they agree to
+// (128 + log2(128) + 3) * 2^-24 < 1e-5 of the group magnitude, which is
+// the tolerance relative to the row norm.
+func TestWhistleCQ(t *testing.T) {
+	f := openWhistle(t)
+
+	for width := 2; width <= 4; width++ {
+		got, err := f.Codebook(width)
+		if err != nil || !slices.Equal(got, portCodebook(width, 128)) {
+			t.Errorf("Codebook(%d) = %v, %v; want _cq_codebook_np(%d, 128) = %v",
+				width, got, err, width, portCodebook(width, 128))
+		}
+	}
+
+	type pin struct {
+		dims     []int
+		rowNorms map[int]float64
+		first4   []float64 // w[0][:4]
+		last     float64   // w[-1][-1]
+	}
+
+	pins := map[int]pin{
+		0: { // the CQ4 token embedding
+			dims:     []int{8199, 512},
+			rowNorms: map[int]float64{0: 186.81284537308602, 1: 57.53578797611011, 4099: 71.17012258767335, 8198: 78.4586356644421},
+			first4:   []float64{-0.3075689673423767, -14.557136535644531, 3.948115110397339, 5.2327423095703125},
+			last:     0.017739592120051384,
+		},
+		2: { // the first CQ2 tensor
+			dims:     []int{384, 512},
+			rowNorms: map[int]float64{0: 6.372649275450949, 1: 5.228630641170833, 192: 8.429754060368738, 383: 9.550146851717102},
+			first4:   []float64{0.2964808940887451, -0.6099874973297119, 0.649564266204834, -0.015735018998384476},
+			last:     0.24696075916290283,
+		},
+		671: { // the last CQ4 tensor, 16 groups per row
+			dims:     []int{128, 2048},
+			rowNorms: map[int]float64{0: 47.7150872785567, 1: 22.116285867410525, 64: 35.72595426974767, 127: 25.951508096145528},
+			first4:   []float64{2.292008876800537, -1.0804028511047363, -1.638489842414856, -0.6228991150856018},
+			last:     0.9282915592193604,
+		},
+	}
+
+	const tol = 1e-5
+
+	count := map[uint32]int{}
+	maxAbs := 0.0
+
+	for i := range f.Len() {
+		rec, _ := f.Record(i)
+		if rec.DType != CQ {
+			continue
+		}
+
+		count[rec.Bits]++
+
+		w, err := f.CQ(i)
+		if err != nil {
+			t.Fatalf("CQ(%d): %v", i, err)
+		}
+
+		if len(w) != rec.Numel() {
+			t.Fatalf("CQ(%d): %d values, want %d", i, len(w), rec.Numel())
+		}
+
+		var sq, tensorMax float64
+
+		for _, v := range w {
+			if math.IsNaN(float64(v)) || math.IsInf(float64(v), 0) {
+				t.Fatalf("CQ(%d) holds %v", i, v)
+			}
+
+			sq += float64(v) * float64(v)
+			tensorMax = math.Max(tensorMax, math.Abs(float64(v)))
+		}
+
+		// Sane magnitudes: no dead tensor, nothing near the FP16 norm range.
+		if rms := math.Sqrt(sq / float64(len(w))); rms < 1e-3 || rms > 10 || tensorMax > 100 {
+			t.Errorf("CQ(%d) %v: rms %.4g, max |w| %.4g", i, rec.Dims(), rms, tensorMax)
+		}
+
+		maxAbs = math.Max(maxAbs, tensorMax)
+
+		p, ok := pins[i]
+		if !ok {
+			continue
+		}
+
+		if !slices.Equal(rec.Dims(), p.dims) {
+			t.Fatalf("CQ(%d) dims %v, want %v", i, rec.Dims(), p.dims)
+		}
+
+		out, in := p.dims[0], p.dims[1]
+
+		for r, want := range p.rowNorms {
+			var rowSq float64
+			for _, v := range w[r*in : (r+1)*in] {
+				rowSq += float64(v) * float64(v)
+			}
+
+			if got := math.Sqrt(rowSq); math.Abs(got-want) > tol*want {
+				t.Errorf("CQ(%d) |row %d| = %.9g, want %.9g", i, r, got, want)
+			}
+		}
+
+		values := map[int]float64{(out-1)*in + in - 1: p.last}
+		for c, v := range p.first4 {
+			values[c] = v
+		}
+
+		for at, want := range values {
+			norm := p.rowNorms[at/in]
+			if diff := math.Abs(float64(w[at]) - want); diff > tol*norm {
+				t.Errorf("CQ(%d) w[%d][%d] = %.9g, want %.9g", i, at/in, at%in, w[at], want)
+			}
+		}
+	}
+
+	if count[2] != 145 || count[4] != 7 || len(count) != 2 {
+		t.Errorf("CQ tensors by width = %v, want 145 CQ2 and 7 CQ4", count)
+	}
+
+	if want := 69.29121398925781; math.Abs(maxAbs-want) > tol*want {
+		t.Errorf("max |w| over all CQ tensors = %.9g, want %.9g", maxAbs, want)
+	}
+}
+
+// TestWhistleCQMatchesSafetensors compares the dequantised CQ4 embedding,
+// tensor 0, with the F32 embedding/embedding of the same checkpoint
+// (docs/FINDINGS.md F-004).
+func TestWhistleCQMatchesSafetensors(t *testing.T) {
+	f := openWhistle(t)
+
+	_, err := os.Stat(whistleSafetensorsPath)
+	if errors.Is(err, os.ErrNotExist) {
+		t.Skipf("%s missing; run `whistle download` to fetch the pinned weights", whistleSafetensorsPath)
+	}
+
+	store, err := safetensors.OpenStore(whistleSafetensorsPath, safetensors.StoreOptions{})
+	if err != nil {
+		t.Fatalf("OpenStore: %v", err)
+	}
+	defer store.Close()
+
+	emb, err := store.TensorWithShape("embedding/embedding", []int64{8199, 512})
+	if err != nil {
+		t.Fatalf("embedding/embedding: %v", err)
+	}
+
+	w, err := f.CQ(0)
+	if err != nil {
+		t.Fatalf("CQ(0): %v", err)
+	}
+
+	cos := func(a, b []float32) float64 {
+		var ab, aa, bb float64
+		for k := range a {
+			ab += float64(a[k]) * float64(b[k])
+			aa += float64(a[k]) * float64(a[k])
+			bb += float64(b[k]) * float64(b[k])
+		}
+
+		return ab / math.Sqrt(aa*bb)
+	}
+
+	// numpy on the same files: 0.9953722094069657 overall, rows >= 0.9898033582667012.
+	if got := cos(w, emb.Data); math.Abs(got-0.99537221) > 1e-6 {
+		t.Errorf("cosine(CQ(0), embedding/embedding) = %.8f, want 0.99537221", got)
+	}
+
+	worst := 1.0
+	for r := range 8199 {
+		worst = min(worst, cos(w[r*512:(r+1)*512], emb.Data[r*512:(r+1)*512]))
+	}
+
+	if math.Abs(worst-0.98980336) > 1e-6 {
+		t.Errorf("worst row cosine = %.8f, want 0.98980336", worst)
+	}
+}

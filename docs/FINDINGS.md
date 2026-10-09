@@ -90,3 +90,45 @@ the same test). The first two values stay open for the tensor-name map (Phase 1)
 Also measured: the header is 196 bytes, not the 120 the `export.py` docstring states; the codebooks are stored already
 scaled by 1/√128 (cb2 = ±0.0399, ±0.1333); blobs are 64-byte aligned and contiguous, and the last one ends exactly at
 EOF. Whistle uses only CQ2 (145 tensors) and CQ4 (7), both with group 128; there is no CQ3, ternary or binary tensor.
+
+## F-004 — CQ dequantisation (2026-10-09)
+
+**Question.** `export.py` documents the CQ blob, and `_cq_unpack` decodes it, but only `_cq_pack` at
+`WEIGHT_BITS` = 4 writes one. Does Whistle's `.cact` follow that code exactly: which codebook, which Hadamard order,
+which bit and norm layout? And what should the Go reader do for the widths Whistle does not use?
+
+**Codebook.** `_cq_codebook_np(bits, group)` draws 400,000 samples from numpy's `RandomState(0)` and runs 200 Lloyd-Max
+iterations. Rerunning that code with numpy reproduces all 28 header floats of `whistle.cact` bit for bit as
+`_cq_codebook_np(2|3|4, 128)`. Winner: `File.CQ` uses the stored codebook and does not port the RNG; the tests carry
+the float64 unit levels. Caveat: the header holds one codebook, scaled by 1/√group of the export. `_pack_cact` writes
+a single group size for every CQ tensor, and every Whistle CQ tensor has group 128, but a file that mixed group sizes
+would decode its 2–4-bit tensors with the wrong scale. The 1-bit (±√(2/π)) and ternary (±1.2240064, 0) levels are not
+stored. They are scaled per record, as `_cq_codebook_np` does.
+
+**Layout.** Measured as the cosine between `CQ(0)` (CQ4, `[8199, 512]`) and the F32 `embedding/embedding` of
+`whistle.safetensors`:
+
+| decoding                                                                 | cosine      |
+| ------------------------------------------------------------------------ | ----------- |
+| `_cq_unpack`: LSB-first, low nibble = even column, norms `[out][groups]` | **0.99537** |
+| high nibble = even column                                                | −0.01339    |
+| norms stored group-major, `[groups][out]`                                | 0.91511     |
+
+The winner's worst row cosine is 0.98980. For a 4-bit Gaussian Lloyd-Max quantiser, the expected cosine is
+√(1 − 0.0095) ≈ 0.9952. The unit round trip (`TestCQ_RoundTrip`) also lands on the textbook distortions, with a
+relative error of 0.60 / 0.34 / 0.17 / 0.09 for 1 / 2 / 3 / 4 bits.
+
+**Rotation.** `_cq_hadamard_np` builds Sylvester's matrix (`np.block([[H, H], [H, -H]])`) in natural order. It is
+symmetric and orthonormal, so the inverse of the pack rotation `g @ H` is `@ H` again. `fwht` applies the ±1 part with
+in-place butterflies; the 1/√group factor is folded into the norm. The explicit matrix stays in the tests as the
+reference. The ternary one-hot tests pin the row order by hand.
+
+**Numerics.** float32, as upstream. A float64 matrix reference agrees with `CQ` within the float32 bound
+γ(log2(group) + 3) · Σ|x| / √group. On `whistle.cact`, numpy's `_cq_unpack` and `CQ` differ by about 1e-8 of the row
+norm, where the test allows 1e-5. All 145 CQ2 and 7 CQ4 tensors are finite, with an RMS between 1e-3 and 10, and the
+largest |w| over all of them is 69.29.
+
+**Widths outside Whistle.** 1-bit and ternary are implemented as `_cq_unpack` does them: eight 1-bit indices per
+byte, and ternary crumbs 3/0/1 → trits 0/1/2. They are only covered by unit tests. Two inputs fail upstream, so they
+are errors here: crumb 2 (numpy raises `IndexError` on the 3-level codebook), and a group that is not a power of two
+(`_cq_hadamard_np` overshoots the group and the matmul fails).
