@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/cwbudde/algo-vecmath v0.1.3 // indirect
 	github.com/icza/bitio v1.1.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mewkiz/pkg v0.0.0-20250417130911-3f050ff8c56d // indirect
