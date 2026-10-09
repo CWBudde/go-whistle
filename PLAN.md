@@ -440,12 +440,38 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       no builder); the `Attention` item needs the half-split layout with θ = 1e5 and GQA 8:2 (`Attention` wants equal
       head counts). The depthwise kernel-9 conv runs on the scalar grouped path. The stem needs a `Conv2D` (stride 2,
       SAME/VALID, groups 1 and 128, HWIO kernels), which is not built yet.
-- [ ] `ZCRMSNorm`, `rms_unit`
-- [ ] `Attention`: Q/K/V projections, optional causal taps, per-head q/k ZCRMSNorm, half-split RoPE (θ = 1e5), GQA
+- [x] `ZCRMSNorm`, `rms_unit`
+      (2026-10-10) — `internal/needle`: `ZCRMSNorm` (`NewZCRMSNorm`, `LoadZCRMSNorm(src, name)`, `Apply` over rows of
+      the scale's width, in place allowed) and `RMSUnit(dst, x, dim)`; mean(x²) accumulates in float64. Against
+      `zcrmsnorm.safetensors` with `layer00.norm_in` (zero row, ×1e-5 … ×100 rows, a non-zero-mean row): `y` max abs
+      8.9e-8, `rms_unit` 4.8e-7, `rms` 1.2e-7, at most 0.01 of the F-009 bound, cosine 1.000000000000. Unit tests on
+      tiny vectors (zero row, in place) need no model (`docs/FINDINGS.md` F-011).
+- [x] `Attention`: Q/K/V projections, optional causal taps, per-head q/k ZCRMSNorm, half-split RoPE (θ = 1e5), GQA
       8:2, sigmoid output gate. Masks: causal and none.
-- [ ] `HadamardMLP`: Monarch 16×32 Kronecker apply, conditional rank-8 scale, SiLU, the permutations p1/p2. Read the
+      (2026-10-10) — `needle.LoadAttention(src, prefix)` derives heads, KV heads, qk and v from the shapes and has taps
+      exactly when `<prefix>q_taps` exists, so `layer00.` is the decoder flavour and `enc00.` the encoder flavour;
+      `Forward(x, T, mask, rope)` with `MaskNone`/`MaskCausal` and an optional `*Rope` (`NewRope(48, T, 1e5)`, block-local
+      half split; `ops.RoPE` is interleaved and stays unchanged). GQA reads KV head h // 4 (`jnp.repeat`), no copies;
+      the core is a per-head loop over `tensor.DotProduct`/`Axpy` (`ops.Attention` needs equal head counts). Every
+      intermediate of both fixtures is within the contract, cosine 1.000000000000: `attention_decoder` worst `gate`
+      3.9e-6 (0.39 of the bound), `out` 7.0e-4 at |ref| 329 (0.21); `attention_encoder` worst `gate` 4.1e-6 (0.41),
+      `out` and `out_rope` 4.9e-4 at |ref| ≤ 1202 (0.04). The `gate` gap is the fixture's own float32 noise (a
+      float64-accumulated gate sits 3.4e-6 / 3.8e-6 from it, as F-009's float64 rerun did). Unit tests: hand-computed
+      RoPE, the fixture's RoPE tables (1.2e-7), the GQA head map, a float64 transcription of upstream on random
+      tiny weights for all four mask/taps/RoPE combinations, exact causality, load and call errors. Gap: no RoPE
+      offset or KV cache yet (decoder branch); padding masks are not supported (F-011).
+- [x] `HadamardMLP`: Monarch 16×32 Kronecker apply, conditional rank-8 scale, SiLU, the permutations p1/p2. Read the
       permutations from `.cact` 226/227. For safetensors-only loads, either reuse the `.cact` values or port numpy MT19937 +
       `permutation`, and pin both against each other in a test.
+      (2026-10-10) — `needle.LoadHadamardMLP(src, prefix)` (`layer00.`, `enc00.hada_0.`, `enc00.hada.`) takes n, the
+      16 × 32 blocks and rank 8 from the shapes and reads `hada_p1`/`hada_p2` from the `Source`: `.cact` 226/227, or
+      the numpy MT19937 port the safetensors backend derives them with, checked to be permutations. `Forward(x, T)`
+      applies each Kronecker stage as aᵀ · Z · b (24,576 multiply-adds per row and stage instead of 262,144;
+      `TestKronApplyMatchesDense` against the dense `np.kron` matrix). Against `hadamard_mlp.safetensors`: `out` 2.0e-3
+      at |ref| 1481, worst `cond` 0.14 of the bound, cosine 1.000000000000 for `cond_logits`, `cond`, `z1`, `a2`,
+      `z2`, `z3` and `out`. Permutation pin: `TestHadaPermsFixture` (fixture `p1`/`p2` = `cact.NumpyPermutation`, no
+      model needed) and `TestHadaPermsBothBackends` (layer 0 through `.cact` and safetensors, identical and equal to
+      the fixture); `internal/weights` `TestWhistleCrossFormat` compares all derived records too.
 - [ ] `MHC`: lane expand/collapse, pre/post/res heads, a numerically stable log-domain 20-iteration Sinkhorn.
 - [ ] `Engram`: uint32 multi-head hashing over the token history, table lookup, key/value projections, dilated
       4-tap conv, sigmoid gating against `rms_unit(x)`.
@@ -463,8 +489,11 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       the script sorts it. All files load with `internal/safetensors`. `testdata/needle/README.md` is the contract.
       Discovery: block outputs reach 1.5e3 and the float32 fixtures lie up to 1.3e-3 from a float64 rerun, so a flat
       1e-5 max abs is unreachable. The contract uses 1e-5 · max(1, max |ref|) per tensor plus cosine ≥ 0.99999; the
-      measured float32 noise is ≤ 3.9e-6 on that scale (`docs/FINDINGS.md` F-009). Pending: the Go blocks in
-      `internal/needle` and their parity tests against these files.
+      measured float32 noise is ≤ 3.9e-6 on that scale (`docs/FINDINGS.md` F-009). (2026-10-10) — the Go blocks
+      `ZCRMSNorm`/`rms_unit`, `Attention` (decoder and encoder fixtures, with and without RoPE) and `HadamardMLP` pass
+      `zcrmsnorm`, `attention_decoder`, `attention_encoder` and `hadamard_mlp` within this contract, every
+      intermediate, worst 0.41 of the bound (F-011). Pending: `MHC`, `Engram` and `Block` against `mhc`, `engram`
+      and `block`.
 
 ## Phase 3 — Front end
 
