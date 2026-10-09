@@ -324,3 +324,128 @@ The test runs in about 1.5 s; `RequantCQ` uses an FWHT and is pinned to the matr
 (magic and version). Every CQ record is a deterministic function of its source, up to float32 rounding ties. A
 safetensors-only load can therefore rebuild the deployment numerics exactly; the derived records need only the
 permutation port and the mel recomputation, both in `internal/cact`'s tests.
+
+## F-010 — WAV decode and resampling to 16 kHz vs `whistle.py` and soxr HQ (2026-10-10)
+
+**Question.** `whistle.py` `_read_wav` turns a WAV file into 16 kHz mono float32 with Python's `wave` module, its own
+sample conversion and `soxr.resample(mono, rate, 16000, quality="HQ")`. How exactly can the port follow it in pure Go,
+which files does it have to reject, and how far is a resampler built on `algo-dsp/dsp/resample` (v0.12.4) from soxr?
+
+**Decode (`internal/frontend/wav.go`).** `ParseWAV` follows `wave.py` (CPython 3.12) rule by rule:
+
+- Every chunk is read through the RIFF chunk, so nothing past the declared RIFF size is seen. Chunks are word-aligned;
+  a chunk whose skip would end past the RIFF chunk is an error (`wave.py` raises from its seek).
+- The format tag must be PCM (1) or EXTENSIBLE (0xFFFE) with the PCM sub-format GUID. Anything else, IEEE float
+  included, is a `*FormatError`, as `wave.py`'s "unknown format".
+- The sample width is `(bits + 7) // 8` from `wBitsPerSample`; block align and byte rate are ignored. Width 0 and no
+  channels are errors; so is a width above 4, which `_read_wav` has no decoder for (a `KeyError` upstream).
+- The last fmt chunk before the first data chunk counts; a data chunk before any fmt chunk is an error; anything after
+  the data chunk is ignored. The frame count is `data size // frame size` (a trailing partial frame is dropped), and
+  the data may be shorter than declared (streamed files with size 0xFFFFFFFF work).
+
+`Mono` is `_read_wav`'s expression, `float32((sum(frame) - offset·channels) / (2^(8w−1)·channels))` in float64 with
+offset 128 for unsigned 8-bit samples, bit for bit (`TestMonoFormula` checks all widths and 1–3 channels). Only two
+malformed-input cases differ: a data chunk cut inside a sample is `ErrTruncated` for every width above 8 bits, where
+upstream raises for 16 and 32 bits but decodes a cut 24-bit sample from the bytes it has; and rates are checked (below).
+
+**Accept matrix.** `TestUpstreamWAVMatrix` writes the six WAVs as `test_whistle.py` `_write_wav` does
+(`TestUpstreamWAVBytes` pins the bytes to Python's writer) and runs `DecodeWAV`. The same files through upstream
+`_read_wav` with soxr 1.1.0:
+
+| rate/channels/width | samples (Go / upstream) | max, min (Go)    | max, min (upstream) | crossings (Go / upstream) |
+| ------------------- | ----------------------- | ---------------- | ------------------- | ------------------------- |
+| 16000/1/2           | 8000 / 8000             | 0.29999 −0.29999 | 0.29999 −0.29999    | 109 / 109                 |
+| 8000/1/2            | 8000 / 8000             | 0.29998 −0.29998 | 0.29999 −0.29999    | 110 / 109                 |
+| 44100/2/2           | 8000 / 8000             | 0.29997 −0.29997 | 0.29997 −0.29997    | 109 / 109                 |
+| 16000/1/1           | 8000 / 8000             | 0.29688 −0.29688 | 0.29688 −0.29688    | 109 / 109                 |
+| 22050/2/3           | 8000 / 8000             | 0.30000 −0.30000 | 0.30000 −0.30000    | 109 / 109                 |
+| 48000/1/4           | 8000 / 8000             | 0.30000 −0.30000 | 0.30000 −0.30000    | 109 / 109                 |
+
+All six meet the criterion (8000±1 samples, peaks inside 0.28–0.31, 108–111 crossings). The 8 kHz crossing count
+differs by one because of the half-sample residual below.
+
+**What soxr does.** The one-shot `soxr.resample` is linear phase with the delay removed (input time t maps to output
+time t) and returns `round(n·16000/rate)` samples (22050 Hz: 100 and 101 input samples both give 73). Measured from
+its impulse response, HQ is flat to 7.35–7.39 kHz (−0.01 dB), −3 dB at 7.60 kHz, −6 dB at 7.66 kHz and −100 dB at
+7.98 kHz when downsampling to 16 kHz (3.70 / 3.80 / 3.83 / 3.99 kHz from 8 kHz). Tones just above 8 kHz come out at
+−130 to −144 dB.
+
+**Fixture.** `scripts/resample_fixture.py` (`just resample-fixture`, deterministic) stores soxr HQ's output for
+220 Hz, 1 kHz, 3.5 kHz, 7 kHz and 9.5 kHz tones, a chirp to 0.98 of the lower Nyquist and seeded white noise, 0.4 s
+each at amplitude 0.5, from 8000, 22050, 44100 and 48000 Hz (26 cases, 16-bit inputs regenerated in Go and checked by
+SHA-256, 675 KB). Because 16-bit quantisation noise floors anything below about −95 dB, it also stores soxr's output
+level for float32 tones at 8.1, 8.2, 8.4 and 9.5 kHz. "Near-Nyquist" means the top quarter of the lower Nyquist:
+6–8 kHz, or 3–4 kHz from 8 kHz. The Go side drops 400 output samples at each end (different filter lengths give
+different start and end transients).
+
+**Alignment.** algo-dsp's polyphase filter is causal, and its prototype has `taps per phase · up` taps. Two built-in
+ways of removing the delay were rejected: `ProcessAligned` interpolates the fractional part linearly, which took a
+further 14 dB off a 7 kHz tone (−15.9 dB total with `QualityBest`), and `Stream` rounds the delay up, leaving up to one
+output sample of offset (not measured). `Resample` instead prepends `lead` zeros so that the integer part of the delay,
+`floor((n−1)/2) + lead·up`, is a multiple of `down`, and takes the raw outputs from there on: no interpolation. That is
+exact for an odd prototype (forced when `up` is odd, e.g. 48 kHz). An even prototype leaves half an upsampled step,
+`0.5/down` output samples: 0.0011 from 22.05 and 44.1 kHz (up 320 or 160), but half a sample (31 µs) from 8 kHz,
+because `up` = 2 makes every prototype even. algo-dsp has no hook for a fractional start phase or a custom
+prototype, so the residual stays. The measured lag equals it to within 0.0011 samples on every case but the
+stopband tones.
+
+**Filter.** algo-dsp's presets fix taps per phase, so their transition band widens by `down/up` when downsampling.
+`filterSpec.length` scales taps per phase to `ceil(length · max(up, down) / up)` instead, so the prototype always spans
+`length` samples of the lower rate. Alternatives, worst case over 22.05/44.1/48 kHz on the fixture, alias levels for
+float input at 48 kHz, time for 30 s of 44.1 kHz (Apple M5 Pro, one core):
+
+| setting                           | 7 kHz gain vs soxr | 9.5 kHz (16-bit) | 8.1 / 8.2 kHz alias | 30 s @ 44.1 kHz |
+| --------------------------------- | ------------------ | ---------------- | ------------------- | --------------- |
+| `QualityFast` (16 taps/phase)     | −5.92 dB           | −17.1 dB         |                     | 4 ms            |
+| `QualityBalanced` (32)            | −4.39 dB           | −25.8 dB         |                     | 6 ms            |
+| `QualityBest` (64)                | −1.68 dB           | −51.7 dB         |                     | 14 ms           |
+| `ProcessAligned`, `QualityBest`   | −15.87 dB          | −62.4 dB         |                     | 14 ms           |
+| length 64, cutoff 0.96, β 9       | ≤ 0.005 dB         | −92.9 dB         | −29.3 / −40.2 dB    | 46 ms           |
+| **length 128, cutoff 0.96, β 11** | ≤ 0.007 dB         | −93.6 dB         | −86.9 / −112.1 dB   | 111 ms          |
+| length 160, cutoff 0.96, β 12     | ≤ 0.007 dB         | −93.6 dB         | −121.8 / −139.8 dB  | 144 ms          |
+| soxr HQ (python-soxr 1.1.0)       | 0                  | −93.6 dB         | −139.4 / −130.6 dB  | 2 ms            |
+
+**Winner: length 128, cutoff 0.96, Kaiser β 11** (`hqSpec`). It is the shortest setting that reproduces soxr's band
+edge (−0.11 dB at 7.4 kHz and −2.78 dB at 7.6 kHz; soxr −0.02 and −2.89 dB) and keeps aliases at −87 dB from 8.1 kHz
+and below −110 dB from 8.2 kHz. Length 64 takes less than half the time but lets 8.1 kHz alias at −29 dB into the top mel bands;
+length 160 gains about 2 dB on noise for 30 % more time. Cutoffs 0.95 or β 9 at length 128 fail the pinned bounds.
+Time per 30 s: 29 ms from 8 kHz, 46 ms from 22.05 kHz, 111 ms from 44.1 kHz and 121 ms from 48 kHz (270–1000× real
+time, about 30–60× slower than soxr's SIMD multi-stage code), dominated by `taps per phase` = 128 to 385
+multiply-adds per output sample.
+
+**Measured** (`TestResampleMatchesSoxr`, interior, `hqSpec`; "aligned" removes the expected residual first, so it
+isolates the filter shape; STFT is the mean |Δ| of log power over 400-sample Hann frames, hop 160, in bins within
+60 dB of the frame peak):
+
+| input                     | SNR dB      | max abs       | lag (residual)       | aligned SNR dB   | STFT dB            |
+| ------------------------- | ----------- | ------------- | -------------------- | ---------------- | ------------------ |
+| 8k: 220 Hz / 1 kHz        | 27.3 / 14.2 | 0.022 / 0.098 | 0.501 (0.5)          | 67.1 / 67.1      | ≤ 0.063            |
+| 8k: 3.5 kHz (near)        | 3.4         | 0.34          | 0.500 (0.5)          | 67.1             | 0.0000             |
+| 8k: chirp                 | 7.4         | 0.35          | 0.500 (0.5)          | 67.2 / 49.3      | 0.052 / 0.052      |
+| 8k: noise                 | 7.4         | 0.40          | 0.500 (0.5)          | 66.9 / 27.4      | 0.039 / 1.49       |
+| 22.05k, 44.1k: tones < 6k | 56.1–80.2   | ≤ 7.8·10⁻⁴    | 0.001–0.002 (0.0011) | ≥ 116.6          | ≤ 0.0001           |
+| 22.05k, 44.1k: 7 kHz      | 49.9        | 1.6·10⁻³      | 0.0003 (0.0011)      | 62.5             | 0.0065             |
+| 22.05k, 44.1k: chirp      | 54.2        | 1.7·10⁻³      | 0.0005 (0.0011)      | 92.0 / 72.4      | 0.0003 / 0.0042    |
+| 22.05k, 44.1k: noise      | 32.9–33.6   | ≤ 0.016       | 0.0006 (0.0011)      | 85.7 / 25.7–29.1 | 0.0003 / 1.24–1.27 |
+| 48k: tones < 6k           | 129.1–136.0 | ≤ 4.5·10⁻⁷    | ≤ 0.001 (0)          | ≥ 131.1          | 0.0000             |
+| 48k: 7 kHz                | 112.0       | 1.3·10⁻⁶      | 0.0000 (0)           | 112.0            | 0.0000             |
+| 48k: chirp                | 70.7        | 2.2·10⁻³      | 0.0000 (0)           | 131.3 / 93.8     | 0.0000 / 0.0002    |
+| 48k: noise                | 32.9        | 0.012         | 0.0000 (0)           | 127.1 / 25.4     | 0.0000 / 1.21      |
+
+Pairs are passband / near-Nyquist. Gain differs by at most 0.0065 dB on every non-stopband case, and every
+non-stopband cosine is ≥ 0.99974 except at 8 kHz (0.77–0.999, the half-sample residual). Two differences remain.
+First, the residual: from 8 kHz the output is 31 µs late, which costs nothing in magnitude (STFT ≤ 0.063 dB, aligned
+SNR ≥ 66.9 dB) but dominates any sample-wise comparison. Second, the 7.4–8 kHz transition band, where noise differs by
+1.2–1.5 dB per STFT bin on average and noise's near-Nyquist band sits at 25–29 dB SNR; the aligned passband is
+≥ 66.9 dB everywhere. A 16 kHz WAV is not resampled, exactly as upstream.
+
+**Rates.** The ratio `16000/rate` is reduced exactly when `down` ≤ 16384, which covers every common rate (11025:
+640/441, 44056: 2000/5507, 192000: 1/12) and bounds the prototype at about two million taps (35 MB, 70 ms to
+design). Rates that need a larger `down` (47999 Hz: 16000/47999) get algo-dsp's continued-fraction approximation with
+denominator ≤ 16384, here 1/3: a 2·10⁻⁵ rate error, 10 samples of drift over 30 s. Two guards reject rates soxr
+takes, both as `ErrSampleRate`: rates below 1 kHz (soxr only refuses 0), so that a small file with a near-zero rate
+field cannot expand more than 16-fold into gigabytes of output, and rates from about 262 MHz up, which have no
+approximation. Pinned in `TestResamplerRatio`, `TestResampleTone`, `TestResampleLength` and
+`TestResampleImpulseAlignment`.
+
+Regenerate the fixture with `just resample-fixture`; `internal/frontend` reads `testdata/frontend/soxr_hq.safetensors`.
