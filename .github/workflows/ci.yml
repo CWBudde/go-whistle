@@ -34,11 +34,15 @@ jobs:
       - name: Install prettier
         run: npm install -g prettier
 
+      # Pinned to the local versions. gofumpt 0.12 needs go >= 1.26, newer than go.mod's go line, and setup-go v7
+      # sets GOTOOLCHAIN=local, so this step alone may fetch a newer toolchain.
       - name: Install Go formatters
+        env:
+          GOTOOLCHAIN: auto
         run: |
-          go install mvdan.cc/gofumpt@latest
-          go install github.com/daixiang0/gci@latest
-          go install mvdan.cc/sh/v3/cmd/shfmt@latest
+          go install mvdan.cc/gofumpt@v0.12.0
+          go install github.com/daixiang0/gci@v0.14.0
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.14.1
 
       - name: Install shellcheck and treefmt
         run: |
