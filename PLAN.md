@@ -314,7 +314,15 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 
 ## Phase 1 — Weights & tokenizer
 
-- [ ] Copy `internal/safetensors` from go-pocket-tts. Parse `__metadata__` `config` and `run` into a typed `Config`.
+- [x] Copy `internal/safetensors` from go-pocket-tts. Parse `__metadata__` `config` and `run` into a typed `Config`.
+      (2026-10-09) — copied from go-pocket-tts `9faba38` (Store with F32/F16/BF16/I64 decode and key remapping,
+      `EncodeTensors`/`WriteFile`, `LoadFirstTensor`, plus tests), without the voice-state and Mimi helpers.
+      `Store.Metadata()` exposes the `__metadata__` string map, and non-string values are rejected.
+      `EncodeTensorsWithMetadata` writes one. `Store.Config()` and `Store.Run()` decode strictly: unknown and missing
+      keys are errors, and the training-only keys are kept so the decode is lossless. `Store.Step()` reads the
+      training step. The model-gated `TestWhistleCheckpoint` pins `whistle.safetensors`: 116 F32 tensors, 55,151,433
+      parameters, `embedding/embedding` `[8199, 512]`, `Config` equal to the reference card, `Run` = qapt/kv 8/act 8,
+      and step 25000. Loading still reads the whole file; mmap belongs to `internal/weights`.
 - [ ] `internal/cact`: the header (196 B, tag check, all fields), the 28 codebook floats, the 44-byte records, 64-byte
       aligned blobs, and readers for FP32, FP16 and RAW.
 - [ ] CQ dequant: the LSB-first bitstream unpack for 2/3/4 bits, the per-group FP16 norm and FWHT-128 (normalised).
