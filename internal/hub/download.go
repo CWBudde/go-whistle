@@ -81,7 +81,8 @@ func (c *Client) fetch(ctx context.Context, m Manifest, f File, dir string) erro
 
 	err = c.fetchPart(ctx, m.Repo, u, part, f)
 	if errors.Is(err, errRestart) {
-		// The server could not continue the .part file; start over once.
+		// The .part file could not be continued (the server refused the range, or a complete part failed
+		// verification); start over once.
 		_ = os.Remove(part)
 		err = c.fetchPart(ctx, m.Repo, u, part, f)
 	}
@@ -100,7 +101,7 @@ func (c *Client) fetch(ctx context.Context, m Manifest, f File, dir string) erro
 	return nil
 }
 
-var errRestart = errors.New("server cannot resume the partial download")
+var errRestart = errors.New("partial download cannot be resumed")
 
 // fetchPart completes part from u and verifies it against f. A part that fails verification is removed; any other
 // error keeps it for the next run.
@@ -128,8 +129,15 @@ func (c *Client) fetchPart(ctx context.Context, repo, u, part string, f File) er
 	case offset > 0 && resp.StatusCode == http.StatusPartialContent:
 		c.logf("resume   %s at %d/%d bytes", f.Local, offset, f.Size)
 	case offset == f.Size && resp.StatusCode == http.StatusRequestedRangeNotSatisfiable:
-		// Everything is in part already; only the rename was missing.
-		return verifyPart(part, h, offset, f)
+		// Everything is in part already; only the rename was missing. A part that fails verification here is
+		// corrupt, not incomplete, so it is downloaded again from byte zero.
+		err = verifyPart(part, h, offset, f)
+		if err != nil {
+			c.logf("restart  %s: complete partial download fails verification (%v)", f.Local, err)
+			return errRestart
+		}
+
+		return nil
 	case offset > 0 && resp.StatusCode == http.StatusRequestedRangeNotSatisfiable:
 		return errRestart
 	default:

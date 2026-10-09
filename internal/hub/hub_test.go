@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -337,6 +339,37 @@ func TestDownloadCompletePart(t *testing.T) {
 	}
 
 	assertFiles(t, dir, m, files)
+}
+
+func TestDownloadCorruptCompletePart(t *testing.T) {
+	files := fakeContent()
+	fh, srv := newFakeHub(t, files)
+	m := fakeManifest(files)
+	dir := t.TempDir()
+
+	// A full-size .part with a wrong byte: the server answers the range with 416, the digest fails, and the same
+	// Download must start over from byte zero instead of failing.
+	corrupt := bytes.Clone(files["weights/model.bin"])
+	corrupt[len(corrupt)/2] ^= 0xff
+
+	err := os.WriteFile(filepath.Join(dir, "model.bin"+partSuffix), corrupt, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = testClient(srv).Download(context.Background(), m, dir)
+	if err != nil {
+		t.Fatalf("Download: %v", err)
+	}
+
+	assertFiles(t, dir, m, files)
+
+	fh.mu.Lock()
+	defer fh.mu.Unlock()
+
+	if !slices.Contains(fh.rangeHdr, "") {
+		t.Errorf("Range headers %q: want a full re-download after the corrupt part", fh.rangeHdr)
+	}
 }
 
 func TestDownloadChecksumMismatch(t *testing.T) {
