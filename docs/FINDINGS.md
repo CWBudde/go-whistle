@@ -132,3 +132,67 @@ largest |w| over all of them is 69.29.
 byte, and ternary crumbs 3/0/1 → trits 0/1/2. They are only covered by unit tests. Two inputs fail upstream, so they
 are errors here: crumb 2 (numpy raises `IndexError` on the 3-level codebook), and a group that is not a power of two
 (`_cq_hadamard_np` overshoots the group and the matmul fails).
+
+## F-005 — Tokenizer blob, decode rules and the sentencepiece fixture (2026-10-09)
+
+**Question.** Does the RAW blob (`.cact` #680) follow `export.py` `_tokenizer_blob`? `Cactus-Compute/whistle` ships no
+`tokenizer.model`, so what is a trustworthy sentencepiece reference for decode? And where sentencepiece and upstream
+`RefTokenizer` disagree, which one does the port follow?
+
+**Measured (blob).** 109,231 bytes in the `_TK_HDR`/`_TK_REC` layout, with the last record ending exactly at the end
+of the blob. Header: 8199 pieces, pad/eos/bos/unk = 0/1/2/3, `add_dummy_prefix` 0, `byte_fallback` 1. Types: 7908
+NORMAL, 256 BYTE (ids 28–283, `<0x00>`…`<0xFF>`), 31 USER_DEFINED, 3 CONTROL (0–2) and 1 UNKNOWN (3). NORMAL scores
+are minus the merge rank, 0 to −7907, all distinct; every other piece scores 0. The USER_DEFINED pieces are ids 4–27
+(24 chat markers, including `<image>`, `<speech>`, `<tts>` and `<imagen>`) and the language tokens 8192–8198
+(`<|en|>`, `<|de|>`, `<|fr|>`, `<|es|>`, `<|it|>`, `<|nl|>`, `<|pl|>`).
+
+Upstream `_tokenizer_blob` marks only the 16 `CHAT_MARKERS` as USER_DEFINED. It would have typed `<image>`,
+`<speech>`, `<tts>`, `<imagen>` and the language tokens as NORMAL, so the pinned exporter did not write Whistle's blob.
+The blob's types match the sentencepiece model's own flags instead: needle3's `user_defined_symbols` lists all 24
+markers. As a result, `Encode` cuts `<speech>` and the language tokens out whole.
+
+**Fixture route.** `scripts/tokenizer_fixture.py` rebuilds a sentencepiece BPE `ModelProto` from the blob's pieces,
+scores and types. Its normalizer and trainer settings copy needle3's model: `identity` normalizer, no dummy prefix, no
+whitespace collapsing, `byte_fallback`, `split_by_whitespace` and a maximum piece length of 16. The script asserts that
+the loaded model reports the blob's piece, score and type back for all 8199 ids. needle3's `tokenizer.model` (@
+`2ae11323dc`, sha256 `97dfd566…1b25`) served as a cross-check: the script's `--needle3` flag runs that comparison and
+only prints, so the fixture does not depend on the download. Results:
+
+- Pieces, scores and types: 0 of 8192 differ from blob ids 0–8191.
+- Decode: 104/104 fixture sequences that use only shared ids are equal, and so are 8192/8192 single ids.
+- Encode: 24/24 samples without language tokens are equal.
+
+The rebuilt model and the published needle3 model therefore agree everywhere they overlap. The rebuilt model also
+covers the 7 language tokens. The decode logic is sentencepiece's own (0.2.2).
+
+One setting deviates on purpose: `unk_surface` is `""`. sentencepiece prints `" ⁇ "` for `<unk>` by default, while
+`RefTokenizer` and PLAN.md skip it. Only sequences containing id 3 are affected.
+
+**Disagreements.** `RefTokenizer.decode` differs from sentencepiece on 11 of the 109 fixture sequences. All 11 are
+byte-fallback corner cases:
+
+1. Invalid UTF-8. sentencepiece writes one U+FFFD per invalid byte (`E2 82` → `��`). Python's `errors="replace"` writes
+   one per maximal subpart (`E2 82` → `�`).
+2. Byte runs. sentencepiece decodes each run of consecutive BYTE pieces on its own, so a CONTROL or UNKNOWN piece
+   between two runs ends the first one (`<0xC3> <pad> <0xA9>` → `��`). `RefTokenizer` joins all bytes first (→ `é`).
+3. `▁` spelled by bytes. sentencepiece turns `▁` into a space only in piece surfaces (`<0xE2><0x96><0x81>` → `▁`).
+   `RefTokenizer` replaces it after the join (→ a space).
+
+**Winner.** `Decode` follows sentencepiece, as the Accept criterion asks; for case 1 that is also what
+`utf8.DecodeRune` gives. Well-formed output never reaches these cases. The engine's behaviour on them is unknown, so
+revisit this if a transcript ever differs on one. `Encode` is a straight port of `RefTokenizer`. Unlike
+sentencepiece, it does not split at whitespace before the BPE, but on all 25 fixture samples (Latin, accented
+European, Cyrillic, CJK, Arabic, Hebrew, Devanagari, emoji, markers, language tokens, whitespace and control
+characters) `RefTokenizer` and sentencepiece give identical ids. Go matches `RefTokenizer` on 25/25 and round-trips all
+25, plus 11 more texts in `TestWhistleRoundTrip`. Text containing a literal `▁` cannot round-trip, because encode
+cannot tell it apart from an escaped space.
+
+The Go side differs from upstream in three more places:
+
+- `Parse` is stricter than `parse_tokenizer_blob`. It rejects trailing bytes, unknown types, malformed or repeated byte
+  pieces, out-of-range special ids, and byte fallback without all 256 byte pieces.
+- `Encode` carries invalid UTF-8 input, which a Python `str` cannot hold, byte by byte into byte pieces.
+- `Decode` returns an error for an id out of range, where sentencepiece raises.
+
+Regenerate with `just tokenizer-fixture [--needle3 tokenizer.model]`. The model-gated tests in `internal/tokenizer`
+read `testdata/tokenizer/whistle.json`.
