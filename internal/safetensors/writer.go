@@ -14,6 +14,12 @@ import (
 // EncodeTensors serializes tensors into safetensors format. A tensor is
 // written as F32 unless its DType is I64; I64 data must hold integers.
 func EncodeTensors(tensors []Tensor) ([]byte, error) {
+	return EncodeTensorsWithMetadata(tensors, nil)
+}
+
+// EncodeTensorsWithMetadata is EncodeTensors plus a __metadata__ header
+// entry; an empty metadata map writes none.
+func EncodeTensorsWithMetadata(tensors []Tensor, metadata map[string]string) ([]byte, error) {
 	if len(tensors) == 0 {
 		return nil, errors.New("safetensors: no tensors to encode")
 	}
@@ -24,13 +30,17 @@ func EncodeTensors(tensors []Tensor) ([]byte, error) {
 		return sorted[i].Name < sorted[j].Name
 	})
 
-	header := make(map[string]storeHeaderEntry, len(sorted))
+	header := make(map[string]any, len(sorted)+1)
 	raw := make([]byte, 0, estimateTensorBytes(sorted))
 
 	for _, tensor := range sorted {
 		name := strings.TrimSpace(tensor.Name)
 		if name == "" {
 			return nil, errors.New("safetensors: tensor name must not be empty")
+		}
+
+		if name == metadataKey {
+			return nil, fmt.Errorf("safetensors: tensor name %q is reserved", name)
 		}
 
 		if _, exists := header[name]; exists {
@@ -64,6 +74,10 @@ func EncodeTensors(tensors []Tensor) ([]byte, error) {
 			Shape:   append([]int64(nil), tensor.Shape...),
 			Offsets: [2]int{start, len(raw)},
 		}
+	}
+
+	if len(metadata) > 0 {
+		header[metadataKey] = metadata
 	}
 
 	headerJSON, err := json.Marshal(header)

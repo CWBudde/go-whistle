@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"sort"
@@ -16,6 +17,9 @@ const (
 	dtypeF16  = "F16"
 	dtypeBF16 = "BF16"
 	dtypeI64  = "I64"
+
+	// metadataKey is the reserved header entry holding a string-to-string map.
+	metadataKey = "__metadata__"
 )
 
 type KeyMapper func(name string) (mapped string, keep bool)
@@ -33,9 +37,10 @@ type StoreOptions struct {
 }
 
 type Store struct {
-	raw     []byte
-	entries map[string]storeEntry
-	names   []string
+	raw      []byte
+	entries  map[string]storeEntry
+	names    []string
+	metadata map[string]string
 }
 
 type storeEntry struct {
@@ -78,6 +83,11 @@ func OpenStoreFromBytes(data []byte, opts StoreOptions) (*Store, error) {
 		return nil, err
 	}
 
+	metadata, err := decodeMetadata(header[metadataKey])
+	if err != nil {
+		return nil, err
+	}
+
 	keys := make([]string, 0, len(header))
 	for name := range header {
 		keys = append(keys, name)
@@ -89,7 +99,7 @@ func OpenStoreFromBytes(data []byte, opts StoreOptions) (*Store, error) {
 	names := make([]string, 0, len(keys))
 
 	for _, original := range keys {
-		if original == "__metadata__" {
+		if original == metadataKey {
 			continue
 		}
 
@@ -177,14 +187,21 @@ func OpenStoreFromBytes(data []byte, opts StoreOptions) (*Store, error) {
 	sort.Strings(names)
 
 	return &Store{
-		raw:     data,
-		entries: entries,
-		names:   names,
+		raw:      data,
+		entries:  entries,
+		names:    names,
+		metadata: metadata,
 	}, nil
 }
 
 func (s *Store) Names() []string {
 	return append([]string(nil), s.names...)
+}
+
+// Metadata returns a copy of the header's __metadata__ map; it is empty when
+// the file has none.
+func (s *Store) Metadata() map[string]string {
+	return maps.Clone(s.metadata)
 }
 
 func (s *Store) Has(name string) bool {
@@ -242,6 +259,7 @@ func (s *Store) Close() {
 	s.raw = nil
 	s.entries = nil
 	s.names = nil
+	s.metadata = nil
 }
 
 func decodeHeader(data []byte) (int, map[string]json.RawMessage, error) {
@@ -269,6 +287,22 @@ func decodeHeader(data []byte) (int, map[string]json.RawMessage, error) {
 	}
 
 	return headerEnd, header, nil
+}
+
+// decodeMetadata decodes the __metadata__ header entry, which the format
+// restricts to string values. A missing entry yields an empty map.
+func decodeMetadata(raw json.RawMessage) (map[string]string, error) {
+	metadata := map[string]string{}
+	if raw == nil {
+		return metadata, nil
+	}
+
+	err := json.Unmarshal(raw, &metadata)
+	if err != nil {
+		return nil, fmt.Errorf("safetensors: decode %s (string map expected): %w", metadataKey, err)
+	}
+
+	return metadata, nil
 }
 
 func parseHeaderEntry(raw json.RawMessage) (storeHeaderEntry, error) {
