@@ -27,6 +27,9 @@ neither the width nor how a partial frame counts.
 **Winner.** The width is **512 floats per frame**, and frames = `(samples + 640) / 1280` in integer division. That is
 an 80 ms hop at 16 kHz. All 32 corpus clips (`testdata/oracle`) return a multiple of 512 floats.
 
+**Correction (F-012).** The frame rule is `ceil(floor(samples / 160) / 8)`, not `(samples + 640) / 1280`. Both fit the
+seven lengths above, but 7 of the 32 corpus clips follow only the former (e.g. 53040 samples give 42 frames).
+
 The engine does not say whether 512 is the encoder width or a projection of it; Phase 4 settles that against the
 safetensors weights. `tools/oracle` stores each embedding as F32 `embed` `[frames, 512]` in
 `testdata/oracle/<clip>.embed.safetensors`.
@@ -682,3 +685,108 @@ approximation. Pinned in `TestResamplerRatio`, `TestResampleTone`, `TestResample
 `TestResampleImpulseAlignment`.
 
 Regenerate the fixture with `just resample-fixture`; `internal/frontend` reads `testdata/frontend/soxr_hq.safetensors`.
+
+## F-012 — STFT, mel bank and the front-end hypothesis set (2026-10-10)
+
+**Question.** Whistle's front end is closed. What is fixed, what stays open, and how is the open part represented so
+that Phase 4 can settle it against `needle_embed`, given that there is no mel-level oracle?
+
+**Sources.** The upstream snapshot (`original/needle` @ `af2654dffa`) has no front-end code: a grep for `mel`, `stft`,
+`spectro`, `hann`, `log10` and `band` finds only `whistle.py`'s WAV I/O and unrelated hits. cactuscompute.com/whistle
+says, verbatim: "16 kHz mono audio is framed at a 25 ms window and a 10 ms hop into 80 log-mel bins, band-limited to
+250-3500 Hz and normalised per channel. Thirty seconds is 3,000 frames." The config and the audio manifest give
+fft 512, win 400, hop 160 and mels 80 (F-003). Tensor 679 is librosa's Slaney bank over the full 0–8 kHz (F-006).
+
+**Fixed.** 16 kHz input; a 400-sample window zero-padded to 512; hop 160; 257 bins; the mel bank
+`audio.mel_filters` `(257, 80)` read from a `weights.Source`. `TestMelBankBackends` (model-gated, ran here) finds the
+`.cact` and safetensors banks bit-identical to each other and to `cact.SlaneyMel`, as F-006/F-007 said.
+
+**STFT on algo-dsp.** `dsp/stft` `STFT32` (v0.12.4) centres an NFFT-long frame on sample `i·hop` and multiplies it
+by an NFFT-long window, with zero or reflect padding. `internal/frontend` passes it a 512-long custom window
+holding the 400-sample Hann at an offset:
+
+- centred (reflect, zero): offset 56, as torch.stft and librosa pad a short window, so frame i covers
+  `[i·160 − 200, i·160 + 200)`;
+- none (Kaldi `snip_edges`): offset 96 in algo-dsp frame `i + 1`, which covers `[i·160, i·160 + 400)`. algo-dsp's
+  own `PadNone` needs all 512 samples inside the signal and loses the last frame (2997 instead of 2998 for 30 s).
+
+The zeros around the window change only the phase, so the power equals that of the 400 windowed samples
+zero-padded to 512. The Hann windows come from `dsp/window` (within 1e-15 of the formulas). One gap: algo-dsp's
+reflect needs more than 256 samples, where only 200 are mirrored; 160–256 samples (one frame) return `ErrTooShort`.
+The engine returns no encoder frame below 640 samples (rule below), so nothing usable is lost.
+
+**Verified.** Power spectra against two independent references, for all 2 windows × 3 paddings
+(`TestSTFTDirectDFT`, `TestSTFTNumpyFixture`):
+
+| reference                                                                | max \|Δ\| / peak    | max rel., bins within 60 dB of the frame peak |
+| ------------------------------------------------------------------------ | ------------------- | --------------------------------------------- |
+| float64 direct DFT of explicitly framed samples (2037-sample tone+noise) | 1.0·10⁻⁷ – 3.2·10⁻⁷ | 1.5·10⁻⁵ – 4.7·10⁻⁵                           |
+| numpy `rfft` fixture (`just mel-fixture`, 4321- and 300-sample inputs)   | 1.3·10⁻⁷ – 2.5·10⁻⁷ | 1.1·10⁻⁶ – 3.7·10⁻⁵                           |
+
+Pinned at 1e-6 and 2e-4. The fixture is `testdata/frontend/stft.safetensors` (183 KB, 10 cases; the 300-sample burst
+has no `none` frame); two runs are byte-identical. The mel product (float64 accumulation over each channel's
+non-zero bins) equals the dense product to 1e-12.
+
+**Frame count.** Centred framing gives `n / 160` (rounded down): 3000 for 30 s, the published count. torch.stft and
+NeMo give `n/160 + 1` (3001) and algo-dsp `ceil(n/160)`. `none` gives `1 + (n − 400) / 160` (2998). The engine
+decides between them through the embedding length. Three stride-2 halvings that round up (SAME, or pad 1 with
+kernel 3), applied to each mel count, against the 32 corpus embeddings plus F-001's seven lengths:
+
+| mel frames                   | encoder frames match    |
+| ---------------------------- | ----------------------- |
+| **`floor(n/160)`** (centred) | **39/39**               |
+| `ceil(n/160)`                | 35/39                   |
+| `1 + (n − 400)/160` (none)   | 36/39                   |
+| `1 + (n − 512)/160`          | 33/39                   |
+| F-001's `(n + 640) / 1280`   | 32/39 (25 of 32 corpus) |
+
+Stems that round down or pad VALID, and `n/160 + 1`, score below 30/39 with every count. **Winner: `floor(n/160)`
+mel frames and a stem that rounds up**, pinned in `TestFrameCountMatchesEngine`. This corrects F-001: its seven
+synthetic lengths all had `n mod 1280` in {0, 1, 640}, which cannot tell `(n + 640)/1280` from
+`ceil(floor(n/160)/8)`. Seven corpus clips with `n mod 1280` in [160, 640) can, and they follow the latter (e.g.
+53040 samples: 42 frames, not 41). The rule supports centred framing; `none` stays in the set, since an engine could
+pad its frames, but it starts behind.
+
+**Hypothesis set (`frontend.Options`).** Each axis is a typed enum starting at 1, so a zero `Options` is invalid and
+nothing is a default yet:
+
+| axis          | values                                         | reading                                                                                                                                                                                           |
+| ------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Window`      | `HannPeriodic`, `HannSymmetric`                | `cos(2πk/400)` (torch default, Whisper) or `cos(2πk/399)` (`np.hanning`, NeMo)                                                                                                                    |
+| `Padding`     | `PadReflect`, `PadZero`, `PadNone`             | as above                                                                                                                                                                                          |
+| `Spectrum`    | `Power`, `Magnitude`                           | \|X\|² or \|X\|                                                                                                                                                                                   |
+| `Log`         | `LogLn`, `LogLog10`, `LogAddEps`, `LogWhisper` | `ln(max(x, 1e-10))`; `log10(max(x, 1e-10))`; `ln(x + 2⁻²⁴)` (NeMo's guard); Whisper: `y = log10(max(x, 1e-10))`, `max(y, max(y) − 8)` over the clip, `(y + 4)/4`                                  |
+| `Norm`        | `NormNone`, `NormChannel`, `NormGlobal`        | `(x − mean)/(std + 1e-5)` with the n−1 std, per mel channel over time (NeMo `per_feature`) or over everything; one frame gives 0                                                                  |
+| `Band`        | `BandFull`, `BandBins`, `BandChannels`         | ignore the claim; zero FFT bins outside [250, 3500] Hz before the bank (bins 8–112 stay; an ideal pre-filter); zero channels whose centre is outside (6–58 stay), which then sit at the log floor |
+| `Preemphasis` | `PreemphNone`, `Preemph097`                    | `y[t] = x[t] − 0.97·x[t−1]`, `y[0] = x[0]`                                                                                                                                                        |
+
+`Variants()` enumerates all 864 combinations in a stable order (last axis fastest); `Options.String()` is a stable
+key (`win=… pad=… spec=… log=… norm=… band=… pre=…`) and `ParseOptions` reads it back. Unit tests show each value
+doing what it says: windows against their formulas, reflect against zero (they differ exactly in the edge frames),
+magnitude² = power, each log on known energies (the Whisper clamp lifts `log10(1e-5)` to `max − 8`), each norm
+against a two-pass reference, `BandBins` zeroing exactly bins 0–7 and 113–256, `BandChannels` putting channels 0–5
+and 59–79 at `ln(1e-10)`, and pre-emphasis equal to filtering first, with its analytic 30.8 dB tilt between
+93.75 Hz and 5 kHz.
+
+**Choices made for the set.**
+
+- Pre-emphasis is not in PLAN.md's list. It was added because NeMo's `AudioToMelSpectrogramPreprocessor` in its
+  Conformer configuration matches every published Whistle constant (n_fft 512, 25 ms / 10 ms, 80 librosa Slaney mels
+  with Slaney norm, `dither` 1e-5 as in Whistle's config, `normalize="per_feature"` = "normalised per channel") and
+  applies 0.97 pre-emphasis by default. `NeMo()` is that preset (symmetric Hann, zero padding, power, `ln(x + 2⁻²⁴)`,
+  per-channel, 0.97); `Whisper()` is Whisper's (periodic Hann, reflect, power, Whisper log, no norm).
+- The band limit is read two ways. Not implemented: a librosa bank re-derived over `fmin` 250, `fmax` 3500, because
+  the shipped bank (679) is full band and is what the engine loads; and a time-domain IIR band-pass, whose order and
+  shape nothing states. Either can be added if both readings fail in Phase 4.
+- The `ln` and `log10` floors are Whisper's 1e-10. Normalisation statistics include every frame, since a clip has
+  no padding frames here.
+- Dither (1e-5 in the config) is training-only noise and is not applied.
+
+**Smoke test.** All 32 clips under `ln`/no-norm, `Whisper()` and `NeMo()`: shapes `[n/160, 80]`, all finite. The
+`ln` mel spans [−23.03, 3.01]; the floor values come from digital silence (under 5 % per clip), and the quietest
+clip peaks at −4.06. The Whisper spread is at most 2 and the NeMo channels have mean 0 and std 1 (within 1e-3). All
+864 variants on 1.5 s of one clip are finite. 30 s gives 3000 × 80 (2998 for `none`) in about 5 ms on an Apple
+M5 Pro.
+
+**Open, for Phase 4.** Every axis above. Resolve it with the encoder probe harness, iterating `Variants()` (greedily
+per axis), by the mean per-frame cosine against `needle_embed`.
