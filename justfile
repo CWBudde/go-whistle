@@ -41,6 +41,10 @@ test-coverage:
 # Run all checks (formatting, linting, tests, tidiness)
 ci: check-formatted test lint check-tidy
 
+# Fetch the pinned Needle 3 engine (test oracle) into engine/<platform>/
+fetch-engine *args:
+    scripts/fetch-engine.sh {{args}}
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
