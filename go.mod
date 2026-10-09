@@ -3,6 +3,8 @@ module github.com/cwbudde/go-whistle
 go 1.25.0
 
 require (
+	github.com/cwbudde/algo-dsp v0.12.4
+	github.com/cwbudde/algo-fft v0.8.0
 	github.com/ebitengine/purego v0.11.1
 	github.com/mewkiz/flac v1.0.14
 	github.com/spf13/cobra v1.10.2
