@@ -23,6 +23,10 @@ excludes = [
     "**/*.jpg",
     "**/*.jpeg",
 
+    # Oracle fixtures, written by tools/oracle; kept byte-exact so a regeneration diffs clean
+    "testdata/audio/**",
+    "testdata/oracle/**",
+
     # Build artifacts
     "bin/**",
     "dist/**",

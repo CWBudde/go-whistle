@@ -49,6 +49,14 @@ fetch-engine *args:
 fetch-upstream:
     scripts/fetch-upstream.sh
 
+# Fetch the oracle clip corpus (LibriSpeech + FLEURS excerpts) into testdata/audio
+oracle-clips:
+    go run -tags oracle ./tools/oracle clips
+
+# Record Needle 3 engine transcripts and embeddings for the corpus into testdata/oracle
+oracle-run:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle run
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
