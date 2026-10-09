@@ -280,7 +280,13 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       via `Range` (206 append, 200 restart, 416 re-verify), and checks size + SHA-256 before the rename.
       `HF_ENDPOINT` is honoured too. httptest suite plus opt-in `WHISTLE_HUB_LIVE=1` test. Against real HF: all three
       files verified, and a `.part` truncated to 100 MB resumed to the right `whistle.safetensors` digest.
-- [ ] `whistle download` command, with the local layout `models/whistle/{whistle.cact, whistle.safetensors, config.json}`
+- [x] `whistle download` command, with the local layout `models/whistle/{whistle.cact, whistle.safetensors, config.json}`
+      (2026-10-09) — `cmd/whistle` (cobra v1.10.2): `whistle download [--dir models/whistle] [--offline]` drives
+      `hub.Pinned()` + `Client.Download`. Progress goes to stderr, and one `whistle b358ddad ready in <dir>` line goes
+      to stdout. `HF_TOKEN` comes from the environment only (no flag), and `--offline` is OR'd with `HF_HUB_OFFLINE`.
+      Ctrl-C cancels the download and keeps the `.part` file for resume. Tests cover the flags, the pinned layout, a
+      download from a fake Hub, and offline failure without a request. Real run: a fresh download in 22 s with all
+      three digests verified; the re-run and `--offline` only verify.
 - [x] `scripts/fetch-engine.sh`: fetch the platform `needle` binary and `libneedle3` from `Cactus-Compute/needle3` into
       `engine/<platform>/`. Set `NEEDLE_TELEMETRY=0` and `DO_NOT_TRACK=1` for every oracle run.
       (2026-10-09) — `just fetch-engine [--platform …]` for macos-arm64, linux-x86_64 and linux-arm64, pinned to HF
