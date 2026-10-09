@@ -359,9 +359,19 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 - [ ] Tensor name map (index → safetensors name). **Accept:** `scripts/compare_cact.py` (or a Go test) reports a cosine
       for all 681 tensors, every tensor passes its threshold, and the map is pinned in a test.
 - [ ] `internal/weights`: one lookup interface over both formats, with lazy dequant and an mmap where the platform allows it.
-- [ ] `internal/tokenizer`: load the pieces, scores and types from the RAW blob (format per `export.py`). Decode
+- [x] `internal/tokenizer`: load the pieces, scores and types from the RAW blob (format per `export.py`). Decode
       (control/unk skipped, byte fallback, `▁`→space) and `RefTokenizer` encode. **Accept:** round-trip on multilingual
       sample text; decode of known id sequences matches `sentencepiece` (fixture from `scripts/`).
+      (2026-10-09) — `Parse`/`FromCact` read the blob (header, 8199 records, strict validation) into pieces, scores
+      and types. `Decode` follows sentencepiece: CONTROL/UNK vanish, `▁`→space in piece surfaces, and byte runs use
+      one U+FFFD per invalid byte. `Encode` is a straight port of `RefTokenizer` (markers longest first, best-score BPE,
+      byte fallback). Fixture route: `scripts/tokenizer_fixture.py` (`just tokenizer-fixture`) rebuilds a
+      sentencepiece `ModelProto` from the blob itself. It cross-checks against needle3's `tokenizer.model`: 0/8192
+      pieces differ, and 104/104 decodes plus 24/24 encodes over the shared ids are equal. The only change is
+      `unk_surface` set to `""`. The model-gated tests match sentencepiece on 109 sequences (2622 ids) and on the
+      decode of every single id (hash), match `RefTokenizer` encode on 25/25 multilingual samples, and round-trip all
+      25 plus 11 more texts. `RefTokenizer` decode disagrees with sentencepiece on 11 byte-fallback corner cases;
+      `docs/FINDINGS.md` F-005 lists them. Gap: the engine's behaviour on those cases is not yet measured.
 
 ## Phase 2 — Shared Needle 3 blocks (float32)
 
