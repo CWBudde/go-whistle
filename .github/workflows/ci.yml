@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+  # Manual runs add macos/arm64; macOS minutes bill at 10x on a private repo.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         # ubuntu-latest is linux/amd64, macos-latest is macos/arm64.
-        os: [ubuntu-latest, macos-latest]
+        os: ${{ github.event_name == 'workflow_dispatch' && fromJSON('["ubuntu-latest", "macos-latest"]') || fromJSON('["ubuntu-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
