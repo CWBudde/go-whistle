@@ -866,3 +866,95 @@ M5 Pro.
 
 **Open, for Phase 4.** Every axis above. Resolve it with the encoder probe harness, iterating `Variants()` (greedily
 per axis), by the mean per-frame cosine against `needle_embed`.
+
+## F-013 — MHC, Engram and the decoder Block in Go (2026-10-10)
+
+**Question.** Can float32 Go ports of `_ScanBody`'s mHC advance (with `_sinkhorn` and `Stack`'s lane expand and
+collapse), of `Engram` with `engram_indices`, and of `Block` meet the F-009 contract on every tensor of the `mhc`,
+`engram` and `block` fixtures? Which upstream details matter?
+
+**API (`internal/needle`).** `MHC` (`LoadMHC(src, prefix, layer)`, `Forward(stream, T, block)`, `Lanes`, `Dim`) with
+`ExpandLanes` and `CollapseLanes`; `Engram` (`LoadEngram(src, prefix, orders, tables)`, `Forward(tokens)` →
+`*EngramKV`, `Indices`, `IndicesAt`, `Dim`, `Tables`, `Slots`, `MaxOrder`); `Block` (`LoadBlock(src, prefix)`,
+`Forward(x, T, mask, rope, engram)`). As in F-011, the dimensions come from the shapes: the lanes from `mhc_b_pre`,
+the width from φ, the slots and sub-width from `tables`, the model width from `key_proj` and the tap count from
+`taps`. The orders and the table count are parameters, since the `.cact` header and the config hold them
+(`weights.Config.Orders`, `Tables`). `MHC.Forward` takes the block as a function. The decoder passes a `Block`; the
+encoder (`enc.mhc_*`, the same layout) will pass its Conformer block. `Block` is upstream's `Block` and so has no
+cross-attention; Whistle's decoder adds one per layer (PLAN.md card), which is Phase 4's job.
+
+**mHC details.**
+
+- **Lane layout.** `lane = eye(n)[layer % n]`, `pre_off = 8·lane − 4`, `post_off = −4·(1 − lane)` match `Stack`
+  (`TestLaneOffsets`). The layer's own lane gets +4 before `h_pre`'s sigmoid and 0 before `h_post`'s; the others get
+  −4 and −4. The Source serves φ lane-major (F-006), so rows layer·n … layer·n + n − 1 of `mhc_phi_pre` are the
+  layer's n columns and row 16·layer + 4i + j of `mhc_phi_res` is `h_res[i, j]`. The heads are then one
+  `MatMulTransB` each.
+- **Stream layout.** A row is n lanes of C values, lane-major, which is upstream's `(B, T, n, C)` and also
+  `nx = rms_unit(stream.reshape(B, T, n·C))` without a copy. `rms_unit` runs over all 2048 values.
+- **Rounding order.** `a · (nx @ φ) + b + off`, `x + σ(gate) · y`, `Σ_j h_res[i, j] · s_j + h_post[i] · y` and the
+  engram's `x + α · v` round the product before the add (explicit `float32(…)` conversions), as upstream's
+  elementwise jnp ops do. Go may otherwise fuse them to FMA on arm64. The effect is far below the contract either
+  way; it keeps the port's rounding close to the reference's.
+- **`y = block(u) − u`** is computed from the block's full output, as upstream does. It is not the block's residual
+  branch, which would round differently.
+
+**Sinkhorn: 20 iterations do not converge on Whistle's `h_res`.** `_sinkhorn` subtracts each row's logsumexp, then
+each column's, 20 times, then takes `exp`. The port does exactly that in float32, each logsumexp shifted by its
+maximum like `jax.nn.logsumexp`. It stays finite for logits of any finite size (1e30 in `TestSinkhornLargeLogits`,
+where a direct `exp` overflows above 88.7). Because the last step normalises the columns, they sum to 1 within float32
+rounding (≤ 1.4e-7 on the fixture). The rows do not: Whistle's `h_res` logits reach 70.8 (layer 0) and 19.9
+(layer 1), Sinkhorn converges slowly on such peaked matrices, and after 20 iterations the fixture's row sums deviate
+from 1 by up to **6.7 %** (layer 0) and 5.4 % (layer 1). After 200 iterations they still deviate by 0.3 %. So
+`h_res` is column-stochastic, not doubly stochastic, and the iteration count is part of the model. Run on the
+fixture's own logits, the port reproduces the fixture's `h_res` within 1.2e-7 at 20 iterations; at 19 or 21 it
+misses by 2.9e-3 to 4.4e-3, 290–440 times the bound (`TestSinkhornFixtureIterations`, no model needed). One
+consequence corrects F-009: on `Stack`'s lane expand, lane i of `Σ_j h_res[i, j] · x` is (row sum i) · x, not x, so
+`h_res` does matter at layer 0 (`TestMHCExpandedStream`). The `layer0` case therefore pins the Sinkhorn too.
+
+**Engram details.**
+
+- **Hash.** For table c = oi·hashes + h: `acc = 0x9E3779B9 · (c + 1)`, then for j < order `acc = (acc ^ tok[t − j]) ·
+0x01000193`, then `acc ^= acc >> 15`, all `uint32` with wraparound (Go's `uint32` arithmetic is exactly
+  `jnp.uint32`), and finally `acc mod slots`. Tokens before the start count as 0 (`_shift_right` pads zeros). The seed
+  stride between orders is the hash count, because Whistle's `engram_seed_heads` is 0 (F-003); upstream sets it only
+  for its half-width sub-model. `TestNgramHashHandComputed` pins seven hand-computed cases, one also worked on paper
+  (col 0, order 1, token 5 → `0xCD55385D`). `TestEngramMatchesReference` checks against a uint64 transcription masked
+  to 32 bits. All 96 fixture indices match exactly, including the pad id 0, the repeated trigram and the positions
+  before `order − 1`, whose hashes run over the zero padding.
+- **Incremental form.** A position's indices depend only on its last `MaxOrder` (3) tokens. `IndicesAt(dst, hist)`
+  takes that window, shorter at the start, and treats the missing tokens as zeros. `Indices` is built from it, and
+  `TestEngramIndicesIncremental` checks that a rolling 3-token window reproduces the sequence's indices at all 40
+  positions. The decoder's KV cache (Phase 5) also needs the last 3·3 = 9 `v_raw` rows for the dilated taps; that
+  cache is not built yet.
+- **Masks.** With the causal mask, `ngram_ok[t, c] = (t ≥ order_c − 1)`: the diagonal is all ones and `_mask_diag`
+  zero-pads the first `order − 1` steps. `tap_ok[j, t] = (t ≥ 3j)`. The test checks both against the fixture. The
+  first is the table-row mask. The second equals where `shift_right(v, 3j)` is defined, so the taps reuse
+  `applyTaps`, which now takes a dilation (1 for the attention, F-011).
+- **Table layout.** The Source serves `engram0.tables` as (4 · 18432, 128) (F-006), so table c's slot s is row
+  c·18432 + s. The lookup is a copy, and `e` matches the fixture exactly (max abs 0).
+- **Gate.** `α = σ(⟨rms_unit(x), rms_unit(k)⟩ / √512)` and `x += α · v`, with the division by `float32(√512)` as
+  upstream. Upstream sums every site's term times its flag. The flags are one-hot per layer, so one site per `Block`
+  call is exact. `Block.Forward` takes the site's `*EngramKV`, or nil away from the sites (3 and 7).
+
+**Result.** FP32 safetensors weights, Apple M5 Pro, every tensor of all seven fixtures. "Of bound" is max |Δ| /
+(1e-5 · max(1, max |ref|)). The first four rows are F-011's blocks, rerun unchanged:
+
+| fixture             | tensors | worst (of bound)                    | max \|Δ\| at max \|ref\|           | min cosine     |
+| ------------------- | ------- | ----------------------------------- | ---------------------------------- | -------------- |
+| `zcrmsnorm`         | 3       | `rms_unit` 0.01                     | 4.8e-7 at 3.6                      | 1.000000000000 |
+| `attention_decoder` | 15      | `gate` 0.39                         | 3.9e-6 at 1.0                      | 1.000000000000 |
+| `attention_encoder` | 11      | `gate` 0.41                         | 4.1e-6 at 1.0                      | 1.000000000000 |
+| `hadamard_mlp`      | 7       | `cond` 0.14                         | 7.9e-6 at 5.6                      | 1.000000000000 |
+| `mhc`               | 24      | `layer1.stream_out` 0.18            | 5.8e-4 at 317                      | 0.999999999999 |
+| `engram`            | 7 + I64 | `v_raw` 0.12; `indices` exact 96/96 | 5.3e-5 at 46                       | 1.000000000000 |
+| `block`             | 7       | `h` 0.18                            | 9.9e-5 at 56; `out` 1.1e-3 at 1457 | 0.999999999999 |
+
+Within `mhc`: `layer0.collapsed` 0.17, `layer0.stream_out` 0.14 (1.6e-3 at 1162), `layer0.final` 0.06, `h_res` 0.05
+(layer 0) and 0.14 (layer 1), and every head ≤ 0.16. `engram`'s `alpha` is 0.01 and `x_out` 0.01, both computed from
+the fixture's k and v so that the gate is checked on its own. The pure-Go fallbacks (`-tags purego`) give the same
+picture: the worst value is again `gate` at 0.40, and the worst of the new tensors is `layer0.collapsed` at 0.19.
+
+**Not covered.** The decoder's cross-attention and the full decoder stack (Phase 4). The KV cache, the rolling
+`v_raw` history for the engram taps, and RoPE offsets (Phase 5). The encoder's Conformer block that `MHC` will wrap.
+Parallelism and speed.

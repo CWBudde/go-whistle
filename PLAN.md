@@ -422,7 +422,7 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       25 plus 11 more texts. `RefTokenizer` decode disagrees with sentencepiece on 11 byte-fallback corner cases;
       `docs/FINDINGS.md` F-005 lists them. Gap: the engine's behaviour on those cases is not yet measured.
 
-## Phase 2 — Shared Needle 3 blocks (float32)
+## Phase 2 — Shared Needle 3 blocks (float32) — ✅ DONE (2026-10-10)
 
 - [x] Copy `internal/tensor` and `internal/ops` from go-pocket-tts; drop what is not needed (convtranspose, Mimi-specific ops).
       (2026-10-10) — copied from go-pocket-tts `internal/runtime/{tensor,ops}` @ `9faba38`; every file names its source
@@ -472,10 +472,29 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       `z2`, `z3` and `out`. Permutation pin: `TestHadaPermsFixture` (fixture `p1`/`p2` = `cact.NumpyPermutation`, no
       model needed) and `TestHadaPermsBothBackends` (layer 0 through `.cact` and safetensors, identical and equal to
       the fixture); `internal/weights` `TestWhistleCrossFormat` compares all derived records too.
-- [ ] `MHC`: lane expand/collapse, pre/post/res heads, a numerically stable log-domain 20-iteration Sinkhorn.
-- [ ] `Engram`: uint32 multi-head hashing over the token history, table lookup, key/value projections, dilated
+- [x] `MHC`: lane expand/collapse, pre/post/res heads, a numerically stable log-domain 20-iteration Sinkhorn.
+      (2026-10-10) — `needle.LoadMHC(src, prefix, layer)` (`""` decoder, `enc.` encoder) slices the layer's heads from
+      the stacked `mhc_*` tensors (φ lane-major, so each head is one GEMM) and derives the lanes and the width from the
+      shapes. `Forward(stream, T, block)` takes the block as a function, so the encoder's Conformer block fits later.
+      `ExpandLanes`/`CollapseLanes` are `Stack`'s broadcast and lane mean. The Sinkhorn is log-domain float32 with
+      max-shifted logsumexp; it stays finite at logits of 1e30. Discovery: 20 iterations do not converge on Whistle's
+      `h_res` (logits up to 70.8). The columns sum to 1, the rows deviate by up to 6.7 % (layer 0), so the count is
+      part of the model: 19 or 21 iterations miss the fixture's `h_res` by about 3e-3, 300 times the bound. Against
+      `mhc.safetensors`: every head and the stream of both layers, plus `collapsed` and `final`. Worst
+      `layer1.stream_out` 0.18 of the bound (5.8e-4 at 317), `h_res` ≤ 0.14, cosine ≥ 0.999999999999. Unit tests:
+      column sums, float64 transcriptions of `_sinkhorn` and of `advance`, large logits, the lane offsets, and the
+      expand/collapse bookkeeping (`docs/FINDINGS.md` F-013).
+- [x] `Engram`: uint32 multi-head hashing over the token history, table lookup, key/value projections, dilated
       4-tap conv, sigmoid gating against `rms_unit(x)`.
-- [ ] `scripts/needle_fixtures.py`: run each Flax module with real Whistle decoder weights on random inputs and save
+      (2026-10-10) — `needle.LoadEngram(src, "engram0.", cfg.Orders, cfg.Tables)`, `Forward(tokens)` → `*EngramKV`;
+      the gate is applied inside `Block.Forward(…, engram)`. The hash is plain Go `uint32` arithmetic (seed stride =
+      hashes, since `engram_seed_heads` = 0) and is pinned to seven hand-computed wraparound cases. Incremental form:
+      `IndicesAt(dst, hist)` reads the last `MaxOrder` = 3 tokens, and a rolling window reproduces the sequence's
+      indices at every position. The value taps reuse `applyTaps`, which now takes a dilation (3). Against
+      `engram.safetensors`: all 96 `indices` exact, `ngram_ok`/`tap_ok` as the causal rule, `e` exact, `k`, `v_raw`,
+      `v`, `alpha`, `x_out` ≤ 0.12 of the bound, cosine 1.000000000000. Gap: the rolling `v_raw` history for the
+      taps during decoding belongs to the Phase 5 cache (F-013).
+- [x] `scripts/needle_fixtures.py`: run each Flax module with real Whistle decoder weights on random inputs and save
       the inputs and outputs. **Accept:** every block matches within 1e-5 (max abs) / cosine ≥ 0.99999.
       (2026-10-10) — partial: the fixture half exists. `just needle-fixtures` imports upstream's Flax modules and binds
       them to the FP32 safetensors parameters by Flax path, with every module leaf present at the exact shape. It runs
@@ -493,7 +512,25 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       `ZCRMSNorm`/`rms_unit`, `Attention` (decoder and encoder fixtures, with and without RoPE) and `HadamardMLP` pass
       `zcrmsnorm`, `attention_decoder`, `attention_encoder` and `hadamard_mlp` within this contract, every
       intermediate, worst 0.41 of the bound (F-011). Pending: `MHC`, `Engram` and `Block` against `mhc`, `engram`
-      and `block`.
+      and `block`. (2026-10-10) — every fixture file passes the contract with every tensor. `MHC`, `Engram` and
+      `Block` (upstream's decoder `Block` without cross-attention: the engram add, `norm_in` → attention →
+      σ(attn_gate)·`post_norm`, `pre_hada` → HadamardMLP) close the last three. Worst per file, over
+      `go test -v -run Fixture ./internal/needle/` (FP32 safetensors weights, Apple M5 Pro):
+
+      | fixture             | tensors | worst (of bound)         | max \|Δ\|  | bound   | min cosine     |
+      | ------------------- | ------- | ------------------------ | ---------- | ------- | -------------- |
+      | `zcrmsnorm`         | 3       | `rms_unit` 0.01          | 4.8e-7     | 3.6e-5  | 1.000000000000 |
+      | `attention_decoder` | 15      | `gate` 0.39              | 3.9e-6     | 1.0e-5  | 1.000000000000 |
+      | `attention_encoder` | 11      | `gate` 0.41              | 4.1e-6     | 1.0e-5  | 1.000000000000 |
+      | `hadamard_mlp`      | 7       | `cond` 0.14              | 7.9e-6     | 5.6e-5  | 1.000000000000 |
+      | `mhc`               | 24      | `layer1.stream_out` 0.18 | 5.8e-4     | 3.2e-3  | 0.999999999999 |
+      | `engram`            | 7 + I64 | `v_raw` 0.12             | 5.3e-5     | 4.6e-4  | 1.000000000000 |
+      | `block`             | 7       | `h` 0.18                 | 9.9e-5     | 5.6e-4  | 0.999999999999 |
+
+      The I64 tensors are exact (`engram.indices` 96/96, `hadamard_mlp.p1`/`p2`), and `-tags purego` gives the same
+      picture (worst 0.40). No fixture was regenerated. F-009's remark that `h_res` does not matter on the lane
+      expand is only approximate, since 20 Sinkhorn iterations leave the rows unconverged; the fixture is right as
+      it is, and `layer0` pins the Sinkhorn too (F-013).
 
 ## Phase 3 — Front end
 

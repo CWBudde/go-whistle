@@ -62,6 +62,22 @@ func (l *loader) matrix(name string, rows, cols int) ([]float32, int, int) {
 	return data, shape[0], shape[1]
 }
 
+// cube returns a rank-3 tensor of shape (a, b, c).
+func (l *loader) cube(name string, a, b, c int) []float32 {
+	data, shape := l.tensor(name, 3)
+	if data == nil {
+		return nil
+	}
+
+	if shape[0] != a || shape[1] != b || shape[2] != c {
+		l.failf("%s%s has shape %v, want (%d, %d, %d)", l.prefix, name, shape, a, b, c)
+
+		return nil
+	}
+
+	return data
+}
+
 // vector returns a rank-1 tensor of length n, any length if n is 0.
 func (l *loader) vector(name string, n int) []float32 {
 	data, shape := l.tensor(name, 1)
