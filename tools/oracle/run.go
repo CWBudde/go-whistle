@@ -6,6 +6,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -109,9 +111,9 @@ func recordClip(ctx context.Context, cfg runConfig, eng *engine, model oracleMod
 ) error {
 	wav := filepath.Join(cfg.audioDir, c.ID+".wav")
 
-	raw, err := os.ReadFile(wav) // #nosec G304 G703 -- ids are checked by readCorpus.
+	raw, err := readClip(wav, c.SHA256)
 	if err != nil {
-		return fmt.Errorf("read clip: %w", err)
+		return err
 	}
 
 	pcm, rate, err := readWAV(raw)
@@ -162,6 +164,22 @@ func recordClip(ctx context.Context, cfg runConfig, eng *engine, model oracleMod
 	_, _ = fmt.Fprintf(log, "%-36s %3d frames  %s\n", c.ID, frames, oneLine(tr))
 
 	return nil
+}
+
+// readClip reads a corpus clip and checks it against the digest in the corpus manifest, so that fixtures are never
+// recorded from, and attributed to, audio other than the pinned clip.
+func readClip(path, wantSHA256 string) ([]byte, error) {
+	raw, err := os.ReadFile(path) // #nosec G304 G703 -- ids are checked by readCorpus.
+	if err != nil {
+		return nil, fmt.Errorf("read clip: %w", err)
+	}
+
+	sum := sha256.Sum256(raw)
+	if got := hex.EncodeToString(sum[:]); got != wantSHA256 {
+		return nil, fmt.Errorf("clip sha256 %s, corpus manifest pins %s (re-run `just oracle-clips`)", got, wantSHA256)
+	}
+
+	return raw, nil
 }
 
 // transcribe runs the needle CLI on wav and returns its JSON with the timing fields removed, keys sorted and

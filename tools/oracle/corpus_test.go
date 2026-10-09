@@ -6,6 +6,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -215,5 +217,29 @@ func TestValidID(t *testing.T) {
 		if got := validID(id); got != want {
 			t.Errorf("validID(%q) = %v, want %v", id, got, want)
 		}
+	}
+}
+
+func TestReadClipVerifiesDigest(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "clip.wav")
+
+	err := os.WriteFile(path, []byte("RIFF....WAVE"), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want, err := fileSHA256(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := readClip(path, want)
+	if err != nil || string(raw) != "RIFF....WAVE" {
+		t.Fatalf("readClip with the pinned digest = %q, %v", raw, err)
+	}
+
+	_, err = readClip(path, strings.Repeat("0", 64))
+	if err == nil || !strings.Contains(err.Error(), "corpus manifest pins") {
+		t.Fatalf("readClip with a stale digest: err = %v, want a digest mismatch", err)
 	}
 }
