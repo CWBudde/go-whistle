@@ -1,0 +1,108 @@
+{
+  "language": "es",
+  "text": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+  "words": [
+    {
+      "word": "No",
+      "start": 0.96,
+      "end": 1.12,
+      "probability": 0.990
+    },
+    {
+      "word": "ha",
+      "start": 1.12,
+      "end": 1.20,
+      "probability": 0.995
+    },
+    {
+      "word": "podido",
+      "start": 1.20,
+      "end": 1.52,
+      "probability": 1.000
+    },
+    {
+      "word": "tomarse",
+      "start": 1.52,
+      "end": 2.00,
+      "probability": 0.994
+    },
+    {
+      "word": "medicamentos",
+      "start": 2.00,
+      "end": 2.72,
+      "probability": 0.999
+    },
+    {
+      "word": "para",
+      "start": 2.72,
+      "end": 2.96,
+      "probability": 0.996
+    },
+    {
+      "word": "lidiar",
+      "start": 2.96,
+      "end": 3.28,
+      "probability": 0.811
+    },
+    {
+      "word": "el",
+      "start": 3.28,
+      "end": 3.44,
+      "probability": 0.976
+    },
+    {
+      "word": "dolor",
+      "start": 3.44,
+      "end": 3.76,
+      "probability": 0.998
+    },
+    {
+      "word": "porque",
+      "start": 3.76,
+      "end": 4.08,
+      "probability": 0.887
+    },
+    {
+      "word": "está",
+      "start": 4.08,
+      "end": 4.32,
+      "probability": 0.991
+    },
+    {
+      "word": "prohibido",
+      "start": 4.32,
+      "end": 4.88,
+      "probability": 0.996
+    },
+    {
+      "word": "su",
+      "start": 4.88,
+      "end": 5.04,
+      "probability": 0.577
+    },
+    {
+      "word": "uso",
+      "start": 5.04,
+      "end": 5.28,
+      "probability": 0.999
+    },
+    {
+      "word": "en",
+      "start": 5.28,
+      "end": 5.36,
+      "probability": 0.775
+    },
+    {
+      "word": "los",
+      "start": 5.36,
+      "end": 5.52,
+      "probability": 0.998
+    },
+    {
+      "word": "juegos.",
+      "start": 5.52,
+      "end": 5.92,
+      "probability": 0.999
+    }
+  ]
+}

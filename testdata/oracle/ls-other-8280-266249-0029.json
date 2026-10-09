@@ -1,0 +1,168 @@
+{
+  "language": "en",
+  "text": "There was a pause, broken by young Horace, who had been watching a group of men gathered about a table at the further end of the room.",
+  "words": [
+    {
+      "word": "There",
+      "start": 0.56,
+      "end": 0.72,
+      "probability": 0.979
+    },
+    {
+      "word": "was",
+      "start": 0.72,
+      "end": 0.96,
+      "probability": 0.999
+    },
+    {
+      "word": "a",
+      "start": 0.96,
+      "end": 1.12,
+      "probability": 0.998
+    },
+    {
+      "word": "pause,",
+      "start": 1.12,
+      "end": 1.44,
+      "probability": 0.999
+    },
+    {
+      "word": "broken",
+      "start": 1.84,
+      "end": 2.08,
+      "probability": 0.999
+    },
+    {
+      "word": "by",
+      "start": 2.08,
+      "end": 2.32,
+      "probability": 0.999
+    },
+    {
+      "word": "young",
+      "start": 2.32,
+      "end": 2.48,
+      "probability": 0.925
+    },
+    {
+      "word": "Horace,",
+      "start": 2.48,
+      "end": 2.96,
+      "probability": 0.938
+    },
+    {
+      "word": "who",
+      "start": 3.04,
+      "end": 3.12,
+      "probability": 0.999
+    },
+    {
+      "word": "had",
+      "start": 3.12,
+      "end": 3.28,
+      "probability": 0.999
+    },
+    {
+      "word": "been",
+      "start": 3.28,
+      "end": 3.44,
+      "probability": 0.999
+    },
+    {
+      "word": "watching",
+      "start": 3.44,
+      "end": 3.84,
+      "probability": 1.000
+    },
+    {
+      "word": "a",
+      "start": 3.84,
+      "end": 3.92,
+      "probability": 0.996
+    },
+    {
+      "word": "group",
+      "start": 3.92,
+      "end": 4.16,
+      "probability": 0.997
+    },
+    {
+      "word": "of",
+      "start": 4.16,
+      "end": 4.32,
+      "probability": 0.999
+    },
+    {
+      "word": "men",
+      "start": 4.32,
+      "end": 4.56,
+      "probability": 0.999
+    },
+    {
+      "word": "gathered",
+      "start": 4.56,
+      "end": 5.12,
+      "probability": 0.983
+    },
+    {
+      "word": "about",
+      "start": 5.12,
+      "end": 5.28,
+      "probability": 0.999
+    },
+    {
+      "word": "a",
+      "start": 5.28,
+      "end": 5.52,
+      "probability": 0.969
+    },
+    {
+      "word": "table",
+      "start": 5.52,
+      "end": 5.76,
+      "probability": 0.989
+    },
+    {
+      "word": "at",
+      "start": 5.76,
+      "end": 5.92,
+      "probability": 0.989
+    },
+    {
+      "word": "the",
+      "start": 5.92,
+      "end": 6.00,
+      "probability": 0.994
+    },
+    {
+      "word": "further",
+      "start": 6.00,
+      "end": 6.24,
+      "probability": 0.933
+    },
+    {
+      "word": "end",
+      "start": 6.24,
+      "end": 6.56,
+      "probability": 1.000
+    },
+    {
+      "word": "of",
+      "start": 6.56,
+      "end": 6.64,
+      "probability": 0.997
+    },
+    {
+      "word": "the",
+      "start": 6.64,
+      "end": 6.80,
+      "probability": 0.999
+    },
+    {
+      "word": "room.",
+      "start": 6.80,
+      "end": 6.96,
+      "probability": 0.998
+    }
+  ]
+}

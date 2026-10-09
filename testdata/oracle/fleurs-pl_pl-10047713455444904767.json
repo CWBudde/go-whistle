@@ -1,0 +1,78 @@
+{
+  "language": "pl",
+  "text": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+  "words": [
+    {
+      "word": "Zgodnie",
+      "start": 0.96,
+      "end": 1.44,
+      "probability": 0.983
+    },
+    {
+      "word": "z",
+      "start": 1.44,
+      "end": 1.52,
+      "probability": 0.990
+    },
+    {
+      "word": "oświadczeniem",
+      "start": 1.52,
+      "end": 2.16,
+      "probability": 0.969
+    },
+    {
+      "word": "wyreguber",
+      "start": 2.16,
+      "end": 2.64,
+      "probability": 0.665
+    },
+    {
+      "word": "na",
+      "start": 2.64,
+      "end": 2.80,
+      "probability": 0.459
+    },
+    {
+      "word": "towarów",
+      "start": 2.80,
+      "end": 3.12,
+      "probability": 0.686
+    },
+    {
+      "word": "śródranych",
+      "start": 3.12,
+      "end": 3.76,
+      "probability": 0.871
+    },
+    {
+      "word": "płodzi",
+      "start": 3.76,
+      "end": 4.16,
+      "probability": 0.736
+    },
+    {
+      "word": "w",
+      "start": 4.16,
+      "end": 4.24,
+      "probability": 0.833
+    },
+    {
+      "word": "ją",
+      "start": 4.24,
+      "end": 4.48,
+      "probability": 0.761
+    },
+    {
+      "word": "nas",
+      "start": 4.48,
+      "end": 4.80,
+      "probability": 0.589
+    },
+    {
+      "word": "obolicjantów.",
+      "start": 4.80,
+      "end": 5.68,
+      "probability": 0.772
+    }
+  ]
+}

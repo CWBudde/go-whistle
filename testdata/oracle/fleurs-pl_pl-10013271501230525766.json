@@ -1,0 +1,108 @@
+{
+  "language": "pl",
+  "text": "W większość mniejszych wyzptów to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+  "words": [
+    {
+      "word": "W",
+      "start": 0.40,
+      "end": 0.56,
+      "probability": 0.978
+    },
+    {
+      "word": "większość",
+      "start": 0.56,
+      "end": 1.04,
+      "probability": 0.904
+    },
+    {
+      "word": "mniejszych",
+      "start": 1.04,
+      "end": 1.52,
+      "probability": 0.986
+    },
+    {
+      "word": "wyzptów",
+      "start": 1.52,
+      "end": 2.16,
+      "probability": 0.776
+    },
+    {
+      "word": "to",
+      "start": 2.16,
+      "end": 2.16,
+      "probability": 0.176
+    },
+    {
+      "word": "narody",
+      "start": 2.16,
+      "end": 2.40,
+      "probability": 0.734
+    },
+    {
+      "word": "niezależne",
+      "start": 2.40,
+      "end": 2.96,
+      "probability": 0.993
+    },
+    {
+      "word": "lub",
+      "start": 2.96,
+      "end": 3.20,
+      "probability": 0.844
+    },
+    {
+      "word": "wspomnieżone",
+      "start": 3.20,
+      "end": 3.60,
+      "probability": 0.817
+    },
+    {
+      "word": "z",
+      "start": 3.60,
+      "end": 3.76,
+      "probability": 0.793
+    },
+    {
+      "word": "Francją",
+      "start": 3.76,
+      "end": 4.16,
+      "probability": 0.983
+    },
+    {
+      "word": "i",
+      "start": 4.16,
+      "end": 4.32,
+      "probability": 0.324
+    },
+    {
+      "word": "słynące",
+      "start": 4.32,
+      "end": 4.72,
+      "probability": 0.867
+    },
+    {
+      "word": "ekologiczowe",
+      "start": 4.72,
+      "end": 5.44,
+      "probability": 0.871
+    },
+    {
+      "word": "nadwalskie",
+      "start": 5.44,
+      "end": 6.00,
+      "probability": 0.751
+    },
+    {
+      "word": "miejscowości",
+      "start": 6.00,
+      "end": 6.56,
+      "probability": 0.967
+    },
+    {
+      "word": "wypoczynkowe.",
+      "start": 6.56,
+      "end": 7.28,
+      "probability": 0.966
+    }
+  ]
+}

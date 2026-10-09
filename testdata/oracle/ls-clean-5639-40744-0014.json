@@ -1,0 +1,144 @@
+{
+  "language": "en",
+  "text": "Among other things on which she cast her eyes was a small crucifix of solid silver, standing on a cabinet near the window.",
+  "words": [
+    {
+      "word": "Among",
+      "start": 0.32,
+      "end": 0.64,
+      "probability": 0.996
+    },
+    {
+      "word": "other",
+      "start": 0.64,
+      "end": 0.80,
+      "probability": 0.994
+    },
+    {
+      "word": "things",
+      "start": 0.80,
+      "end": 1.04,
+      "probability": 0.999
+    },
+    {
+      "word": "on",
+      "start": 1.04,
+      "end": 1.36,
+      "probability": 0.840
+    },
+    {
+      "word": "which",
+      "start": 1.36,
+      "end": 1.92,
+      "probability": 0.963
+    },
+    {
+      "word": "she",
+      "start": 1.92,
+      "end": 2.16,
+      "probability": 0.793
+    },
+    {
+      "word": "cast",
+      "start": 2.16,
+      "end": 2.48,
+      "probability": 0.996
+    },
+    {
+      "word": "her",
+      "start": 2.48,
+      "end": 2.80,
+      "probability": 0.997
+    },
+    {
+      "word": "eyes",
+      "start": 2.80,
+      "end": 3.04,
+      "probability": 0.995
+    },
+    {
+      "word": "was",
+      "start": 3.04,
+      "end": 3.28,
+      "probability": 0.986
+    },
+    {
+      "word": "a",
+      "start": 3.28,
+      "end": 3.36,
+      "probability": 0.988
+    },
+    {
+      "word": "small",
+      "start": 3.36,
+      "end": 3.60,
+      "probability": 0.999
+    },
+    {
+      "word": "crucifix",
+      "start": 3.60,
+      "end": 4.32,
+      "probability": 0.993
+    },
+    {
+      "word": "of",
+      "start": 4.32,
+      "end": 4.48,
+      "probability": 0.997
+    },
+    {
+      "word": "solid",
+      "start": 4.48,
+      "end": 4.96,
+      "probability": 0.997
+    },
+    {
+      "word": "silver,",
+      "start": 4.96,
+      "end": 5.60,
+      "probability": 1.000
+    },
+    {
+      "word": "standing",
+      "start": 5.92,
+      "end": 6.16,
+      "probability": 0.998
+    },
+    {
+      "word": "on",
+      "start": 6.16,
+      "end": 6.32,
+      "probability": 0.998
+    },
+    {
+      "word": "a",
+      "start": 6.32,
+      "end": 6.48,
+      "probability": 0.996
+    },
+    {
+      "word": "cabinet",
+      "start": 6.48,
+      "end": 6.88,
+      "probability": 0.988
+    },
+    {
+      "word": "near",
+      "start": 6.88,
+      "end": 7.04,
+      "probability": 0.999
+    },
+    {
+      "word": "the",
+      "start": 7.04,
+      "end": 7.20,
+      "probability": 0.999
+    },
+    {
+      "word": "window.",
+      "start": 7.20,
+      "end": 7.36,
+      "probability": 1.000
+    }
+  ]
+}

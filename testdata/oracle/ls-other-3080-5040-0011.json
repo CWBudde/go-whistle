@@ -1,0 +1,78 @@
+{
+  "language": "en",
+  "text": "Here are some verses of colonies. Tell me how you like them.",
+  "words": [
+    {
+      "word": "Here",
+      "start": 0.56,
+      "end": 0.80,
+      "probability": 0.367
+    },
+    {
+      "word": "are",
+      "start": 0.80,
+      "end": 0.88,
+      "probability": 0.997
+    },
+    {
+      "word": "some",
+      "start": 0.88,
+      "end": 1.04,
+      "probability": 1.000
+    },
+    {
+      "word": "verses",
+      "start": 1.04,
+      "end": 1.36,
+      "probability": 0.963
+    },
+    {
+      "word": "of",
+      "start": 1.36,
+      "end": 1.52,
+      "probability": 0.973
+    },
+    {
+      "word": "colonies.",
+      "start": 1.52,
+      "end": 2.08,
+      "probability": 0.774
+    },
+    {
+      "word": "Tell",
+      "start": 2.64,
+      "end": 2.80,
+      "probability": 0.912
+    },
+    {
+      "word": "me",
+      "start": 2.80,
+      "end": 2.96,
+      "probability": 1.000
+    },
+    {
+      "word": "how",
+      "start": 2.96,
+      "end": 3.04,
+      "probability": 0.909
+    },
+    {
+      "word": "you",
+      "start": 3.04,
+      "end": 3.12,
+      "probability": 0.994
+    },
+    {
+      "word": "like",
+      "start": 3.12,
+      "end": 3.28,
+      "probability": 0.924
+    },
+    {
+      "word": "them.",
+      "start": 3.28,
+      "end": 3.52,
+      "probability": 0.999
+    }
+  ]
+}

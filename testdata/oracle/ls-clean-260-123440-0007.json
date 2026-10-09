@@ -1,0 +1,66 @@
+{
+  "language": "en",
+  "text": "I almost think I can remember feeling a little different.",
+  "words": [
+    {
+      "word": "I",
+      "start": 0.40,
+      "end": 0.64,
+      "probability": 0.497
+    },
+    {
+      "word": "almost",
+      "start": 0.64,
+      "end": 0.96,
+      "probability": 0.965
+    },
+    {
+      "word": "think",
+      "start": 0.96,
+      "end": 1.20,
+      "probability": 0.996
+    },
+    {
+      "word": "I",
+      "start": 1.20,
+      "end": 1.36,
+      "probability": 0.993
+    },
+    {
+      "word": "can",
+      "start": 1.36,
+      "end": 1.52,
+      "probability": 0.994
+    },
+    {
+      "word": "remember",
+      "start": 1.52,
+      "end": 1.84,
+      "probability": 0.997
+    },
+    {
+      "word": "feeling",
+      "start": 1.84,
+      "end": 2.24,
+      "probability": 0.991
+    },
+    {
+      "word": "a",
+      "start": 2.24,
+      "end": 2.56,
+      "probability": 0.447
+    },
+    {
+      "word": "little",
+      "start": 2.56,
+      "end": 2.80,
+      "probability": 0.998
+    },
+    {
+      "word": "different.",
+      "start": 2.80,
+      "end": 3.12,
+      "probability": 0.993
+    }
+  ]
+}

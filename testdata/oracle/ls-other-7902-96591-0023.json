@@ -1,0 +1,102 @@
+{
+  "language": "en",
+  "text": "But there was no chance for his body there, and the head would not go first.",
+  "words": [
+    {
+      "word": "But",
+      "start": 0.24,
+      "end": 0.40,
+      "probability": 0.954
+    },
+    {
+      "word": "there",
+      "start": 0.40,
+      "end": 0.48,
+      "probability": 0.999
+    },
+    {
+      "word": "was",
+      "start": 0.48,
+      "end": 0.64,
+      "probability": 0.996
+    },
+    {
+      "word": "no",
+      "start": 0.64,
+      "end": 0.80,
+      "probability": 1.000
+    },
+    {
+      "word": "chance",
+      "start": 0.80,
+      "end": 1.12,
+      "probability": 0.288
+    },
+    {
+      "word": "for",
+      "start": 1.12,
+      "end": 1.20,
+      "probability": 0.999
+    },
+    {
+      "word": "his",
+      "start": 1.20,
+      "end": 1.36,
+      "probability": 0.998
+    },
+    {
+      "word": "body",
+      "start": 1.36,
+      "end": 1.60,
+      "probability": 0.997
+    },
+    {
+      "word": "there,",
+      "start": 1.60,
+      "end": 1.84,
+      "probability": 0.989
+    },
+    {
+      "word": "and",
+      "start": 1.92,
+      "end": 2.00,
+      "probability": 0.949
+    },
+    {
+      "word": "the",
+      "start": 2.00,
+      "end": 2.08,
+      "probability": 0.963
+    },
+    {
+      "word": "head",
+      "start": 2.08,
+      "end": 2.16,
+      "probability": 0.973
+    },
+    {
+      "word": "would",
+      "start": 2.16,
+      "end": 2.32,
+      "probability": 0.984
+    },
+    {
+      "word": "not",
+      "start": 2.32,
+      "end": 2.40,
+      "probability": 0.994
+    },
+    {
+      "word": "go",
+      "start": 2.40,
+      "end": 2.56,
+      "probability": 0.999
+    },
+    {
+      "word": "first.",
+      "start": 2.56,
+      "end": 2.80,
+      "probability": 0.993
+    }
+  ]
+}

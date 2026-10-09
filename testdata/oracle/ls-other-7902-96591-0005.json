@@ -1,0 +1,84 @@
+{
+  "language": "en",
+  "text": "He could not help it. He hates the smugglers. You shall not tell.",
+  "words": [
+    {
+      "word": "He",
+      "start": 0.16,
+      "end": 0.32,
+      "probability": 0.881
+    },
+    {
+      "word": "could",
+      "start": 0.32,
+      "end": 0.48,
+      "probability": 0.573
+    },
+    {
+      "word": "not",
+      "start": 0.48,
+      "end": 0.64,
+      "probability": 0.997
+    },
+    {
+      "word": "help",
+      "start": 0.64,
+      "end": 0.88,
+      "probability": 0.998
+    },
+    {
+      "word": "it.",
+      "start": 0.88,
+      "end": 1.04,
+      "probability": 0.998
+    },
+    {
+      "word": "He",
+      "start": 1.28,
+      "end": 1.44,
+      "probability": 0.962
+    },
+    {
+      "word": "hates",
+      "start": 1.44,
+      "end": 1.60,
+      "probability": 0.931
+    },
+    {
+      "word": "the",
+      "start": 1.60,
+      "end": 1.76,
+      "probability": 0.864
+    },
+    {
+      "word": "smugglers.",
+      "start": 1.76,
+      "end": 2.24,
+      "probability": 0.960
+    },
+    {
+      "word": "You",
+      "start": 2.48,
+      "end": 2.56,
+      "probability": 0.929
+    },
+    {
+      "word": "shall",
+      "start": 2.56,
+      "end": 2.80,
+      "probability": 0.998
+    },
+    {
+      "word": "not",
+      "start": 2.80,
+      "end": 2.96,
+      "probability": 0.997
+    },
+    {
+      "word": "tell.",
+      "start": 2.96,
+      "end": 3.20,
+      "probability": 0.980
+    }
+  ]
+}

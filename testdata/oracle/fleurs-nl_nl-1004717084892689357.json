@@ -1,0 +1,72 @@
+{
+  "language": "nl",
+  "text": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+  "words": [
+    {
+      "word": "Vanke",
+      "start": 0.72,
+      "end": 1.20,
+      "probability": 0.574
+    },
+    {
+      "word": "strafreziekte",
+      "start": 1.20,
+      "end": 1.68,
+      "probability": 0.560
+    },
+    {
+      "word": "bij",
+      "start": 1.68,
+      "end": 1.84,
+      "probability": 0.681
+    },
+    {
+      "word": "zich",
+      "start": 1.84,
+      "end": 2.00,
+      "probability": 0.494
+    },
+    {
+      "word": "en",
+      "start": 2.00,
+      "end": 2.16,
+      "probability": 0.340
+    },
+    {
+      "word": "dragen",
+      "start": 2.16,
+      "end": 2.40,
+      "probability": 0.405
+    },
+    {
+      "word": "het",
+      "start": 2.40,
+      "end": 2.56,
+      "probability": 0.904
+    },
+    {
+      "word": "via",
+      "start": 2.56,
+      "end": 2.72,
+      "probability": 0.926
+    },
+    {
+      "word": "mugen",
+      "start": 2.72,
+      "end": 3.12,
+      "probability": 0.694
+    },
+    {
+      "word": "overal",
+      "start": 3.12,
+      "end": 3.52,
+      "probability": 0.762
+    },
+    {
+      "word": "mensen.",
+      "start": 3.52,
+      "end": 3.76,
+      "probability": 0.981
+    }
+  ]
+}

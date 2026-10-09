@@ -1,0 +1,96 @@
+{
+  "language": "nl",
+  "text": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+  "words": [
+    {
+      "word": "Volgens",
+      "start": 0.56,
+      "end": 0.80,
+      "probability": 0.618
+    },
+    {
+      "word": "Angel",
+      "start": 0.80,
+      "end": 1.12,
+      "probability": 0.743
+    },
+    {
+      "word": "2006",
+      "start": 1.12,
+      "end": 1.92,
+      "probability": 0.821
+    },
+    {
+      "word": "kunnen",
+      "start": 1.92,
+      "end": 2.00,
+      "probability": 0.985
+    },
+    {
+      "word": "organisaties",
+      "start": 2.00,
+      "end": 2.56,
+      "probability": 0.976
+    },
+    {
+      "word": "beter",
+      "start": 2.56,
+      "end": 2.88,
+      "probability": 0.999
+    },
+    {
+      "word": "presteren",
+      "start": 2.88,
+      "end": 3.36,
+      "probability": 0.987
+    },
+    {
+      "word": "met",
+      "start": 3.36,
+      "end": 3.52,
+      "probability": 0.981
+    },
+    {
+      "word": "een",
+      "start": 3.52,
+      "end": 3.60,
+      "probability": 0.997
+    },
+    {
+      "word": "aanpak",
+      "start": 3.60,
+      "end": 4.00,
+      "probability": 0.997
+    },
+    {
+      "word": "op",
+      "start": 4.00,
+      "end": 4.16,
+      "probability": 0.998
+    },
+    {
+      "word": "basis",
+      "start": 4.16,
+      "end": 4.40,
+      "probability": 1.000
+    },
+    {
+      "word": "van",
+      "start": 4.40,
+      "end": 4.64,
+      "probability": 1.000
+    },
+    {
+      "word": "het",
+      "start": 4.64,
+      "end": 4.72,
+      "probability": 0.982
+    },
+    {
+      "word": "continuummodel.",
+      "start": 4.72,
+      "end": 5.60,
+      "probability": 0.646
+    }
+  ]
+}

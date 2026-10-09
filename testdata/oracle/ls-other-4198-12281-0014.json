@@ -1,0 +1,54 @@
+{
+  "language": "en",
+  "text": "\"Can you tell with what instruments they did?\"",
+  "words": [
+    {
+      "word": "\"Can",
+      "start": 0.64,
+      "end": 0.88,
+      "probability": 0.802
+    },
+    {
+      "word": "you",
+      "start": 0.88,
+      "end": 1.04,
+      "probability": 0.992
+    },
+    {
+      "word": "tell",
+      "start": 1.04,
+      "end": 1.36,
+      "probability": 0.998
+    },
+    {
+      "word": "with",
+      "start": 1.36,
+      "end": 1.68,
+      "probability": 0.974
+    },
+    {
+      "word": "what",
+      "start": 1.68,
+      "end": 1.92,
+      "probability": 0.996
+    },
+    {
+      "word": "instruments",
+      "start": 1.92,
+      "end": 2.48,
+      "probability": 0.993
+    },
+    {
+      "word": "they",
+      "start": 2.48,
+      "end": 2.72,
+      "probability": 0.989
+    },
+    {
+      "word": "did?\"",
+      "start": 2.72,
+      "end": 3.28,
+      "probability": 0.943
+    }
+  ]
+}

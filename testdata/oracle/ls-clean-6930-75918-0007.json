@@ -1,0 +1,60 @@
+{
+  "language": "en",
+  "text": "\"You will be frank with me? I always am.\"",
+  "words": [
+    {
+      "word": "\"You",
+      "start": 0.40,
+      "end": 0.64,
+      "probability": 0.795
+    },
+    {
+      "word": "will",
+      "start": 0.64,
+      "end": 0.80,
+      "probability": 0.985
+    },
+    {
+      "word": "be",
+      "start": 0.80,
+      "end": 0.96,
+      "probability": 0.999
+    },
+    {
+      "word": "frank",
+      "start": 0.96,
+      "end": 1.28,
+      "probability": 0.994
+    },
+    {
+      "word": "with",
+      "start": 1.28,
+      "end": 1.44,
+      "probability": 1.000
+    },
+    {
+      "word": "me?",
+      "start": 1.44,
+      "end": 1.68,
+      "probability": 1.000
+    },
+    {
+      "word": "I",
+      "start": 2.08,
+      "end": 2.32,
+      "probability": 0.927
+    },
+    {
+      "word": "always",
+      "start": 2.32,
+      "end": 2.56,
+      "probability": 0.999
+    },
+    {
+      "word": "am.\"",
+      "start": 2.56,
+      "end": 3.28,
+      "probability": 0.856
+    }
+  ]
+}

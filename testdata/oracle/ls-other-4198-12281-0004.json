@@ -1,0 +1,90 @@
+{
+  "language": "en",
+  "text": "By the belly of St. James, what shall we poor devils drink the while?",
+  "words": [
+    {
+      "word": "By",
+      "start": 0.56,
+      "end": 0.80,
+      "probability": 0.634
+    },
+    {
+      "word": "the",
+      "start": 0.80,
+      "end": 0.96,
+      "probability": 0.996
+    },
+    {
+      "word": "belly",
+      "start": 0.96,
+      "end": 1.28,
+      "probability": 0.767
+    },
+    {
+      "word": "of",
+      "start": 1.28,
+      "end": 1.44,
+      "probability": 0.999
+    },
+    {
+      "word": "St.",
+      "start": 1.44,
+      "end": 1.68,
+      "probability": 0.959
+    },
+    {
+      "word": "James,",
+      "start": 1.76,
+      "end": 2.24,
+      "probability": 0.999
+    },
+    {
+      "word": "what",
+      "start": 2.80,
+      "end": 2.88,
+      "probability": 0.879
+    },
+    {
+      "word": "shall",
+      "start": 2.88,
+      "end": 3.20,
+      "probability": 0.995
+    },
+    {
+      "word": "we",
+      "start": 3.20,
+      "end": 3.36,
+      "probability": 0.990
+    },
+    {
+      "word": "poor",
+      "start": 3.36,
+      "end": 3.60,
+      "probability": 0.908
+    },
+    {
+      "word": "devils",
+      "start": 3.60,
+      "end": 4.00,
+      "probability": 0.995
+    },
+    {
+      "word": "drink",
+      "start": 4.00,
+      "end": 4.40,
+      "probability": 1.000
+    },
+    {
+      "word": "the",
+      "start": 4.40,
+      "end": 4.64,
+      "probability": 0.969
+    },
+    {
+      "word": "while?",
+      "start": 4.64,
+      "end": 4.96,
+      "probability": 0.933
+    }
+  ]
+}

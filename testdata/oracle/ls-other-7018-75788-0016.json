@@ -1,0 +1,138 @@
+{
+  "language": "en",
+  "text": "Presently the ship struck the mountain and broke up, and all and everything on board of her were plunged into the sea.",
+  "words": [
+    {
+      "word": "Presently",
+      "start": 0.56,
+      "end": 1.04,
+      "probability": 0.991
+    },
+    {
+      "word": "the",
+      "start": 1.04,
+      "end": 1.28,
+      "probability": 0.991
+    },
+    {
+      "word": "ship",
+      "start": 1.28,
+      "end": 1.52,
+      "probability": 0.985
+    },
+    {
+      "word": "struck",
+      "start": 1.52,
+      "end": 1.84,
+      "probability": 0.999
+    },
+    {
+      "word": "the",
+      "start": 1.84,
+      "end": 2.00,
+      "probability": 0.996
+    },
+    {
+      "word": "mountain",
+      "start": 2.00,
+      "end": 2.40,
+      "probability": 0.999
+    },
+    {
+      "word": "and",
+      "start": 2.40,
+      "end": 2.48,
+      "probability": 0.918
+    },
+    {
+      "word": "broke",
+      "start": 2.48,
+      "end": 2.80,
+      "probability": 0.997
+    },
+    {
+      "word": "up,",
+      "start": 2.80,
+      "end": 3.04,
+      "probability": 0.998
+    },
+    {
+      "word": "and",
+      "start": 3.84,
+      "end": 4.08,
+      "probability": 0.998
+    },
+    {
+      "word": "all",
+      "start": 4.08,
+      "end": 4.32,
+      "probability": 0.999
+    },
+    {
+      "word": "and",
+      "start": 4.32,
+      "end": 4.48,
+      "probability": 0.713
+    },
+    {
+      "word": "everything",
+      "start": 4.48,
+      "end": 4.80,
+      "probability": 0.968
+    },
+    {
+      "word": "on",
+      "start": 4.80,
+      "end": 5.04,
+      "probability": 0.995
+    },
+    {
+      "word": "board",
+      "start": 5.04,
+      "end": 5.28,
+      "probability": 0.999
+    },
+    {
+      "word": "of",
+      "start": 5.28,
+      "end": 5.52,
+      "probability": 0.998
+    },
+    {
+      "word": "her",
+      "start": 5.52,
+      "end": 5.76,
+      "probability": 0.998
+    },
+    {
+      "word": "were",
+      "start": 5.76,
+      "end": 5.92,
+      "probability": 0.985
+    },
+    {
+      "word": "plunged",
+      "start": 5.92,
+      "end": 6.32,
+      "probability": 1.000
+    },
+    {
+      "word": "into",
+      "start": 6.32,
+      "end": 6.56,
+      "probability": 0.999
+    },
+    {
+      "word": "the",
+      "start": 6.56,
+      "end": 6.80,
+      "probability": 0.999
+    },
+    {
+      "word": "sea.",
+      "start": 6.80,
+      "end": 6.96,
+      "probability": 0.999
+    }
+  ]
+}

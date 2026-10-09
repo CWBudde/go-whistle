@@ -1,0 +1,96 @@
+{
+  "language": "it",
+  "text": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+  "words": [
+    {
+      "word": "L'incidente",
+      "start": 0.96,
+      "end": 1.68,
+      "probability": 0.996
+    },
+    {
+      "word": "è",
+      "start": 1.68,
+      "end": 1.84,
+      "probability": 0.862
+    },
+    {
+      "word": "avvenuto",
+      "start": 1.84,
+      "end": 2.32,
+      "probability": 0.997
+    },
+    {
+      "word": "in",
+      "start": 2.32,
+      "end": 2.40,
+      "probability": 1.000
+    },
+    {
+      "word": "alta",
+      "start": 2.40,
+      "end": 2.64,
+      "probability": 0.879
+    },
+    {
+      "word": "montagna",
+      "start": 2.64,
+      "end": 3.28,
+      "probability": 0.998
+    },
+    {
+      "word": "e",
+      "start": 3.28,
+      "end": 3.68,
+      "probability": 0.928
+    },
+    {
+      "word": "si",
+      "start": 3.68,
+      "end": 3.92,
+      "probability": 0.997
+    },
+    {
+      "word": "ritiene",
+      "start": 3.92,
+      "end": 4.32,
+      "probability": 0.997
+    },
+    {
+      "word": "sia",
+      "start": 4.32,
+      "end": 4.56,
+      "probability": 0.859
+    },
+    {
+      "word": "stato",
+      "start": 4.56,
+      "end": 4.88,
+      "probability": 1.000
+    },
+    {
+      "word": "causato",
+      "start": 4.88,
+      "end": 5.36,
+      "probability": 0.999
+    },
+    {
+      "word": "da",
+      "start": 5.36,
+      "end": 5.60,
+      "probability": 0.994
+    },
+    {
+      "word": "fuoco",
+      "start": 5.60,
+      "end": 5.92,
+      "probability": 0.981
+    },
+    {
+      "word": "nemico.",
+      "start": 5.92,
+      "end": 6.32,
+      "probability": 0.964
+    }
+  ]
+}

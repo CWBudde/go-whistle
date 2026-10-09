@@ -1,0 +1,120 @@
+{
+  "language": "fr",
+  "text": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+  "words": [
+    {
+      "word": "Jan",
+      "start": 1.36,
+      "end": 1.60,
+      "probability": 0.824
+    },
+    {
+      "word": "Carlo",
+      "start": 1.60,
+      "end": 2.00,
+      "probability": 0.708
+    },
+    {
+      "word": "Fitierla",
+      "start": 2.00,
+      "end": 2.80,
+      "probability": 0.503
+    },
+    {
+      "word": "a",
+      "start": 2.80,
+      "end": 3.04,
+      "probability": 0.955
+    },
+    {
+      "word": "perdu",
+      "start": 3.04,
+      "end": 3.28,
+      "probability": 0.993
+    },
+    {
+      "word": "le",
+      "start": 3.28,
+      "end": 3.44,
+      "probability": 0.999
+    },
+    {
+      "word": "contrôle",
+      "start": 3.44,
+      "end": 3.76,
+      "probability": 0.998
+    },
+    {
+      "word": "de",
+      "start": 3.76,
+      "end": 3.84,
+      "probability": 0.999
+    },
+    {
+      "word": "sa",
+      "start": 3.84,
+      "end": 4.00,
+      "probability": 0.955
+    },
+    {
+      "word": "voiture",
+      "start": 4.00,
+      "end": 4.32,
+      "probability": 0.986
+    },
+    {
+      "word": "et",
+      "start": 4.32,
+      "end": 4.48,
+      "probability": 0.986
+    },
+    {
+      "word": "a",
+      "start": 4.48,
+      "end": 4.56,
+      "probability": 0.997
+    },
+    {
+      "word": "terminé",
+      "start": 4.56,
+      "end": 4.96,
+      "probability": 1.000
+    },
+    {
+      "word": "la",
+      "start": 4.96,
+      "end": 5.04,
+      "probability": 0.995
+    },
+    {
+      "word": "course",
+      "start": 5.04,
+      "end": 5.28,
+      "probability": 0.985
+    },
+    {
+      "word": "peu",
+      "start": 5.28,
+      "end": 5.68,
+      "probability": 0.915
+    },
+    {
+      "word": "après",
+      "start": 5.68,
+      "end": 5.92,
+      "probability": 0.999
+    },
+    {
+      "word": "le",
+      "start": 5.92,
+      "end": 6.08,
+      "probability": 0.965
+    },
+    {
+      "word": "démarrage.",
+      "start": 6.08,
+      "end": 6.56,
+      "probability": 0.918
+    }
+  ]
+}
