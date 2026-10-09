@@ -298,9 +298,19 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       `sentencepiece`, `numpy`) for `scripts/`
       (2026-10-09) — `just fetch-upstream` (shallow fetch of the pinned commit, idempotent, HEAD verified);
       `scripts/pyproject.toml` + `uv.lock` (Python 3.12; resolved jax 0.11.2, flax 0.12.10, numpy 2.5.3).
-- [ ] `tools/oracle` (build tag `oracle`): run `needle --model … --audio clip.wav --audio-word-timestamps` and
+- [x] `tools/oracle` (build tag `oracle`): run `needle --model … --audio clip.wav --audio-word-timestamps` and
       `needle_embed`, and write `testdata/oracle/<clip>.{json,embed.safetensors}`.
       **Accept:** fixtures exist for at least 20 English and 2 clips per other language.
+      (2026-10-09) — `just oracle-clips` stream-reads the tarballs and closes them once enough clips are found:
+      LibriSpeech test-clean/test-other from openslr (FLAC decoded with `mewkiz/flac`) and FLEURS `test.tar.gz` at
+      `70bb2e84b9`. It commits 32 clips of 2–8 s as 16-bit WAV (5.5 MB) in `testdata/audio`, with `manifest.json`
+      (archive, member, transcript, sha256) and `ATTRIBUTION.md` (CC BY 4.0). The selection is deterministic:
+      10 clips per LibriSpeech split from 10 speakers (≤ 2 each), and 2 different sentences per de/fr/es/it/nl/pl.
+      `just oracle-run` runs the CLI and gets `needle_embed` from `libneedle3` through purego. It writes
+      `<id>.json` (timing fields dropped) and `<id>.embed.safetensors` (F32 `[frames, 512]`), plus `manifest.json`
+      with the engine and model pins (4.6 MB in total). Count: en 20, de/fr/es/it/nl/pl 2 each. Detected language
+      32/32. A re-run is byte-identical. Embed shape and CLI output are in `docs/FINDINGS.md` F-001/F-002.
+      `testdata/{audio,oracle}` are excluded from treefmt. Only macos-arm64 has been run.
 
 ## Phase 1 — Weights & tokenizer
 
