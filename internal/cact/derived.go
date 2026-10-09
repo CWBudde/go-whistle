@@ -1,14 +1,31 @@
-package cact_test
+package cact
 
-import (
-	"math"
-	"slices"
-	"testing"
+import "math"
+
+// Recomputations of Whistle's derived .cact records (docs/FINDINGS.md
+// F-006): the Hadamard permutations and the mel filterbank are functions of
+// the config, so a safetensors-only load can rebuild them
+// (docs/FINDINGS.md F-007).
+
+// Audio manifest constants (F-006): the engine finds the manifest as the
+// FP32 (13,) record that starts with this magic and accepts version 1 only.
+const (
+	AudioManifestMagic   = 0xCAE
+	AudioManifestVersion = 1
 )
 
-// Recomputations of the derived .cact tensors (docs/FINDINGS.md F-006), so
-// TestWhistleNameMap can check them by equality. Phase 2 (safetensors-only
-// loads) and Phase 3 (front end) may promote them to library code.
+// HadaPermSeed is the numpy seed of a Hadamard permutation record,
+// architecture.py _HADA_PERM_SEEDS: 11 for hada_p1, 13 for hada_p2.
+func HadaPermSeed(name string) (uint32, bool) {
+	switch name {
+	case "hada_p1":
+		return 11, true
+	case "hada_p2":
+		return 13, true
+	default:
+		return 0, false
+	}
+}
 
 // mt19937 is the Mersenne Twister as numpy's legacy RandomState seeds it
 // from an integer: init_genrand(seed), 32-bit outputs.
@@ -55,12 +72,12 @@ func (m *mt19937) uint32() uint32 {
 	return y ^ y>>18
 }
 
-// numpyPermutation is np.random.RandomState(seed).permutation(n), which
+// NumpyPermutation is np.random.RandomState(seed).permutation(n), which
 // architecture.py _hada_perms draws with seeds 11 and 13: the legacy
 // shuffle of arange(n) swaps i with j = random_interval(i) for i from n-1
 // down to 1, and random_interval draws 32-bit words masked to the smallest
 // covering power of two minus one until one is <= i.
-func numpyPermutation(seed uint32, n int) []int {
+func NumpyPermutation(seed uint32, n int) []int {
 	m := newMT19937(seed)
 
 	p := make([]int, n)
@@ -113,12 +130,12 @@ func melToHz(mel float64) float64 {
 	return slaneyHzPerMel * mel
 }
 
-// slaneyMel is librosa.filters.mel(sr=rate, n_fft=nfft, n_mels=mels) with its
+// SlaneyMel is librosa.filters.mel(sr=rate, n_fft=nfft, n_mels=mels) with its
 // defaults fmin 0, fmax rate/2, htk False and norm "slaney", computed in
 // float64 and rounded once to float32, laid out [nfft/2+1][mels] as .cact
 // tensor 679 stores it. The bin and mel grids use numpy's rfftfreq and
 // linspace arithmetic.
-func slaneyMel(rate, nfft, mels int) []float32 {
+func SlaneyMel(rate, nfft, mels int) []float32 {
 	bins := nfft/2 + 1
 
 	freq := make([]float64, bins)
@@ -149,72 +166,4 @@ func slaneyMel(rate, nfft, mels int) []float32 {
 	}
 
 	return out
-}
-
-func TestMT19937(t *testing.T) {
-	// The C++ standard fixes the 10000th output of mt19937 seeded 5489.
-	m := newMT19937(5489)
-	for range 9999 {
-		m.uint32()
-	}
-
-	if got := m.uint32(); got != 4123659995 {
-		t.Errorf("10000th output = %d, want 4123659995", got)
-	}
-}
-
-func TestNumpyPermutation(t *testing.T) {
-	// numpy 2.5.3: RandomState(s).permutation(512)[:8] and [-4:].
-	for seed, want := range map[uint32][2][]int{
-		11: {{396, 445, 60, 115, 423, 146, 410, 329}, {91, 80, 191, 409}},
-		13: {{458, 437, 29, 0, 58, 152, 269, 482}, {16, 74, 176, 338}},
-	} {
-		p := numpyPermutation(seed, 512)
-		if !slices.Equal(p[:8], want[0]) || !slices.Equal(p[508:], want[1]) {
-			t.Errorf("seed %d: %v ... %v, want %v ... %v", seed, p[:8], p[508:], want[0], want[1])
-		}
-
-		sorted := slices.Sorted(slices.Values(p))
-		for k, v := range sorted {
-			if v != k {
-				t.Fatalf("seed %d: not a permutation of 0..511", seed)
-			}
-		}
-	}
-}
-
-func TestSlaneyMel(t *testing.T) {
-	for hz, mel := range map[float64]float64{0: 0, 200: 3, 1000: 15, 6400: 42} {
-		if got := hzToMel(hz); math.Abs(got-mel) > 1e-12 {
-			t.Errorf("hzToMel(%v) = %v, want %v", hz, got, mel)
-		}
-
-		if got := melToHz(mel); math.Abs(got-hz) > 1e-9 {
-			t.Errorf("melToHz(%v) = %v, want %v", mel, got, hz)
-		}
-	}
-
-	fb := slaneyMel(16000, 512, 80)
-	if len(fb) != 257*80 {
-		t.Fatalf("%d weights, want 257*80", len(fb))
-	}
-
-	// Each filter is a triangle between its neighbours' centres: never
-	// negative and positive somewhere.
-	for m := range 80 {
-		peak := float32(0)
-
-		for b := range 257 {
-			v := fb[b*80+m]
-			if v < 0 {
-				t.Fatalf("filter %d bin %d = %v", m, b, v)
-			}
-
-			peak = max(peak, v)
-		}
-
-		if peak == 0 {
-			t.Errorf("filter %d is empty", m)
-		}
-	}
 }

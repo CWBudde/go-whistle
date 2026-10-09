@@ -163,6 +163,39 @@ func TestStore_TensorWithShapeAndMissingDiagnostics(t *testing.T) {
 	}
 }
 
+func TestStore_Shape(t *testing.T) {
+	blob := buildSafetensors(t, map[string]struct {
+		dtype string
+		shape []int64
+		data  []byte
+	}{
+		"beta": {dtype: "F32", shape: []int64{1, 3}, data: float32Bytes([]float32{3, 4, 5})},
+	})
+
+	store, err := OpenStoreFromBytes(blob, StoreOptions{})
+	if err != nil {
+		t.Fatalf("OpenStoreFromBytes: %v", err)
+	}
+	defer store.Close()
+
+	shape, err := store.Shape("beta")
+	if err != nil || !equalShape(shape, []int64{1, 3}) {
+		t.Fatalf("Shape(beta) = %v, %v; want [1 3]", shape, err)
+	}
+
+	shape[0] = 7
+
+	again, _ := store.Shape("beta")
+	if again[0] != 1 {
+		t.Fatalf("Shape returned the header's slice: %v", again)
+	}
+
+	_, err = store.Shape("missing")
+	if err == nil {
+		t.Fatal("Shape(missing) should fail")
+	}
+}
+
 func TestStore_CorruptionAndUnsupportedDTypeErrors(t *testing.T) {
 	// Unsupported dtype.
 	unsupported := buildSafetensors(t, map[string]struct {

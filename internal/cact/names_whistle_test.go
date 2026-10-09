@@ -28,16 +28,6 @@ const (
 	tokenizerFixturePath   = "../../testdata/tokenizer/whistle.json"
 )
 
-// The audio manifest's first two values (docs/FINDINGS.md F-006): the
-// engine finds the manifest as the FP32 (13,) tensor that holds these.
-const (
-	audioManifestMagic   = 0xCAE
-	audioManifestVersion = 1
-)
-
-// Hadamard permutation seeds, architecture.py _HADA_PERM_SEEDS.
-var hadaPermSeeds = map[string]uint32{"hada_p1": 11, "hada_p2": 13}
-
 // Measured minimum cosine per dtype against the source (F-006). They pin
 // the files; drift past 1e-9 fails.
 var pinnedMinCos = map[string]float64{
@@ -375,11 +365,13 @@ func checkDerived(t *testing.T, f *cact.File, i int, e cact.Entry, cfg safetenso
 	switch e.Name {
 	case "hada_p1", "hada_p2":
 		hadaN := 1 << bits.Len(uint(cfg.Dim-1)) // next power of two
-		for _, v := range numpyPermutation(hadaPermSeeds[e.Name], hadaN) {
+		seed, _ := cact.HadaPermSeed(e.Name)
+
+		for _, v := range cact.NumpyPermutation(seed, hadaN) {
 			want = append(want, float32(v))
 		}
 	case "audio.manifest":
-		want = []float32{audioManifestMagic, audioManifestVersion}
+		want = []float32{cact.AudioManifestMagic, cact.AudioManifestVersion}
 		for _, v := range []int{
 			cfg.Text, cfg.EncLayers, cfg.EncLanes, cfg.ConvKernel, cfg.Stem, cfg.StemStages,
 			cfg.Mels, cfg.Rate, cfg.FFT, cfg.Win, cfg.Hop,
@@ -387,7 +379,7 @@ func checkDerived(t *testing.T, f *cact.File, i int, e cact.Entry, cfg safetenso
 			want = append(want, float32(v))
 		}
 	case "audio.mel_filters":
-		want = slaneyMel(cfg.Rate, cfg.FFT, cfg.Mels)
+		want = cact.SlaneyMel(cfg.Rate, cfg.FFT, cfg.Mels)
 	case "tokenizer":
 		return checkTokenizer(t, f, i, cfg)
 	default:
