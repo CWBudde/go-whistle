@@ -1,8 +1,8 @@
 // Package cact reads the .cact deployment container that Needle 3 exports
 // (upstream needle/model/export.py @ af2654dffa): a fixed header with the
 // model geometry, the CQ codebooks, a nameless tensor directory and 64-byte
-// aligned tensor blobs. Tensors are positional; which index holds which
-// weight is the tensor-name map's job, not this package's.
+// aligned tensor blobs. Tensors are positional; WhistleNames maps Whistle's
+// indices to names and safetensors sources (docs/FINDINGS.md F-006).
 package cact
 
 import "fmt"
