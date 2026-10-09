@@ -424,7 +424,22 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 
 ## Phase 2 — Shared Needle 3 blocks (float32)
 
-- [ ] Copy `internal/tensor` and `internal/ops` from go-pocket-tts; drop what is not needed (convtranspose, Mimi-specific ops).
+- [x] Copy `internal/tensor` and `internal/ops` from go-pocket-tts; drop what is not needed (convtranspose, Mimi-specific ops).
+      (2026-10-10) — copied from go-pocket-tts `internal/runtime/{tensor,ops}` @ `9faba38`; every file names its source
+      and, where it differs, the change. Kept: `Tensor` with broadcast and shape ops, `MatMulTransB` (NEON 4×4/1×4),
+      `DotProduct` and `Axpy` (NEON, AVX2+FMA via `golang.org/x/sys/cpu`), `Linear`, `MatMul`, `Softmax`, `Attention`
+      (causal + offset or none), `CausalMask`, `RoPE`, `Conv1D`/`Conv1DLeftPad` and the conv worker/scratch pools.
+      Dropped: `ConvTranspose1D` (Mimi), `MLP` (FlowLM; Whistle uses `HadamardMLP`), `AttentionWithPositions` (Pocket-TTS
+      streaming mask), `LayerNorm` (Needle norms are ZCRMSNorm) and the FlowLM/Mimi benchmarks, now Whistle-shaped. A
+      `purego` build tag forces the pure-Go fallbacks on any arch. The new `asm_test.go` compares all six asm routines
+      with their fallbacks under float32 rounding bounds (dot/GEMM 2(n+1)·2⁻²⁴·Σ|ab|, axpy one FMA rounding). It passes
+      natively on arm64 and under linux/amd64 emulation with AVX2 detected, in both tag variants. The tolerances keep
+      their values (1e-4 matmul/linear/softmax, 0 causal_mask, 2e-4 rope/attention/conv1d). The entries of the dropped
+      kernels are gone, and `TestKernelTolerancesPinned` pins the rest. A 32-bit overflow in a copied test is fixed.
+      Follow-ups (`docs/FINDINGS.md` F-008): `RoPE` is interleaved with caller-built cos/sin tables (θ is the caller's,
+      no builder); the `Attention` item needs the half-split layout with θ = 1e5 and GQA 8:2 (`Attention` wants equal
+      head counts). The depthwise kernel-9 conv runs on the scalar grouped path. The stem needs a `Conv2D` (stride 2,
+      SAME/VALID, groups 1 and 128, HWIO kernels), which is not built yet.
 - [ ] `ZCRMSNorm`, `rms_unit`
 - [ ] `Attention`: Q/K/V projections, optional causal taps, per-head q/k ZCRMSNorm, half-split RoPE (θ = 1e5), GQA
       8:2, sigmoid output gate. Masks: causal and none.
