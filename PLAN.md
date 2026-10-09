@@ -451,6 +451,20 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       4-tap conv, sigmoid gating against `rms_unit(x)`.
 - [ ] `scripts/needle_fixtures.py`: run each Flax module with real Whistle decoder weights on random inputs and save
       the inputs and outputs. **Accept:** every block matches within 1e-5 (max abs) / cosine ≥ 0.99999.
+      (2026-10-10) — partial: the fixture half exists. `just needle-fixtures` imports upstream's Flax modules and binds
+      them to the FP32 safetensors parameters by Flax path, with every module leaf present at the exact shape. It runs
+      in float32 (`highest` matmul precision, `flash=False`, `quant=False`) and writes seven files to
+      `testdata/needle/` (1.97 MB in total, 89 tensors, no weights): `zcrmsnorm`, `attention_decoder` (layer 0: taps,
+      causal mask, RoPE 1e5, GQA, gate), `attention_encoder` (encoder layer 0 weights, no mask or taps, with and
+      without RoPE), `hadamard_mlp`, `mhc` (layer 0 from the lane expand to the collapse + `final_norm`, and layer 1
+      on four distinct lanes, with h_pre/h_post/h_res and the block output), `engram` (site 0 / layer 3, I64 ids and
+      hash indices, the gate) and `block` (layer 0). Every intermediate either is a submodule output or reproduces
+      the module output exactly. Two runs are byte-identical; safetensors writes `__metadata__` in hash-map order, so
+      the script sorts it. All files load with `internal/safetensors`. `testdata/needle/README.md` is the contract.
+      Discovery: block outputs reach 1.5e3 and the float32 fixtures lie up to 1.3e-3 from a float64 rerun, so a flat
+      1e-5 max abs is unreachable. The contract uses 1e-5 · max(1, max |ref|) per tensor plus cosine ≥ 0.99999; the
+      measured float32 noise is ≤ 3.9e-6 on that scale (`docs/FINDINGS.md` F-009). Pending: the Go blocks in
+      `internal/needle` and their parity tests against these files.
 
 ## Phase 3 — Front end
 

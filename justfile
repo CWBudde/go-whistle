@@ -61,6 +61,10 @@ oracle-run:
 tokenizer-fixture *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/tokenizer_fixture.py {{args}}
 
+# Regenerate the shared Needle 3 block fixtures for internal/needle (testdata/needle); --f64-check compares against float64
+needle-fixtures *args:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/needle_fixtures.py {{args}}
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
