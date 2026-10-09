@@ -1,0 +1,16 @@
+# Model weights and engine binaries (downloaded, never committed)
+models/
+engine/
+
+# Upstream reference snapshot
+original/
+
+# Large audio fixtures (small ones live in testdata/)
+testdata/audio/large/
+
+# Build artifacts
+bin/
+*.test
+coverage.out
+coverage.html
+*.prof
