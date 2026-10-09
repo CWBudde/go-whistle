@@ -61,6 +61,10 @@ oracle-run:
 tokenizer-fixture *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/tokenizer_fixture.py {{args}}
 
+# Regenerate the soxr-HQ resampling fixture for internal/frontend (testdata/frontend)
+resample-fixture *args:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/resample_fixture.py {{args}}
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
