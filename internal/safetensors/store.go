@@ -1,6 +1,7 @@
 package safetensors
 
 import (
+	"cmp"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"maps"
 	"math"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -97,6 +99,7 @@ func OpenStoreFromBytes(data []byte, opts StoreOptions) (*Store, error) {
 
 	entries := make(map[string]storeEntry, len(keys))
 	names := make([]string, 0, len(keys))
+	ranges := make([]dataRange, 0, len(keys))
 
 	for _, original := range keys {
 		if original == metadataKey {
@@ -112,6 +115,8 @@ func OpenStoreFromBytes(data []byte, opts StoreOptions) (*Store, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		ranges = append(ranges, dataRange{name: original, start: entry.Offsets[0], end: entry.Offsets[1]})
 
 		mapped, keep := keyMapper(original)
 		if !keep {
@@ -158,6 +163,10 @@ func OpenStoreFromBytes(data []byte, opts StoreOptions) (*Store, error) {
 			return nil, fmt.Errorf("safetensors: tensor %q: %w", original, err)
 		}
 
+		if elemCount > int64(math.MaxInt)/int64(elemBytes) {
+			return nil, fmt.Errorf("safetensors: tensor %q byte count overflows for shape %v", original, entry.Shape)
+		}
+
 		expectedBytes := int(elemCount) * elemBytes
 
 		actualBytes := end - start
@@ -178,6 +187,11 @@ func OpenStoreFromBytes(data []byte, opts StoreOptions) (*Store, error) {
 			End:          end,
 		}
 		names = append(names, mapped)
+	}
+
+	err = checkOverlaps(ranges)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(entries) == 0 {
@@ -330,6 +344,29 @@ func validateHeaderEntry(name string, entry storeHeaderEntry) error {
 	for _, d := range entry.Shape {
 		if d < 0 {
 			return fmt.Errorf("safetensors: tensor %q has negative shape dimension in %v", name, entry.Shape)
+		}
+	}
+
+	return nil
+}
+
+// dataRange is one header entry's data_offsets, relative to the data section.
+type dataRange struct {
+	name       string
+	start, end int
+}
+
+// checkOverlaps rejects entries whose data ranges share bytes, so that no two
+// tensors can alias the same weights. Empty ranges overlap nothing.
+func checkOverlaps(ranges []dataRange) error {
+	ranges = slices.DeleteFunc(ranges, func(r dataRange) bool { return r.start == r.end })
+	slices.SortFunc(ranges, func(a, b dataRange) int { return cmp.Compare(a.start, b.start) })
+
+	for i := 1; i < len(ranges); i++ {
+		prev, cur := ranges[i-1], ranges[i]
+		if cur.start < prev.end {
+			return fmt.Errorf("safetensors: tensor %q data [%d:%d] overlaps %q [%d:%d]",
+				cur.name, cur.start, cur.end, prev.name, prev.start, prev.end)
 		}
 	}
 

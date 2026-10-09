@@ -249,3 +249,45 @@ func assertFloatSliceNear(t *testing.T, got, want []float32, tol float64) {
 		}
 	}
 }
+
+// rawStore wraps a hand-written JSON header and n data bytes into a safetensors blob.
+func rawStore(header string, n int) []byte {
+	data := make([]byte, 8+len(header)+n)
+	binary.LittleEndian.PutUint64(data[:8], uint64(len(header)))
+	copy(data[8:], header)
+
+	return data
+}
+
+func TestStore_ByteCountOverflowRejected(t *testing.T) {
+	// 2^62 F32 elements: the element count fits int64, the byte count does not.
+	_, err := OpenStoreFromBytes(rawStore(`{"x":{"dtype":"F32","shape":[4611686018427387904],"data_offsets":[0,4]}}`, 4),
+		StoreOptions{})
+	if err == nil || !strings.Contains(err.Error(), "overflow") {
+		t.Fatalf("err = %v, want a byte-count overflow error", err)
+	}
+}
+
+func TestStore_OverlappingRangesRejected(t *testing.T) {
+	for name, header := range map[string]string{
+		"identical": `{"a":{"dtype":"F32","shape":[1],"data_offsets":[0,4]},` +
+			`"b":{"dtype":"F32","shape":[1],"data_offsets":[0,4]}}`,
+		"partial": `{"a":{"dtype":"F32","shape":[2],"data_offsets":[0,8]},` +
+			`"b":{"dtype":"F32","shape":[1],"data_offsets":[4,8]}}`,
+	} {
+		_, err := OpenStoreFromBytes(rawStore(header, 8), StoreOptions{})
+		if err == nil || !strings.Contains(err.Error(), "overlap") {
+			t.Errorf("%s: err = %v, want an overlap error", name, err)
+		}
+	}
+
+	// Adjacent ranges and an empty tensor sitting on a boundary are fine.
+	ok := `{"a":{"dtype":"F32","shape":[1],"data_offsets":[0,4]},` +
+		`"b":{"dtype":"F32","shape":[1],"data_offsets":[4,8]},` +
+		`"c":{"dtype":"F32","shape":[0],"data_offsets":[4,4]}}`
+
+	_, err := OpenStoreFromBytes(rawStore(ok, 8), StoreOptions{})
+	if err != nil {
+		t.Fatalf("adjacent ranges: %v", err)
+	}
+}
