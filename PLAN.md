@@ -414,11 +414,30 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 
 ## Phase 3 — Front end
 
-- [ ] WAV decode exactly as in `whistle.py`: 8/16/24/32-bit, channel averaging, 8-bit offset 128.
+- [x] WAV decode exactly as in `whistle.py`: 8/16/24/32-bit, channel averaging, 8-bit offset 128.
       **Accept:** the upstream matrix (16000/1/2, 8000/1/2, 44100/2/2, 16000/1/1, 22050/2/3, 48000/1/4). A 220 Hz tone
-      at 0.3 gives 8000±1 samples, a peak of 0.28–0.31 and 108–111 zero crossings.
-- [ ] Resampling with `algo-dsp/dsp/resample` (windowed-sinc / polyphase). Measure the deviation from soxr HQ on test
-      tones and document it.
+      at 0.3 gives 8000±1 samples, a peak of 0.28–0.31 and 108–111 zero crossings. (2026-10-10) —
+      `internal/frontend`: `ParseWAV` walks RIFF chunks as Python's `wave` does (reads bounded by the RIFF size,
+      word-aligned chunks, width from bits per sample, last fmt before data) and rejects what it rejects with typed
+      errors: `*FormatError` for non-PCM (IEEE float included) and `ErrNotRIFF`, `ErrNotWAVE`, `ErrMissingChunk`,
+      `ErrDataBeforeFmt`, `ErrTruncated`, `ErrChannels`, `ErrSampleWidth`. `WAV.Mono` is `_read_wav`'s float64
+      expression rounded to float32, bit for bit. `DecodeWAV`/`ReadWAV` resample anything not at 16 kHz.
+      `TestUpstreamWAVMatrix` writes the six files like `_write_wav` (bytes pinned to Python's writer): 8000 samples
+      each, peaks ±0.29688 to ±0.30000, 109 or 110 crossings; upstream with soxr gives 109 everywhere. The 30 s
+      limit is not part of this item. All 32 committed clips decode to their manifest sample counts (F-010).
+- [x] Resampling with `algo-dsp/dsp/resample` (windowed-sinc / polyphase). Measure the deviation from soxr HQ on test
+      tones and document it. (2026-10-10) — algo-dsp v0.12.4 `NewRational` with taps per phase scaled to
+      `ceil(128 · max(up, down) / up)`, cutoff 0.96, Kaiser β 11. The group delay is removed by prepending zeros
+      instead of `ProcessAligned`'s linear interpolation (−14 dB at 7 kHz). The residual is 0 for odd prototypes
+      (48 kHz), 0.0011 output samples from 22.05/44.1 kHz and half a sample from 8 kHz. Fixture
+      `testdata/frontend/soxr_hq.safetensors` (`just resample-fixture`, soxr 1.1.0 HQ): tones 220 Hz–9.5 kHz, a chirp
+      and noise from 8/22.05/44.1/48 kHz, plus soxr's levels for float tones at 8.1–9.5 kHz. Against soxr: passband
+      tones 56–80 dB SNR (residual-limited) from 22.05/44.1 kHz and 129–136 dB from 48 kHz; 7 kHz 49.9 / 112 dB;
+      gain within 0.0065 dB; aligned passband ≥ 66.9 dB everywhere, 8 kHz included; noise's 7.4–8 kHz transition
+      band 25–29 dB; aliases −87 dB at 8.1 kHz and below −110 dB from 8.2 kHz (soxr −130 to −144 dB). 30 s takes
+      29–121 ms (soxr 0.5–2 ms). The presets lose 1.7–5.9 dB at 7 kHz, and length 64 lets 8.1 kHz alias at −29 dB.
+      Rates with `down` > 16384 (e.g. 47999 Hz) use algo-dsp's ratio approximation; rates below 1 kHz are rejected
+      (F-010).
 - [ ] STFT: 400-sample window zero-padded to 512, hop 160 → 257 bins → power → mel from `.cact` tensor 679.
 - [ ] Hypothesis set for what the docs leave open: window (Hann periodic or symmetric), centre padding (reflect, zero
       or none), power or magnitude, log flavour (`ln`, `log10`, `log(x + eps)` or `clamp` à la Whisper),
