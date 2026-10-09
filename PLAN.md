@@ -293,9 +293,11 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       `engine/<platform>/`. Set `NEEDLE_TELEMETRY=0` and `DO_NOT_TRACK=1` for every oracle run.
       (2026-10-09) — `just fetch-engine [--platform …]` for macos-arm64, linux-x86_64 and linux-arm64, pinned to HF
       revision `2ae11323dc` with a SHA-256 for every file. `libneedle3.{dylib,so}` ships only inside
-      `python/cactus_needle-3.2.0-py3-none-<tag>.whl`, so the script extracts it from there. The platform dirs hold only
-      `needle`, `libneedle.a` and `needle.h`. The CLI has no `--version` and no version string; its upload
-      (`80896a6582`, 2026-10-05) has the same date as the 3.2.0 wheel. Only macos-arm64 was run here.
+      `python/cactus_needle-3.2.0-py3-none-<tag>.whl`, so the script extracts it from there: upstream's `<platform>/`
+      dirs on HF hold only `needle`, the static `libneedle.a` (not fetched) and `needle.h`. `engine/<platform>/` ends
+      up with `needle`, `needle.h`, the wheel, the extracted `libneedle3.{dylib,so}` and a `PIN` file. The CLI has no
+      `--version` and no version string; its upload (`80896a6582`, 2026-10-05) has the same date as the 3.2.0 wheel.
+      Only macos-arm64 was run here.
 - [x] Snapshot upstream into `original/needle` at `af2654dffa` and set up `uv` (`jax`, `flax`, `safetensors`,
       `sentencepiece`, `numpy`) for `scripts/`
       (2026-10-09) — `just fetch-upstream` (shallow fetch of the pinned commit, idempotent, HEAD verified);
