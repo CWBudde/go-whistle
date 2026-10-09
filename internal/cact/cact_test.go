@@ -337,6 +337,8 @@ func TestParse_Errors(t *testing.T) {
 		{"too many orders", func(b []byte) []byte { put32(b, 4*26, 5); return b }, "orders"},
 		{"too many sites", func(b []byte) []byte { put32(b, 4*31, 17); return b }, "sites"},
 		{"directory past EOF", func(b []byte) []byte { put32(b, 4, 1000); return b }, "directory"},
+		// 97612894 * 44 = 2^32 + 40: in uint32 the directory would wrap to 40 bytes and pass the EOF check.
+		{"directory size wraps uint32", func(b []byte) []byte { put32(b, 4, 97612894); return b }, "directory"},
 		{"unknown dtype", func(b []byte) []byte { b[recordAt(0)+recDType] = 9; return b }, "dtype 9"},
 		{"ndim > 4", func(b []byte) []byte { b[recordAt(0)+recNDim] = 5; return b }, "ndim"},
 		{"dim past ndim", func(b []byte) []byte { put32(b, recordAt(1)+recShape+4, 7); return b }, "past ndim"},
