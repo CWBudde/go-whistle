@@ -93,6 +93,10 @@ linters:
           - goconst
         path: _test\.go
 
+      # tokenizer tests need text in every script the vocabulary covers
+      - linters: [gosmopolitan]
+        path: internal/tokenizer/.*_test\.go
+
       # unsafe is intentional in SIMD/tensor code
       - linters: [gosec]
         path: internal/runtime/tensor/.*\.go

@@ -26,6 +26,8 @@ excludes = [
     # Oracle fixtures, written by tools/oracle; kept byte-exact so a regeneration diffs clean
     "testdata/audio/**",
     "testdata/oracle/**",
+    # Tokenizer fixture, written by scripts/tokenizer_fixture.py; same reason
+    "testdata/tokenizer/**",
 
     # Build artifacts
     "bin/**",

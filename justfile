@@ -57,6 +57,10 @@ oracle-clips:
 oracle-run:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle run
 
+# Regenerate the sentencepiece fixture for internal/tokenizer (testdata/tokenizer); --needle3 <tokenizer.model> cross-checks
+tokenizer-fixture *args:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/tokenizer_fixture.py {{args}}
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
