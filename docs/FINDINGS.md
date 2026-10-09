@@ -85,7 +85,7 @@ the rest of the header. The encoder (`conv_kernel`, `stem`, `stem_stages`) and t
 `win`, `hop`) are not in the header. They appear in the 13-float FP32 tensor #237,
 `[3246, 1, 8192, 8, 4, 9, 128, 3, 80, 16000, 512, 400, 160]`: from the third value on it equals `text`,
 `enc_layers`, `enc_lanes`, `conv_kernel`, `stem`, `stem_stages`, `mels`, `rate`, `fft`, `win` and `hop` (asserted by
-the same test). The first two values stay open for the tensor-name map (Phase 1).
+the same test). F-006 explains the first two values: a magic and a format version.
 
 Also measured: the header is 196 bytes, not the 120 the `export.py` docstring states; the codebooks are stored already
 scaled by 1/√128 (cb2 = ±0.0399, ±0.1333); blobs are 64-byte aligned and contiguous, and the last one ends exactly at
@@ -196,3 +196,131 @@ The Go side differs from upstream in three more places:
 
 Regenerate with `just tokenizer-fixture [--needle3 tokenizer.model]`. The model-gated tests in `internal/tokenizer`
 read `testdata/tokenizer/whistle.json`.
+
+## F-006 — Whistle's `.cact` tensor order, transforms and per-tensor checks (2026-10-09)
+
+**Question.** `.cact` records are nameless and positional. Upstream's public exporter (`export.py` `_tensors`) writes
+the Needle 3 text model only, and Whistle's audio exporter is not published. Which safetensors tensor feeds each of the
+681 records, through which transform? And how is each record shown to be correct?
+
+**Method.** A throw-away Go search scored every record against every shape-compatible candidate by cosine: each of the
+116 safetensors tensors whole, each layer slice of the 80 stacked `[8, …]` tensors (unit axes squeezed), plus every
+2-D candidate transposed and every mHC φ in export.py's lane-major layout. The search assumed no order. Every sourced
+record had one clear winner:
+
+| record type | winner cosine            | best runner-up cosine                                                  |
+| ----------- | ------------------------ | ---------------------------------------------------------------------- |
+| FP16 vector | ≥ 0.99999996             | 0.999983 (`cross01.k_norm` vs `cross_attn/q_norm[1]`)                  |
+| CQ2         | 0.9319–0.9401            | 0.069                                                                  |
+| CQ4         | 0.9943–0.9954            | 0.014                                                                  |
+| FP16 scalar | ±1 (cosine is only sign) | decided by value: the FP16 of the winner equals the record bit for bit |
+
+The winners form the order below. `internal/cact` `WhistleNames()` encodes it and `testdata/whistle_names.txt` pins it.
+
+| index   | name                     | contents                                                                                                                                 |
+| ------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 0       | `embedding`              | `embedding/embedding`                                                                                                                    |
+| 1–216   | `layerNN.*`, 8 × 27      | exactly `_tensors`' per-layer order with `qkv_conv_taps` = 3, from `stack/layers/block`                                                  |
+| 217–225 | `mhc_*`                  | `stack/mhc_*`, a/b whole, φ lane-major                                                                                                   |
+| 226–227 | `hada_p1`, `hada_p2`     | derived                                                                                                                                  |
+| 228–235 | `engram0.*`, `engram1.*` | `engrams_0` (site 3) and `engrams_1` (site 7): tables, key_proj, value_proj, taps                                                        |
+| 236     | `final_norm`             | `stack/final_norm/scale`                                                                                                                 |
+| 237     | `audio.manifest`         | derived, where `_tensors` would put `heads.manifest`                                                                                     |
+| 238–317 | `crossNN.*`, 8 × 10      | `cross_norm`, `cross_attn/{q,k,v,gate,out}_proj`, `q_norm`, `k_norm`, `post_cross_norm`, `cross_gate`, named with the decoder's suffixes |
+| 318     | `pe_gate`                | `pe_gate`, stored `(1,)`                                                                                                                 |
+| 319–662 | `encNN.*`, 8 × 43        | six norms, q/k/v/gate/out, q_norm, k_norm, attn_gate, pw1, pw2, dw, `hadamard_mlp_0` (13), `hadamard_mlp` (13)                           |
+| 663–671 | `enc.mhc_*`              | `encoder/mhc_*`                                                                                                                          |
+| 672     | `enc.final_norm`         | `encoder/final_norm/scale`                                                                                                               |
+| 673–678 | `stem.*`                 | `w`, `dw_1`, `pw_1`, `dw_2`, `pw_2`, `out`                                                                                               |
+| 679     | `audio.mel_filters`      | derived                                                                                                                                  |
+| 680     | `tokenizer`              | RAW (F-005)                                                                                                                              |
+
+The encoder's six norms come in macaron execution order: `pre_hada_norm_0`, `ZCRMSNorm_0`, `post_attn_norm`,
+`conv_norm`, `conv_out_norm`, `pre_hada_norm`. All 116 safetensors tensors are used; none is training-only. Every HadamardMLP, the encoder's included, keeps
+`_tensors`' inner order (d1, d2, b2, d3, d4, w1a … w3b, cond_v, cond_u). The decoder layers come first and the audio parts follow, each as its own block of eight
+layers.
+
+**Transforms.** Four transforms cover every record (`cact.Transform`, applied by `Entry.Apply` after the layer slice):
+
+- `reshape`: the values stay in order. Unit axes are squeezed (`dw` `(9, 1, 512)` → `(9, 512)`), the 3×3 stem kernels
+  `(3, 3, 1, 128)` become `(9, 128)`, the engram tables `(4, 18432, 128)` become `(73728, 128)`, and layer scalars
+  plus `pe_gate` are stored as `(1,)`.
+- `transpose`: every Flax Dense kernel `(in, out)` is stored `(out, in)`. This includes `pw1`/`pw2`, the stem's 1×1
+  kernels and `stem/out` `(1280, 512)` → `(512, 1280)`.
+- `lane-major`: an mHC φ `(L, n·C, lanes)` is stored as `transpose(0, 2, 1).reshape(L·lanes, n·C)`, as `_tensors`
+  does.
+- `derived`: records 226, 227, 237, 679 and 680 have no safetensors source.
+
+Read untransposed, no square kernel scores better than the CQ runner-ups (≤ 0.069), so the transposition is not in
+doubt.
+
+**Derived records.** Each one is checked by equality:
+
+- `hada_p1`/`hada_p2` equal `np.random.RandomState(11 / 13).permutation(512)` (`_hada_perms` without the split, since
+  the config has no `ladder_widths`). A Go port of MT19937 (`init_genrand`) and numpy's legacy shuffle
+  (`random_interval` with masked rejection) reproduces both bit for bit. It is pinned to numpy 2.5.3 output and to the
+  C++ standard's 10000th `mt19937` value. One pair serves every HadamardMLP, encoder and decoder alike.
+- `audio.mel_filters` equals `librosa.filters.mel(sr=16000, n_fft=512, n_mels=80)` with Slaney scale and Slaney norm,
+  computed in float64 with numpy's `rfftfreq`/`linspace` arithmetic and rounded **once** to float32: 0 of 20,560
+  values differ. librosa's own default path, float32 weights later multiplied by the float64 `enorm`, misses 142
+  values by 1 ulp; doing everything in float32 misses 182. The exporter therefore built the bank in float64.
+- `audio.manifest` equals 3246 and 1, followed by the eleven config values F-003 lists (`text` … `hop`). F-003 left
+  the first two values open. 3246 is `0xCAE`, a magic. The engine (`needle` 3.2.0) was run on a copy of
+  `whistle.cact` with one manifest value patched:
+
+  | patched value                   | engine result                                         |
+  | ------------------------------- | ----------------------------------------------------- |
+  | `[0]` = 3247 or 0, `[9]` = 8000 | "no speech model loaded" (the file is not recognised) |
+  | `[1]` = 2 or 0                  | "failed to load .cact speech model"                   |
+  | `[2]` = 8000, `[3]` = 7         | "failed to load .cact speech model"                   |
+  | unpatched                       | the normal transcript                                 |
+
+  So the engine finds the manifest by content, as the FP32 `(13,)` record with the magic and a 16 kHz rate. `[1]` is
+  a format version it accepts only as 1, and the geometry must agree with the tensors. A static look at
+  `libneedle3.dylib`'s `needle_load` with `objdump` had shown the same comparisons (3246.0f, 1.0f, 16000.0f) and led
+  to the experiment; no engine code was copied.
+
+- `tokenizer` parses with `internal/tokenizer` (8199 pieces = header `vocab` = `text` + 7, pad/eos/bos 0/1/2 = the
+  config). Its sha256 equals the `blob_sha256` of F-005's sentencepiece fixture.
+
+**Thresholds.** They are derived per record, not tuned:
+
+- **FP16** (524 records, 458,057 values). Every value must be the round-to-nearest-even FP16 of its F32 source, and
+  all 458,057 are. The cosine must also meet the rounding bound: with |x̂ᵢ − xᵢ| ≤ hᵢ, half an FP16 ulp at xᵢ (2⁻²⁵ in
+  the subnormal range), sin θ ≤ ‖h‖/‖x‖, so cos ≥ √(1 − ‖h‖²/‖x‖²). The bounds range
+  from 0.99999991 to 0.99999996. The 25 scalars (attention gates, cross gates, `pe_gate`) rest on the exact-value check, since their
+  cosine is ±1.
+- **CQ** (145 CQ2, 7 CQ4). A Go port of `_cq_pack` (rotate by H/√128 via a float64 FWHT, split off the norm, nearest
+  Lloyd-Max level, FP16 norm) requantises each source. The record must equal that blob. The FP16 norms may differ by
+  1 ulp, which happens for 11 norms in 10 records. A packed index may differ only by one level, and only where the exact
+  unit coordinate lies within 260·2⁻²⁴ ≈ 1.5·10⁻⁵ of the decision boundary between the two levels. That tolerance is
+  the float32 error of upstream's rotation: H's rounded entries, γ₁₂₈ for the 128-term sum, and as much again for the
+  norm. 16 indices in 14 records differ, all within 2·10⁻¹⁰ to 4·10⁻⁸ of the boundary; every other index of the
+  54.7 M CQ weights is identical. The cosine threshold is then cos(acos(cos(Q(src), src)) + asin(2⁻¹⁰)): the quantiser's
+  own error on these weights, plus the angle that 1-ulp norm changes (a group scaled by at most 2⁻¹⁰) can add.
+  A near-tie flip barely moves the cosine, because u lies about equally far from both levels.
+- **Derived FP32 and RAW**: exact equality, as listed above.
+
+**Rejected thresholds.**
+
+- A Gaussian Lloyd-Max floor, √(1 − D) = 0.93941 for CQ2 (D = 0.1175) and 0.99524 for CQ4 (D = 0.009497), would fail
+  143 of 145 CQ2 and 5 of 7 CQ4 records. QAT did **not** pull these weights closer to the grid; the rotated groups
+  quantise slightly worse than i.i.d. Gaussians.
+- PLAN.md's "≥ 0.95 for CQ2" is wrong for the same reason. The measured CQ2 range is 0.93185–0.94008 (median 0.93465),
+  and the CQ4 range is 0.99431–0.99537.
+
+**Measured** (`TestWhistleNameMap`): all 681 records pass. The minimum cosine per type is pinned to 1e-9:
+
+| type | records | min cosine     | at                 |
+| ---- | ------- | -------------- | ------------------ |
+| FP16 | 524     | 0.999999963923 | `enc00.q_norm`     |
+| CQ2  | 145     | 0.931853685259 | `cross07.k_proj`   |
+| CQ4  | 7       | 0.994312193718 | `enc.mhc_phi_post` |
+
+Every CQ record's width also matches the run's `weight_bits` plan (`embedding=4,stack/mhc=4,encoder/mhc=4,default=2`).
+The test runs in about 1.5 s; `RequantCQ` uses an FWHT and is pinned to the matrix reference `portPack`.
+
+**Consequence.** The `.cact` file holds no information beyond the safetensors checkpoint, its config and two constants
+(magic and version). Every CQ record is a deterministic function of its source, up to float32 rounding ties. A
+safetensors-only load can therefore rebuild the deployment numerics exactly; the derived records need only the
+permutation port and the mel recomputation, both in `internal/cact`'s tests.
