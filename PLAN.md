@@ -270,9 +270,16 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       (2026-10-09) — partial: `.github/workflows/ci.yml` (ubuntu-latest + macos-latest matrix, treefmt 2.6.0,
       golangci-lint 2.13.2) and a doc-only `whistle` package, without which `go test`/`golangci-lint` fail on an empty
       module. `just ci` is green locally. Remains: the GitHub repo does not exist yet, so the workflow has never run.
-- [ ] `internal/hub`: a minimal pure-Go Hugging Face downloader. It resolves `revision`, resumes downloads, verifies
+- [x] `internal/hub`: a minimal pure-Go Hugging Face downloader. It resolves `revision`, resumes downloads, verifies
       SHA-256 against a committed `models/manifest.lock.json`, and honours `HF_TOKEN`/`HF_HUB_OFFLINE`. Pin
       `whistle.cact`, `checkpoints/whistle.safetensors` and `config.json` at `b358ddad`.
+      (2026-10-09) — the manifest lives in `internal/hub/manifest.lock.json`, embedded with `go:embed`, rather than in
+      `models/manifest.lock.json`: `models/` is git-ignored and an installed binary has no checkout to read from.
+      `b358ddad` is pinned as `b358ddadd89b7a713b5aa131f23032d3cca1b251`; `config.json` is
+      `ac2dbcb9…a3d43` (603 B). `Download` re-resolves the pin, skips verified files, resumes from `<local>.part`
+      via `Range` (206 append, 200 restart, 416 re-verify), and checks size + SHA-256 before the rename.
+      `HF_ENDPOINT` is honoured too. httptest suite plus opt-in `WHISTLE_HUB_LIVE=1` test. Against real HF: all three
+      files verified, and a `.part` truncated to 100 MB resumed to the right `whistle.safetensors` digest.
 - [ ] `whistle download` command, with the local layout `models/whistle/{whistle.cact, whistle.safetensors, config.json}`
 - [x] `scripts/fetch-engine.sh`: fetch the platform `needle` binary and `libneedle3` from `Cactus-Compute/needle3` into
       `engine/<platform>/`. Set `NEEDLE_TELEMETRY=0` and `DO_NOT_TRACK=1` for every oracle run.
