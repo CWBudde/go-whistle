@@ -5,21 +5,15 @@ on:
   push:
     branches:
       - main
-  # Manual runs add macos/arm64; macOS minutes bill at 10x on a private repo.
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   ci:
-    name: just ci (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        # ubuntu-latest is linux/amd64, macos-latest is macos/arm64.
-        os: ${{ github.event_name == 'workflow_dispatch' && fromJSON('["ubuntu-latest", "macos-latest"]') || fromJSON('["ubuntu-latest"]') }}
-    runs-on: ${{ matrix.os }}
+    name: just ci
+    # Linux only: macOS minutes bill at 10x, and the arm64 assembly is exercised in go-pocket-tts.
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,16 +40,11 @@ jobs:
           go install github.com/daixiang0/gci@latest
           go install mvdan.cc/sh/v3/cmd/shfmt@latest
 
-      - name: Install shellcheck and treefmt (Linux)
-        if: runner.os == 'Linux'
+      - name: Install shellcheck and treefmt
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
           curl -fsSL https://github.com/numtide/treefmt/releases/download/v2.6.0/treefmt_2.6.0_linux_amd64.tar.gz \
             | sudo tar -xz -C /usr/local/bin treefmt
-
-      - name: Install shellcheck and treefmt (macOS)
-        if: runner.os == 'macOS'
-        run: brew install shellcheck treefmt
 
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v8

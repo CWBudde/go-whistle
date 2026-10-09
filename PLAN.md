@@ -267,11 +267,11 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 
 - [x] Repo, `go.mod`, `justfile`, `treefmt.toml`, `.golangci.yml`, `AGENTS.md`, `PLAN.md`
 - [x] GitHub Actions: `just ci` on linux/amd64 and macos/arm64. Model-dependent tests skip when `models/` is absent.
-      (2026-10-09) — `.github/workflows/ci.yml` (ubuntu-latest + macos-latest matrix, treefmt 2.6.0,
+      (2026-10-09) — `.github/workflows/ci.yml` (initially an ubuntu-latest + macos-latest matrix, treefmt 2.6.0,
       golangci-lint 2.13.2) and a doc-only `whistle` package, without which `go test`/`golangci-lint` fail on an empty
       module. First run on `CWBudde/go-whistle` PR #1 (run 37953639555): both jobs green, macos 1m37s, ubuntu 1m41s.
-      Since then pull requests and pushes run ubuntu-latest only; macos/arm64 runs on manual `workflow_dispatch`
-      (macOS minutes bill at 10x on a private repo).
+      macOS was then dropped: CI runs ubuntu-latest only, because macOS minutes bill at 10x on a private repo and the
+      arm64 assembly copied from go-pocket-tts is built and tested there.
 - [x] `internal/hub`: a minimal pure-Go Hugging Face downloader. It resolves `revision`, resumes downloads, verifies
       SHA-256 against a committed `models/manifest.lock.json`, and honours `HF_TOKEN`/`HF_HUB_OFFLINE`. Pin
       `whistle.cact`, `checkpoints/whistle.safetensors` and `config.json` at `b358ddad`.
