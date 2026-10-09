@@ -46,3 +46,47 @@ and nothing on stderr:
 removed, two runs of the whole corpus give byte-identical JSON and embeddings (macos-arm64, default threads).
 
 **Language detection** matched the corpus language on 32 of 32 clips.
+
+## F-003 — `.cact` header vs the safetensors config (2026-10-09)
+
+**Question.** The `.cact` header (`export.py` `_HDR_FMT "<48If"`) is written for Needle's text model
+(`num_heads`, `hada_n`, `engram_*`), while `whistle.safetensors` stores the Whistle config as JSON. Which header field
+corresponds to which config key, and does the header describe the encoder at all?
+
+**Measured.** `internal/cact` `TestWhistleCactMatchesConfig` reads both files at `b358ddad`:
+
+| `.cact` header                  | value        | safetensors config / run      |
+| ------------------------------- | ------------ | ----------------------------- |
+| `vocab`                         | 8199         | `text` + 7 language tokens    |
+| `d_model`                       | 512          | `dim`                         |
+| `num_kv_heads`                  | 2            | `kv_heads`                    |
+| `num_layers`                    | 8            | `dec_layers` (= `enc_layers`) |
+| `qk_head_dim`, `v_head_dim`     | 48, 64       | `qk_dim`, `v_dim`             |
+| `max_seq_len`                   | 320          | `max_tokens`                  |
+| `hada_n`                        | 512          | next power of two of `dim`    |
+| `mhc_lanes`                     | 4            | `lanes` (= `enc_lanes`)       |
+| `qkv_conv_taps`                 | 3            | `taps`                        |
+| `engram_slots`                  | 18432        | `slots`                       |
+| `num_engram_tables`             | 4            | `len(orders)` × `hashes`      |
+| `engram_sub_dim`                | 128          | `dim` / tables                |
+| `engram_conv_dilation`          | 3            | `max(orders)`                 |
+| `engram_orders`, `engram_sites` | [2,3], [3,7] | `orders`, `sites`             |
+| `rope_theta`                    | 1e5          | `rope`                        |
+| `kv_bits`                       | 8            | `run.kv_bits`                 |
+
+The header holds three values the config does not state: `num_heads` = 8, `engram_conv_taps` = 4 (the `export.py`
+constant `ENGRAM_CONV_TAPS`) and `kv_window` = 0. `out_vocab`, `sliding_window`, the global mask and
+`engram_seed_heads` are all 0.
+
+**Conclusion.** The header carries the fields `export.py` writes for Needle's text model, so it describes the
+**decoder**: vocab, engram and the Q/K/V taps exist only there. Whistle's encoder and decoder both have 8 layers and 4
+mHC lanes, so `num_layers` and `mhc_lanes` cannot tell the two apart; the decoder reading is the one consistent with
+the rest of the header. The encoder (`conv_kernel`, `stem`, `stem_stages`) and the front end (`mels`, `rate`, `fft`,
+`win`, `hop`) are not in the header. They appear in the 13-float FP32 tensor #237,
+`[3246, 1, 8192, 8, 4, 9, 128, 3, 80, 16000, 512, 400, 160]`: from the third value on it equals `text`,
+`enc_layers`, `enc_lanes`, `conv_kernel`, `stem`, `stem_stages`, `mels`, `rate`, `fft`, `win` and `hop` (asserted by
+the same test). The first two values stay open for the tensor-name map (Phase 1).
+
+Also measured: the header is 196 bytes, not the 120 the `export.py` docstring states; the codebooks are stored already
+scaled by 1/√128 (cb2 = ±0.0399, ±0.1333); blobs are 64-byte aligned and contiguous, and the last one ends exactly at
+EOF. Whistle uses only CQ2 (145 tensors) and CQ4 (7), both with group 128; there is no CQ3, ternary or binary tensor.
