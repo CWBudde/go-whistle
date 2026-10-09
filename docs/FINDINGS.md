@@ -682,3 +682,79 @@ approximation. Pinned in `TestResamplerRatio`, `TestResampleTone`, `TestResample
 `TestResampleImpulseAlignment`.
 
 Regenerate the fixture with `just resample-fixture`; `internal/frontend` reads `testdata/frontend/soxr_hq.safetensors`.
+
+## F-011 — Needle 3 core blocks in Go: ZCRMSNorm, Attention, HadamardMLP (2026-10-10)
+
+**Question.** Can float32 Go ports of `ZCRMSNorm`/`_rms_unit`, `MultiHeadAttention` and `HadamardMLP` meet the F-009
+fixture contract (max |Δ| ≤ 1e-5 · max(1, max |ref|) per tensor and cosine ≥ 0.99999) on every intermediate, and which
+upstream details does a port have to get right to do so?
+
+**API (`internal/needle`).** `ZCRMSNorm` (`NewZCRMSNorm`, `LoadZCRMSNorm(src, name)`, `Apply`), `RMSUnit`, `Rope`
+(`NewRope(headDim, seqLen, θ)`), `Attention` (`LoadAttention(src, prefix)`, `Forward(x, T, mask, rope)`, masks
+`MaskNone` and `MaskCausal`) and `HadamardMLP` (`LoadHadamardMLP(src, prefix)`, `Forward(x, T)`). Activations are one
+sequence, row-major (T, width); a per-head tensor keeps head h of row t at columns h·d … (h+1)·d. Blocks load by name
+prefix from a `weights.Source` (`layer00.`, `enc00.`, `enc00.hada_0.`, `enc00.hada.`), so encoder and decoder share
+the code. Dimensions come from the shapes, not from the config: qk from `q_norm`, the query heads from `q_proj`, the
+KV heads from `k_proj`, v from `v_proj`, the Monarch blocks from `w1a`/`w1b`, the rank from `cond_v`. An attention has
+taps exactly when `<prefix>q_taps` exists, so `LoadAttention` gives the decoder flavour for `layer00.` and the encoder
+flavour for `enc00.` without a flag. The mask and RoPE are per call, because U3 (does the encoder rotate?) is open.
+
+**Details a port must match.**
+
+- **Half-split RoPE.** `apply_rope` rotates (xᵢ, xᵢ₊₂₄), not interleaved pairs, so `ops.RoPE` (F-008) does not fit.
+  It stays untouched; `needle.Rope` is block-local. The tables round every step to float32 as the jnp code does:
+  e = float32(2i)/48, f = 1/float32(θ^e), angle = float32(t)·f, then cos/sin. They match the fixture's `rope_cos` and
+  `rope_sin` within 1.2e-7. Position = row index; a decoding offset (KV cache) is the decoder branch's addition.
+- **GQA.** `jnp.repeat(k, 4, axis=1)` repeats each KV head in place, so query head h reads KV head h // 4 (heads 0–3
+  → 0, 4–7 → 1), not h mod 2 as `jnp.tile` would. `kvHead` maps the index; nothing is copied. `ops.Attention` needs
+  equal head counts and has no per-head hooks for the trace, so the attention core is a per-head loop over
+  `tensor.DotProduct` and `tensor.Axpy`; `internal/ops` is unchanged.
+- **Taps and the mask.** Upstream multiplies the j-th shifted term by the mask's j-th diagonal (`_mask_diag`). For the
+  causal mask that is 1 wherever `shift_right` is defined (zeros elsewhere), and without a mask there is no factor, so
+  `applyTaps` is Σⱼ taps[j] · shift_right(z, j), summed j = 0, 1, 2 as Python's `sum`. A padding mask would zero taps
+  across padding; no Whistle path uses one, and `Forward` accepts only `MaskNone` and `MaskCausal`.
+- **Masked logits.** Upstream fills them with float32 min before the softmax; exp underflows to exactly 0, and every
+  causal row has an unmasked key. The port skips masked keys, which gives the same probabilities (the fixture's
+  `probs` are 0 there, and so are ours).
+- **Scale.** `qkᵀ / sqrt(float32(48))`, a division as upstream, not a multiplication by the reciprocal.
+- **Norm.** mean(x²) is accumulated in float64 and rounded to float32 before `+ 1e-6` and the square root. Every
+  qk-wide chunk of a row is one head, so the per-head q/k norms are `ZCRMSNorm.Apply` over the whole row buffer.
+- **Kronecker apply.** `_kron_apply`'s einsum `"ij,ik,jl->kl"` is out = aᵀ · Z · b for Z = z.reshape(16, 32), which
+  equals z · (a ⊗ b) with `np.kron`'s layout (`TestKronApplyMatchesDense`, 2×3, 4×4 and 16×32 against the dense
+  matrix). The port computes Y = Z · b, then aᵀ · Y: 24,576 multiply-adds per row and stage instead of 262,144. The
+  gathers are `out[i] = z[p[i]]`; `cond_v` (stored (512, 8), not transposed) is transposed once at load for the GEMM.
+- **No padding.** `HadamardMLP` pads x to the next power of two; Whistle's width is 512 = n, so the port takes n from
+  `d1` and requires inputs of that width.
+
+**Permutations.** `LoadHadamardMLP` reads `hada_p1`/`hada_p2` from the `Source`: `.cact` records 226/227 or, from
+safetensors, the numpy MT19937 port in `internal/cact/derived.go`. It checks that each is a permutation of n.
+`TestHadaPermsFixture` pins the fixture's `p1`/`p2` (upstream's `RandomState(11 / 13).permutation(512)`) to
+`cact.NumpyPermutation` without the model; `TestHadaPermsBothBackends` loads layer 0 through both backends and
+requires identical permutations equal to the fixture's. `internal/weights` `TestWhistleCrossFormat` compares every
+derived record across the backends as well.
+
+**Result.** Safetensors (FP32) weights, both batch rows of each fixture, Apple M5 Pro. Every cosine is 1.000000000000
+to 12 digits; "of bound" is max |Δ| / (1e-5 · max(1, max |ref|)):
+
+| fixture             | tensors (worst first)                                                                   | max \|Δ\|                 | of bound |
+| ------------------- | --------------------------------------------------------------------------------------- | ------------------------- | -------- |
+| `zcrmsnorm`         | `rms_unit`, `y`, `rms`                                                                  | 4.8e-7, 8.9e-8, 1.2e-7    | ≤ 0.01   |
+| `attention_decoder` | `gate` 0.39, `out` 0.21, `probs`/`attn` 0.13, `gated` 0.10, the other ten ≤ 0.09        | `out` 7.0e-4 at 329       | 0.39     |
+| `attention_encoder` | `gate` 0.41, `gated` 0.15, `attn`/`v_proj` 0.11, `out`/`out_rope` 0.04, the rest ≤ 0.09 | `out_rope` 4.9e-4 at 1202 | 0.41     |
+| `hadamard_mlp`      | `cond` 0.14, `z3`/`out` 0.13, `a2` 0.08, `z2` 0.06, `cond_logits` 0.04, `z1` 0.02       | `out` 2.0e-3 at 1481      | 0.14     |
+| RoPE tables         | `rope_cos`, `rope_sin`                                                                  | 6.0e-8, 1.2e-7            | 0.01     |
+
+The pure-Go fallbacks (`-tags purego`) give the same picture (worst `gate` 0.40). The only tensor above a fifth of its
+bound is `gate`, whose max is 1, so its bound is the flat 1e-5. That gap is the fixture's own float32 rounding: a
+probe that accumulates the gate logits in float64 lands 3.4e-6 (decoder) and 3.8e-6 (encoder) from the fixture,
+against 3.9e-6 and 4.1e-6 for the float32 port, and F-009's float64 rerun measured 3.4e-6 and 3.9e-6 for the fixture.
+The logits reach |78.5|; the float32 rounding of their 512-term sums passes through σ, whose slope is at most 1/4.
+
+**Summation order depends on T.** `MatMulTransB` computes 4×4 blocks with NEON on arm64 and a 1×4 tail, so a row's
+dot products take a different path when T changes. A 3-step causal run therefore equals the first three rows of a
+5-step run only to about 1e-7, not bit for bit. Causality itself is exact: changing rows 3–4 at the same T leaves
+rows 0–2 bit-identical (`TestAttentionCausal`).
+
+**Not covered.** RoPE offsets and a KV cache for incremental decoding, padding masks, parallelism and speed (each
+block is a single goroutine; the projections use `MatMulTransB`, the rest is scalar), and the remaining Phase 2
+blocks (`MHC`, `Engram`, `Block`).
