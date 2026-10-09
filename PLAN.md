@@ -267,14 +267,24 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 
 - [x] Repo, `go.mod`, `justfile`, `treefmt.toml`, `.golangci.yml`, `AGENTS.md`, `PLAN.md`
 - [ ] GitHub Actions: `just ci` on linux/amd64 and macos/arm64. Model-dependent tests skip when `models/` is absent.
+      (2026-10-09) — partial: `.github/workflows/ci.yml` (ubuntu-latest + macos-latest matrix, treefmt 2.6.0,
+      golangci-lint 2.13.2) and a doc-only `whistle` package, without which `go test`/`golangci-lint` fail on an empty
+      module. `just ci` is green locally. Remains: the GitHub repo does not exist yet, so the workflow has never run.
 - [ ] `internal/hub`: a minimal pure-Go Hugging Face downloader. It resolves `revision`, resumes downloads, verifies
       SHA-256 against a committed `models/manifest.lock.json`, and honours `HF_TOKEN`/`HF_HUB_OFFLINE`. Pin
       `whistle.cact`, `checkpoints/whistle.safetensors` and `config.json` at `b358ddad`.
 - [ ] `whistle download` command, with the local layout `models/whistle/{whistle.cact, whistle.safetensors, config.json}`
-- [ ] `scripts/fetch-engine.sh`: fetch the platform `needle` binary and `libneedle3` from `Cactus-Compute/needle3` into
+- [x] `scripts/fetch-engine.sh`: fetch the platform `needle` binary and `libneedle3` from `Cactus-Compute/needle3` into
       `engine/<platform>/`. Set `NEEDLE_TELEMETRY=0` and `DO_NOT_TRACK=1` for every oracle run.
-- [ ] Snapshot upstream into `original/needle` at `af2654dffa` and set up `uv` (`jax`, `flax`, `safetensors`,
+      (2026-10-09) — `just fetch-engine [--platform …]` for macos-arm64, linux-x86_64 and linux-arm64, pinned to HF
+      revision `2ae11323dc` with a SHA-256 for every file. `libneedle3.{dylib,so}` ships only inside
+      `python/cactus_needle-3.2.0-py3-none-<tag>.whl`, so the script extracts it from there. The platform dirs hold only
+      `needle`, `libneedle.a` and `needle.h`. The CLI has no `--version` and no version string; its upload
+      (`80896a6582`, 2026-10-05) has the same date as the 3.2.0 wheel. Only macos-arm64 was run here.
+- [x] Snapshot upstream into `original/needle` at `af2654dffa` and set up `uv` (`jax`, `flax`, `safetensors`,
       `sentencepiece`, `numpy`) for `scripts/`
+      (2026-10-09) — `just fetch-upstream` (shallow fetch of the pinned commit, idempotent, HEAD verified);
+      `scripts/pyproject.toml` + `uv.lock` (Python 3.12; resolved jax 0.11.2, flax 0.12.10, numpy 2.5.3).
 - [ ] `tools/oracle` (build tag `oracle`): run `needle --model … --audio clip.wav --audio-word-timestamps` and
       `needle_embed`, and write `testdata/oracle/<clip>.{json,embed.safetensors}`.
       **Accept:** fixtures exist for at least 20 English and 2 clips per other language.
