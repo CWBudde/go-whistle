@@ -18,6 +18,7 @@ package encoder
 import (
 	"cmp"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"os"
 	"runtime"
@@ -590,7 +591,7 @@ var searchStages = []stage{
 	{"conv module", []string{"glu", "blockact", "convnorm", "dwpad"}},
 	{"block structure", []string{"ffn", "order", "mhc", "perms"}},
 	{"positions and output", []string{"rope", "pe", "out"}},
-	{"front end: window, padding, band, pre-emphasis", []string{"win", "pad", "band", "pre"}},
+	{"front end: window, padding, band, pre-emphasis, dither", []string{"win", "pad", "band", "pre", "dither"}},
 }
 
 // TestProbeSearch is the staged beam search, then the escalating
@@ -777,4 +778,326 @@ func TestProbeSweep(t *testing.T) {
 
 	t.Logf("weights %s, %d inner clips: %s", srcName, nClips, h)
 	sensitivity(t, newEvaluator(src, loadClips(t, innerClips[:nClips]...)), h)
+}
+
+// family is a probe's kind, the part of its name before the first dash.
+func family(id string) string {
+	f, _, _ := strings.Cut(id, "-")
+
+	return f
+}
+
+// probeScore is one hypothesis on the probe set and on the corpus.
+type probeScore struct {
+	h                    Hypothesis
+	silence, probes, all result
+	families             map[string]float64 // mean per probe family
+}
+
+// scoreProbes scores hs on the silence probes, on all probes and on all
+// corpus clips with the .cact weights.
+func scoreProbes(t *testing.T, hs []Hypothesis) []probeScore {
+	t.Helper()
+
+	src := openModel(t, whistleCactPath)
+	probes := loadProbes(t)
+
+	var silence []clip
+
+	for _, p := range probes {
+		if family(p.ID) == "silence" {
+			silence = append(silence, p)
+		}
+	}
+
+	sil := newEvaluator(src, silence).scoreAll(hs)
+	all := newEvaluator(src, probes).scoreAll(hs)
+	corpus := newEvaluator(src, loadClips(t)).scoreAll(hs)
+
+	out := make([]probeScore, len(hs))
+
+	for i, h := range hs {
+		out[i] = probeScore{h: h, silence: sil[i], probes: all[i], all: corpus[i], families: map[string]float64{}}
+
+		if !all[i].ok() {
+			continue
+		}
+
+		n := map[string]int{}
+
+		for c, p := range probes {
+			out[i].families[family(p.ID)] += all[i].perClip[c]
+			n[family(p.ID)]++
+		}
+
+		for f := range n {
+			out[i].families[f] /= float64(n[f])
+		}
+	}
+
+	return out
+}
+
+// logProbeScores prints scores sorted by key, best first, relative to
+// ref's values.
+func logProbeScores(t *testing.T, title string, ps []probeScore, ref Hypothesis, key func(probeScore) float64) {
+	t.Helper()
+
+	slices.SortStableFunc(ps, func(a, b probeScore) int { return cmp.Compare(key(b), key(a)) })
+
+	fams := []string{"silence", "dc", "tone", "burst", "noise", "decay", "impulse"}
+	t.Logf("── %s (.cact; probe means per family: %s)", title, strings.Join(fams, " "))
+
+	for i, p := range ps {
+		if !p.probes.ok() {
+			t.Logf("  #%-2d ruled out: %s | %s", i+1, p.probes.ruled, diff(p.h, ref))
+
+			continue
+		}
+
+		fm := make([]string, 0, len(fams))
+		for _, f := range fams {
+			fm = append(fm, fmt.Sprintf("%.5f", p.families[f]))
+		}
+
+		corpus := "32 clips ruled out (frame count)"
+		if p.all.ok() {
+			corpus = fmt.Sprintf("32 clips %.6f (min %.6f)", p.all.mean, p.all.min)
+		}
+
+		t.Logf("  #%-2d silence %.6f (min %.6f) | probes %.6f (min %.6f) | %s | %s | %s",
+			i+1, p.silence.mean, p.silence.min, p.probes.mean, p.probes.min, corpus, strings.Join(fm, " "),
+			diff(p.h, ref))
+	}
+}
+
+// TestProbePEGate scores every pe_gate placement, each with and without
+// the encoder's RoPE, on the silence probes, where the stem output is 0
+// and any additive position term is the stack's only input, on all
+// probes and on the 32 clips (docs/FINDINGS.md F-019).
+func TestProbePEGate(t *testing.T) {
+	ref := Best()
+	ps := scoreProbes(t, product(ref, []string{"pe", "rope"}))
+
+	logProbeScores(t, "pe_gate placements × RoPE, sorted by the silence probes", ps, ref,
+		func(p probeScore) float64 { return p.silence.mean })
+
+	for _, p := range ps {
+		if p.h.Rope != ref.Rope {
+			continue
+		}
+
+		var parts []string
+		for c, cl := range loadProbes(t)[:len(p.silence.perClip)] {
+			parts = append(parts, fmt.Sprintf("%s %.6f", strings.TrimPrefix(cl.ID, "silence-"), p.silence.perClip[c]))
+		}
+
+		t.Logf("  silence per length, pe=%s: %s", valueOf(p.h, "pe"), strings.Join(parts, "  "))
+	}
+}
+
+// TestProbeFrontEnd sweeps the log floor, the window, the centring and
+// dither around Best on the probes and the 32 clips (docs/FINDINGS.md
+// F-020).
+func TestProbeFrontEnd(t *testing.T) {
+	ref := Best()
+	ps := scoreProbes(t, product(ref, []string{"log", "win", "pad", "dither"}))
+
+	logProbeScores(t, "front end: log × window × centring × dither, sorted by the 32 clips", ps, ref,
+		func(p probeScore) float64 { return p.all.mean })
+}
+
+// TestProbeScaleInvariance compares the engine's rows for the same probe
+// at different levels: a front end without an absolute floor (log, a clamp
+// relative to the peak, per-channel normalisation) gives the same rows at
+// any gain (docs/FINDINGS.md F-020).
+func TestProbeScaleInvariance(t *testing.T) {
+	ps := map[string]clip{}
+	for _, p := range loadProbes(t) {
+		ps[p.ID] = p
+	}
+
+	for _, pair := range [][2]string{
+		{"tone-1e-01", "tone-1e-03"},
+		{"tone-1e-01", "tone-1e-05"},
+		{"burst-1e-01", "burst-1e-03"},
+		{"burst-1e-01", "burst-1e-05"},
+		{"noise-1e-01", "noise-1e-05"},
+		{"dc-1e-02", "dc-1e-04"},
+		{"impulse-d0-1e-01", "impulse-d0-1e-02"},
+		{"impulse-d0-1e-01", "impulse-d0-1e-04"},
+		{"impulse-d0-1e-01", "impulse-d0-1e-06"},
+		{"impulse-d80-1e-01", "impulse-d80-1e-03"},
+		{"impulse-d80-1e-01", "impulse-d80-1e-05"},
+		{"impulse-d80-1e-01", "impulse-d80-1e-06"},
+		{"silence-32000", "impulse-d80-1e-06"},
+		{"silence-32000", "impulse-d0-1e-06"},
+	} {
+		a, b := ps[pair[0]], ps[pair[1]]
+		cos := frameCosines(a.Embed, b.Embed, a.Frames, 512)
+		t.Logf("engine %-17s vs %-17s mean %.6f min %.6f", a.ID, b.ID, mean(cos), slices.Min(cos))
+	}
+}
+
+// TestProbeLogKnee sweeps the depth of the log's floor below the clip's
+// peak, as a soft knee log10(x + 10^−d·max x) and as Whisper's hard clamp
+// max(log10 x, log10 max x − d), on the 32 clips, then fits the soft depth
+// on half the clips and scores it on the other half (docs/FINDINGS.md
+// F-020). Every other axis is Best's.
+func TestProbeLogKnee(t *testing.T) {
+	src := openModel(t, whistleCactPath)
+	clips := loadClips(t)
+
+	e, err := Load(src, Best())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bank, _, err := src.Tensor(frontend.MelBankName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	energies := make([][]float64, len(clips))
+
+	for i, c := range clips {
+		spec, frames, err := e.fe.Spectrogram(c.Samples)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		energies[i] = make([]float64, frames*frontend.Mels)
+
+		for f := range frames {
+			for m := range frontend.Mels {
+				var s float64
+				for k := range frontend.Bins {
+					s += float64(spec[f*frontend.Bins+k]) * float64(bank[k*frontend.Mels+m])
+				}
+
+				energies[i][f*frontend.Mels+m] = s
+			}
+		}
+	}
+
+	score := func(soft bool, depth float64) []float64 {
+		per := make([]float64, len(clips))
+
+		for i, c := range clips {
+			mel := slices.Clone(energies[i])
+			top := math.Log10(slices.Max(mel))
+
+			for j, x := range mel {
+				if soft {
+					mel[j] = math.Log10(x + math.Pow(10, top-depth))
+				} else {
+					mel[j] = max(math.Log10(max(x, 1e-30)), top-depth)
+				}
+			}
+
+			frames := len(mel) / frontend.Mels
+			for m := range frontend.Mels {
+				standardiseColumn(mel, m, frames)
+			}
+
+			ft := frontend.Features{Frames: frames, Data: make([]float32, len(mel))}
+			for j, v := range mel {
+				ft.Data[j] = float32(v)
+			}
+
+			y, n, err := e.Forward(ft)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			per[i] = mean(frameCosines(y, c.Embed, n, 512))
+		}
+
+		return per
+	}
+
+	var depths []float64
+	for d := 7.3; d < 8.25; d += 0.05 {
+		depths = append(depths, math.Round(d*100)/100)
+	}
+
+	soft := make([][]float64, len(depths))
+
+	for k, d := range depths {
+		soft[k] = score(true, d)
+		hard := score(false, d)
+		t.Logf("depth %.2f: soft knee mean %.6f min %.6f | hard clamp mean %.6f min %.6f",
+			d, mean(soft[k]), slices.Min(soft[k]), mean(hard), slices.Min(hard))
+	}
+
+	hard8 := score(false, 8)
+
+	// Fit the soft depth on one half, score it on the other.
+	var even, odd, ls, fleurs []int
+
+	for i, c := range clips {
+		if i%2 == 0 {
+			even = append(even, i)
+		} else {
+			odd = append(odd, i)
+		}
+
+		if strings.HasPrefix(c.ID, "ls-") {
+			ls = append(ls, i)
+		} else {
+			fleurs = append(fleurs, i)
+		}
+	}
+
+	sub := func(v []float64, idx []int) []float64 {
+		out := make([]float64, len(idx))
+		for j, i := range idx {
+			out[j] = v[i]
+		}
+
+		return out
+	}
+
+	for _, split := range []struct {
+		name       string
+		fit, check []int
+	}{{"even → odd", even, odd}, {"odd → even", odd, even}, {"ls → fleurs", ls, fleurs}, {"fleurs → ls", fleurs, ls}} {
+		bestK := 0
+		for k := range depths {
+			if mean(sub(soft[k], split.fit)) > mean(sub(soft[bestK], split.fit)) {
+				bestK = k
+			}
+		}
+
+		got, ref := sub(soft[bestK], split.check), sub(hard8, split.check)
+		t.Logf("cross-validation %-11s fit depth %.2f on %2d clips: held out mean %.6f min %.6f, hard clamp 8 mean %.6f min %.6f",
+			split.name, depths[bestK], len(split.fit), mean(got), slices.Min(got), mean(ref), slices.Min(ref))
+	}
+}
+
+// standardiseColumn is NormChannel on mel channel m of frames rows:
+// (x − mean) / (std + 1e-5), std with n − 1.
+func standardiseColumn(mel []float64, m, frames int) {
+	var s float64
+	for f := range frames {
+		s += mel[f*frontend.Mels+m]
+	}
+
+	mu := s / float64(frames)
+
+	var d float64
+
+	for f := range frames {
+		v := mel[f*frontend.Mels+m] - mu
+		d += v * v
+	}
+
+	sd := 0.0
+	if frames > 1 {
+		sd = math.Sqrt(d / float64(frames-1))
+	}
+
+	for f := range frames {
+		mel[f*frontend.Mels+m] = (mel[f*frontend.Mels+m] - mu) / (sd + 1e-5)
+	}
 }

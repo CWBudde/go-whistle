@@ -590,7 +590,7 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       re-derived over 250–3500 Hz (the shipped bank is full band) and a time-domain band-pass (no stated shape)
       (`docs/FINDINGS.md` F-012).
 
-## Phase 4 — Encoder (reverse engineering)
+## Phase 4 — Encoder (reverse engineering) — ✅ DONE (2026-10-10)
 
 - [x] Stem: a 2-D conv with candidate strides (2,2) on all three convs vs. stride only on the depthwise stages; padding
       SAME or VALID; activation (SiLU, GELU or none) after each stage. Pin the frame count: 3000 → 375.
@@ -603,22 +603,31 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       (NHWC −0.713620); SiLU after `stem/w` (GELU −0.000569, none −0.063222), nothing after the depthwise convs (SiLU
       −0.092369), SiLU after the pointwise convs (GELU −0.027121, none −0.815920); no input scale (×√512 −0.837042)
       (`docs/FINDINGS.md` F-016).
-- [ ] Encoder block candidates:
+- [x] Encoder block candidates:
   - FFN residual scale 1 or ½ (macaron)
   - conv module: GLU over pw1's 1024 channels or not; SiLU after dw; any normalisation between dw and pw2
   - attention: full non-causal; RoPE in the encoder or not
   - where `pe_gate` applies: a sinusoidal or RoPE mix-in gated by σ(pe_gate), or on the stem output
   - how mHC wraps the block (same as the decoder, `enc_lanes` 4)
 
-  (2026-10-10) — partial: everything but `pe_gate` is resolved by score (F-017). FFN ½ (1: −0.622692); GLU a·σ(b)
-  over pw1's halves ("no GLU" ruled out by the 512-wide `dw`; a·silu(b) −0.403596, σ(a)·b −0.978467); SiLU after
-  `dw` (GELU −0.005362, none −0.820849); `conv_out_norm` between `dw` and the SiLU (after it −0.185564, after `pw2`
-  −0.896173); centred kernel-9 `dw` (causal −0.907688); macaron order (conv first −0.415660); full non-causal
-  attention with half-split RoPE θ = 1e5 (θ 1e4 −0.029625, none −0.221335); mHC exactly as the decoder, 4 lanes
-  (plain stack −0.678340); shared `hada_p1/p2`, so U5 is settled (split −0.980344, identity −0.977999). Open:
-  `pe_gate`. σ(pe_gate) = 0.0022 makes a sinusoid −70 dB below the stem output (RMS 0.0016 against 4.6–5.1), so
-  adding it to the stem output either way changes the score by ≤ 1e-6. A RoPE mix replaces the winning RoPE
-  (−0.221535). `Best()` leaves it unused; the embeddings cannot decide it.
+  (2026-10-10) — everything but `pe_gate` is resolved by score (F-017). FFN ½ (1: −0.622692); GLU a·σ(b) over pw1's
+  halves ("no GLU" ruled out by the 512-wide `dw`; a·silu(b) −0.403596, σ(a)·b −0.978467); SiLU after `dw` (GELU
+  −0.005362, none −0.820849); `conv_out_norm` between `dw` and the SiLU (after it −0.185564, after `pw2` −0.896173);
+  centred kernel-9 `dw` (causal −0.907688); macaron order (conv first −0.415660); full non-causal attention with
+  half-split RoPE θ = 1e5 (θ 1e4 −0.029625, none −0.221335); mHC exactly as the decoder, 4 lanes (plain stack
+  −0.678340); shared `hada_p1/p2`, so U5 is settled (split −0.980344, identity −0.977999). On speech, σ(pe_gate) =
+  0.0022 puts a sinusoid −70 dB below the stem output, so the corpus cannot decide `pe_gate`.
+  (2026-10-10) — `pe_gate` decided by synthetic probes: **unused** (F-019). `just oracle-probes` records
+  `needle_embed` for 30 signals from `tools/oracle/probe` (silence 0.32–30 s, DC, quiet tones and bursts, noise, a
+  −20 → −140 dB decay, impulses at sub-frame offsets and falling levels): 1217 frames, 2.5 MB in
+  `testdata/oracle/probes` with a manifest of every generator parameter and each signal's SHA-256. On digital silence
+  the stem output is exactly 0, so a position term would be the stack's only input. `pe=none` reproduces the engine's
+  silence rows at 0.999946 (every length ≥ 0.999916, the engine's own reproducibility). Every tested placement loses
+  at least 0.0088 (`TestProbePEGate`): sinusoid on the stem input, before or after `stem/out`, on every block's input,
+  each as `[sin | cos]` or interleaved; the RoPE mix; and an ungated control. The best of them, interleaved after
+  `stem/out`, scores 0.991178 (0.977333 on 10 s). On the 32 clips they all tie within 6e-6 except the control and the
+  RoPE mix. So the encoder has no position term beyond RoPE (silence: no RoPE 0.942122, θ 1e4 0.985391).
+  `TestBestMatchesProbes` pins it.
 
 - [x] Hypothesis harness `internal/encoder/probe_test.go` (build tag `oracle`): enumerate the combinations, run the
       encoder on the fixture clips and score each by the mean per-frame cosine against `needle_embed`. Prune greedily by stage.
@@ -647,6 +656,15 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       decided as far as the embeddings allow: power spectrum, Whisper log clamp, per-channel norm, full band (the
       "250–3500 Hz" mask is ruled out), no pre-emphasis; window and reflect vs zero padding tie (F-018). Findings
       F-014 to F-018.
+      (2026-10-10) — the near-silent gap was the Whisper clamp's hard edge (F-020). `Best()` now takes
+      `log=soft-76db`, log10(x + 10^−7.6 · max x): mean 0.999828, every clip ≥ 0.999033 (ls-clean-260-123440-0018);
+      the old worst clip rises to 0.999713, and 7 frames stay below 0.995 instead of 13 (worst 0.9558 instead of
+      0.6753). Safetensors weights: 0.921134 (min 0.881205). The absolute floor never binds on speech: the engine is
+      scale invariant on tones, bursts, noise and DC over 2–4 decades, down to 1e-5. Every soft depth from 7.35 to
+      8.2 beats the hard clamp, and the fitted depth holds on held-out halves. Zero centring is decided by the DC probes (reflect
+      0.8775); dither is ruled out by silence (0.915996). The window still ties (Δ 1e-6). Open, below the target:
+      the per-clip optimal knee depth varies (7.5–8.55), and impulses below about 1e-5 behave as if under an absolute
+      floor that tones do not show. Findings F-014 to F-020.
 
 ## Phase 5 — Decoder + greedy decoding — ✅ DONE (2026-10-10)
 

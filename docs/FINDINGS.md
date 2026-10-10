@@ -1032,7 +1032,8 @@ clips):
 | descent 1, single axes           | `log=whisper`                  | 0.999819 | 0.999710 |
 | descent 2–4, single/pairs/stages | (unchanged: converged)         | 0.999819 | 0.999710 |
 
-The leader with `pe=none` is `encoder.Best()`:
+The leader with `pe=none` was `encoder.Best()` (F-019 keeps `pe=none` by the silence probes; F-020 moves the log to
+the soft knee `soft-76db`, 32-clip mean 0.999828, min 0.999033):
 `win=hann-symmetric pad=zero spec=power log=whisper norm=channel band=full pre=none stride=all stempad=sym
 kernel=time-mel flatten=ch-mel convact=silu dwact=none pwact=silu scale=1 pe=none rope=1e5 ffn=half glu=a*sig(b)
 blockact=silu convnorm=before-act dwpad=centred order=macaron mhc=lanes perms=shared out=final-norm`.
@@ -1137,7 +1138,8 @@ advance as the decoder (`needle.MHC` with `enc.mhc_*`). The attention is `needle
 4.6–5.1, about −70 dB. Adding it to the stem output, as `[sin | cos]` or interleaved, moves the score by ≤ 1e-6
 (−0.000000 and −0.000001). As a RoPE mix, `(1 − g)·x + g·RoPE(x)` replaces the RoPE that wins and costs −0.221535,
 as much as no RoPE. `Best()` leaves `pe_gate` unused. The embeddings cannot tell whether the engine uses it; a
-probe with a far larger signal (or the decoder side, Phase 5) could.
+probe with a far larger signal (or the decoder side, Phase 5) could. **Decided by such probes in F-019: unused.** On
+digital silence the stack input is exactly 0, and every placement loses at least 0.0088 there.
 
 ## F-018 — The front end against the encoder oracle (U1, partial) (2026-10-10)
 
@@ -1165,13 +1167,171 @@ float-weight search prefers 0.97, `log10` and reflect padding on its inner clips
 either source (F-014). The `log` choice is the weakest decision of this table.
 
 **Ties.** The window (Δ −0.000001) and reflect against zero padding (−0.000040 with `.cact`, +0.000014 with
-safetensors) are below what the embeddings resolve; `Best()` keeps the search's choice (symmetric, zero).
+safetensors) are below what the embeddings resolve; `Best()` keeps the search's choice (symmetric, zero). **F-020:**
+the DC probes decide zero centring (0.9998 against 0.8775); the window still ties.
 
 **Open: quiet frames.** The frames below 0.995 are all near-silent: peak |x| < 3e-3 within the frame's 80 ms, and a
 log10-mel maximum ≤ −3.7. The three worst are fleurs-fr_fr-10174413140250646001 frames 13–14 (0.756, 0.675, peak 3e-4)
 and ls-clean-5639-40744-0014 frame 69 (0.883). Elsewhere frames reach 0.9999. The floor that the clamp approximates,
 dither or the engine's 8-bit activations on low-energy frames remain candidates for the next session. They cost
-0.007 on the worst clip and do not threaten the 0.99 target.
+0.007 on the worst clip and do not threaten the 0.99 target. **F-020:** the Whisper clamp's hard edge is the cause.
+A soft knee 76 dB below the clip's peak (`log=soft-76db`) lifts these three frames from 0.756, 0.675 and 0.883 to
+0.9926, 0.9953 and 0.9558, and the worst clip to 0.999713. The absolute floor never binds on speech, and the probes
+rule out dither.
+
+## F-019 — `pe_gate` is unused: the silence probes (U3) (2026-10-10)
+
+**Question.** Where does `pe_gate` (σ(−6.1094) = 0.00222) add a position signal, if anywhere? On speech a sinusoid
+gated by it sits about 70 dB below the stem output, so the corpus embeddings cannot tell (F-017).
+
+**Probes.** `tools/oracle/probe` synthesises 30 signals, `just oracle-probes` (`oracle probes`, build tag `oracle`) runs
+them through `needle_embed` with telemetry off and writes `testdata/oracle/probes/<name>.embed.safetensors` plus
+`manifest.json` (engine and model pins, every generator parameter, the frame counts and the SHA-256 of each signal):
+1217 encoder frames, 2.5 MB. Two runs are byte-identical. The encoder tests regenerate each signal from the manifest
+and refuse it unless its digest matches (`loadProbes`). Interior frames are those whose stem input
+`[1280t − 1320, 1280t + 1320)` lies inside the clip.
+
+| family      | probes                                                                                                                            | frames (interior) | why it discriminates                                                                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| silence     | 0.32, 1, 2, 4, 10, 30 s                                                                                                           | 4 … 375 (1 … 372) | the stem output is exactly 0 (below), so any additive position term is the stack's only input; dither would be normalised to full scale; the lengths reach position 374  |
+| DC          | 0.01, 1e-4, 2 s                                                                                                                   | 25 (22)           | reflect centring makes every mel frame equal (the silence rows), zero centring changes the frames that reach past the clip; the two levels test scale invariance         |
+| tone, burst | 440 Hz at 1e-1, 1e-3, 1e-5, steady or in the middle second                                                                        | 25 (22) each      | Hann leakage spans 15 decades, so any absolute floor binds somewhere; a burst makes each channel two-level, so the floor decides which channels carry the on/off pattern |
+| noise       | σ 1e-1, 1e-5                                                                                                                      | 25 (22)           | every channel at a similar level; 1e-5 is the config's dither                                                                                                            |
+| decay       | noise from −20 to −140 dB over 4 s                                                                                                | 50 (47)           | every channel crosses the floor, whose shape bends its trajectory                                                                                                        |
+| impulse     | one click at 16000 + δ, δ ∈ {0, 20, 40, 80, 120, 140}, 0.1; δ 0 at 1e-2, 1e-4, 1e-6; δ 80 at 1e-3, 1e-5, 1e-6; a pair 40 dB apart | 25 (22) each      | 2–3 frames see the click at known window offsets (centring, window shape); falling levels test the floor on frames with tiny energy                                      |
+
+**Why silence decides.** On digital silence every mel frame is equal, so per-channel normalisation gives exactly 0.
+The stem has no biases and SiLU(0) = 0, so the stem output and the stack input are exactly 0
+(`TestPEPlacements`). A position term added before or inside the blocks is then the stack's only input, and the
+ZCRMSNorms scale it up to unit RMS, so its gain of 0.0022 no longer hides it. Without one the engine's rows are still
+neither zero nor constant (adjacent-frame cosine 0.3–0.5, deterministic): each Hadamard MLP adds the constant its `b2`
+bias makes, the blocks' zero-padded depthwise convs set the frames near the edges apart, and the global attention
+with RoPE spreads that by position. So "the interior frames are identical" is not a test here, but the model is:
+the hypothesis must reproduce the engine's varying rows.
+
+**Placements** (`encoder.PE`; each adds σ(pe_gate) times the sinusoid of its row width w, frequencies
+10000^(−2i/w), as `[sin | cos]` (concat) or interleaved; `TestProbePEGate`, Best otherwise, `.cact`):
+
+| `pe`                           | where the sinusoid is added                 | silence mean | silence min  | 32 clips |
+| ------------------------------ | ------------------------------------------- | ------------ | ------------ | -------- |
+| **none**                       | —                                           | **0.999946** | **0.999916** | 0.999828 |
+| stem-interleaved               | stem output (after `stem/out`, w = 512)     | 0.991178     | 0.977333     | 0.999829 |
+| flat-concat                    | before `stem/out` (w = 1280)                | 0.962869     | 0.909087     | 0.999834 |
+| block-interleaved              | every block's input u, inside mHC (w = 512) | 0.953773     | 0.936508     | 0.999825 |
+| flat-interleaved               | before `stem/out`                           | 0.945616     | 0.904476     | 0.999832 |
+| rope-mix                       | q, k rotated by (1 − g)·x + g·RoPE(x)       | 0.942294     | 0.914018     | 0.714247 |
+| mel-concat                     | stem input, the normalised log-mel (w = 80) | 0.941623     | 0.917200     | 0.999831 |
+| stem-concat                    | stem output                                 | 0.933335     | 0.844558     | 0.999828 |
+| mel-interleaved                | stem input                                  | 0.925033     | 0.845102     | 0.999824 |
+| block-concat                   | every block's input                         | 0.892453     | 0.821885     | 0.999827 |
+| stem-ungated (control, gain 1) | stem output                                 | 0.884709     | 0.774427     | 0.998886 |
+| none, `rope=none`              | —                                           | 0.942122     | 0.913784     | 0.714435 |
+| none, `rope=1e4`               | —                                           | 0.985391     | 0.973419     | 0.953470 |
+
+Per length, `pe=none` gives 0.999972, 0.999969, 0.999952, 0.999939, 0.999916 and 0.999927 (0.32 s to 30 s). That is
+the engine's own reproducibility: the same tone, burst, noise or DC at two levels 2 to 4 decades apart gives
+0.999926–0.999957 against itself (F-020). Every placement loses at least 0.0088 on average and 0.0226 on 10 s of silence; on the corpus they all
+tie within 6e-6, except the ungated control and the RoPE mix. The silence probes also confirm the encoder's RoPE:
+none scores 0.942122, θ = 1e4 0.985391.
+
+**Winner.** `pe_gate` is unused in the encoder: with RoPE as its only position term the model reproduces the engine's
+silence rows to 5e-5 at every length up to 30 s, and no tested placement comes within 0.0088. `Best()` keeps
+`pe=none`. Whether the decoder reads `pe_gate` is not tested here.
+
+## F-020 — The log floor is a soft knee 76 dB below the peak; zero centring, no dither (U1) (2026-10-10)
+
+**Question.** F-018 left the near-silent frames (worst clip 0.992932, frames down to 0.675) and the window and
+centring ties. Which floor does the engine put under quiet mel energies: Whisper's absolute 1e-10, its clamp 8
+decades below the clip's peak, an epsilon inside the log, or dither? The probes of F-019 add signals where the floor
+dominates.
+
+**No absolute floor on tones, noise or DC.** A front end with only a log, a clamp relative to the peak and per-channel
+normalisation gives the same rows at any gain. The engine does, from 1e-1 to 1e-5 (`TestProbeScaleInvariance`):
+tone 0.999957 and 0.999953, burst 0.999943 and 0.999949, noise 0.999934, DC 0.999926. That is the same 5e-5 as the
+silence rows, the engine's own reproducibility level. Whisper's 1e-10 floor binds on the quiet tones and breaks this
+(tone 1e-5 0.932919, burst 1e-5 0.947681 under the old `Best()`; 0.999706 and 0.999216 with the soft knee below). On
+speech no absolute floor binds: `max(x, F)` with F from 1e-10 to 1e-20 under the 8-decade clamp gives 0.999539 every
+time (a one-off sweep, like every number in this entry not attributed to a test).
+
+**Hard clamp, soft knee or epsilon** (`TestProbeLogKnee`, 32 clips, `.cact`, every other axis Best's; the soft knee is
+log10(x + 10^−d · max x), the hard clamp max(log10 x, log10 max x − d)):
+
+| depth d  | soft knee mean | soft knee min | hard clamp mean    | hard clamp min |
+| -------- | -------------- | ------------- | ------------------ | -------------- |
+| 7.30     | 0.999464       | 0.995388      | 0.999235           | 0.996223       |
+| 7.50     | 0.999766       | 0.998921      | 0.999593           | 0.998506       |
+| **7.60** | **0.999828**   | **0.999033**  | 0.999632           | 0.997588       |
+| 7.65     | 0.999826       | 0.999037      | 0.999634           | 0.996607       |
+| 7.80     | 0.999762       | 0.996081      | 0.999601           | 0.994170       |
+| 8.00     | 0.999651       | 0.992779      | 0.999539 (Whisper) | 0.992934       |
+| 8.20     | 0.999549       | 0.990966      | 0.999418           | 0.990909       |
+
+Every soft depth from 7.35 to 8.2 beats the hard clamp at 8 in mean, and at every depth the soft knee beats the hard
+clamp of the same depth, by 1.1e-4 to 2.3e-4. Fitted on one half and scored on the other:
+
+| fit → held out | fitted d | held-out mean / min | hard clamp 8 on the same clips |
+| -------------- | -------- | ------------------- | ------------------------------ |
+| even → odd     | 7.60     | 0.999811 / 0.999245 | 0.999699 / 0.998082            |
+| odd → even     | 7.85     | 0.999599 / 0.995128 | 0.999380 / 0.992934            |
+| ls → fleurs    | 7.80     | 0.999599 / 0.996081 | 0.999282 / 0.992934            |
+| fleurs → ls    | 7.60     | 0.999821 / 0.999033 | 0.999694 / 0.998082            |
+
+So the shape is a finding and the depth a fit. Fitted per clip, the depth ranges from 7.50 to 8.55 (σ 0.20). Taking
+the reference to be the waveform's peak (σ 0.24) or its mean square (σ 0.22) instead of the mel's peak spreads it
+wider. An absolute epsilon inside the log does worst of the three: log10(x + 3e-8) gives 0.999679, 0.999734 under the
+8-decade clamp (min 0.998582, the quiet fleurs-nl clip), and x + 1e-8 0.999323. Ruled out on the way, all with Best's other axes: a knee referenced to the power
+spectrum's peak (best 0.999559 at 9.5 decades); FP16 storage of the max-normalised mel (0.999519); int8 quantisation
+of the stem input, per tensor, row or group of 32 (0.999529–0.999560); Kaldi's per-frame DC removal (0.999303); a
+squared Hann window (the 0.1 clicks rise to 0.9997, tones fall to 0.985).
+
+**The probes, front end** (`TestProbeFrontEnd`, around the new `Best()`; family means silence, DC, tone, burst,
+noise, decay, impulse):
+
+| change from `Best()`                        | silence  | probes (min)        | dc / tone / burst / noise / decay / impulse     | 32 clips (min)      |
+| ------------------------------------------- | -------- | ------------------- | ----------------------------------------------- | ------------------- |
+| — (`soft-76db`, symmetric, zero, no dither) | 0.999946 | 0.984252 (0.845708) | 0.99984 0.99974 0.99924 0.99993 0.99943 0.96400 | 0.999828 (0.999033) |
+| `win=hann-periodic`                         | 0.999946 | 0.984247 (0.845671) | 0.99981 0.99977 0.99915 0.99992 0.99943 0.96401 | 0.999829 (0.999149) |
+| `log=soft-80db`                             | 0.999946 | 0.984350 (0.845706) | 0.99968 0.99992 0.99991 0.99993 0.99899 0.96409 | 0.999651 (0.992779) |
+| `log=whisper` (F-018)                       | 0.999946 | 0.990395 (0.932919) | 0.98876 0.97477 0.97788 0.99725 0.99889 0.99102 | 0.999539 (0.992932) |
+| `log=ln-eps`                                | 0.999946 | 0.983386 (0.831978) | 0.98506 0.98717 0.97732 0.91594 0.99992 0.98512 | 0.999532 (0.994120) |
+| `pad=reflect`                               | 0.999946 | 0.975772 (0.845708) | 0.87748 0.99827 0.99924 0.99709 0.99981 0.96400 | 0.999789 (0.998593) |
+| `dither=1e-5`                               | 0.915996 | 0.943547 (0.786754) | 0.95097 0.96173 0.90586 0.98467 0.99945 0.94900 | 0.999829 (0.999028) |
+| `pad=none`                                  | 0.999946 | 0.959419 (0.850491) | 0.87748 0.90808 0.97818 0.97943 0.99787 0.95480 | ruled out (frames)  |
+
+**Decided.**
+
+- **Log: `soft-76db`**, the new `frontend.LogSoft76`, log10(x + 10^−7.6 · max x) over the clip; an all-zero clip
+  takes ε = 1e-10. The soft knee fits tones, bursts and noise better than the hard clamp (0.9992 to 0.9999 against
+  0.975 to 0.997). `LogSoft80` (Whisper's 80 dB, soft) fits the tones a little better still (0.99992). But on speech
+  it loses 1.8e-4 and lets the old worst clip fall back to 0.992779.
+- **Centring: zero.** A constant reflected at the edges is still constant, so reflect makes every DC frame equal. The
+  engine's DC rows are not (DC family 0.99984 against 0.87748). `none` loses on the probes and fails the corpus' frame
+  rule.
+- **Dither: none.** The new `frontend.Dither1e5` (σ = 1e-5, fixed seed, the config's training value) turns silence
+  into normalised noise: 0.915996 against 0.999946. The corpus cannot tell (0.999829). With the two log values and
+  this axis, `frontend.Variants()` enumerates 2592 front ends (F-012's 864 × 3).
+- **Window: still a tie.** Symmetric against periodic Hann differs by 1e-6 on the corpus and 5e-6 on the probes, and
+  the click probes, which sample the window at known offsets, do not separate them either. `Best()` keeps the
+  symmetric window.
+
+With these, `Best()` scores mean 0.999828 over the 32 clips, every clip ≥ 0.999033 (ls-clean-260-123440-0018, then
+ls-clean-5639-40744-0014 0.999245); the old worst clip fleurs-fr_fr-10174413140250646001 rises to 0.999713. 7 frames
+stay below 0.995 instead of 13, all quiet (peak |x| ≤ 3e-2), the worst 0.9558 (ls-clean-5639-40744-0014 frame 69)
+instead of 0.6753. The safetensors weights give 0.921134 (min 0.881205). The search from the prior, with the new
+values on its axes, reaches `log=soft-76db pad=zero` by itself (`just encoder-probe`, 244 s, 6 inner clips: soft-80
+−0.000033, Whisper −0.000084). On those clips `pe` and the window tie, as above.
+
+**Open.**
+
+- The knee depth varies per clip (7.50–8.55) for a reason not found. The probes' tones and bursts prefer 8.0, speech
+  7.6.
+- Clicks below about 1e-5 behave as if under an absolute threshold that tones do not show. The engine's rows for a
+  1e-6 click equal its rows for silence (cosine 1.000000). A 1e-5 click at δ 80 is neither silence nor scale
+  invariant (0.845468 against the 0.1 click). The same click at 1e-3 is invariant (0.999942). Clicks at δ 0, whose
+  side frames sit 2 decades down, already differ from 1e-1 to 1e-2 (0.984834). With the soft knee the impulse family
+  scores 0.96400, under the hard clamp 0.99102. A per-frame energy gate fits some of these clicks, but no single
+  threshold fits all of them, and none touches speech, whose quiet frames hold far more energy. So it stays out of
+  `Best()`.
 
 ## F-021 — The decoder's cross-attention: form and place in the block (U6) (2026-10-10)
 

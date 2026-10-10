@@ -3,6 +3,7 @@ package frontend
 import (
 	"fmt"
 	"math"
+	"math/rand/v2"
 	"slices"
 
 	"github.com/cwbudde/go-whistle/internal/weights"
@@ -20,6 +21,8 @@ const (
 	logFloor   = 1e-10           // LogLn, LogLog10, LogWhisper (Whisper's clamp)
 	logEps     = 1.0 / (1 << 24) // LogAddEps (NeMo log_zero_guard_value 2⁻²⁴)
 	whisperTop = 8.0             // LogWhisper keeps the top 8 decades (80 dB)
+	soft76     = 7.6             // LogSoft76's knee in decades below the peak (F-020)
+	soft80     = 8.0             // LogSoft80's
 	normEps    = 1e-5            // NormChannel, NormGlobal (NeMo CONSTANT)
 	preemph    = 0.97            // Preemph097
 )
@@ -182,9 +185,13 @@ func (f *Frontend) Options() Options { return f.opts }
 func (f *Frontend) FrameCount(n int) int { return FrameCount(n, f.opts.Padding) }
 
 // Spectrogram returns what the mel bank is applied to: the power or
-// magnitude spectrum after pre-emphasis and, for BandBins, the bin mask.
-// It holds FrameCount(len(x)) frames of Bins values, frame-major.
+// magnitude spectrum after dither, pre-emphasis and, for BandBins, the bin
+// mask. It holds FrameCount(len(x)) frames of Bins values, frame-major.
 func (f *Frontend) Spectrogram(x []float32) ([]float32, int, error) {
+	if f.opts.Dither == Dither1e5 {
+		x = dither(x)
+	}
+
 	if f.opts.Preemphasis == Preemph097 && len(x) > 1 {
 		y := make([]float32, len(x))
 
@@ -243,6 +250,19 @@ func (f *Frontend) LogMel(x []float32) (Features, error) {
 	return Features{Frames: frames, Data: out}, nil
 }
 
+// dither returns x plus Gaussian noise of σ ditherSigma from a fixed seed
+// (Dither1e5).
+func dither(x []float32) []float32 {
+	rng := rand.New(rand.NewPCG(ditherSeed, ditherSeed)) // #nosec G404 -- reproducible noise, not a secret.
+	y := make([]float32, len(x))
+
+	for t, v := range x {
+		y[t] = v + float32(ditherSigma*rng.NormFloat64())
+	}
+
+	return y
+}
+
 // applyLog compresses mel energies in place (Log).
 func applyLog(mel []float64, l Log) {
 	switch l {
@@ -269,6 +289,28 @@ func applyLog(mel []float64, l Log) {
 		for i, v := range mel {
 			mel[i] = (max(v, top-whisperTop) + 4) / 4
 		}
+	case LogSoft76:
+		softLog(mel, soft76)
+	case LogSoft80:
+		softLog(mel, soft80)
+	}
+}
+
+// softLog is log10(x + ε) in place with ε = 10^−depth times the largest
+// energy, a soft knee depth decades below the peak; an all-zero mel takes
+// ε = logFloor (LogSoft76, LogSoft80).
+func softLog(mel []float64, depth float64) {
+	if len(mel) == 0 {
+		return
+	}
+
+	eps := math.Pow(10, -depth) * slices.Max(mel)
+	if eps == 0 {
+		eps = logFloor
+	}
+
+	for i, v := range mel {
+		mel[i] = math.Log10(v + eps)
 	}
 }
 

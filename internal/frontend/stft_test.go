@@ -24,7 +24,7 @@ var (
 func stftOptions(w Window, p Padding) Options {
 	return Options{
 		Window: w, Padding: p, Spectrum: Power, Log: LogLn,
-		Norm: NormNone, Band: BandFull, Preemphasis: PreemphNone,
+		Norm: NormNone, Band: BandFull, Preemphasis: PreemphNone, Dither: DitherNone,
 	}
 }
 
