@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/cwbudde/go-whistle/internal/cact"
@@ -168,6 +169,10 @@ func TestLogVariants(t *testing.T) {
 		// Whisper: log10 with the 1e-10 floor, then max(y, max(y) − 8) with
 		// max(y) = 2, then (y + 4) / 4.
 		{LogWhisper, []float64{1, (math.Log10(math.E) + 4) / 4, 1.5, 0.25, -0.5, -0.5}},
+		// Soft knees: log10(x + ε) with ε = 10^−7.6 or 10^−8 times the
+		// largest energy, 100.
+		{LogSoft76, softWant(in, 100*math.Pow(10, -7.6))},
+		{LogSoft80, softWant(in, 100*1e-8)},
 	}
 
 	for _, c := range cases {
@@ -188,6 +193,121 @@ func TestLogVariants(t *testing.T) {
 
 	if want := []float64{2, 0.25, 0}; got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
 		t.Errorf("Whisper clamp: %v, want %v", got, want)
+	}
+}
+
+func softWant(in []float64, eps float64) []float64 {
+	out := make([]float64, len(in))
+	for i, v := range in {
+		out[i] = math.Log10(v + eps)
+	}
+
+	return out
+}
+
+// TestSoftLog checks what makes the soft knees differ from the Whisper
+// clamp (docs/FINDINGS.md F-020): a gain shifts every value by the same
+// amount, energies far below the knee all land on log10(ε), an energy at the
+// knee lies log10(2) above it, and digital silence stays finite.
+func TestSoftLog(t *testing.T) {
+	in := []float64{3, 0.5, 2e-6, 3e-8, 1e-14, 0}
+
+	for _, l := range []Log{LogSoft76, LogSoft80} {
+		ref := append([]float64{}, in...)
+		applyLog(ref, l)
+
+		for _, gain := range []float64{1e-9, 1e-4, 1e3} {
+			got := make([]float64, len(in))
+			for i, v := range in {
+				got[i] = v * gain
+			}
+
+			applyLog(got, l)
+
+			for i := range got {
+				if d := got[i] - ref[i] - math.Log10(gain); math.Abs(d) > 1e-9 {
+					t.Errorf("log %d gain %g: value %d moves by %v more than log10(gain)", l, gain, i, d)
+				}
+			}
+		}
+
+		depth := soft76
+		if l == LogSoft80 {
+			depth = soft80
+		}
+
+		floor := math.Log10(3) - depth
+		if math.Abs(ref[5]-floor) > 1e-12 || math.Abs(ref[4]-floor) > 1e-6 {
+			t.Errorf("log %d: zero → %v, 1e-14 → %v, want ≈ %v", l, ref[5], ref[4], floor)
+		}
+
+		knee := []float64{1, math.Pow(10, -depth)}
+		applyLog(knee, l)
+
+		if d := knee[1] - (-depth); math.Abs(d-math.Log10(2)) > 1e-12 {
+			t.Errorf("log %d: the knee lies %v above the floor, want log10(2)", l, d)
+		}
+
+		zero := make([]float64, 4)
+		applyLog(zero, l)
+
+		for _, v := range zero {
+			if v != math.Log10(logFloor) {
+				t.Errorf("log %d: silence → %v, want %v", l, v, math.Log10(logFloor))
+			}
+		}
+
+		applyLog(nil, l)
+	}
+
+	// The Whisper clamp, unlike the knee, is not scale invariant once its
+	// 1e-10 floor binds.
+	quiet := []float64{1e-6, 1e-11, 1e-13}
+	applyLog(quiet, LogWhisper)
+
+	if quiet[1] != quiet[2] {
+		t.Errorf("Whisper: 1e-11 → %v and 1e-13 → %v, want both at the floor", quiet[1], quiet[2])
+	}
+}
+
+// TestDither checks Dither1e5: σ = 1e-5 noise, the same on every call, and
+// DitherNone leaves the samples alone.
+func TestDither(t *testing.T) {
+	x := make([]float32, 20000)
+
+	a, b := dither(x), dither(x)
+
+	var ss float64
+
+	for i := range a {
+		if a[i] != b[i] {
+			t.Fatalf("sample %d differs between calls: %v, %v", i, a[i], b[i])
+		}
+
+		ss += float64(a[i]) * float64(a[i])
+	}
+
+	if sigma := math.Sqrt(ss / float64(len(a))); math.Abs(sigma-1e-5) > 2e-7 {
+		t.Errorf("dither σ = %.3g, want 1e-5", sigma)
+	}
+
+	for _, d := range []Dither{DitherNone, Dither1e5} {
+		o := Whisper()
+		o.Dither = d
+
+		fe, err := New(testBank(t), o)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		spec, _, err := fe.Spectrogram(x)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if nonzero := slices.ContainsFunc(spec, func(v float32) bool { return v != 0 }); nonzero != (d == Dither1e5) {
+			t.Errorf("dither %d: non-zero spectrum of silence = %v", d, nonzero)
+		}
 	}
 }
 
@@ -451,7 +571,7 @@ func TestLogMelPipeline(t *testing.T) {
 	x := noise(1600, 8, 0.2)
 	opts := Options{
 		Window: HannSymmetric, Padding: PadNone, Spectrum: Power, Log: LogAddEps,
-		Norm: NormGlobal, Band: BandFull, Preemphasis: PreemphNone,
+		Norm: NormGlobal, Band: BandFull, Preemphasis: PreemphNone, Dither: DitherNone,
 	}
 
 	f := newFrontend(t, opts)

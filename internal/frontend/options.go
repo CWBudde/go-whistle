@@ -73,6 +73,15 @@ const (
 	// LogWhisper is Whisper's log_mel_spectrogram: y = log10(max(x, 1e-10)),
 	// y = max(y, max(y) − 8) over the whole clip, then (y + 4) / 4.
 	LogWhisper
+	// LogSoft76 is a soft knee 76 dB below the clip's peak: y = log10(x + ε)
+	// with ε = 10^−7.6 · max(x) over the whole clip, where LogWhisper clamps
+	// hard at 80 dB. The depth is fitted on the corpus (docs/FINDINGS.md
+	// F-020). It is scale invariant, as the engine is on quiet tones and
+	// noise; an all-zero clip takes ε = 1e-10.
+	LogSoft76
+	// LogSoft80 is LogSoft76 with the knee at Whisper's 80 dB, ε = 10^−8 ·
+	// max(x).
+	LogSoft80
 )
 
 // Norm is the normalisation after the log.
@@ -124,6 +133,25 @@ const (
 	Preemph097
 )
 
+// Dither is optional noise added to the samples before the STFT, as NeMo's
+// preprocessor does in training (config "dither" 1e-5). Added to test
+// whether the engine dithers; the silence probes rule it out (F-020).
+type Dither int
+
+const (
+	// DitherNone feeds the samples unchanged.
+	DitherNone Dither = iota + 1
+	// Dither1e5 adds Gaussian noise with σ = 1e-5 from a fixed seed, so a
+	// clip's features are reproducible.
+	Dither1e5
+)
+
+// ditherSigma and ditherSeed define Dither1e5.
+const (
+	ditherSigma = 1e-5
+	ditherSeed  = 0x5eed
+)
+
 // Options pick one hypothesis per axis.
 type Options struct {
 	Window      Window
@@ -133,6 +161,7 @@ type Options struct {
 	Norm        Norm
 	Band        Band
 	Preemphasis Preemphasis
+	Dither      Dither
 }
 
 // axis describes one Options field for Validate, String, ParseOptions and
@@ -150,10 +179,11 @@ var axes = []axis{
 	{"win", []string{"hann-periodic", "hann-symmetric"}, func(o *Options) *int { return (*int)(&o.Window) }},
 	{"pad", []string{"reflect", "zero", noneName}, func(o *Options) *int { return (*int)(&o.Padding) }},
 	{"spec", []string{"power", "magnitude"}, func(o *Options) *int { return (*int)(&o.Spectrum) }},
-	{"log", []string{"ln", "log10", "ln-eps", "whisper"}, func(o *Options) *int { return (*int)(&o.Log) }},
+	{"log", []string{"ln", "log10", "ln-eps", "whisper", "soft-76db", "soft-80db"}, func(o *Options) *int { return (*int)(&o.Log) }},
 	{"norm", []string{noneName, "channel", "global"}, func(o *Options) *int { return (*int)(&o.Norm) }},
 	{"band", []string{"full", "bins", "channels"}, func(o *Options) *int { return (*int)(&o.Band) }},
 	{"pre", []string{noneName, "0.97"}, func(o *Options) *int { return (*int)(&o.Preemphasis) }},
+	{"dither", []string{noneName, "1e-5"}, func(o *Options) *int { return (*int)(&o.Dither) }},
 }
 
 // Validate reports an unset or unknown value on any axis.
@@ -169,7 +199,7 @@ func (o Options) Validate() error {
 }
 
 // String is the variant's stable key, e.g.
-// "win=hann-periodic pad=reflect spec=power log=whisper norm=none band=full pre=none".
+// "win=hann-periodic pad=reflect spec=power log=whisper norm=none band=full pre=none dither=none".
 // ParseOptions reads it back.
 func (o Options) String() string {
 	parts := make([]string, len(axes))
@@ -224,9 +254,9 @@ func ParseOptions(key string) (Options, error) {
 	return o, nil
 }
 
-// Variants enumerates every combination of the axes, 864 in all, in a stable
-// order: the last axis (pre) varies fastest and the first (win) slowest, each
-// in its constant order. Phase 4's probe harness iterates it.
+// Variants enumerates every combination of the axes, 2592 in all, in a
+// stable order: the last axis (dither) varies fastest and the first (win)
+// slowest, each in its constant order. Phase 4's probe harness iterates it.
 func Variants() []Options {
 	n := 1
 	for _, a := range axes {
@@ -255,7 +285,7 @@ func Variants() []Options {
 func NeMo() Options {
 	return Options{
 		Window: HannSymmetric, Padding: PadZero, Spectrum: Power, Log: LogAddEps,
-		Norm: NormChannel, Band: BandFull, Preemphasis: Preemph097,
+		Norm: NormChannel, Band: BandFull, Preemphasis: Preemph097, Dither: DitherNone,
 	}
 }
 
@@ -264,6 +294,6 @@ func NeMo() Options {
 func Whisper() Options {
 	return Options{
 		Window: HannPeriodic, Padding: PadReflect, Spectrum: Power, Log: LogWhisper,
-		Norm: NormNone, Band: BandFull, Preemphasis: PreemphNone,
+		Norm: NormNone, Band: BandFull, Preemphasis: PreemphNone, Dither: DitherNone,
 	}
 }

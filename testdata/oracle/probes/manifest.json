@@ -1,0 +1,395 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "model": {
+    "repo": "Cactus-Compute/whistle",
+    "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    "file": "whistle.cact",
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "embed_width": 512,
+  "generator": "tools/oracle/probe Set (go run -tags oracle ./tools/oracle probes)",
+  "probes": [
+    {
+      "name": "silence-5120",
+      "kind": "silence",
+      "samples": 5120,
+      "purpose": "Digital silence. Per-channel normalisation maps a constant mel to 0 and the stem has no biases, so the stack input is exactly 0; an additive position term (pe_gate) would be its only input, where RoPE, the Hadamard MLPs' b2 and the zero-padded depthwise convs alone shape the rows. Under a clamp relative to the clip's peak any dither would be normalised to full scale. The lengths sweep positions up to 374.",
+      "frames": 4,
+      "interior_frames": 1,
+      "pcm_sha256": "cc61635da46b2c9974335ea37e0b5fd660a5c8a42a89b271fa7ec2ac4b8b26f6"
+    },
+    {
+      "name": "silence-16000",
+      "kind": "silence",
+      "samples": 16000,
+      "purpose": "Digital silence. Per-channel normalisation maps a constant mel to 0 and the stem has no biases, so the stack input is exactly 0; an additive position term (pe_gate) would be its only input, where RoPE, the Hadamard MLPs' b2 and the zero-padded depthwise convs alone shape the rows. Under a clamp relative to the clip's peak any dither would be normalised to full scale. The lengths sweep positions up to 374.",
+      "frames": 13,
+      "interior_frames": 10,
+      "pcm_sha256": "4f7988030a00d082fe445e00a2ac5dab502300ff1b80e8592dd569867b60ef74"
+    },
+    {
+      "name": "silence-32000",
+      "kind": "silence",
+      "samples": 32000,
+      "purpose": "Digital silence. Per-channel normalisation maps a constant mel to 0 and the stem has no biases, so the stack input is exactly 0; an additive position term (pe_gate) would be its only input, where RoPE, the Hadamard MLPs' b2 and the zero-padded depthwise convs alone shape the rows. Under a clamp relative to the clip's peak any dither would be normalised to full scale. The lengths sweep positions up to 374.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "eec19bc6af0b3b6dfb97a08782c65f4bb3c3203e789a015d2008b0d689ad08be"
+    },
+    {
+      "name": "silence-64000",
+      "kind": "silence",
+      "samples": 64000,
+      "purpose": "Digital silence. Per-channel normalisation maps a constant mel to 0 and the stem has no biases, so the stack input is exactly 0; an additive position term (pe_gate) would be its only input, where RoPE, the Hadamard MLPs' b2 and the zero-padded depthwise convs alone shape the rows. Under a clamp relative to the clip's peak any dither would be normalised to full scale. The lengths sweep positions up to 374.",
+      "frames": 50,
+      "interior_frames": 47,
+      "pcm_sha256": "24a046dc04fefdb652e4077b41162490b344a4dd45f918505477f84c592f3070"
+    },
+    {
+      "name": "silence-160000",
+      "kind": "silence",
+      "samples": 160000,
+      "purpose": "Digital silence. Per-channel normalisation maps a constant mel to 0 and the stem has no biases, so the stack input is exactly 0; an additive position term (pe_gate) would be its only input, where RoPE, the Hadamard MLPs' b2 and the zero-padded depthwise convs alone shape the rows. Under a clamp relative to the clip's peak any dither would be normalised to full scale. The lengths sweep positions up to 374.",
+      "frames": 125,
+      "interior_frames": 122,
+      "pcm_sha256": "3d00ed86b663cd1b8ac82b105257cd109412f92dca442048532439f920a7f645"
+    },
+    {
+      "name": "silence-480000",
+      "kind": "silence",
+      "samples": 480000,
+      "purpose": "Digital silence. Per-channel normalisation maps a constant mel to 0 and the stem has no biases, so the stack input is exactly 0; an additive position term (pe_gate) would be its only input, where RoPE, the Hadamard MLPs' b2 and the zero-padded depthwise convs alone shape the rows. Under a clamp relative to the clip's peak any dither would be normalised to full scale. The lengths sweep positions up to 374.",
+      "frames": 375,
+      "interior_frames": 372,
+      "pcm_sha256": "124617c1f65e92d3bc895fbd869e4bb16a30754b198f59e6e973949b9aaa1b01"
+    },
+    {
+      "name": "dc-1e-02",
+      "kind": "dc",
+      "samples": 32000,
+      "amplitude": 0.01,
+      "purpose": "Constant offset. Reflect centring makes every mel frame equal (the silence rows), zero centring changes the frames that reach past the clip; two levels test scale invariance.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "dd3447b8e4fe93a0a2c7700fe2e3745f2bf821872dc241832af7e9f6a082e9f2"
+    },
+    {
+      "name": "dc-1e-04",
+      "kind": "dc",
+      "samples": 32000,
+      "amplitude": 0.0001,
+      "purpose": "Constant offset. Reflect centring makes every mel frame equal (the silence rows), zero centring changes the frames that reach past the clip; two levels test scale invariance.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "9ccb4c371ee189db2e7fb03ae8f2b6a02f6a4adc31dd106edf03b909cbdc5d67"
+    },
+    {
+      "name": "tone-1e-01",
+      "kind": "tone",
+      "samples": 32000,
+      "amplitude": 0.1,
+      "hz": 440,
+      "purpose": "Stationary 440 Hz tone. Interior frames normalise to 0 and the edges carry the partial-window spectrum; the leakage spans 15 decades, so 1e-1 … 1e-5 show whether an absolute floor binds anywhere.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "2cd5334114e2fc7a5ebd40724ef80dc54531830814ec7cedea46a922444ed405"
+    },
+    {
+      "name": "burst-1e-01",
+      "kind": "burst",
+      "samples": 32000,
+      "amplitude": 0.1,
+      "hz": 440,
+      "from": 8000,
+      "to": 24000,
+      "purpose": "Tone in the middle second. Each channel is two-level, so the floor decides which leakage channels carry the on/off pattern; the levels test scale invariance.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "c9c51767aef663142d2b503f0037a6eb4835991ab2bec26dab0daec97fbae129"
+    },
+    {
+      "name": "tone-1e-03",
+      "kind": "tone",
+      "samples": 32000,
+      "amplitude": 0.001,
+      "hz": 440,
+      "purpose": "Stationary 440 Hz tone. Interior frames normalise to 0 and the edges carry the partial-window spectrum; the leakage spans 15 decades, so 1e-1 … 1e-5 show whether an absolute floor binds anywhere.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "3f9bede7f9176c0cdade916f90cdf758bad37592d13ad1b461c3b4999d9513b5"
+    },
+    {
+      "name": "burst-1e-03",
+      "kind": "burst",
+      "samples": 32000,
+      "amplitude": 0.001,
+      "hz": 440,
+      "from": 8000,
+      "to": 24000,
+      "purpose": "Tone in the middle second. Each channel is two-level, so the floor decides which leakage channels carry the on/off pattern; the levels test scale invariance.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "0127c9071e62e806e0dcf10cba62cb3e7109b50204ca56e773c7e31e368d1e7d"
+    },
+    {
+      "name": "tone-1e-05",
+      "kind": "tone",
+      "samples": 32000,
+      "amplitude": 0.00001,
+      "hz": 440,
+      "purpose": "Stationary 440 Hz tone. Interior frames normalise to 0 and the edges carry the partial-window spectrum; the leakage spans 15 decades, so 1e-1 … 1e-5 show whether an absolute floor binds anywhere.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "c29c9b4892b0eeb6d3dda0efd5de5e1747d84f9790456a0cb8264b64db5dc97c"
+    },
+    {
+      "name": "burst-1e-05",
+      "kind": "burst",
+      "samples": 32000,
+      "amplitude": 0.00001,
+      "hz": 440,
+      "from": 8000,
+      "to": 24000,
+      "purpose": "Tone in the middle second. Each channel is two-level, so the floor decides which leakage channels carry the on/off pattern; the levels test scale invariance.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "85e7784a44f10952fee0dd46b332097aed0ae701089168e20f0d78db765ce740"
+    },
+    {
+      "name": "noise-1e-01",
+      "kind": "noise",
+      "samples": 32000,
+      "amplitude": 0.1,
+      "seed": 1,
+      "purpose": "White noise: every channel at a similar level; σ 1e-5 is where the config's dither would sit.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "23f07b51a9c056fa623979460e2f2dbbbef1d1ae43c8a68946bce0b165119908"
+    },
+    {
+      "name": "noise-1e-05",
+      "kind": "noise",
+      "samples": 32000,
+      "amplitude": 0.00001,
+      "seed": 1,
+      "purpose": "White noise: every channel at a similar level; σ 1e-5 is where the config's dither would sit.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "649d3732baafc18dbbb3cc64cc8b6e82074acf86a3b02ea78a3b83a2a4552d82"
+    },
+    {
+      "name": "decay",
+      "kind": "decay",
+      "samples": 64000,
+      "from_db": -20,
+      "to_db": -140,
+      "seed": 3,
+      "purpose": "Noise falling from −20 to −140 dB over 4 s: every channel crosses the floor, whose shape (hard clamp, soft knee, absolute floor) bends each channel's trajectory.",
+      "frames": 50,
+      "interior_frames": 47,
+      "pcm_sha256": "14946f40323c67edfd791d9c65fe89f60f1b7067d23a03079bfd3ddf7b812ba6"
+    },
+    {
+      "name": "impulse-d0-1e-01",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16000
+      ],
+      "amplitudes": [
+        0.1
+      ],
+      "purpose": "One click 0.1 at 16000 + δ: frames i see it at window index 16000 + δ − 160i + 200, so 2–3 frames sample the window at known offsets (centring and window shape); δ = 0 puts the side frames at w(40) = 0.095, 2 decades below the centre.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "20153b9f5b088c0ee4578a2327fc958c8843ff2ffe50ee374eefc88f6c97bad4"
+    },
+    {
+      "name": "impulse-d20-1e-01",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16020
+      ],
+      "amplitudes": [
+        0.1
+      ],
+      "purpose": "One click 0.1 at 16000 + δ: frames i see it at window index 16000 + δ − 160i + 200, so 2–3 frames sample the window at known offsets (centring and window shape); δ = 0 puts the side frames at w(40) = 0.095, 2 decades below the centre.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "a8bacc7a514d6205fd9df03bd5c86ceb1df401449d173e8818269682d5d2938b"
+    },
+    {
+      "name": "impulse-d40-1e-01",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16040
+      ],
+      "amplitudes": [
+        0.1
+      ],
+      "purpose": "One click 0.1 at 16000 + δ: frames i see it at window index 16000 + δ − 160i + 200, so 2–3 frames sample the window at known offsets (centring and window shape); δ = 0 puts the side frames at w(40) = 0.095, 2 decades below the centre.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "ef78a5cf29728aaf67269a0eb27117075880edef8f9fe9bd188aa89c494b2d55"
+    },
+    {
+      "name": "impulse-d80-1e-01",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16080
+      ],
+      "amplitudes": [
+        0.1
+      ],
+      "purpose": "One click 0.1 at 16000 + δ: frames i see it at window index 16000 + δ − 160i + 200, so 2–3 frames sample the window at known offsets (centring and window shape); δ = 0 puts the side frames at w(40) = 0.095, 2 decades below the centre.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "1d6d47f9ea92bad21328bbd706e68846b8798c8d134b57bf151619b29d2407b4"
+    },
+    {
+      "name": "impulse-d120-1e-01",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16120
+      ],
+      "amplitudes": [
+        0.1
+      ],
+      "purpose": "One click 0.1 at 16000 + δ: frames i see it at window index 16000 + δ − 160i + 200, so 2–3 frames sample the window at known offsets (centring and window shape); δ = 0 puts the side frames at w(40) = 0.095, 2 decades below the centre.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "4a0ad7e717c7dd648e19b0006ba2b2edeb83823803d2be79f175e38630fa7d63"
+    },
+    {
+      "name": "impulse-d140-1e-01",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16140
+      ],
+      "amplitudes": [
+        0.1
+      ],
+      "purpose": "One click 0.1 at 16000 + δ: frames i see it at window index 16000 + δ − 160i + 200, so 2–3 frames sample the window at known offsets (centring and window shape); δ = 0 puts the side frames at w(40) = 0.095, 2 decades below the centre.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "19a39c691f4e367c1a005d796f0c6e8d63788a1b390849a7afae7a1ef6cc09f2"
+    },
+    {
+      "name": "impulse-d0-1e-02",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16000
+      ],
+      "amplitudes": [
+        0.01
+      ],
+      "purpose": "The same click at a falling level: scale invariance, and the absolute floor for frames whose energy is tiny.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "bae47b726aa6b5b861e725c8e4d27658913aed8a288952d201f72798e38b434e"
+    },
+    {
+      "name": "impulse-d0-1e-04",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16000
+      ],
+      "amplitudes": [
+        0.0001
+      ],
+      "purpose": "The same click at a falling level: scale invariance, and the absolute floor for frames whose energy is tiny.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "4079a6b677a68de4823eb579f921603c205d6bbf9a4944d8c1bb948823756620"
+    },
+    {
+      "name": "impulse-d0-1e-06",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16000
+      ],
+      "amplitudes": [
+        0.000001
+      ],
+      "purpose": "The same click at a falling level: scale invariance, and the absolute floor for frames whose energy is tiny.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "6b9d5d986eefc190fb4a81e3b1f7a8bc9df2fb06a72f28fc9d8fb6867cbe9079"
+    },
+    {
+      "name": "impulse-d80-1e-03",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16080
+      ],
+      "amplitudes": [
+        0.001
+      ],
+      "purpose": "The same click at a falling level: scale invariance, and the absolute floor for frames whose energy is tiny.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "13e94642b4b80129702e39d0c02e0d8c3c02d1e62a6b329c08ee88d0e5f91c4c"
+    },
+    {
+      "name": "impulse-d80-1e-05",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16080
+      ],
+      "amplitudes": [
+        0.00001
+      ],
+      "purpose": "The same click at a falling level: scale invariance, and the absolute floor for frames whose energy is tiny.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "840686e5a869ef0fb026947556eff128e3228753b3166c6abd7b23c5cb7afaa0"
+    },
+    {
+      "name": "impulse-d80-1e-06",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        16080
+      ],
+      "amplitudes": [
+        0.000001
+      ],
+      "purpose": "The same click at a falling level: scale invariance, and the absolute floor for frames whose energy is tiny.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "9af6e6e6389bcf279667f12434fdb2000194829a913f010842bd8df7c011e2f3"
+    },
+    {
+      "name": "impulse-pair",
+      "kind": "impulse",
+      "samples": 32000,
+      "offsets": [
+        8000,
+        24000
+      ],
+      "amplitudes": [
+        0.1,
+        0.001
+      ],
+      "purpose": "Clicks of 0.1 and 0.001 (40 dB apart) in one clip: the relative floor between them.",
+      "frames": 25,
+      "interior_frames": 22,
+      "pcm_sha256": "2cb344bb995255e2b99ea32e75b3c80146912f30129aa77763fe20326857f7ce"
+    }
+  ]
+}

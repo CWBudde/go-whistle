@@ -32,6 +32,8 @@ type stem struct {
 	out []float32         // [dim, mels'·C]
 	dim int
 	in  int // stem/out's input width
+
+	peGate float32 // σ(pe_gate), for PEFlatConcat and PEFlatInterleaved
 }
 
 func loadStem(src weights.Source, h Hypothesis, mels int) (*stem, error) {
@@ -223,6 +225,10 @@ func (s *stem) forward(mel []float32, frames, mels int) ([]float32, int, error) 
 				}
 			}
 		}
+	}
+
+	if s.h.PE == PEFlatConcat || s.h.PE == PEFlatInterleaved {
+		addSinusoid(flat, t, s.in, s.peGate, s.h.PE.interleaved())
 	}
 
 	out := make([]float32, t*s.dim)

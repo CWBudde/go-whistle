@@ -202,6 +202,61 @@ func TestAddSinusoid(t *testing.T) {
 	}
 }
 
+// TestPEPlacements checks where each pe_gate placement acts on 1 s of
+// silence, whose stem output is exactly 0 without one (docs/FINDINGS.md
+// F-019): the mel, flat and stem placements change Stem's output, the
+// block placements and the RoPE mix leave it at 0 and change only Stack's.
+func TestPEPlacements(t *testing.T) {
+	src := openModel(t, whistleCactPath)
+	x := make([]float32, 16000)
+
+	run := func(pe PE) (stemOut, out []float32) {
+		h := Best()
+		h.PE = pe
+
+		e, err := Load(src, h)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mel, err := e.fe.LogMel(x)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		stemOut, n, err := e.Stem(mel)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		out, err = e.Stack(stemOut, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return stemOut, out
+	}
+
+	zeroStem, base := run(PENone)
+	if slices.ContainsFunc(zeroStem, func(v float32) bool { return v != 0 }) {
+		t.Fatal("pe=none: the stem output of silence is not 0")
+	}
+
+	for v := PENone + 1; int(v) <= len(axes[8].Names); v++ {
+		stemOut, out := run(v)
+		stemSide := slices.ContainsFunc(stemOut, func(v float32) bool { return v != 0 })
+		wantStem := v != PERopeMix && v != PEBlockConcat && v != PEBlockInterleaved
+
+		if stemSide != wantStem {
+			t.Errorf("pe=%s: stem output changed = %v, want %v", axes[8].Names[v-1], stemSide, wantStem)
+		}
+
+		if slices.Equal(out, base) {
+			t.Errorf("pe=%s: the encoder output equals pe=none's", axes[8].Names[v-1])
+		}
+	}
+}
+
 // fakePermSource answers only the permutations' shape.
 type fakePermSource struct{ permSource }
 
@@ -237,30 +292,120 @@ func TestSplitPerms(t *testing.T) {
 	}
 }
 
-// shortClips are the fast test's clips, the corpus' three shortest, with a
+// shortClips are the fast test's clips, the corpus' three shortest and
+// the clip whose near-silent frames the soft log knee fixed (F-020), with a
 // floor per weight source about 1e-4 (.cact) or 1e-3 (safetensors) under
 // the mean per-frame cosine measured on Apple M5 Pro.
 var shortClips = map[string]map[string]float64{
 	whistleCactPath: {
-		"ls-other-8280-266249-0032": 0.9996, // 0.999709
-		"ls-other-3080-5040-0018":   0.9997, // 0.999842
-		"ls-clean-5639-40744-0011":  0.9997, // 0.999833
+		"ls-other-8280-266249-0032":         0.99983, // 0.999936
+		"ls-other-3080-5040-0018":           0.99985, // 0.999952
+		"ls-clean-5639-40744-0011":          0.99985, // 0.999952
+		"fleurs-fr_fr-10174413140250646001": 0.9996,  // 0.999713 (0.992932 with the hard Whisper clamp)
 	},
 	whistleSafetensorsPath: {
-		"ls-other-8280-266249-0032": 0.912, // 0.9132
-		"ls-other-3080-5040-0018":   0.938, // 0.9389
-		"ls-clean-5639-40744-0011":  0.935, // 0.9366
+		"ls-other-8280-266249-0032":         0.912, // 0.9128
+		"ls-other-3080-5040-0018":           0.937, // 0.9378
+		"ls-clean-5639-40744-0011":          0.936, // 0.9372
+		"fleurs-fr_fr-10174413140250646001": 0.912, // 0.9132
 	},
 }
 
-// TestBestMatchesEngine runs Best on three short clips with either weight
+// TestBestMatchesEngine runs Best on four corpus clips with either weight
 // source and pins the mean per-frame cosine against needle_embed, a floor
 // just under the measured value. The engine runs the quantised weights, so
 // the dequantised .cact is far closer than the float checkpoint
-// (docs/FINDINGS.md F-014).
+// (docs/FINDINGS.md F-014, F-020).
 func TestBestMatchesEngine(t *testing.T) {
 	for _, path := range []string{whistleCactPath, whistleSafetensorsPath} {
 		t.Run(filepath.Base(path), func(t *testing.T) { checkBest(t, path, shortClips[path]) })
+	}
+}
+
+// probeFloors pins Best on the probes that decided pe_gate and the front
+// end, floors about 1e-4 under the values measured on Apple M5 Pro.
+var probeFloors = map[string]float64{
+	"silence-160000": 0.9998, // 0.999916
+	"dc-1e-02":       0.9997, // 0.999809
+	"tone-1e-03":     0.9996, // 0.999735
+	"burst-1e-03":    0.9992, // 0.999288
+}
+
+// TestBestMatchesProbes pins Best on synthetic probes and checks that each
+// rejected reading is clearly worse there (docs/FINDINGS.md F-019, F-020):
+// every pe_gate placement on 10 s of silence, where the stem output is 0;
+// the hard Whisper clamp on a quiet tone; reflect centring on DC; dither
+// on silence.
+func TestBestMatchesProbes(t *testing.T) {
+	src := openModel(t, whistleCactPath)
+	probes := map[string]clip{}
+
+	for _, p := range loadProbes(t, slices.Sorted(maps.Keys(probeFloors))...) {
+		probes[p.ID] = p
+	}
+
+	score := func(h Hypothesis, id string) float64 {
+		e, err := Load(src, h)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		p := probes[id]
+
+		y, n, err := e.Embed(p.Samples)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if n != p.Frames {
+			t.Fatalf("%s: %d frames, engine %d", id, n, p.Frames)
+		}
+
+		return mean(frameCosines(y, p.Embed, n, 512))
+	}
+
+	best := map[string]float64{}
+
+	for _, id := range slices.Sorted(maps.Keys(probeFloors)) {
+		best[id] = score(Best(), id)
+		t.Logf("%-15s Best %.6f", id, best[id])
+
+		if best[id] < probeFloors[id] {
+			t.Errorf("%s: mean per-frame cosine %.6f < %.4f", id, best[id], probeFloors[id])
+		}
+	}
+
+	// Each rejected reading against Best on its probe, with the margin it
+	// must lose by; the measured losses are 0.023 to 0.155 (pe), 0.0079
+	// (log), 0.12 (pad) and 0.11 (dither).
+	type rival struct {
+		name, probe string
+		mod         func(*Hypothesis)
+		margin      float64
+	}
+
+	var rivals []rival
+
+	for v := PENone + 1; int(v) <= len(axes[8].Names); v++ {
+		rivals = append(rivals, rival{"pe=" + axes[8].Names[v-1], "silence-160000", func(h *Hypothesis) { h.PE = v }, 0.01})
+	}
+
+	rivals = append(rivals,
+		rival{"log=whisper", "tone-1e-03", func(h *Hypothesis) { h.Frontend.Log = frontend.LogWhisper }, 0.004},
+		rival{"pad=reflect", "dc-1e-02", func(h *Hypothesis) { h.Frontend.Padding = frontend.PadReflect }, 0.05},
+		rival{"dither=1e-5", "silence-160000", func(h *Hypothesis) { h.Frontend.Dither = frontend.Dither1e5 }, 0.05},
+	)
+
+	for _, r := range rivals {
+		h := Best()
+		r.mod(&h)
+
+		got := score(h, r.probe)
+		t.Logf("%-20s on %-15s %.6f (Best − %.6f)", r.name, r.probe, got, best[r.probe]-got)
+
+		if best[r.probe]-got < r.margin {
+			t.Errorf("%s on %s: %.6f, not %.3f below Best's %.6f", r.name, r.probe, got, r.margin, best[r.probe])
+		}
 	}
 }
 
