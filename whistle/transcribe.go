@@ -40,8 +40,11 @@ type TranscribeOptions struct {
 }
 
 // Transcribe turns 16 kHz mono samples in [-1, 1], at most MaxSamples, into
-// a transcript. It decodes greedily (PLAN.md 6.6 brings the engine's beam
-// search). A clip under 160 samples has no encoder frame and gives Result{}.
+// a transcript by the engine's beam search (docs/FINDINGS.md F-026). A clip
+// the engine treats as silence (F-031: digital silence, steady noise, too
+// little level contrast in the speech band, fewer than 160 samples) gives
+// the empty result without decoding: Result{}, the engine's JSON without
+// word timestamps.
 func (m *Model) Transcribe(pcm []float32, opts TranscribeOptions) (Result, error) {
 	return m.transcribe(pcm, opts, time.Now)
 }
@@ -72,11 +75,17 @@ func (m *Model) transcribe(pcm []float32, opts TranscribeOptions, now func() tim
 		return Result{}, err
 	}
 
-	if m.enc.Frames(len(pcm)) == 0 {
-		return Result{}, nil
+	// The length check comes first, then the gate (F-025).
+	clk := newClock(now)
+
+	silent, err := m.gate.Silent(pcm)
+	if err != nil {
+		return Result{}, wrap(err)
 	}
 
-	clk := newClock(now)
+	if silent || m.enc.Frames(len(pcm)) == 0 {
+		return silentResult(opts), nil
+	}
 
 	enc, frames, err := m.enc.Embed(pcm)
 	if err != nil {
@@ -99,6 +108,16 @@ func (m *Model) transcribe(pcm []float32, opts TranscribeOptions, now func() tim
 	}
 
 	return Result{Text: text, Language: out.lang, TTFT: clk.ttft(), DecodeTPS: clk.tps()}, nil
+}
+
+// silentResult is the engine's result for a silent clip: Silence() with word
+// timestamps, Result{} without (F-027).
+func silentResult(opts TranscribeOptions) Result {
+	if opts.WordTimestamps {
+		return Silence()
+	}
+
+	return Result{}
 }
 
 // check rejects options the port cannot honour.
