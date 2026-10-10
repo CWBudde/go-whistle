@@ -37,7 +37,9 @@ type Decoder struct {
 	blocks []*needle.Block
 	cross  []*cross
 	mhc    []*needle.MHC
-	sites  map[int]int // layer → engram site
+	run    []int         // the layers that run, ascending (WithDepth)
+	runMHC []*needle.MHC // their mHC, with the lane of their position
+	sites  map[int]int   // layer → engram site
 	engram []*needle.Engram
 	final  needle.ZCRMSNorm
 	rope   *needle.Rope // self-attention and xrope tables
@@ -247,10 +249,10 @@ func (d *Decoder) Extend(s *State, tokens []int) ([]float32, error) {
 
 	stream := needle.ExpandLanes(x, d.lanes, d.dim)
 
-	for l := range d.blocks {
+	for i, l := range d.run {
 		var err error
 
-		stream, err = d.layer(l, s, stream, t, off, ekv)
+		stream, err = d.layer(l, d.runMHC[i], s, stream, t, off, ekv)
 		if err != nil {
 			return nil, err
 		}
@@ -309,6 +311,7 @@ func (d *Decoder) loadStack(src weights.Source, cfg weights.Config) error {
 		}
 
 		d.blocks, d.cross, d.mhc = append(d.blocks, b), append(d.cross, c), append(d.mhc, m)
+		d.run, d.runMHC = append(d.run, l), append(d.runMHC, m)
 		d.lanes, d.qk = m.Lanes(), c.qk
 	}
 
@@ -389,9 +392,11 @@ func (d *Decoder) crossRope() *needle.Rope {
 	return nil
 }
 
-// layer advances the stream through layer l's mHC, block and
-// cross-attention.
-func (d *Decoder) layer(l int, s *State, stream []float32, t, off int, ekv []*needle.EngramKV) ([]float32, error) {
+// layer advances the stream through layer l's block and cross-attention
+// inside the mHC mhc.
+func (d *Decoder) layer(l int, mhc *needle.MHC, s *State, stream []float32, t, off int,
+	ekv []*needle.EngramKV,
+) ([]float32, error) {
 	var site *needle.EngramKV
 	if i, ok := d.sites[l]; ok {
 		site = ekv[i]
@@ -417,7 +422,7 @@ func (d *Decoder) layer(l int, s *State, stream []float32, t, off int, ekv []*ne
 		hooks.AfterAttn = hook
 	}
 
-	out, err := d.mhc[l].Forward(stream, t, func(u []float32) ([]float32, error) {
+	out, err := mhc.Forward(stream, t, func(u []float32) ([]float32, error) {
 		return d.blocks[l].Extend(u, t, &s.kv[l], d.rope, site, hooks)
 	})
 	if err != nil {

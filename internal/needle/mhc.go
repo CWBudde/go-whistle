@@ -84,6 +84,17 @@ func LoadMHC(src weights.Source, prefix string, layer int) (*MHC, error) {
 	return m, nil
 }
 
+// WithLane returns m with the lane offsets of position lane instead of its
+// layer's: the heads and weights are shared. A ladder sub-network (Stack
+// with exit_depth) gives its i-th active layer lane eye(n)[i % n]
+// (docs/FINDINGS.md F-030).
+func (m *MHC) WithLane(lane int) *MHC {
+	c := *m
+	c.preOff, c.postOff = laneOffsets(m.lanes, lane)
+
+	return &c
+}
+
 // Lanes is the number of residual lanes.
 func (m *MHC) Lanes() int { return m.lanes }
 
