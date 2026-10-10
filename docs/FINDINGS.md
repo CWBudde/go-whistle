@@ -1634,6 +1634,10 @@ live hypothesis' 6 best next tokens; that is enough for every admission rule bel
 - the language step: argmax, argmax with its log p in the score, or one beam per language token.
 
 At the end the best finished hypothesis by the normalised score wins; with none finished, the best live one wins.
+When the token limit ends the search before StopK has its 5, the best live hypotheses by summed log-probability join
+the finished ones up to 5 candidates, as Whisper's `finalize` fills its finished sequences (PR #20 review; before, the
+live ones were left out whenever one hypothesis had finished). A forced language's log-probability is not scored
+under `LangArgmaxScored`/`LangBeam`, which only rank a detected language.
 `Options.Adjust` is a per-step hook on each live hypothesis' log-probabilities for keyword biasing (PLAN.md 6.3); it
 runs on one goroutine at a time.
 
@@ -1838,18 +1842,22 @@ form, so it keeps the float path.
 activation rows (four Gaussian, one Gaussian cubed for heavy tails), so `nibble4` runs one block of four plus one
 leftover row. The worst of the five rows:
 
-| tensor                   | CQ  | shape   | rows    | float NEON | float purego | `gather` | `nibble` | `nibble4` | MB float32 | MB packed |
-| ------------------------ | --- | ------- | ------- | ---------- | ------------ | -------- | -------- | --------- | ---------- | --------- |
-| k_proj (96, 512) CQ2     | 1   | 1.84 µs | 8.88 µs | 50.8 µs    | 7.25 µs      | 7.29 µs  | 0.197    | 0.0138    |
-| q_proj (384, 512) CQ2    | 1   | 7.70 µs | 34.4 µs | 204 µs     | 20.2 µs      | 20.1 µs  | 0.786    | 0.0553    |
-| out (512, 512) CQ2       | 1   | 10.6 µs | 45.9 µs | 274 µs     | 25.6 µs      | 25.8 µs  | 1.049    | 0.0737    |
-| pw1 (1024, 512) CQ2      | 1   | 22.8 µs | 91.7 µs | 601 µs     | 49.7 µs      | 50.2 µs  | 2.097    | 0.1475    |
-| stem.out (512, 1280) CQ2 | 1   | 28.1 µs | 127 µs  | 651 µs     | 61.2 µs      | 61.5 µs  | 2.621    | 0.1843    |
-| phi_res (128, 2048) CQ4  | 1   | 9.69 µs | 52.3 µs | 264 µs     | 55.8 µs      | 55.6 µs  | 1.049    | 0.1393    |
-| head (8199, 512) CQ4     | 1   | 192 µs  | 748 µs  | 4.19 ms    | 653 µs       | 652 µs   | 16.79    | 2.230     |
-| q_proj (384, 512) CQ2    | 5   | 20.4 µs | 173 µs  | 982 µs     | 96.1 µs      | 76.9 µs  | 0.786    | 0.0553    |
-| head (8199, 512) CQ4     | 5   | 464 µs  | 3.71 ms | 20.9 ms    | 3.27 ms      | 2.33 ms  | 16.79    | 2.230     |
-| q_proj (384, 512) CQ2    | 375 | 1.21 ms | 12.9 ms | 73.4 ms    | 7.22 ms      | 5.43 ms  | 0.786    | 0.0553    |
+| tensor          | CQ  | shape        | `gather` 1 − cos | `nibble` 1 − cos | `nibble4` 1 − cos | max \|Δ\| `gather` / `nibble4` | max \|y\| |
+| --------------- | --- | ------------ | ---------------- | ---------------- | ----------------- | ------------------------------ | --------- |
+| layer00.q_proj  | CQ2 | (384, 512)   | 5.97e-14         | 3.94e-14         | 3.96e-14          | 5.91e-05 / 3.62e-05            | 153.9     |
+| layer03.k_proj  | CQ2 | (96, 512)    | 7.76e-14         | 5.04e-14         | 6.22e-14          | 4.01e-05 / 4.2e-05             | 121       |
+| cross05.v_proj  | CQ2 | (512, 512)   | 4.91e-14         | 2.91e-14         | 3.39e-14          | 0.000107 / 5.3e-05             | 410       |
+| enc00.pw1       | CQ2 | (1024, 512)  | 5.25e-14         | 3.63e-14         | 4.07e-14          | 6.1e-05 / 4.58e-05             | 149.5     |
+| enc07.out_proj  | CQ2 | (512, 512)   | 4.91e-14         | 2.96e-14         | 3.45e-14          | 0.000122 / 9.16e-05            | 247.4     |
+| stem.pw_1       | CQ2 | (128, 128)   | 4.15e-14         | 1.77e-14         | 1.92e-14          | 0.000244 / 0.000122            | 708.3     |
+| stem.out        | CQ2 | (512, 1280)  | 8.77e-14         | 6.95e-14         | 7.36e-14          | 6.1e-05 / 4.58e-05             | 188.7     |
+| engram0.tables  | CQ2 | (73728, 128) | 1.08e-13         | 6.41e-14         | 8.19e-14          | 6.87e-05 / 4.58e-05            | 173.4     |
+| embedding       | CQ4 | (8199, 512)  | 1.07e-13         | 8.08e-14         | 9.55e-14          | 0.000403 / 0.000472            | 878.8     |
+| mhc_phi_pre     | CQ4 | (32, 2048)   | 1.56e-13         | 1.21e-13         | 1.72e-13          | 0.000549 / 0.000305            | 958.2     |
+| enc.mhc_phi_res | CQ4 | (128, 2048)  | 1.67e-13         | 1.19e-13         | 1.24e-13          | 0.000385 / 0.000397            | 1428      |
+
+(Re-run on 2026-10-10 for the PR #18 review: this table had held a copy of the speed table below by mistake. The test
+also runs the lut kernel of F-034, whose accuracy is there.)
 
 The Accept asks for cosine ≥ 0.99999, i.e. 1 − cos ≤ 1e-5. The worst kernel is almost eight orders of magnitude below
 it: both sides compute the same product in float32, in a different order. The largest |Δ| is 5.7e-7 of max |y| (5.4e-7
@@ -1905,15 +1913,16 @@ closed. `testdata/oracle/keywords` holds the engine's text with and without the 
 `Bias.Forms` selects and builds an Aho-Corasick automaton over the token ids. The vocabulary has no dummy prefix, so
 a word inside the text is spelled `" "+word` (`▁C ow ley ' s`) and the first word of a transcript bare (`C ow ley ' s`);
 `FormSpace` and `FormBare` are these two, and `FormCapital` and `FormLower` add the first letter upper- and lower-cased.
-`internal/tokenizer` needed nothing new. Each node carries φ, the bonus of the partial match since the last completed
-keyword on its path. `Keywords.Adjust` is a `search.Adjust`: it reruns the automaton over a hypothesis' text and adds to
+`internal/tokenizer` needed nothing new. The state after a text is the node of its longest suffix that is a keyword
+prefix, plus which of that suffix' tokens belong to a completed keyword. `Keywords.Adjust` is a `search.Adjust`: it reruns the automaton over a hypothesis' text and adds to
 every next token the change of the hypothesis' bonus:
 
 - a token that advances a match earns `Bias.Weight` (or Weight × its characters under `PerChar`), plus
-  `Bias.Complete` when it completes a keyword;
+  `Bias.Complete` for every keyword it completes, a keyword that ends as a suffix of the match included;
 - a token that breaks a partial match falls back through the failure links to the longest suffix that is still a
-  keyword prefix and loses `Bias.Revoke` × the bonus of the part it drops; EOS breaks every partial match;
-- a completed keyword's bonus is never taken back.
+  keyword prefix and loses `Bias.Revoke` × the bonus of the tokens it drops; EOS breaks every partial match;
+- the tokens of a completed keyword keep their bonus;
+- a bare spelling matches only at the start of the text (a `textStart` token in front of every text anchors it).
 
 Every token outside the automaton falls back to the root and gets the same change, so `Adjust` touches the whole row
 once and only the automaton's tokens individually. The bonus enters the adjusted log-probability, which ranks, prunes
@@ -1992,6 +2001,24 @@ of 53 (94.3 %), and the reference rate is 31 of 32 clips (96.9 %, F-026). Leavin
 already miss without keywords: 45 of 50 (90 %). Four of the five other mismatches are near-ties or model gaps (two of
 them 2.4-nat gaps on the German pair); one is a search miss our search rules cannot avoid without losing parity
 elsewhere. No variant in 3846 reaches 46.
+
+**Review fixes (2026-10-10, PR #23 review).** Three automaton bugs and a weight bug, fixed after the tuning above:
+
+- the bonus depended on the insertion order: a node created before its prefix became a keyword kept that keyword's
+  bonus in its φ (`[1 2 3]` then `[1 2]` earned 5 unit weights for `1 2 3`, the reverse order 3);
+- a keyword that completed as the suffix of a longer keyword's partial match (`2 3` inside `1 2 3 …`) earned no
+  completion, and a later failure took back its tokens;
+- the bare spellings were not anchored: `FormBare`'s pieces could start a match anywhere in the text;
+- under `PerChar` a byte piece counted the letters of `<0xNN>`, 6 characters per byte.
+
+The bookkeeping is now per token: each node keeps the bonus of every token on its path, the state marks which of them
+a completed keyword covers (outputs through the failure links included), and only the uncovered ones are revoked. On
+the 53 keyword cases with `DefaultBias` the first two fixes change no text. The anchoring changes three:
+`de-diese-paare-phrase` now equals the engine's text ("… Adoptionsplan …", so it was no model gap after all), and the
+two Polish cases on the clip we miss without keywords (`pl-gubernatora-missed`, `pl-dziewietnastu-policjantow-phrase`)
+change their text but still differ. Result: **46/53** (86.8 %) with keywords, Accept still not met. `PerChar` is not
+in `DefaultBias`, so its fix changes no default result. The grids above were run before these fixes; their ranking was
+not re-run. `TestKeywordOverlaps` and `TestKeywordPerCharBytes` pin the fixes.
 
 **Speed.** 72 ms per case with keywords against 61 ms without (F-026), M5 Pro; the automaton is rerun over the text of
 every live hypothesis at every step.
