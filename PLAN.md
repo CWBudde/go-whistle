@@ -532,7 +532,7 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       expand is only approximate, since 20 Sinkhorn iterations leave the rows unconverged; the fixture is right as
       it is, and `layer0` pins the Sinkhorn too (F-013).
 
-## Phase 3 — Front end
+## Phase 3 — Front end — ✅ DONE (2026-10-10)
 
 - [x] WAV decode exactly as in `whistle.py`: 8/16/24/32-bit, channel averaging, 8-bit offset 128.
       **Accept:** the upstream matrix (16000/1/2, 8000/1/2, 44100/2/2, 16000/1/1, 22050/2/3, 48000/1/4). A 220 Hz tone
