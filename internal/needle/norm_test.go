@@ -2,6 +2,7 @@ package needle
 
 import (
 	"math"
+	"math/rand/v2"
 	"testing"
 )
 
@@ -97,4 +98,35 @@ func TestZCRMSNormFixture(t *testing.T) {
 	checkContract(t, "rms", rms, wantRMS)
 	checkContract(t, "y", y, wantY)
 	checkContract(t, "rms_unit", unit, wantUnit)
+}
+
+// TestMeanSquareOrder: the four partial sums give the serial float64
+// sum's float32 result, at most one float32 step off where the two
+// float64 sums straddle a rounding boundary (docs/FINDINGS.md F-035).
+func TestMeanSquareOrder(t *testing.T) {
+	r := rand.New(rand.NewPCG(12, 34))
+	same, rows := 0, 0
+
+	for _, n := range []int{1, 2, 3, 4, 5, 7, 8, 9, 48, 63, 512, 2048} {
+		for range 50 {
+			row := randVec(r, n, 3)
+
+			var s float64
+			for _, v := range row {
+				s += float64(v) * float64(v)
+			}
+
+			want := float32(s / float64(n))
+			got := meanSquare(row)
+			rows++
+
+			if got == want {
+				same++
+			} else if math.Abs(float64(got-want)) > float64(math.Nextafter32(want, float32(math.Inf(1)))-want) {
+				t.Errorf("n %d: meanSquare %v, serial %v", n, got, want)
+			}
+		}
+	}
+
+	t.Logf("%d of %d rows equal to the serial sum", same, rows)
 }

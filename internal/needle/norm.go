@@ -82,14 +82,26 @@ func rowRMS(row []float32) float32 {
 }
 
 // meanSquare is mean(row²), accumulated in float64 and rounded to float32
-// (docs/FINDINGS.md F-011).
+// (docs/FINDINGS.md F-011). Four partial sums break the chain of
+// dependent adds; in float64 the order does not show in the float32
+// result (F-035).
 func meanSquare(row []float32) float32 {
-	var s float64
-	for _, v := range row {
-		s += float64(v) * float64(v)
+	var s0, s1, s2, s3 float64
+
+	i := 0
+	for ; i+3 < len(row); i += 4 {
+		v := row[i : i+4 : i+4]
+		s0 += float64(v[0]) * float64(v[0])
+		s1 += float64(v[1]) * float64(v[1])
+		s2 += float64(v[2]) * float64(v[2])
+		s3 += float64(v[3]) * float64(v[3])
 	}
 
-	return float32(s / float64(len(row)))
+	for ; i < len(row); i++ {
+		s0 += float64(row[i]) * float64(row[i])
+	}
+
+	return float32((s0 + s1 + s2 + s3) / float64(len(row)))
 }
 
 func checkRows(op string, dst, x []float32, dim int) {
