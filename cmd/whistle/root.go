@@ -12,7 +12,7 @@ func NewRootCmd() *cobra.Command {
 		SilenceErrors: true,
 	}
 
-	cmd.AddCommand(newDownloadCmd())
+	cmd.AddCommand(newDownloadCmd(), newTranscribeCmd())
 
 	return cmd
 }

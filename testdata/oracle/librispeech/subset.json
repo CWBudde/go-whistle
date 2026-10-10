@@ -1,0 +1,1810 @@
+{
+  "dataset": "LibriSpeech test-clean",
+  "archive": "https://www.openslr.org/resources/12/test-clean.tar.gz",
+  "archive_sha256": "39fde525e59672dc6d1551919b1478f724438a95aa55f874b576be21967e6c23",
+  "seed": "go-whistle 6.1",
+  "selection": "per speaker, the 5 utterances of at most 480000 samples with the smallest hex SHA-256 of \"\u003cseed\u003e/\u003cutterance id\u003e\"",
+  "audio_dir": "models/corpus/librispeech",
+  "utterances": [
+    {
+      "id": "ls-clean-1089-134686-0025",
+      "speaker": "1089",
+      "chapter": "134686",
+      "member": "LibriSpeech/test-clean/1089/134686/1089-134686-0025.flac",
+      "samples": 105760,
+      "sha256": "08844bfb979ce8240f332032a4b86bed89703dcdb0379087e9747db278eb60dd",
+      "transcript": "A GENTLE KICK FROM THE TALL BOY IN THE BENCH BEHIND URGED STEPHEN TO ASK A DIFFICULT QUESTION"
+    },
+    {
+      "id": "ls-clean-1089-134686-0037",
+      "speaker": "1089",
+      "chapter": "134686",
+      "member": "LibriSpeech/test-clean/1089/134686/1089-134686-0037.flac",
+      "samples": 83360,
+      "sha256": "8b160c9198bde2e6ca1234f840fd997d80bff1f869ab818815ddf558f92f4218",
+      "transcript": "IN THE SILENCE THEIR DARK FIRE KINDLED THE DUSK INTO A TAWNY GLOW"
+    },
+    {
+      "id": "ls-clean-1089-134691-0013",
+      "speaker": "1089",
+      "chapter": "134691",
+      "member": "LibriSpeech/test-clean/1089/134691/1089-134691-0013.flac",
+      "samples": 261280,
+      "sha256": "fccb8dd12f6aa93d3b199bd8a0369955b9028877cf48f189aff0b68593c860d2",
+      "transcript": "IDLE AND EMBITTERING FINALLY TO ARGUE AGAINST HIS OWN DISPASSIONATE CERTITUDE THAT THE COMMANDMENT OF LOVE BADE US NOT TO LOVE OUR NEIGHBOUR AS OURSELVES WITH THE SAME AMOUNT AND INTENSITY OF LOVE BUT TO LOVE HIM AS OURSELVES WITH THE SAME KIND OF LOVE"
+    },
+    {
+      "id": "ls-clean-1089-134691-0017",
+      "speaker": "1089",
+      "chapter": "134691",
+      "member": "LibriSpeech/test-clean/1089/134691/1089-134691-0017.flac",
+      "samples": 187120,
+      "sha256": "4e99c84d14cdecd4d8235736ef9126bbabafa7b8b43d598ae8cc80f3223d51fb",
+      "transcript": "THE EUROPE THEY HAD COME FROM LAY OUT THERE BEYOND THE IRISH SEA EUROPE OF STRANGE TONGUES AND VALLEYED AND WOODBEGIRT AND CITADELLED AND OF ENTRENCHED AND MARSHALLED RACES"
+    },
+    {
+      "id": "ls-clean-1089-134691-0020",
+      "speaker": "1089",
+      "chapter": "134691",
+      "member": "LibriSpeech/test-clean/1089/134691/1089-134691-0020.flac",
+      "samples": 63840,
+      "sha256": "1d486998d5e45f8372962b2ebdc3a6cfbedba62f0eb01d4b8ca8540a2cddc7b8",
+      "transcript": "HELLO STEPHANOS HERE COMES THE DEDALUS"
+    },
+    {
+      "id": "ls-clean-1188-133604-0017",
+      "speaker": "1188",
+      "chapter": "133604",
+      "member": "LibriSpeech/test-clean/1188/133604/1188-133604-0017.flac",
+      "samples": 73840,
+      "sha256": "3f9328f5bcc0337e14fdd3e00a0280b3ed8360ed249bb98d9ece41737f88bed0",
+      "transcript": "THAT A STYLE IS RESTRAINED OR SEVERE DOES NOT MEAN THAT IT IS ALSO ERRONEOUS"
+    },
+    {
+      "id": "ls-clean-1188-133604-0023",
+      "speaker": "1188",
+      "chapter": "133604",
+      "member": "LibriSpeech/test-clean/1188/133604/1188-133604-0023.flac",
+      "samples": 378720,
+      "sha256": "7cd2c4529ebd209e07a7fa35822527384f7fe14e921b3d964620356dfeaab9c1",
+      "transcript": "THE COLORIST SAYS FIRST OF ALL AS MY DELICIOUS PAROQUET WAS RUBY SO THIS NASTY VIPER SHALL BE BLACK AND THEN IS THE QUESTION CAN I ROUND HIM OFF EVEN THOUGH HE IS BLACK AND MAKE HIM SLIMY AND YET SPRINGY AND CLOSE DOWN CLOTTED LIKE A POOL OF BLACK BLOOD ON THE EARTH ALL THE SAME"
+    },
+    {
+      "id": "ls-clean-1188-133604-0024",
+      "speaker": "1188",
+      "chapter": "133604",
+      "member": "LibriSpeech/test-clean/1188/133604/1188-133604-0024.flac",
+      "samples": 243840,
+      "sha256": "5336f5c14764c0277198d612f1800a832cd3c0a81f17eaeacfaa02fe6e46dfc2",
+      "transcript": "NOTHING WILL BE MORE PRECIOUS TO YOU I THINK IN THE PRACTICAL STUDY OF ART THAN THE CONVICTION WHICH WILL FORCE ITSELF ON YOU MORE AND MORE EVERY HOUR OF THE WAY ALL THINGS ARE BOUND TOGETHER LITTLE AND GREAT IN SPIRIT AND IN MATTER"
+    },
+    {
+      "id": "ls-clean-1188-133604-0027",
+      "speaker": "1188",
+      "chapter": "133604",
+      "member": "LibriSpeech/test-clean/1188/133604/1188-133604-0027.flac",
+      "samples": 179920,
+      "sha256": "b21bed45e7655e0e4ecaa996b40b89e8845476623595e16a9f7571092a5ea164",
+      "transcript": "NOW HERE IS RAPHAEL EXACTLY BETWEEN THE TWO TREES STILL DRAWN LEAF BY LEAF WHOLLY FORMAL BUT BEAUTIFUL MIST COMING GRADUALLY INTO THE DISTANCE"
+    },
+    {
+      "id": "ls-clean-1188-133604-0030",
+      "speaker": "1188",
+      "chapter": "133604",
+      "member": "LibriSpeech/test-clean/1188/133604/1188-133604-0030.flac",
+      "samples": 30640,
+      "sha256": "bf0a84571b50203a06af0900b0a8be0719b2d50e8801f56661d03ee0ed5956e6",
+      "transcript": "HE KNOWS THEM BOTH"
+    },
+    {
+      "id": "ls-clean-121-121726-0004",
+      "speaker": "121",
+      "chapter": "121726",
+      "member": "LibriSpeech/test-clean/121/121726/121-121726-0004.flac",
+      "samples": 64320,
+      "sha256": "4bbc737ca67241542d273abfc2344f1e79c73efac7b096a2fc4f1ec346aaa9eb",
+      "transcript": "HEAVEN A GOOD PLACE TO BE RAISED TO"
+    },
+    {
+      "id": "ls-clean-121-121726-0013",
+      "speaker": "121",
+      "chapter": "121726",
+      "member": "LibriSpeech/test-clean/121/121726/121-121726-0013.flac",
+      "samples": 39840,
+      "sha256": "08ef76efd7bf91e5ce14ae6f27334d672ef9e88f6c4a513f12a65c4b43d2ce68",
+      "transcript": "TIED TO A WOMAN"
+    },
+    {
+      "id": "ls-clean-121-123859-0001",
+      "speaker": "121",
+      "chapter": "123859",
+      "member": "LibriSpeech/test-clean/121/123859/121-123859-0001.flac",
+      "samples": 406320,
+      "sha256": "d700304daeed539eb5c4d3c3a0dec7f181f47ed30f95d33fe0b8569ddc6dc768",
+      "transcript": "O TIS THE FIRST TIS FLATTERY IN MY SEEING AND MY GREAT MIND MOST KINGLY DRINKS IT UP MINE EYE WELL KNOWS WHAT WITH HIS GUST IS GREEING AND TO HIS PALATE DOTH PREPARE THE CUP IF IT BE POISON'D TIS THE LESSER SIN THAT MINE EYE LOVES IT AND DOTH FIRST BEGIN"
+    },
+    {
+      "id": "ls-clean-121-127105-0004",
+      "speaker": "121",
+      "chapter": "127105",
+      "member": "LibriSpeech/test-clean/121/127105/121-127105-0004.flac",
+      "samples": 33760,
+      "sha256": "68fdd404bea4123d3a99d3707cf9722542c5aa2aee34fbe756d75f87338b7206",
+      "transcript": "THE STORY'S WRITTEN"
+    },
+    {
+      "id": "ls-clean-121-127105-0019",
+      "speaker": "121",
+      "chapter": "127105",
+      "member": "LibriSpeech/test-clean/121/127105/121-127105-0019.flac",
+      "samples": 56400,
+      "sha256": "094a31946d6a1040e7585889329958348defc5a998bd54ae3cb851bafa8b12d8",
+      "transcript": "MISSUS GRIFFIN HOWEVER EXPRESSED THE NEED FOR A LITTLE MORE LIGHT"
+    },
+    {
+      "id": "ls-clean-1221-135766-0004",
+      "speaker": "1221",
+      "chapter": "135766",
+      "member": "LibriSpeech/test-clean/1221/135766/1221-135766-0004.flac",
+      "samples": 119040,
+      "sha256": "8ff4aa5749ae2d6a649bd517c35aeea3ab111bdd825c476dadce1ec7567fc4bb",
+      "transcript": "THIS OUTWARD MUTABILITY INDICATED AND DID NOT MORE THAN FAIRLY EXPRESS THE VARIOUS PROPERTIES OF HER INNER LIFE"
+    },
+    {
+      "id": "ls-clean-1221-135766-0006",
+      "speaker": "1221",
+      "chapter": "135766",
+      "member": "LibriSpeech/test-clean/1221/135766/1221-135766-0006.flac",
+      "samples": 182640,
+      "sha256": "b9d6ab4ef92a971984802ea32a1efa0f81a7d1287e6afb2bcbc2fef9fca70226",
+      "transcript": "THEY WERE NOW ILLUMINATED BY THE MORNING RADIANCE OF A YOUNG CHILD'S DISPOSITION BUT LATER IN THE DAY OF EARTHLY EXISTENCE MIGHT BE PROLIFIC OF THE STORM AND WHIRLWIND"
+    },
+    {
+      "id": "ls-clean-1221-135766-0013",
+      "speaker": "1221",
+      "chapter": "135766",
+      "member": "LibriSpeech/test-clean/1221/135766/1221-135766-0013.flac",
+      "samples": 58320,
+      "sha256": "ca563e7e629d62ec4cb9276af767ae0d74c63b7be789eb65e7bb0519a8668ac6",
+      "transcript": "PEARL WAS A BORN OUTCAST OF THE INFANTILE WORLD"
+    },
+    {
+      "id": "ls-clean-1221-135767-0000",
+      "speaker": "1221",
+      "chapter": "135767",
+      "member": "LibriSpeech/test-clean/1221/135767/1221-135767-0000.flac",
+      "samples": 397600,
+      "sha256": "dd065f22b8300c04c43323f15b52cc06a331c82f3933bed6179c3b4920f05c07",
+      "transcript": "HESTER PRYNNE WENT ONE DAY TO THE MANSION OF GOVERNOR BELLINGHAM WITH A PAIR OF GLOVES WHICH SHE HAD FRINGED AND EMBROIDERED TO HIS ORDER AND WHICH WERE TO BE WORN ON SOME GREAT OCCASION OF STATE FOR THOUGH THE CHANCES OF A POPULAR ELECTION HAD CAUSED THIS FORMER RULER TO DESCEND A STEP OR TWO FROM THE HIGHEST RANK HE STILL HELD AN HONOURABLE AND INFLUENTIAL PLACE AMONG THE COLONIAL MAGISTRACY"
+    },
+    {
+      "id": "ls-clean-1221-135767-0012",
+      "speaker": "1221",
+      "chapter": "135767",
+      "member": "LibriSpeech/test-clean/1221/135767/1221-135767-0012.flac",
+      "samples": 222160,
+      "sha256": "6cd629cd56e846999d7b17813b4e79f72dab6def281fdc1cc2f4c69a121595ee",
+      "transcript": "THEY APPROACHED THE DOOR WHICH WAS OF AN ARCHED FORM AND FLANKED ON EACH SIDE BY A NARROW TOWER OR PROJECTION OF THE EDIFICE IN BOTH OF WHICH WERE LATTICE WINDOWS THE WOODEN SHUTTERS TO CLOSE OVER THEM AT NEED"
+    },
+    {
+      "id": "ls-clean-1284-1180-0006",
+      "speaker": "1284",
+      "chapter": "1180",
+      "member": "LibriSpeech/test-clean/1284/1180/1284-1180-0006.flac",
+      "samples": 109840,
+      "sha256": "18ded8a9a99077bf60e51187761cf785e7ae039b06c8c928ac7f2bb9527d44e0",
+      "transcript": "AT THE FOOT OF THE MOUNTAIN THAT SEPARATED THE COUNTRY OF THE MUNCHKINS FROM THE COUNTRY OF THE GILLIKINS THE PATH DIVIDED"
+    },
+    {
+      "id": "ls-clean-1284-1180-0014",
+      "speaker": "1284",
+      "chapter": "1180",
+      "member": "LibriSpeech/test-clean/1284/1180/1284-1180-0014.flac",
+      "samples": 58640,
+      "sha256": "77dd3ba0722eb440bc35b5645d926392a244e9c715465ecd8364b75e8e61c917",
+      "transcript": "OJO HAD NEVER EATEN SUCH A FINE MEAL IN ALL HIS LIFE"
+    },
+    {
+      "id": "ls-clean-1284-1180-0019",
+      "speaker": "1284",
+      "chapter": "1180",
+      "member": "LibriSpeech/test-clean/1284/1180/1284-1180-0019.flac",
+      "samples": 240400,
+      "sha256": "7c52590999672974cd1fb29e575a91f0314df6fb0948a9659e31823514f260f0",
+      "transcript": "YOU MUST KNOW SAID MARGOLOTTE WHEN THEY WERE ALL SEATED TOGETHER ON THE BROAD WINDOW SEAT THAT MY HUSBAND FOOLISHLY GAVE AWAY ALL THE POWDER OF LIFE HE FIRST MADE TO OLD MOMBI THE WITCH WHO USED TO LIVE IN THE COUNTRY OF THE GILLIKINS TO THE NORTH OF HERE"
+    },
+    {
+      "id": "ls-clean-1284-1181-0009",
+      "speaker": "1284",
+      "chapter": "1181",
+      "member": "LibriSpeech/test-clean/1284/1181/1284-1181-0009.flac",
+      "samples": 83920,
+      "sha256": "edd61be5449ab319981b19a740fba00f6b8e597974b716626dd89e9b59644e3b",
+      "transcript": "SHE RAN TO HER HUSBAND'S SIDE AT ONCE AND HELPED HIM LIFT THE FOUR KETTLES FROM THE FIRE"
+    },
+    {
+      "id": "ls-clean-1284-1181-0014",
+      "speaker": "1284",
+      "chapter": "1181",
+      "member": "LibriSpeech/test-clean/1284/1181/1284-1181-0014.flac",
+      "samples": 126720,
+      "sha256": "ca4d2e7b48a6aab5524aa4b07be6dca4ba156d619825ff787d2edced1be5cb5d",
+      "transcript": "HE SELECTED A SMALL GOLD BOTTLE WITH A PEPPER BOX TOP SO THAT THE POWDER MIGHT BE SPRINKLED ON ANY OBJECT THROUGH THE SMALL HOLES"
+    },
+    {
+      "id": "ls-clean-1320-122612-0001",
+      "speaker": "1320",
+      "chapter": "122612",
+      "member": "LibriSpeech/test-clean/1320/122612/1320-122612-0001.flac",
+      "samples": 152320,
+      "sha256": "986e81e2ff26f02c611633ec5265b4f123b773b1dec9a63aaf071357910d11e3",
+      "transcript": "THE DEWS WERE SUFFERED TO EXHALE AND THE SUN HAD DISPERSED THE MISTS AND WAS SHEDDING A STRONG AND CLEAR LIGHT IN THE FOREST WHEN THE TRAVELERS RESUMED THEIR JOURNEY"
+    },
+    {
+      "id": "ls-clean-1320-122612-0002",
+      "speaker": "1320",
+      "chapter": "122612",
+      "member": "LibriSpeech/test-clean/1320/122612/1320-122612-0002.flac",
+      "samples": 119360,
+      "sha256": "096812d54a8d3c4c5723a98bae12c783e087c98a407bc8094dcf2be1eb0cc3ad",
+      "transcript": "AFTER PROCEEDING A FEW MILES THE PROGRESS OF HAWKEYE WHO LED THE ADVANCE BECAME MORE DELIBERATE AND WATCHFUL"
+    },
+    {
+      "id": "ls-clean-1320-122617-0015",
+      "speaker": "1320",
+      "chapter": "122617",
+      "member": "LibriSpeech/test-clean/1320/122617/1320-122617-0015.flac",
+      "samples": 82000,
+      "sha256": "ea505c9db6e1edb5379ad919dc02477862d418ccb635996b77707b7cc7b99ebf",
+      "transcript": "BUT THE BEAR INSTEAD OF OBEYING MAINTAINED THE SEAT IT HAD TAKEN AND GROWLED"
+    },
+    {
+      "id": "ls-clean-1320-122617-0027",
+      "speaker": "1320",
+      "chapter": "122617",
+      "member": "LibriSpeech/test-clean/1320/122617/1320-122617-0027.flac",
+      "samples": 91039,
+      "sha256": "f13188f0dc7fd1ba814a0e9423e1b086be1bcadf67d4927f9fd0fd45e92d2ef3",
+      "transcript": "AS SOON AS THESE DISPOSITIONS WERE MADE THE SCOUT TURNED TO DAVID AND GAVE HIM HIS PARTING INSTRUCTIONS"
+    },
+    {
+      "id": "ls-clean-1320-122617-0040",
+      "speaker": "1320",
+      "chapter": "122617",
+      "member": "LibriSpeech/test-clean/1320/122617/1320-122617-0040.flac",
+      "samples": 127600,
+      "sha256": "3c30d51e3370b649a86aea48c2860ed8de9dadff5e422bbc452bbd33abd4a7d6",
+      "transcript": "HE HAD NO OCCASION TO DELAY FOR AT THE NEXT INSTANT A BURST OF CRIES FILLED THE OUTER AIR AND RAN ALONG THE WHOLE EXTENT OF THE VILLAGE"
+    },
+    {
+      "id": "ls-clean-1580-141083-0003",
+      "speaker": "1580",
+      "chapter": "141083",
+      "member": "LibriSpeech/test-clean/1580/141083/1580-141083-0003.flac",
+      "samples": 104800,
+      "sha256": "2b702986e57cd06642e7fca99e769992a789e74ff8425d3c822f29246c4678f2",
+      "transcript": "WITHOUT HIS SCRAPBOOKS HIS CHEMICALS AND HIS HOMELY UNTIDINESS HE WAS AN UNCOMFORTABLE MAN"
+    },
+    {
+      "id": "ls-clean-1580-141083-0009",
+      "speaker": "1580",
+      "chapter": "141083",
+      "member": "LibriSpeech/test-clean/1580/141083/1580-141083-0009.flac",
+      "samples": 112640,
+      "sha256": "a56a72dbe070f023475c7535e9d6f3844a9cf1ba48c4baf630c5b52ab4216635",
+      "transcript": "THE ALTERNATIVE WAS THAT SOMEONE PASSING HAD OBSERVED THE KEY IN THE DOOR HAD KNOWN THAT I WAS OUT AND HAD ENTERED TO LOOK AT THE PAPERS"
+    },
+    {
+      "id": "ls-clean-1580-141083-0010",
+      "speaker": "1580",
+      "chapter": "141083",
+      "member": "LibriSpeech/test-clean/1580/141083/1580-141083-0010.flac",
+      "samples": 85120,
+      "sha256": "b6ed92f1ac8e6a538d63cfa0902c2891139bb891a088a8d5732a7e826828be60",
+      "transcript": "I GAVE HIM A LITTLE BRANDY AND LEFT HIM COLLAPSED IN A CHAIR WHILE I MADE A MOST CAREFUL EXAMINATION OF THE ROOM"
+    },
+    {
+      "id": "ls-clean-1580-141084-0030",
+      "speaker": "1580",
+      "chapter": "141084",
+      "member": "LibriSpeech/test-clean/1580/141084/1580-141084-0030.flac",
+      "samples": 34320,
+      "sha256": "f1794e8072a02da379189c8f0065f0ffda58a21add5e55890a4c0b4520a201d2",
+      "transcript": "JUST CLOSE THE DOOR SAID HOLMES"
+    },
+    {
+      "id": "ls-clean-1580-141084-0040",
+      "speaker": "1580",
+      "chapter": "141084",
+      "member": "LibriSpeech/test-clean/1580/141084/1580-141084-0040.flac",
+      "samples": 95760,
+      "sha256": "03d442a4c4271be5403a2263415b5d14077f4ccd8d7d9b9e2c9b29f5594e7a4a",
+      "transcript": "HE RETURNED CARRYING HIS JUMPING SHOES WHICH ARE PROVIDED AS YOU ARE AWARE WITH SEVERAL SHARP SPIKES"
+    },
+    {
+      "id": "ls-clean-1995-1826-0003",
+      "speaker": "1995",
+      "chapter": "1826",
+      "member": "LibriSpeech/test-clean/1995/1826/1995-1826-0003.flac",
+      "samples": 49440,
+      "sha256": "0776d9e199cee1db52d27753930e451111174c5367a70e6543f3d111db9895eb",
+      "transcript": "BETTER GO HE HAD COUNSELLED SENTENTIOUSLY"
+    },
+    {
+      "id": "ls-clean-1995-1826-0011",
+      "speaker": "1995",
+      "chapter": "1826",
+      "member": "LibriSpeech/test-clean/1995/1826/1995-1826-0011.flac",
+      "samples": 143040,
+      "sha256": "6647e8e9197c20cd3b7d2241dc8237b7e0f62145221e8a5c946aea841b431d93",
+      "transcript": "HERE SHE WAS TEACHING DIRTY CHILDREN AND THE SMELL OF CONFUSED ODORS AND BODILY PERSPIRATION WAS TO HER AT TIMES UNBEARABLE"
+    },
+    {
+      "id": "ls-clean-1995-1837-0012",
+      "speaker": "1995",
+      "chapter": "1837",
+      "member": "LibriSpeech/test-clean/1995/1837/1995-1837-0012.flac",
+      "samples": 131920,
+      "sha256": "e2c3e9b0048ff05bfd4baf07725a11b8ee4f452224cbea5288c703625c0b64a6",
+      "transcript": "HE SPLASHED AND STAMPED ALONG FARTHER AND FARTHER ONWARD UNTIL HE NEARED THE RAMPART OF THE CLEARING AND PUT FOOT UPON THE TREE BRIDGE"
+    },
+    {
+      "id": "ls-clean-1995-1837-0019",
+      "speaker": "1995",
+      "chapter": "1837",
+      "member": "LibriSpeech/test-clean/1995/1837/1995-1837-0019.flac",
+      "samples": 86080,
+      "sha256": "557f2ba92490b355059730acb89ae06d3ab37485496930d648536c97a92b2e4b",
+      "transcript": "HE SAT DOWN WEAK BEWILDERED AND ONE THOUGHT WAS UPPERMOST ZORA"
+    },
+    {
+      "id": "ls-clean-1995-1837-0021",
+      "speaker": "1995",
+      "chapter": "1837",
+      "member": "LibriSpeech/test-clean/1995/1837/1995-1837-0021.flac",
+      "samples": 49440,
+      "sha256": "14ca74ba0d40cd55ba6cb9f6448ae9db2253d10c1b8d7b329d472aed184d83f6",
+      "transcript": "THE HOPE AND DREAM OF HARVEST WAS UPON THE LAND"
+    },
+    {
+      "id": "ls-clean-2094-142345-0005",
+      "speaker": "2094",
+      "chapter": "142345",
+      "member": "LibriSpeech/test-clean/2094/142345/2094-142345-0005.flac",
+      "samples": 145440,
+      "sha256": "ade78d2f10d8da361ae0ccb9e7e56eb139d4b06b6da1467ac509060d09fc0bc5",
+      "transcript": "SEVERAL CLOTHES HORSES A PILLION A SPINNING WHEEL AND AN OLD BOX WIDE OPEN AND STUFFED FULL OF COLOURED RAGS"
+    },
+    {
+      "id": "ls-clean-2094-142345-0015",
+      "speaker": "2094",
+      "chapter": "142345",
+      "member": "LibriSpeech/test-clean/2094/142345/2094-142345-0015.flac",
+      "samples": 240240,
+      "sha256": "f56a8952bc5897dfef0ed88b3a905f3061cb90244b712688b26e1353004bfa9e",
+      "transcript": "TO ALL APPEARANCE MOLLY HAD GOT THROUGH HER AFTER DINNER WORK IN AN EXEMPLARY MANNER HAD CLEANED HERSELF WITH GREAT DISPATCH AND NOW CAME TO ASK SUBMISSIVELY IF SHE SHOULD SIT DOWN TO HER SPINNING TILL MILKING TIME"
+    },
+    {
+      "id": "ls-clean-2094-142345-0023",
+      "speaker": "2094",
+      "chapter": "142345",
+      "member": "LibriSpeech/test-clean/2094/142345/2094-142345-0023.flac",
+      "samples": 82880,
+      "sha256": "7fd32a8b92c3d5ce9452c27c13c174b9125569df964614cea45ab031333d8fa4",
+      "transcript": "YOU'RE A RARE UN FOR SITTING DOWN TO YOUR WORK A LITTLE WHILE AFTER IT'S TIME TO PUT BY"
+    },
+    {
+      "id": "ls-clean-2094-142345-0054",
+      "speaker": "2094",
+      "chapter": "142345",
+      "member": "LibriSpeech/test-clean/2094/142345/2094-142345-0054.flac",
+      "samples": 90880,
+      "sha256": "5b787343e871e4e4835b80b6a69be102713fc91aca4c637210bfc83ca21969c2",
+      "transcript": "OH SIR SAID MISSUS POYSER RATHER ALARMED YOU WOULDN'T LIKE IT AT ALL"
+    },
+    {
+      "id": "ls-clean-2094-142345-0056",
+      "speaker": "2094",
+      "chapter": "142345",
+      "member": "LibriSpeech/test-clean/2094/142345/2094-142345-0056.flac",
+      "samples": 61440,
+      "sha256": "b96802639b318f2e82781b10d067dc60fab89da6cfe8d380d65dd4b1a921bf01",
+      "transcript": "I THINK I SHOULD BE DOING YOU A SERVICE TO TURN YOU OUT OF SUCH A PLACE"
+    },
+    {
+      "id": "ls-clean-2300-131720-0004",
+      "speaker": "2300",
+      "chapter": "131720",
+      "member": "LibriSpeech/test-clean/2300/131720/2300-131720-0004.flac",
+      "samples": 318560,
+      "sha256": "4b8ce347726633e06d2d276266a671eeff36d8910b32ac2822615b4575d7d0bf",
+      "transcript": "OWING TO HIS INSISTENCE ON LOW PRESSURE DIRECT CURRENT FOR USE IN DENSELY POPULATED DISTRICTS AS THE ONLY SAFE AND TRULY UNIVERSAL PROFITABLE WAY OF DELIVERING ELECTRICAL ENERGY TO THE CONSUMERS EDISON HAS BEEN FREQUENTLY SPOKEN OF AS AN OPPONENT OF THE ALTERNATING CURRENT"
+    },
+    {
+      "id": "ls-clean-2300-131720-0011",
+      "speaker": "2300",
+      "chapter": "131720",
+      "member": "LibriSpeech/test-clean/2300/131720/2300-131720-0011.flac",
+      "samples": 254000,
+      "sha256": "6b82f1daab08389f6563cce0b3e13e8c033da5280579b6f28994e87efae30e81",
+      "transcript": "BUT WHEN IT CAME TO BE A QUESTION OF LIGHTING A SCATTERED SUBURB A GROUP OF DWELLINGS ON THE OUTSKIRTS A REMOTE COUNTRY RESIDENCE OR A FARM HOUSE THE ALTERNATING CURRENT IN ALL ELEMENTS SAVE ITS DANGER WAS AND IS IDEAL"
+    },
+    {
+      "id": "ls-clean-2300-131720-0023",
+      "speaker": "2300",
+      "chapter": "131720",
+      "member": "LibriSpeech/test-clean/2300/131720/2300-131720-0023.flac",
+      "samples": 176960,
+      "sha256": "74d002c0b0155ef20deee71179ccb44866d46a38b24c47728a12ec94930b6860",
+      "transcript": "I THINK HE WAS PERHAPS MORE APPRECIATIVE THAN I WAS OF THE DISCIPLINE OF THE EDISON CONSTRUCTION DEPARTMENT AND THOUGHT IT WOULD BE WELL FOR US TO WAIT UNTIL THE MORNING OF THE FOURTH BEFORE WE STARTED UP"
+    },
+    {
+      "id": "ls-clean-2300-131720-0034",
+      "speaker": "2300",
+      "chapter": "131720",
+      "member": "LibriSpeech/test-clean/2300/131720/2300-131720-0034.flac",
+      "samples": 137680,
+      "sha256": "962590b2f3dde7b8c970ed8f0305f89e83ec1bca04cd40338ada27bf3d4fedbc",
+      "transcript": "THE OTHERS HAVING BEEN IN OPERATION TOO SHORT A TIME TO SHOW DEFINITE RESULTS ALTHOUGH THEY ALSO WENT QUICKLY TO A DIVIDEND BASIS"
+    },
+    {
+      "id": "ls-clean-2300-131720-0038",
+      "speaker": "2300",
+      "chapter": "131720",
+      "member": "LibriSpeech/test-clean/2300/131720/2300-131720-0038.flac",
+      "samples": 89760,
+      "sha256": "8c4b9e701507ff8833171aa870284ed30c4a1529672c2bb6f27414e87a0a8bf0",
+      "transcript": "HE FELT HE WAS UP AGAINST IT AND THAT PERHAPS ANOTHER KIND OF A JOB WOULD SUIT HIM BETTER"
+    },
+    {
+      "id": "ls-clean-237-126133-0016",
+      "speaker": "237",
+      "chapter": "126133",
+      "member": "LibriSpeech/test-clean/237/126133/237-126133-0016.flac",
+      "samples": 68000,
+      "sha256": "76e725decce5269ac786718edd2c668b7b19e9073e1edb3369232b3822539132",
+      "transcript": "OH NO JASPER I MUST GO BY MY VERY OWN SELF"
+    },
+    {
+      "id": "ls-clean-237-126133-0024",
+      "speaker": "237",
+      "chapter": "126133",
+      "member": "LibriSpeech/test-clean/237/126133/237-126133-0024.flac",
+      "samples": 154640,
+      "sha256": "dc829af9c203b88fdc14ec043602cfe049b279b2d4a3ad79f9271cb27169991a",
+      "transcript": "AND THE OLD GENTLEMAN WAS SO DELIGHTED WITH HIS SUCCESS THAT HE HAD TO BURST OUT INTO A SERIES OF SHORT HAPPY BITS OF LAUGHTER THAT OCCUPIED QUITE A SPACE OF TIME"
+    },
+    {
+      "id": "ls-clean-237-134493-0017",
+      "speaker": "237",
+      "chapter": "134493",
+      "member": "LibriSpeech/test-clean/237/134493/237-134493-0017.flac",
+      "samples": 145680,
+      "sha256": "479fe9f764204ef085b21963a482e83b3fa0fe1b26d74b1dd625bb8c8c324f85",
+      "transcript": "ANY ONE THEREABOUTS WOULD HAVE TOLD YOU THAT THIS WAS ONE OF THE RICHEST FARMS ON THE DIVIDE AND THAT THE FARMER WAS A WOMAN ALEXANDRA BERGSON"
+    },
+    {
+      "id": "ls-clean-237-134500-0016",
+      "speaker": "237",
+      "chapter": "134500",
+      "member": "LibriSpeech/test-clean/237/134500/237-134500-0016.flac",
+      "samples": 50560,
+      "sha256": "3a0b1dfbabc90998467d18581117e88918c47e0b3cb214590c89c5e7bebc7745",
+      "transcript": "I DON'T KNOW ALL OF THEM BUT I KNOW LINDENS ARE"
+    },
+    {
+      "id": "ls-clean-237-134500-0029",
+      "speaker": "237",
+      "chapter": "134500",
+      "member": "LibriSpeech/test-clean/237/134500/237-134500-0029.flac",
+      "samples": 33040,
+      "sha256": "39c0a89b2a89e7bf5e8b9de1dc4ccec157674f99670e0c7992c36cffa8556100",
+      "transcript": "I DON'T WANT TO STAND AROUND AND LOOK ON"
+    },
+    {
+      "id": "ls-clean-260-123288-0000",
+      "speaker": "260",
+      "chapter": "123288",
+      "member": "LibriSpeech/test-clean/260/123288/260-123288-0000.flac",
+      "samples": 48640,
+      "sha256": "c00a83738a30d886f6b8e94dd18fc23a790b692ecd9cc059811d06e96770de9c",
+      "transcript": "THE ROARINGS BECOME LOST IN THE DISTANCE"
+    },
+    {
+      "id": "ls-clean-260-123288-0003",
+      "speaker": "260",
+      "chapter": "123288",
+      "member": "LibriSpeech/test-clean/260/123288/260-123288-0003.flac",
+      "samples": 142480,
+      "sha256": "ba843da57b1ebfae3a33c6c2ded045488f63190edb384b37a95231d09f9c28d9",
+      "transcript": "THE ELECTRIC LIGHT CAN SCARCELY PENETRATE THROUGH THE DENSE CURTAIN WHICH HAS DROPPED OVER THE THEATRE ON WHICH THE BATTLE OF THE ELEMENTS IS ABOUT TO BE WAGED"
+    },
+    {
+      "id": "ls-clean-260-123288-0018",
+      "speaker": "260",
+      "chapter": "123288",
+      "member": "LibriSpeech/test-clean/260/123288/260-123288-0018.flac",
+      "samples": 51920,
+      "sha256": "c1a68a9ae9a28289218aca63ae14d10aacdb6dfd091b5463d1faa8135f609062",
+      "transcript": "THE RAFT BEARS ON STILL TO THE SOUTH EAST"
+    },
+    {
+      "id": "ls-clean-260-123288-0020",
+      "speaker": "260",
+      "chapter": "123288",
+      "member": "LibriSpeech/test-clean/260/123288/260-123288-0020.flac",
+      "samples": 46400,
+      "sha256": "35457eb31b72f2a8d368263a32dac63873a0d8d8ced6149b241287db3539c09b",
+      "transcript": "EACH OF US IS LASHED TO SOME PART OF THE RAFT"
+    },
+    {
+      "id": "ls-clean-260-123288-0021",
+      "speaker": "260",
+      "chapter": "123288",
+      "member": "LibriSpeech/test-clean/260/123288/260-123288-0021.flac",
+      "samples": 43360,
+      "sha256": "85418a1303e0ce84791be2d08b12f0b5240899ed12bf42968dc1a28d7497a02c",
+      "transcript": "THE WAVES RISE ABOVE OUR HEADS"
+    },
+    {
+      "id": "ls-clean-2830-3980-0000",
+      "speaker": "2830",
+      "chapter": "3980",
+      "member": "LibriSpeech/test-clean/2830/3980/2830-3980-0000.flac",
+      "samples": 59680,
+      "sha256": "3c0d6c94ce6b60db4f062fbe74ea645847bef8ce13b91db6895489891c950d1e",
+      "transcript": "IN EVERY WAY THEY SOUGHT TO UNDERMINE THE AUTHORITY OF SAINT PAUL"
+    },
+    {
+      "id": "ls-clean-2830-3980-0026",
+      "speaker": "2830",
+      "chapter": "3980",
+      "member": "LibriSpeech/test-clean/2830/3980/2830-3980-0026.flac",
+      "samples": 23760,
+      "sha256": "70133a42f7a8aaabbf5919dcccce8ae7d3431ac8451ab99ebfea834f50bc1bc3",
+      "transcript": "VERSE TWO"
+    },
+    {
+      "id": "ls-clean-2830-3980-0042",
+      "speaker": "2830",
+      "chapter": "3980",
+      "member": "LibriSpeech/test-clean/2830/3980/2830-3980-0042.flac",
+      "samples": 48320,
+      "sha256": "5e22212091c96e849307da53473405f16ddb5c86e6b5b2173bee381c3f414176",
+      "transcript": "THE WORLD BRANDS THIS A PERNICIOUS DOCTRINE"
+    },
+    {
+      "id": "ls-clean-2830-3980-0062",
+      "speaker": "2830",
+      "chapter": "3980",
+      "member": "LibriSpeech/test-clean/2830/3980/2830-3980-0062.flac",
+      "samples": 87040,
+      "sha256": "6bcaf8fcda288852f3a74c1bbdfa3536db73b9837cad421787e2dc7b986cc239",
+      "transcript": "NOT FOR A CROWN OR A KINGDOM OR OUR GOODNESS BUT FOR OUR SINS"
+    },
+    {
+      "id": "ls-clean-2830-3980-0063",
+      "speaker": "2830",
+      "chapter": "3980",
+      "member": "LibriSpeech/test-clean/2830/3980/2830-3980-0063.flac",
+      "samples": 86640,
+      "sha256": "e328df683838a54e3a2ca3b0ff96b8cd52be86e56b33618efc7dc2df356f75cb",
+      "transcript": "UNDERSCORE THESE WORDS FOR THEY ARE FULL OF COMFORT FOR SORE CONSCIENCES"
+    },
+    {
+      "id": "ls-clean-2961-960-0002",
+      "speaker": "2961",
+      "chapter": "960",
+      "member": "LibriSpeech/test-clean/2961/960/2961-960-0002.flac",
+      "samples": 245600,
+      "sha256": "596a7030a831100519501dee0d400405e2b25197343c4df2826e80f6a3ab71cd",
+      "transcript": "IN THE SUPPOSED DEPTHS OF THIS DIALOGUE THE NEO PLATONISTS FOUND HIDDEN MEANINGS AND CONNECTIONS WITH THE JEWISH AND CHRISTIAN SCRIPTURES AND OUT OF THEM THEY ELICITED DOCTRINES QUITE AT VARIANCE WITH THE SPIRIT OF PLATO"
+    },
+    {
+      "id": "ls-clean-2961-960-0003",
+      "speaker": "2961",
+      "chapter": "960",
+      "member": "LibriSpeech/test-clean/2961/960/2961-960-0003.flac",
+      "samples": 277040,
+      "sha256": "9dbda0470ec849f6d1692a4c0378706640cabd0b3802a1a511583e394839876b",
+      "transcript": "THEY WERE ABSORBED IN HIS THEOLOGY AND WERE UNDER THE DOMINION OF HIS NAME WHILE THAT WHICH WAS TRULY GREAT AND TRULY CHARACTERISTIC IN HIM HIS EFFORT TO REALIZE AND CONNECT ABSTRACTIONS WAS NOT UNDERSTOOD BY THEM AT ALL"
+    },
+    {
+      "id": "ls-clean-2961-960-0015",
+      "speaker": "2961",
+      "chapter": "960",
+      "member": "LibriSpeech/test-clean/2961/960/2961-960-0015.flac",
+      "samples": 125280,
+      "sha256": "2a811344aa4d212f9d8bf120d1e5cf1cc9bd033715ff20d14592dc2d605aba59",
+      "transcript": "THE STYLE AND PLAN OF THE TIMAEUS DIFFER GREATLY FROM THAT OF ANY OTHER OF THE PLATONIC DIALOGUES"
+    },
+    {
+      "id": "ls-clean-2961-961-0004",
+      "speaker": "2961",
+      "chapter": "961",
+      "member": "LibriSpeech/test-clean/2961/961/2961-961-0004.flac",
+      "samples": 183680,
+      "sha256": "33d0abe168ec63a37f5a0ffe42fb15acf240d99db26d44949256e5bd3396e8cf",
+      "transcript": "LISTEN THEN SOCRATES TO A TALE OF SOLON'S WHO BEING THE FRIEND OF DROPIDAS MY GREAT GRANDFATHER TOLD IT TO MY GRANDFATHER CRITIAS AND HE TOLD ME"
+    },
+    {
+      "id": "ls-clean-2961-961-0016",
+      "speaker": "2961",
+      "chapter": "961",
+      "member": "LibriSpeech/test-clean/2961/961/2961-961-0016.flac",
+      "samples": 125040,
+      "sha256": "7bd5bc14c378fe47663a6c33bde69bcee80058b787aed6dee261c3115d8dffd9",
+      "transcript": "I WILL BRIEFLY DESCRIBE THEM TO YOU AND YOU SHALL READ THE ACCOUNT OF THEM AT YOUR LEISURE IN THE SACRED REGISTERS"
+    },
+    {
+      "id": "ls-clean-3570-5694-0001",
+      "speaker": "3570",
+      "chapter": "5694",
+      "member": "LibriSpeech/test-clean/3570/5694/3570-5694-0001.flac",
+      "samples": 90800,
+      "sha256": "7de6d535e2a7fab20fe7d8d29283ebfddafd3bc9bc05a4f79f67ce48df15719a",
+      "transcript": "THE UTILITY OF CONSUMPTION AS AN EVIDENCE OF WEALTH IS TO BE CLASSED AS A DERIVATIVE GROWTH"
+    },
+    {
+      "id": "ls-clean-3570-5694-0017",
+      "speaker": "3570",
+      "chapter": "5694",
+      "member": "LibriSpeech/test-clean/3570/5694/3570-5694-0017.flac",
+      "samples": 133360,
+      "sha256": "cb4d1d2a214a411c4c77e304298e212cac7841d709b08d9e94493f8571c52094",
+      "transcript": "THE WEARING OF UNIFORMS OR LIVERIES IMPLIES A CONSIDERABLE DEGREE OF DEPENDENCE AND MAY EVEN BE SAID TO BE A MARK OF SERVITUDE REAL OR OSTENSIBLE"
+    },
+    {
+      "id": "ls-clean-3570-5694-0022",
+      "speaker": "3570",
+      "chapter": "5694",
+      "member": "LibriSpeech/test-clean/3570/5694/3570-5694-0022.flac",
+      "samples": 68720,
+      "sha256": "e19d31ff9a007ab0446b159920023780d1aa210873abb133e4c760f0dfcca4bc",
+      "transcript": "THE LIVERY BECOMES OBNOXIOUS TO NEARLY ALL WHO ARE REQUIRED TO WEAR IT"
+    },
+    {
+      "id": "ls-clean-3570-5695-0000",
+      "speaker": "3570",
+      "chapter": "5695",
+      "member": "LibriSpeech/test-clean/3570/5695/3570-5695-0000.flac",
+      "samples": 77280,
+      "sha256": "ec23dea137b43cca44a3a23c08c2db5ba01d5b828bc22a9cd167a854a307c7e1",
+      "transcript": "IN A GENERAL WAY THOUGH NOT WHOLLY NOR CONSISTENTLY THESE TWO GROUPS COINCIDE"
+    },
+    {
+      "id": "ls-clean-3570-5696-0005",
+      "speaker": "3570",
+      "chapter": "5696",
+      "member": "LibriSpeech/test-clean/3570/5696/3570-5696-0005.flac",
+      "samples": 208400,
+      "sha256": "f9148f18bf6e33b3cccdba52603ebbcb0881b6bf3e3f7e5132f5d5960d93c01e",
+      "transcript": "THROUGHOUT THE ENTIRE EVOLUTION OF CONSPICUOUS EXPENDITURE WHETHER OF GOODS OR OF SERVICES OR HUMAN LIFE RUNS THE OBVIOUS IMPLICATION THAT IN ORDER TO EFFECTUALLY MEND THE CONSUMER'S GOOD FAME IT MUST BE AN EXPENDITURE OF SUPERFLUITIES"
+    },
+    {
+      "id": "ls-clean-3575-170457-0028",
+      "speaker": "3575",
+      "chapter": "170457",
+      "member": "LibriSpeech/test-clean/3575/170457/3575-170457-0028.flac",
+      "samples": 88480,
+      "sha256": "c23384ef8db9e726e21a348c2ab511aff4a454719ea7a0cf0352b4e2de3b1b9c",
+      "transcript": "KESWICK MARCH TWENTY SECOND EIGHTEEN THIRTY SEVEN DEAR MADAM"
+    },
+    {
+      "id": "ls-clean-3575-170457-0030",
+      "speaker": "3575",
+      "chapter": "170457",
+      "member": "LibriSpeech/test-clean/3575/170457/3575-170457-0030.flac",
+      "samples": 143121,
+      "sha256": "dfdf06775891343bd1b26b519c5394c636480cd4565dd17478be2e86c9520b75",
+      "transcript": "OF THIS SECOND LETTER ALSO SHE SPOKE AND TOLD ME THAT IT CONTAINED AN INVITATION FOR HER TO GO AND SEE THE POET IF EVER SHE VISITED THE LAKES"
+    },
+    {
+      "id": "ls-clean-3575-170457-0040",
+      "speaker": "3575",
+      "chapter": "170457",
+      "member": "LibriSpeech/test-clean/3575/170457/3575-170457-0040.flac",
+      "samples": 110480,
+      "sha256": "c4f5a188d74aae92439102584ac91f022b2ad9352a5e6c365cde47423ae4169d",
+      "transcript": "INDEED THERE WERE ONLY ONE OR TWO STRANGERS WHO COULD BE ADMITTED AMONG THE SISTERS WITHOUT PRODUCING THE SAME RESULT"
+    },
+    {
+      "id": "ls-clean-3575-170457-0048",
+      "speaker": "3575",
+      "chapter": "170457",
+      "member": "LibriSpeech/test-clean/3575/170457/3575-170457-0048.flac",
+      "samples": 88880,
+      "sha256": "900003499044a95ca643ef3ae077d829f7ee6aeddc6b05b8480b07dc66ffb344",
+      "transcript": "HE REFUSED AT FIRST TO LISTEN TO THE CAREFUL ADVICE IT WAS REPUGNANT TO HIS LIBERAL NATURE"
+    },
+    {
+      "id": "ls-clean-3575-170457-0051",
+      "speaker": "3575",
+      "chapter": "170457",
+      "member": "LibriSpeech/test-clean/3575/170457/3575-170457-0051.flac",
+      "samples": 78640,
+      "sha256": "06072cea26b539b99a314b716cfd5a888ee79b832361d106bbfe9ba0cd1bda1c",
+      "transcript": "AT TEA TIME THEY WERE SAD AND SILENT AND THE MEAL WENT AWAY UNTOUCHED BY ANY OF THE THREE"
+    },
+    {
+      "id": "ls-clean-3729-6852-0001",
+      "speaker": "3729",
+      "chapter": "6852",
+      "member": "LibriSpeech/test-clean/3729/6852/3729-6852-0001.flac",
+      "samples": 195120,
+      "sha256": "96f7a8f8fdae99101677f05126fa6c57a258951bf465e8c7a5ef97399364b4a0",
+      "transcript": "WITHOUT SAYING IT POSITIVELY SHE MADE ME UNDERSTAND THAT BEING HERSELF AN ILLUSTRIOUS MEMBER OF THE REPUBLIC OF LETTERS SHE WAS WELL AWARE THAT SHE WAS SPEAKING TO AN INSECT"
+    },
+    {
+      "id": "ls-clean-3729-6852-0002",
+      "speaker": "3729",
+      "chapter": "6852",
+      "member": "LibriSpeech/test-clean/3729/6852/3729-6852-0002.flac",
+      "samples": 140480,
+      "sha256": "8cbca70d965aab750131e10e02600d97f24e129c77390f68524ba795c04f3a89",
+      "transcript": "IN ORDER TO PLEASE HER I SPOKE TO HER OF THE ABBE CONTI AND I HAD OCCASION TO QUOTE TWO LINES OF THAT PROFOUND WRITER"
+    },
+    {
+      "id": "ls-clean-3729-6852-0035",
+      "speaker": "3729",
+      "chapter": "6852",
+      "member": "LibriSpeech/test-clean/3729/6852/3729-6852-0035.flac",
+      "samples": 330400,
+      "sha256": "42af332e59748c80128cb84f5e5251841395683c2b872cdddbc7d6a1879c7a75",
+      "transcript": "IT SEEMS TO ME I REPLIED THAT SUCH APPROVAL SUCH RATIFICATION OF THE OPINION EXPRESSED BY THE KING THE PRINCES OF THE BLOOD ET CETERA IS RATHER A PROOF OF THE AFFECTION FELT FOR THEM BY THE NATION FOR THE FRENCH CARRY THAT AFFECTION TO SUCH AN EXTENT THAT THEY BELIEVE THEM INFALLIBLE"
+    },
+    {
+      "id": "ls-clean-3729-6852-0039",
+      "speaker": "3729",
+      "chapter": "6852",
+      "member": "LibriSpeech/test-clean/3729/6852/3729-6852-0039.flac",
+      "samples": 141200,
+      "sha256": "672438b1c4cab33ab63d1673e7d4d45c86df7d516d4fc1e30ecfb0465543c5ad",
+      "transcript": "HE HIMSELF RECITED THE SAME PASSAGE IN FRENCH AND POLITELY POINTED OUT THE PARTS IN WHICH HE THOUGHT THAT I HAD IMPROVED ON THE ORIGINAL"
+    },
+    {
+      "id": "ls-clean-3729-6852-0046",
+      "speaker": "3729",
+      "chapter": "6852",
+      "member": "LibriSpeech/test-clean/3729/6852/3729-6852-0046.flac",
+      "samples": 201680,
+      "sha256": "7e2191f0830edbe2985a27642c4a93e6be8daacac54e43b3b7c5f6ed78fecfe5",
+      "transcript": "HIS HOUSEKEEPER HAD THE MANAGEMENT OF EVERYTHING SHE NEVER ALLOWED HIM TO BE IN NEED OF ANYTHING AND SHE GAVE NO ACCOUNT OF HIS MONEY WHICH SHE KEPT ALTOGETHER BECAUSE HE NEVER ASKED HER TO RENDER ANY ACCOUNTS"
+    },
+    {
+      "id": "ls-clean-4077-13751-0002",
+      "speaker": "4077",
+      "chapter": "13751",
+      "member": "LibriSpeech/test-clean/4077/13751/4077-13751-0002.flac",
+      "samples": 156000,
+      "sha256": "047be764cdc5bcbf8bc1f5f025bea6467ebe19017f7732f91057c259be0c652d",
+      "transcript": "INSTEAD OF BUT SIX REGULARLY AFFILIATED MEMBERS AND AT MOST TWO SCORE OF ADHERENTS THE ORGANIZATION NUMBERS TODAY MANY HUNDRED THOUSAND SOULS"
+    },
+    {
+      "id": "ls-clean-4077-13751-0013",
+      "speaker": "4077",
+      "chapter": "13751",
+      "member": "LibriSpeech/test-clean/4077/13751/4077-13751-0013.flac",
+      "samples": 69040,
+      "sha256": "a55cf150487b51f440169550d0211087e36294993cc3262dd3a91691c242154c",
+      "transcript": "THEIR SUFFERINGS HAVE NEVER YET BEEN FITLY CHRONICLED BY HUMAN SCRIBE"
+    },
+    {
+      "id": "ls-clean-4077-13754-0002",
+      "speaker": "4077",
+      "chapter": "13754",
+      "member": "LibriSpeech/test-clean/4077/13754/4077-13754-0002.flac",
+      "samples": 284480,
+      "sha256": "71b7cd91bedb05148e299258425dcdef73edccbaeb7964827aa3bda2426e1cf5",
+      "transcript": "IT WAS THROUGH FLOYD'S ADVICE THAT BUCHANAN ORDERED THE MILITARY EXPEDITION TO UTAH OSTENSIBLY TO INSTALL CERTAIN FEDERAL OFFICIALS AND TO REPRESS AN ALLEGED INFANTILE REBELLION WHICH IN FACT HAD NEVER COME INTO EXISTENCE BUT IN REALITY TO FURTHER THE INTERESTS OF THE SECESSIONISTS"
+    },
+    {
+      "id": "ls-clean-4077-13754-0007",
+      "speaker": "4077",
+      "chapter": "13754",
+      "member": "LibriSpeech/test-clean/4077/13754/4077-13754-0007.flac",
+      "samples": 223200,
+      "sha256": "8aa49aa1ef5afffc58e819a8560774aa3753c950379006ab3378aa39779dbe26",
+      "transcript": "WE BELIEVE IN A LITERAL RESURRECTION AND AN ACTUAL HEREAFTER IN WHICH FUTURE STATE SHALL BE RECOGNIZED EVERY SANCTIFIED AND AUTHORIZED RELATIONSHIP EXISTING HERE ON EARTH OF PARENT AND CHILD BROTHER AND SISTER HUSBAND AND WIFE"
+    },
+    {
+      "id": "ls-clean-4077-13754-0011",
+      "speaker": "4077",
+      "chapter": "13754",
+      "member": "LibriSpeech/test-clean/4077/13754/4077-13754-0011.flac",
+      "samples": 226080,
+      "sha256": "9148a26ff4b781d71b40ff8a1d8f73b60b13276eab51499df76cd7a54f6ca3d9",
+      "transcript": "FEDERAL JUDGES AND UNITED STATES ATTORNEYS IN UTAH WHO WERE NOT MORMONS NOR LOVERS OF MORMONISM REFUSED TO ENTERTAIN COMPLAINTS OR PROSECUTE CASES UNDER THE LAW BECAUSE OF ITS MANIFEST INJUSTICE AND INADEQUACY"
+    },
+    {
+      "id": "ls-clean-4446-2273-0008",
+      "speaker": "4446",
+      "chapter": "2273",
+      "member": "LibriSpeech/test-clean/4446/2273/4446-2273-0008.flac",
+      "samples": 123440,
+      "sha256": "553608a221e07a51e214914f3931ae2762264b5e3b2eee43e6d71e527c274a78",
+      "transcript": "I'VE MANAGED TO SAVE SOMETHING EVERY YEAR AND THAT WITH HELPING MY THREE SISTERS NOW AND THEN AND TIDING POOR COUSIN MIKE OVER BAD SEASONS"
+    },
+    {
+      "id": "ls-clean-4446-2273-0019",
+      "speaker": "4446",
+      "chapter": "2273",
+      "member": "LibriSpeech/test-clean/4446/2273/4446-2273-0019.flac",
+      "samples": 49840,
+      "sha256": "f3f1a5c6f6e809d89269d458a61183ba5520dfb9e7e0274cf447872676b04224",
+      "transcript": "COME WE'LL HAVE OUR COFFEE IN THE OTHER ROOM AND YOU CAN SMOKE"
+    },
+    {
+      "id": "ls-clean-4446-2273-0022",
+      "speaker": "4446",
+      "chapter": "2273",
+      "member": "LibriSpeech/test-clean/4446/2273/4446-2273-0022.flac",
+      "samples": 93840,
+      "sha256": "4248265a7c677b90e1fcd10369707eb2ec5ff341d2769178ac7c9a3cee19ae37",
+      "transcript": "THEY WERE BOTH REMEMBERING WHAT THE WOMAN HAD SAID WHEN SHE TOOK THE MONEY GOD GIVE YOU A HAPPY LOVE"
+    },
+    {
+      "id": "ls-clean-4446-2273-0036",
+      "speaker": "4446",
+      "chapter": "2273",
+      "member": "LibriSpeech/test-clean/4446/2273/4446-2273-0036.flac",
+      "samples": 49920,
+      "sha256": "98b01d88e7a849f2ff62c17dd2c4c2a30e5f62bad0d4b7bcd7ffc72947c939c5",
+      "transcript": "ALEXANDER UNCLENCHED THE TWO HANDS AT HIS SIDES"
+    },
+    {
+      "id": "ls-clean-4446-2275-0039",
+      "speaker": "4446",
+      "chapter": "2275",
+      "member": "LibriSpeech/test-clean/4446/2275/4446-2275-0039.flac",
+      "samples": 30400,
+      "sha256": "2f78e48a522da000a808442c5c5b683d85ac75698cbbd0a51e72d231376d79d8",
+      "transcript": "I MUST KNOW ABOUT YOU"
+    },
+    {
+      "id": "ls-clean-4507-16021-0002",
+      "speaker": "4507",
+      "chapter": "16021",
+      "member": "LibriSpeech/test-clean/4507/16021/4507-16021-0002.flac",
+      "samples": 50960,
+      "sha256": "9c22a6f03e3a43c73aefac09e2631209a7863ad12cc56964dbdf96a6c009ba86",
+      "transcript": "THUS IDLENESS IS THE MOTHER"
+    },
+    {
+      "id": "ls-clean-4507-16021-0027",
+      "speaker": "4507",
+      "chapter": "16021",
+      "member": "LibriSpeech/test-clean/4507/16021/4507-16021-0027.flac",
+      "samples": 31920,
+      "sha256": "425a34d03970c3aeb7f32eed44a169d9236b42ff6b5f19f38048d866d3b1b109",
+      "transcript": "PHOENICIAN VERY GOOD"
+    },
+    {
+      "id": "ls-clean-4507-16021-0030",
+      "speaker": "4507",
+      "chapter": "16021",
+      "member": "LibriSpeech/test-clean/4507/16021/4507-16021-0030.flac",
+      "samples": 236640,
+      "sha256": "e1c8eb2766e075fce8729edf5f007e02c221e24cd4c6fea27de11c17533e0a13",
+      "transcript": "ASSUREDLY IF THE TONGUE WHICH A NATION OR A PROVINCE HAS SPOKEN IS WORTHY OF INTEREST THE LANGUAGE WHICH HAS BEEN SPOKEN BY A MISERY IS STILL MORE WORTHY OF ATTENTION AND STUDY"
+    },
+    {
+      "id": "ls-clean-4507-16021-0033",
+      "speaker": "4507",
+      "chapter": "16021",
+      "member": "LibriSpeech/test-clean/4507/16021/4507-16021-0033.flac",
+      "samples": 88720,
+      "sha256": "95242d5933a7e9d4272b21008310cc888769f73e05a120bf771582a36540449a",
+      "transcript": "DO WE REALLY KNOW THE MOUNTAIN WELL WHEN WE ARE NOT ACQUAINTED WITH THE CAVERN"
+    },
+    {
+      "id": "ls-clean-4507-16021-0058",
+      "speaker": "4507",
+      "chapter": "16021",
+      "member": "LibriSpeech/test-clean/4507/16021/4507-16021-0058.flac",
+      "samples": 49760,
+      "sha256": "ab27f3e157c7bd13ba50200c0ba0150b28146aca7028b1c46cf9fb4301e6d558",
+      "transcript": "THE FLAME IS THE ENEMY OF THE WING"
+    },
+    {
+      "id": "ls-clean-4970-29095-0011",
+      "speaker": "4970",
+      "chapter": "29095",
+      "member": "LibriSpeech/test-clean/4970/29095/4970-29095-0011.flac",
+      "samples": 53680,
+      "sha256": "ccfd525fa1f4de330a2d7dcb366e83d4bb711e6b88458304a213d97d921d809a",
+      "transcript": "DOES THEE THINK THEE COULD STAND IT SIX MONTHS"
+    },
+    {
+      "id": "ls-clean-4970-29095-0018",
+      "speaker": "4970",
+      "chapter": "29095",
+      "member": "LibriSpeech/test-clean/4970/29095/4970-29095-0018.flac",
+      "samples": 194240,
+      "sha256": "7e9923661b5c5e1f306d752007805d4a7046321f42fc6132b790f39a57426afc",
+      "transcript": "RUTH ASKED THE ENTHUSIASTS IF THEY WOULD LIKE TO LIVE IN SUCH A SOUNDING MAUSOLEUM WITH ITS GREAT HALLS AND ECHOING ROOMS AND NO COMFORTABLE PLACE IN IT FOR THE ACCOMMODATION OF ANY BODY"
+    },
+    {
+      "id": "ls-clean-4970-29095-0022",
+      "speaker": "4970",
+      "chapter": "29095",
+      "member": "LibriSpeech/test-clean/4970/29095/4970-29095-0022.flac",
+      "samples": 76240,
+      "sha256": "82a8f1fe17d3f8377d258fa363974e69e2e6c63165e0b0b711b0068856e65c43",
+      "transcript": "IS THEE GOING TO THE YEARLY MEETING RUTH ASKED ONE OF THE GIRLS"
+    },
+    {
+      "id": "ls-clean-4970-29095-0033",
+      "speaker": "4970",
+      "chapter": "29095",
+      "member": "LibriSpeech/test-clean/4970/29095/4970-29095-0033.flac",
+      "samples": 192400,
+      "sha256": "81362cb432764161012ee47bf3b3b58f6a3d7e91fe1acd4b5186cbd635066a1e",
+      "transcript": "WHAT A BOX WOMEN ARE PUT INTO MEASURED FOR IT AND PUT IN YOUNG IF WE GO ANYWHERE IT'S IN A BOX VEILED AND PINIONED AND SHUT IN BY DISABILITIES"
+    },
+    {
+      "id": "ls-clean-4970-29095-0038",
+      "speaker": "4970",
+      "chapter": "29095",
+      "member": "LibriSpeech/test-clean/4970/29095/4970-29095-0038.flac",
+      "samples": 139840,
+      "sha256": "9a7261e24e73600a156caa8a52a7a71aa536981f416d35e61fe2e048b5cce7b2",
+      "transcript": "RUTH WAS GLAD TO HEAR THAT PHILIP HAD MADE A PUSH INTO THE WORLD AND SHE WAS SURE THAT HIS TALENT AND COURAGE WOULD MAKE A WAY FOR HIM"
+    },
+    {
+      "id": "ls-clean-4992-23283-0009",
+      "speaker": "4992",
+      "chapter": "23283",
+      "member": "LibriSpeech/test-clean/4992/23283/4992-23283-0009.flac",
+      "samples": 134320,
+      "sha256": "17519a59bd9402591bcfbd5f9b79a3622a5af38d7a787b20f3f877d7b102c3c6",
+      "transcript": "OH MY LORD CRIED MISS WOODLEY WITH A MOST FORCIBLE ACCENT YOU ARE THE LAST PERSON ON EARTH SHE WOULD PARDON ME FOR ENTRUSTING"
+    },
+    {
+      "id": "ls-clean-4992-23283-0018",
+      "speaker": "4992",
+      "chapter": "23283",
+      "member": "LibriSpeech/test-clean/4992/23283/4992-23283-0018.flac",
+      "samples": 105200,
+      "sha256": "e6004072b0cca61a7d6232e97b60f9ef6e2c4902da0165e12f3121068d6949d0",
+      "transcript": "TO RELIEVE HER FROM BOTH HE LAID HIS HAND WITH FORCE UPON HIS HEART AND SAID DO YOU BELIEVE ME"
+    },
+    {
+      "id": "ls-clean-4992-41797-0001",
+      "speaker": "4992",
+      "chapter": "41797",
+      "member": "LibriSpeech/test-clean/4992/41797/4992-41797-0001.flac",
+      "samples": 454560,
+      "sha256": "3b138d28076bcc78f7866590f77e5621f3e8721823abcb94774a316c6d823dfe",
+      "transcript": "WELL AS I SAY IT'S AN AWFUL QUEER WORLD THEY CLAP ALL THE BURGLARS INTO JAIL AND THE MURDERERS AND THE WIFE BEATERS I'VE ALLERS THOUGHT A GENTLE REPROOF WOULD BE ENOUGH PUNISHMENT FOR A WIFE BEATER CAUSE HE PROBABLY HAS A LOT O PROVOCATION THAT NOBODY KNOWS AND THE FIREBUGS CAN'T THINK O THE RIGHT NAME SOMETHING LIKE CENDENARIES AN THE BREAKERS O THE PEACE AN WHAT NOT AN YET THE LAW HAS NOTHIN TO SAY TO A MAN LIKE HEN LORD"
+    },
+    {
+      "id": "ls-clean-4992-41797-0005",
+      "speaker": "4992",
+      "chapter": "41797",
+      "member": "LibriSpeech/test-clean/4992/41797/4992-41797-0005.flac",
+      "samples": 61520,
+      "sha256": "bf0334c55a83da714beb7ba54db1f76a45038dbb68c0d5ec15ba014319769242",
+      "transcript": "DONE HE AIN'T DONE A THING HE'D OUGHTER SENCE HE WAS BORN"
+    },
+    {
+      "id": "ls-clean-4992-41797-0020",
+      "speaker": "4992",
+      "chapter": "41797",
+      "member": "LibriSpeech/test-clean/4992/41797/4992-41797-0020.flac",
+      "samples": 119840,
+      "sha256": "94c779c4b323fc0064f532c3ccbee1da73a8cf7199ab9295acb866238788efcb",
+      "transcript": "NANCY'S CURLY CHESTNUT CROP SHONE IN THE SUN AND OLIVE'S THICK BLACK PLAITS LOOKED BLACKER BY CONTRAST"
+    },
+    {
+      "id": "ls-clean-5105-28233-0003",
+      "speaker": "5105",
+      "chapter": "28233",
+      "member": "LibriSpeech/test-clean/5105/28233/5105-28233-0003.flac",
+      "samples": 236960,
+      "sha256": "5dc105af38adc5aa65903cc36f9942ea711d5405e57e1e399c66e5da4c2c7fef",
+      "transcript": "WE DON'T SPIN TOPS IS A FAVORITE SAYING AMONGST ARTILLERY OFFICERS INDICATING THAT THEY DO NOT SHIRK THEIR DUTY BY FRIVOLOUS PURSUITS BUT IT MUST BE CONFESSED THAT SERVADAC BEING NATURALLY IDLE WAS VERY MUCH GIVEN TO SPINNING TOPS"
+    },
+    {
+      "id": "ls-clean-5105-28233-0008",
+      "speaker": "5105",
+      "chapter": "28233",
+      "member": "LibriSpeech/test-clean/5105/28233/5105-28233-0008.flac",
+      "samples": 171680,
+      "sha256": "c3c21dc5ed2f327efda450c41ffec1df673bc69d50274d4c45c120b412442857",
+      "transcript": "WHEN A PRIVATE IN THE EIGHTH CAVALRY HE HAD BEEN ON THE POINT OF QUITTING THE ARMY AT TWENTY EIGHT YEARS OF AGE BUT UNEXPECTEDLY HE HAD BEEN APPOINTED ORDERLY TO CAPTAIN SERVADAC"
+    },
+    {
+      "id": "ls-clean-5105-28240-0009",
+      "speaker": "5105",
+      "chapter": "28240",
+      "member": "LibriSpeech/test-clean/5105/28240/5105-28240-0009.flac",
+      "samples": 186400,
+      "sha256": "19550af325500d2109ed5e7be1f28629de4eee84f3d1c3197e38227b4398c73b",
+      "transcript": "SLIGHTLY CHANGING HER COURSE SHE FIRST STRUCK HER MAINSAIL AND IN ORDER TO FACILITATE THE MOVEMENTS OF HER HELMSMAN SOON CARRIED NOTHING BUT HER TWO TOPSAILS BRIGANTINE AND JIB"
+    },
+    {
+      "id": "ls-clean-5105-28240-0015",
+      "speaker": "5105",
+      "chapter": "28240",
+      "member": "LibriSpeech/test-clean/5105/28240/5105-28240-0015.flac",
+      "samples": 136400,
+      "sha256": "dcda045ef931450b779308ae5db7f89dd068cb661b0da9d356a4b8eac59c979d",
+      "transcript": "FOR SOME MOMENTS HE SEEMED PERFECTLY STUPEFIED THEN RECOVERING HIMSELF HE BEGAN TO OVERWHELM THE COUNT WITH A TORRENT OF QUESTIONS"
+    },
+    {
+      "id": "ls-clean-5105-28241-0018",
+      "speaker": "5105",
+      "chapter": "28241",
+      "member": "LibriSpeech/test-clean/5105/28241/5105-28241-0018.flac",
+      "samples": 205280,
+      "sha256": "43e0cbe80c90cf5501fc90ea9acb53eb0a6a4bc661035a8b287c45c5cdcd1343",
+      "transcript": "ITS DEPTH REMAINED INVARIABLE STILL FOUR OR AT MOST FIVE FATHOMS AND ALTHOUGH ITS BOTTOM WAS ASSIDUOUSLY DREDGED IT WAS ONLY TO PROVE IT BARREN OF MARINE PRODUCTION OF ANY TYPE"
+    },
+    {
+      "id": "ls-clean-5142-33396-0000",
+      "speaker": "5142",
+      "chapter": "33396",
+      "member": "LibriSpeech/test-clean/5142/33396/5142-33396-0000.flac",
+      "samples": 32080,
+      "sha256": "b878b5ed2d2a0484f204347a18b7f772901b7cf5936aecaa4dcf6d15ae5d0053",
+      "transcript": "AT ANOTHER TIME HARALD ASKED"
+    },
+    {
+      "id": "ls-clean-5142-33396-0014",
+      "speaker": "5142",
+      "chapter": "33396",
+      "member": "LibriSpeech/test-clean/5142/33396/5142-33396-0014.flac",
+      "samples": 51920,
+      "sha256": "9a1aa3446571bf43b4762dfbc6ce1bea9f67f79161ac11da4f8bb4090e329243",
+      "transcript": "THIRTY MEN ONE AFTER ANOTHER RAISED THEIR HORNS AND SAID"
+    },
+    {
+      "id": "ls-clean-5142-33396-0042",
+      "speaker": "5142",
+      "chapter": "33396",
+      "member": "LibriSpeech/test-clean/5142/33396/5142-33396-0042.flac",
+      "samples": 97520,
+      "sha256": "52401e783acdaf67090d7a9de429cc9c40cbdeeff33635b92364818d86bfe849",
+      "transcript": "SO NO TALES GOT OUT TO THE NEIGHBORS BESIDES IT WAS A LONELY PLACE AND BY GOOD LUCK NO ONE CAME THAT WAY"
+    },
+    {
+      "id": "ls-clean-5142-33396-0065",
+      "speaker": "5142",
+      "chapter": "33396",
+      "member": "LibriSpeech/test-clean/5142/33396/5142-33396-0065.flac",
+      "samples": 83120,
+      "sha256": "7593b2524f5b7d483e8cb36292ca6f5ec3ef7e7bc0e3f35fe47e94b316956502",
+      "transcript": "SOFT HEART HE SAID GENTLY TO HER THEN TO THORKEL WELL LET HIM GO THORKEL"
+    },
+    {
+      "id": "ls-clean-5142-33396-0068",
+      "speaker": "5142",
+      "chapter": "33396",
+      "member": "LibriSpeech/test-clean/5142/33396/5142-33396-0068.flac",
+      "samples": 67760,
+      "sha256": "49d8e2434e7eb57e02e22dd5bf9af8223f3bb4c067aeccffa1086d2818d8995b",
+      "transcript": "SO I LIVED AND NOW AM YOUR TOOTH THRALL WELL IT IS THE LUCK OF WAR"
+    },
+    {
+      "id": "ls-clean-5639-40744-0008",
+      "speaker": "5639",
+      "chapter": "40744",
+      "member": "LibriSpeech/test-clean/5639/40744/5639-40744-0008.flac",
+      "samples": 35440,
+      "sha256": "7a5dfd19505e587c1849ffc9909f7cd20b6c0d7af17e7073c9369427d25447c6",
+      "transcript": "WHO TOUCHES ME AM I IN BED"
+    },
+    {
+      "id": "ls-clean-5639-40744-0024",
+      "speaker": "5639",
+      "chapter": "40744",
+      "member": "LibriSpeech/test-clean/5639/40744/5639-40744-0024.flac",
+      "samples": 141520,
+      "sha256": "128a3738385440f28844e3e7ad185e5fbf7948356fe76aab9b7c464c2c0065f1",
+      "transcript": "ONE DAY WHEN THE BOY WAS SENT BY HIS GRANDFATHER WITH A MESSAGE TO A RELATION HE PASSED ALONG A STREET IN WHICH THERE WAS A GREAT CONCOURSE OF HORSEMEN"
+    },
+    {
+      "id": "ls-clean-5639-40744-0027",
+      "speaker": "5639",
+      "chapter": "40744",
+      "member": "LibriSpeech/test-clean/5639/40744/5639-40744-0027.flac",
+      "samples": 372160,
+      "sha256": "f5d98362c3baceae3acdaeb75d7ed76cea84bad14a75f96c503c2022591f1d02",
+      "transcript": "THUS SAYING AND PRESSING THE CRUCIFIX TO HER BREAST SHE FELL FAINTING INTO THE ARMS OF DONA ESTAFANIA WHO AS A GENTLEWOMAN TO WHOSE SEX PITY IS AS NATURAL AS CRUELTY IS TO MAN INSTANTLY PRESSED HER LIPS TO THOSE OF THE FAINTING GIRL SHEDDING OVER HER SO MANY TEARS THAT THERE NEEDED NO OTHER SPRINKLING OF WATER TO RECOVER LEOCADIA FROM HER SWOON"
+    },
+    {
+      "id": "ls-clean-5639-40744-0028",
+      "speaker": "5639",
+      "chapter": "40744",
+      "member": "LibriSpeech/test-clean/5639/40744/5639-40744-0028.flac",
+      "samples": 196000,
+      "sha256": "2087b4b501a7194dafac9b6e84644036a4d2e0cbcc816e419ee9e1b43239f779",
+      "transcript": "I HAVE GREAT THINGS TO TELL YOU SENOR SAID DONA ESTAFANIA TO HER HUSBAND THE CREAM AND SUBSTANCE OF WHICH IS THIS THE FAINTING GIRL BEFORE YOU IS YOUR DAUGHTER AND THAT BOY IS YOUR GRANDSON"
+    },
+    {
+      "id": "ls-clean-5639-40744-0036",
+      "speaker": "5639",
+      "chapter": "40744",
+      "member": "LibriSpeech/test-clean/5639/40744/5639-40744-0036.flac",
+      "samples": 184560,
+      "sha256": "916f6b1defb02124c5b54007a0712af99a11fe3b5b743384b941499bfb166163",
+      "transcript": "HIS MOTHER HAD LEFT HER TO HIM AS BEING HER DESTINED PROTECTOR BUT WHEN SHE SAW THAT HE TOO WAS INSENSIBLE SHE WAS NEAR MAKING A THIRD AND WOULD HAVE DONE SO HAD HE NOT COME TO HIMSELF"
+    },
+    {
+      "id": "ls-clean-5683-32865-0007",
+      "speaker": "5683",
+      "chapter": "32865",
+      "member": "LibriSpeech/test-clean/5683/32865/5683-32865-0007.flac",
+      "samples": 97040,
+      "sha256": "1986df21629eda6c4634ecd73517f652e66ca6228e291b4173e374149e8cb9dc",
+      "transcript": "I'M GLAD YOU LIKE IT SAYS WYLDER CHUCKLING BENIGNANTLY ON IT OVER HIS SHOULDER"
+    },
+    {
+      "id": "ls-clean-5683-32866-0010",
+      "speaker": "5683",
+      "chapter": "32866",
+      "member": "LibriSpeech/test-clean/5683/32866/5683-32866-0010.flac",
+      "samples": 240480,
+      "sha256": "75e50c51683a2731628dc62d3669ecc6309bad4c5ab621a031de249b5c122c54",
+      "transcript": "WELL YOU KNOW RADIE WOMEN LIKE WICKED FELLOWS IT IS CONTRAST I SUPPOSE BUT THEY DO AND I'M SURE FROM WHAT BRACTON HAS SAID TO ME I KNOW HIM INTIMATELY THAT DORCAS LIKES HIM AND I CAN'T CONCEIVE WHY THEY ARE NOT MARRIED"
+    },
+    {
+      "id": "ls-clean-5683-32866-0017",
+      "speaker": "5683",
+      "chapter": "32866",
+      "member": "LibriSpeech/test-clean/5683/32866/5683-32866-0017.flac",
+      "samples": 73360,
+      "sha256": "f77985f912c9dd86cd86fe9b36b124dd8a266186f8861df454cdf8ab1f39af8f",
+      "transcript": "I AM VERY UNEASY ABOUT IT WHATEVER IT IS I CAN'T HELP IT"
+    },
+    {
+      "id": "ls-clean-5683-32866-0026",
+      "speaker": "5683",
+      "chapter": "32866",
+      "member": "LibriSpeech/test-clean/5683/32866/5683-32866-0026.flac",
+      "samples": 37440,
+      "sha256": "57faf0b15949c58e581620fabcd5250e94e8cbe52cd4727061ed82db2352ad04",
+      "transcript": "I BOLDLY LIGHTED MY CHEROOT"
+    },
+    {
+      "id": "ls-clean-5683-32879-0002",
+      "speaker": "5683",
+      "chapter": "32879",
+      "member": "LibriSpeech/test-clean/5683/32879/5683-32879-0002.flac",
+      "samples": 177360,
+      "sha256": "2e06cf60152fef05e33f42efe7c00941f7cdb5b50f1fce3d804c6636e0889c47",
+      "transcript": "SO THERE CAME A STEP AND A LITTLE RUSTLING OF FEMININE DRAPERIES THE SMALL DOOR OPENED AND RACHEL ENTERED WITH HER HAND EXTENDED AND A PALE SMILE OF WELCOME"
+    },
+    {
+      "id": "ls-clean-61-70968-0025",
+      "speaker": "61",
+      "chapter": "70968",
+      "member": "LibriSpeech/test-clean/61/70968/61-70968-0025.flac",
+      "samples": 70560,
+      "sha256": "eb6123b80871c0c31f43972ec9f77b7bce667cfc9a26774e6376a31f0ed7e660",
+      "transcript": "COME TO ME MEN HERE HERE HE RAISED HIS VOICE STILL LOUDER"
+    },
+    {
+      "id": "ls-clean-61-70968-0042",
+      "speaker": "61",
+      "chapter": "70968",
+      "member": "LibriSpeech/test-clean/61/70968/61-70968-0042.flac",
+      "samples": 44560,
+      "sha256": "0e4c658f1e067baf1083c919353436ff77d7ba0233def4f563de7a517b92fc65",
+      "transcript": "MONTFICHET CALLED OUT FOR ROBIN TO GIVE HIM AN ARM"
+    },
+    {
+      "id": "ls-clean-61-70968-0050",
+      "speaker": "61",
+      "chapter": "70968",
+      "member": "LibriSpeech/test-clean/61/70968/61-70968-0050.flac",
+      "samples": 89280,
+      "sha256": "847f20ecfbd7e24f565d21ed9e419dad341ad89919cb5e670d7315de1c2b1a4b",
+      "transcript": "HE MADE AN EFFORT TO HIDE HIS CONDITION FROM THEM ALL AND ROBIN FELT HIS FINGERS TIGHTEN UPON HIS ARM"
+    },
+    {
+      "id": "ls-clean-61-70970-0016",
+      "speaker": "61",
+      "chapter": "70970",
+      "member": "LibriSpeech/test-clean/61/70970/61-70970-0016.flac",
+      "samples": 69920,
+      "sha256": "7645d6821cfe08c15106c5319b8bf44f5ea0abbb5d5aa3e6a00bde8c744c263c",
+      "transcript": "WE WILL GO OUT TOGETHER TO THE BOWER THERE IS A WAY DOWN TO THE COURT FROM MY WINDOW"
+    },
+    {
+      "id": "ls-clean-61-70970-0030",
+      "speaker": "61",
+      "chapter": "70970",
+      "member": "LibriSpeech/test-clean/61/70970/61-70970-0030.flac",
+      "samples": 51840,
+      "sha256": "4ac31c704abb93c6165ea8de474079bdd6f67097d1ec3c875ec791e12a4a1e13",
+      "transcript": "SAVE ME MASTERS BUT YOU STARTLED ME RARELY"
+    },
+    {
+      "id": "ls-clean-672-122797-0040",
+      "speaker": "672",
+      "chapter": "122797",
+      "member": "LibriSpeech/test-clean/672/122797/672-122797-0040.flac",
+      "samples": 82000,
+      "sha256": "7043b25a1ce7f71c302119552706aeda50f5fdcebf2f76fe0edc7615016323c5",
+      "transcript": "AND THE WHOLE NIGHT THE TREE STOOD STILL AND IN DEEP THOUGHT"
+    },
+    {
+      "id": "ls-clean-672-122797-0050",
+      "speaker": "672",
+      "chapter": "122797",
+      "member": "LibriSpeech/test-clean/672/122797/672-122797-0050.flac",
+      "samples": 77680,
+      "sha256": "5c14da56e405e9b169efde9627bef455ee5ff1df658b484ee7fc09b8ccf7aba6",
+      "transcript": "THEY SNUFFED ABOUT THE FIR TREE AND RUSTLED AMONG THE BRANCHES"
+    },
+    {
+      "id": "ls-clean-672-122797-0054",
+      "speaker": "672",
+      "chapter": "122797",
+      "member": "LibriSpeech/test-clean/672/122797/672-122797-0054.flac",
+      "samples": 68000,
+      "sha256": "77893cec7c5e056c412243400506c9801834e91b14c26aa8b6218403f4a5b872",
+      "transcript": "I KNOW NO SUCH PLACE SAID THE TREE"
+    },
+    {
+      "id": "ls-clean-672-122797-0055",
+      "speaker": "672",
+      "chapter": "122797",
+      "member": "LibriSpeech/test-clean/672/122797/672-122797-0055.flac",
+      "samples": 131680,
+      "sha256": "cfa0d03dc64331a2d1e11ed5b87da150c0e24431d82ec3f4bbb3f3b2cbb78313",
+      "transcript": "AND THEN HE TOLD ALL ABOUT HIS YOUTH AND THE LITTLE MICE HAD NEVER HEARD THE LIKE BEFORE AND THEY LISTENED AND SAID"
+    },
+    {
+      "id": "ls-clean-672-122797-0057",
+      "speaker": "672",
+      "chapter": "122797",
+      "member": "LibriSpeech/test-clean/672/122797/672-122797-0057.flac",
+      "samples": 104960,
+      "sha256": "1aef449cadac3242db8b3e1e0d3b89795329be3e65bb26a86edc1127a9bdd780",
+      "transcript": "YES IN REALITY THOSE WERE HAPPY TIMES"
+    },
+    {
+      "id": "ls-clean-6829-68769-0005",
+      "speaker": "6829",
+      "chapter": "68769",
+      "member": "LibriSpeech/test-clean/6829/68769/6829-68769-0005.flac",
+      "samples": 107520,
+      "sha256": "8bcd8fb0ede66ed97c7077e5bc6504e62a4eab77942f41ae5ede5f18e982f10f",
+      "transcript": "HE WAS SOFT HEARTED AND IMPETUOUS SAID BETH AND BEING IN LOVE HE DIDN'T STOP TO COUNT THE COST"
+    },
+    {
+      "id": "ls-clean-6829-68769-0033",
+      "speaker": "6829",
+      "chapter": "68769",
+      "member": "LibriSpeech/test-clean/6829/68769/6829-68769-0033.flac",
+      "samples": 64320,
+      "sha256": "037fc130be391f53db3dc0c8e5c06b02e32d8fecef40b7f6f862bccb176c51f1",
+      "transcript": "IT WAS BETTER FOR HIM TO THINK THE GIRL UNFEELING THAN TO KNOW THE TRUTH"
+    },
+    {
+      "id": "ls-clean-6829-68769-0050",
+      "speaker": "6829",
+      "chapter": "68769",
+      "member": "LibriSpeech/test-clean/6829/68769/6829-68769-0050.flac",
+      "samples": 46640,
+      "sha256": "e3fc1fa8fe6b5d25cf39317c9d2cd7a2f921fc45fcda663cd3c0db22a4df745c",
+      "transcript": "BETH UNEASY AT HIS SILENCE NUDGED HIM"
+    },
+    {
+      "id": "ls-clean-6829-68771-0018",
+      "speaker": "6829",
+      "chapter": "68771",
+      "member": "LibriSpeech/test-clean/6829/68771/6829-68771-0018.flac",
+      "samples": 135120,
+      "sha256": "d021a83946e746a26f9680b8fe12149ff51afe867cdde15413bb53825705000f",
+      "transcript": "FOR A MOMENT BETH STOOD STARING WHILE THE NEW MAID REGARDED HER WITH COMPOSURE AND A SLIGHT SMILE UPON HER BEAUTIFUL FACE"
+    },
+    {
+      "id": "ls-clean-6829-68771-0024",
+      "speaker": "6829",
+      "chapter": "68771",
+      "member": "LibriSpeech/test-clean/6829/68771/6829-68771-0024.flac",
+      "samples": 99920,
+      "sha256": "cac46b4f24bf1239780bb3e4eadb20b29d8e265e268af701ec576e4008fd2b36",
+      "transcript": "FOR THE FIRST TIME THE MAID SEEMED A LITTLE CONFUSED AND HER GAZE WANDERED FROM THE FACE OF HER VISITOR"
+    },
+    {
+      "id": "ls-clean-6930-75918-0016",
+      "speaker": "6930",
+      "chapter": "75918",
+      "member": "LibriSpeech/test-clean/6930/75918/6930-75918-0016.flac",
+      "samples": 160240,
+      "sha256": "7dd7b99b09b009ffc8c6961eb4cd055cc001cd5fcf2dd2e2e45fea7f7f9c2677",
+      "transcript": "YES I NEED REPOSE MANY THINGS HAVE AGITATED ME TO DAY BOTH IN MIND AND BODY WHEN YOU RETURN TO MORROW I SHALL NO LONGER BE THE SAME MAN"
+    },
+    {
+      "id": "ls-clean-6930-76324-0003",
+      "speaker": "6930",
+      "chapter": "76324",
+      "member": "LibriSpeech/test-clean/6930/76324/6930-76324-0003.flac",
+      "samples": 54160,
+      "sha256": "32d0fc1390c1094c4ba1ee7a92eeb8936c7be6ec996c7facb1129c09d9f3570f",
+      "transcript": "NOW WHAT WAS THE SENSE OF IT TWO INNOCENT BABIES LIKE THAT"
+    },
+    {
+      "id": "ls-clean-6930-76324-0011",
+      "speaker": "6930",
+      "chapter": "76324",
+      "member": "LibriSpeech/test-clean/6930/76324/6930-76324-0011.flac",
+      "samples": 147840,
+      "sha256": "990d8b365dfec5b6025fce8549bdf7f8abe28f917f219269bd889ba47b451c2e",
+      "transcript": "THEY WORRY ME TERRIBLY AND BESIDES I'D LIKE TO SEE WHAT THIS LOVELY FURNITURE LOOKS LIKE WITHOUT SUCH QUANTITIES OF DUST ALL OVER IT GOOD SCHEME CYN"
+    },
+    {
+      "id": "ls-clean-6930-76324-0014",
+      "speaker": "6930",
+      "chapter": "76324",
+      "member": "LibriSpeech/test-clean/6930/76324/6930-76324-0014.flac",
+      "samples": 75520,
+      "sha256": "c847c4549948cd1742a7a32c09dc15c4c1990ead6fa91efee08e427d8fddf037",
+      "transcript": "THIS THOUGHT HOWEVER DID NOT ENTER THE HEADS OF THE ENTHUSIASTIC PAIR"
+    },
+    {
+      "id": "ls-clean-6930-76324-0028",
+      "speaker": "6930",
+      "chapter": "76324",
+      "member": "LibriSpeech/test-clean/6930/76324/6930-76324-0028.flac",
+      "samples": 158000,
+      "sha256": "5708af271397a2f0c42f5c58dd6dbb142e505050a48f12a58cbefa8c4513a4f8",
+      "transcript": "WELL I'M CONVINCED THAT THE BOARDED UP HOUSE MYSTERY HAPPENED NOT EARLIER THAN APRIL SIXTEENTH EIGHTEEN SIXTY ONE AND PROBABLY NOT MUCH LATER"
+    },
+    {
+      "id": "ls-clean-7021-79740-0012",
+      "speaker": "7021",
+      "chapter": "79740",
+      "member": "LibriSpeech/test-clean/7021/79740/7021-79740-0012.flac",
+      "samples": 52160,
+      "sha256": "b659a84ba11c80bdaaae7955ef2e00576787cb1e37e802609353628e500f66c8",
+      "transcript": "SAID SHE POINTING TO THE PLAYTHINGS SEE"
+    },
+    {
+      "id": "ls-clean-7021-79759-0001",
+      "speaker": "7021",
+      "chapter": "79759",
+      "member": "LibriSpeech/test-clean/7021/79759/7021-79759-0001.flac",
+      "samples": 39680,
+      "sha256": "01448179588d2b5137a649df386c83917ec2b0c0c0d97aac57101a308a31533c",
+      "transcript": "THAT IS COMPARATIVELY NOTHING"
+    },
+    {
+      "id": "ls-clean-7021-85628-0003",
+      "speaker": "7021",
+      "chapter": "85628",
+      "member": "LibriSpeech/test-clean/7021/85628/7021-85628-0003.flac",
+      "samples": 244640,
+      "sha256": "a68841b44618e241eaf6b61042c67eddb11f3fc516f192d6053957c05c4f63ca",
+      "transcript": "NOW THIS KNIFE WAS A SPLENDID ONE THOUGH HALF THE BLADE WAS GONE AND THE HANDLE WAS A LITTLE CRACKED AND ANDERS KNEW THAT ONE IS ALMOST A MAN AS SOON AS ONE HAS A JACK KNIFE"
+    },
+    {
+      "id": "ls-clean-7021-85628-0021",
+      "speaker": "7021",
+      "chapter": "85628",
+      "member": "LibriSpeech/test-clean/7021/85628/7021-85628-0021.flac",
+      "samples": 85840,
+      "sha256": "5693a7b4ae63b8649d71c26babfcf88823a0edd17b958820bd8b4d3ca03d4ecf",
+      "transcript": "HE STILL HELD ON TO IT WITH BOTH HANDS AS HE RUSHED INTO HIS MOTHER'S COTTAGE"
+    },
+    {
+      "id": "ls-clean-7021-85628-0025",
+      "speaker": "7021",
+      "chapter": "85628",
+      "member": "LibriSpeech/test-clean/7021/85628/7021-85628-0025.flac",
+      "samples": 44400,
+      "sha256": "25c578e697272b363165121e9feb9d5e225d36ad5adc5c359659974235d11f4a",
+      "transcript": "BUT HIS MOTHER HUGGED HIM CLOSE"
+    },
+    {
+      "id": "ls-clean-7127-75946-0003",
+      "speaker": "7127",
+      "chapter": "75946",
+      "member": "LibriSpeech/test-clean/7127/75946/7127-75946-0003.flac",
+      "samples": 76960,
+      "sha256": "2402f562e4eb8ea37ea9b1fe36c7e4516aaa1143809a54ced6cf24651e252d5c",
+      "transcript": "GENTLEMEN TO YOUR POSTS WHEREUPON SAINT AIGNAN AND VILLEROY TOOK THEIR LEAVE"
+    },
+    {
+      "id": "ls-clean-7127-75946-0020",
+      "speaker": "7127",
+      "chapter": "75946",
+      "member": "LibriSpeech/test-clean/7127/75946/7127-75946-0020.flac",
+      "samples": 104320,
+      "sha256": "84b011241f2069f390908473bca010bfdf48b532d2565bc4fdafab956414b7a5",
+      "transcript": "FAR FROM IT SIRE YOUR MAJESTY HAVING GIVEN NO DIRECTIONS ABOUT IT THE MUSICIANS HAVE RETAINED IT"
+    },
+    {
+      "id": "ls-clean-7127-75947-0011",
+      "speaker": "7127",
+      "chapter": "75947",
+      "member": "LibriSpeech/test-clean/7127/75947/7127-75947-0011.flac",
+      "samples": 57920,
+      "sha256": "33316afec60d43b6028affb291354cf50160393414e177fc2e074123f983e11a",
+      "transcript": "REMAIN I IMPLORE YOU THE EVENING IS MOST LOVELY"
+    },
+    {
+      "id": "ls-clean-7127-75947-0017",
+      "speaker": "7127",
+      "chapter": "75947",
+      "member": "LibriSpeech/test-clean/7127/75947/7127-75947-0017.flac",
+      "samples": 42640,
+      "sha256": "ed8bbab57091a74ef4bdfee8de8c0f5faaf1b07eba03df80ef3d306016471413",
+      "transcript": "WHAT ALREADY HERE THEY SAID TO HER"
+    },
+    {
+      "id": "ls-clean-7127-75947-0025",
+      "speaker": "7127",
+      "chapter": "75947",
+      "member": "LibriSpeech/test-clean/7127/75947/7127-75947-0025.flac",
+      "samples": 89120,
+      "sha256": "f37086677d4943aba7114f3be49872929dc97fa12f1cb98234f7bce3c10ac110",
+      "transcript": "EXQUISITE SOFT TURF OF THE WOODS THE HAPPINESS WHICH YOUR FRIENDSHIP CONFERS UPON ME"
+    },
+    {
+      "id": "ls-clean-7176-88083-0000",
+      "speaker": "7176",
+      "chapter": "88083",
+      "member": "LibriSpeech/test-clean/7176/88083/7176-88083-0000.flac",
+      "samples": 91120,
+      "sha256": "eb6831413282d3c2c4f50ae84833715e4cfc26032fd81ebd00688191958ae66a",
+      "transcript": "ALL ABOUT HIM WAS A TUMULT OF BRIGHT AND BROKEN COLOR SCATTERED IN BROAD SPLASHES"
+    },
+    {
+      "id": "ls-clean-7176-88083-0010",
+      "speaker": "7176",
+      "chapter": "88083",
+      "member": "LibriSpeech/test-clean/7176/88083/7176-88083-0010.flac",
+      "samples": 107840,
+      "sha256": "f78ed7b8521b29eddd494dbeb894ea772ccf853194247e09b0297997d9863be2",
+      "transcript": "THE CAT GROWLED SOFTLY PICKED UP THE PRIZE IN HER JAWS AND TROTTED INTO THE BUSHES TO DEVOUR IT"
+    },
+    {
+      "id": "ls-clean-7176-92135-0008",
+      "speaker": "7176",
+      "chapter": "92135",
+      "member": "LibriSpeech/test-clean/7176/92135/7176-92135-0008.flac",
+      "samples": 70880,
+      "sha256": "c4f107b9ce63d703718b7fa23e1d6e045d66cb71c387fd0308888963cd1abc8f",
+      "transcript": "LEND ME YOUR EAR FOR TEN MINUTES AND YOU SHALL LEARN JUST WHAT STAGECRAFT IS"
+    },
+    {
+      "id": "ls-clean-7176-92135-0024",
+      "speaker": "7176",
+      "chapter": "92135",
+      "member": "LibriSpeech/test-clean/7176/92135/7176-92135-0024.flac",
+      "samples": 65600,
+      "sha256": "b58728677412d064c30aae388e22b35c0ece2d2608ad1011613ae0123d369cb2",
+      "transcript": "TO BE OR NOT TO BE THAT IS THE QUESTION WHETHER TIS NOBLER"
+    },
+    {
+      "id": "ls-clean-7176-92135-0045",
+      "speaker": "7176",
+      "chapter": "92135",
+      "member": "LibriSpeech/test-clean/7176/92135/7176-92135-0045.flac",
+      "samples": 83680,
+      "sha256": "de26eaa6d5b6b21b7446196d0cd062076980db51f375bdb99f418055f1167df9",
+      "transcript": "LORD JOHN TAKING OUT GOLD CIGARETTE CASE FROM HIS LEFT HAND UPPER WAISTCOAT POCKET"
+    },
+    {
+      "id": "ls-clean-7729-102255-0001",
+      "speaker": "7729",
+      "chapter": "102255",
+      "member": "LibriSpeech/test-clean/7729/102255/7729-102255-0001.flac",
+      "samples": 55200,
+      "sha256": "a4e032b319a4ac5933a29a090ad23431f334528564eb381017da2692e56ec45f",
+      "transcript": "THIS WAS AT THE MARCH ELECTION EIGHTEEN FIFTY FIVE"
+    },
+    {
+      "id": "ls-clean-7729-102255-0012",
+      "speaker": "7729",
+      "chapter": "102255",
+      "member": "LibriSpeech/test-clean/7729/102255/7729-102255-0012.flac",
+      "samples": 65200,
+      "sha256": "8ed730d628c4d4e9ce8b28a4162a0237edd675904a006681d4fb79f114e084c7",
+      "transcript": "SEVERAL HUNDRED FREE STATE MEN PROMPTLY RESPONDED TO THE SUMMONS"
+    },
+    {
+      "id": "ls-clean-7729-102255-0033",
+      "speaker": "7729",
+      "chapter": "102255",
+      "member": "LibriSpeech/test-clean/7729/102255/7729-102255-0033.flac",
+      "samples": 108400,
+      "sha256": "49cd0007d292e9378f2b9d7e26cd85d0d0bb17f108071b2e3c2d22af06f93738",
+      "transcript": "AS HE HAD PROMISED TO PROTECT THE HOTEL THE REASSURED CITIZENS BEGAN TO LAUGH AT THEIR OWN FEARS"
+    },
+    {
+      "id": "ls-clean-7729-102255-0042",
+      "speaker": "7729",
+      "chapter": "102255",
+      "member": "LibriSpeech/test-clean/7729/102255/7729-102255-0042.flac",
+      "samples": 147600,
+      "sha256": "10e040d39920166f7cd15edc927938d8c7cf8efd6254f8c3b2e6478c4df113f1",
+      "transcript": "RELOCATED FOOTNOTE GOVERNOR ROBINSON BEING ON HIS WAY EAST THE STEAMBOAT ON WHICH HE WAS TRAVELING STOPPED AT LEXINGTON MISSOURI"
+    },
+    {
+      "id": "ls-clean-7729-102255-0043",
+      "speaker": "7729",
+      "chapter": "102255",
+      "member": "LibriSpeech/test-clean/7729/102255/7729-102255-0043.flac",
+      "samples": 176560,
+      "sha256": "91a9a53ad05da22d106803d13e20d1e1eddddf36cf957e62ba18934d53854472",
+      "transcript": "IN A FEW DAYS AN OFFICER CAME WITH A REQUISITION FROM GOVERNOR SHANNON AND TOOK THE PRISONER BY LAND TO WESTPORT AND AFTERWARDS FROM THERE TO KANSAS CITY AND LEAVENWORTH"
+    },
+    {
+      "id": "ls-clean-8224-274381-0000",
+      "speaker": "8224",
+      "chapter": "274381",
+      "member": "LibriSpeech/test-clean/8224/274381/8224-274381-0000.flac",
+      "samples": 283840,
+      "sha256": "1a319e17ca38e5e863b0beccaae3331afe24d516c1b74776e898bf1daca67b24",
+      "transcript": "THOUGH THROWN INTO PRISON FOR THIS ENTERPRISE AND DETAINED SOME TIME HE WAS NOT DISCOURAGED BUT STILL CONTINUED BY HIS COUNTENANCE AND PROTECTION TO INFUSE SPIRIT INTO THE DISTRESSED ROYALISTS"
+    },
+    {
+      "id": "ls-clean-8224-274381-0001",
+      "speaker": "8224",
+      "chapter": "274381",
+      "member": "LibriSpeech/test-clean/8224/274381/8224-274381-0001.flac",
+      "samples": 359200,
+      "sha256": "2670105cf59e9d0fa68c7a4aaf25dd2e3cf0cd8012ab933d22f8063a7043d9b4",
+      "transcript": "AMONG OTHER PERSONS OF DISTINCTION WHO UNITED THEMSELVES TO HIM WAS LORD NAPIER OF MERCHISTON SON OF THE FAMOUS INVENTOR OF THE LOGARITHMS THE PERSON TO WHOM THE TITLE OF A GREAT MAN IS MORE JUSTLY DUE THAN TO ANY OTHER WHOM HIS COUNTRY EVER PRODUCED"
+    },
+    {
+      "id": "ls-clean-8224-274381-0003",
+      "speaker": "8224",
+      "chapter": "274381",
+      "member": "LibriSpeech/test-clean/8224/274381/8224-274381-0003.flac",
+      "samples": 209360,
+      "sha256": "0a273e9f0b36d7d6d45ee136698c716468b555136176a375385a8e25d71432f0",
+      "transcript": "THE KING'S EARS WERE NOW OPEN TO MONTROSE'S COUNSELS WHO PROPOSED NONE BUT THE BOLDEST AND MOST DARING AGREEABLY TO THE DESPERATE STATE OF THE ROYAL CAUSE IN SCOTLAND"
+    },
+    {
+      "id": "ls-clean-8224-274381-0008",
+      "speaker": "8224",
+      "chapter": "274381",
+      "member": "LibriSpeech/test-clean/8224/274381/8224-274381-0008.flac",
+      "samples": 335680,
+      "sha256": "66e538841163f59aba98529723e73a0aae9d363f4bef03e23a66f7b834322c4f",
+      "transcript": "WITH THESE AND SOME REENFORCEMENTS OF THE ATHOLEMEN AND MACDONALDS WHOM HE HAD RECALLED MONTROSE FELL SUDDENLY UPON ARGYLE'S COUNTRY AND LET LOOSE UPON IT ALL THE RAGE OF WAR CARRYING OFF THE CATTLE BURNING THE HOUSES AND PUTTING THE INHABITANTS TO THE SWORD"
+    },
+    {
+      "id": "ls-clean-8224-274384-0005",
+      "speaker": "8224",
+      "chapter": "274384",
+      "member": "LibriSpeech/test-clean/8224/274384/8224-274384-0005.flac",
+      "samples": 139920,
+      "sha256": "715cbcee684e265fe7252feadd4b285dd3ec8d486ab4ea00d202c9fc515bbfa1",
+      "transcript": "ANOTHER PREACHER AFTER REPROACHING HIM TO HIS FACE WITH HIS MISGOVERNMENT ORDERED THIS PSALM TO BE SUNG"
+    },
+    {
+      "id": "ls-clean-8230-279154-0003",
+      "speaker": "8230",
+      "chapter": "279154",
+      "member": "LibriSpeech/test-clean/8230/279154/8230-279154-0003.flac",
+      "samples": 51120,
+      "sha256": "e40e72bf4ed32eee03a37b43cf2e3f3476150b4e9345da908f6924ebafa13b32",
+      "transcript": "AND WHAT SORT OF EVIDENCE IS LOGICALLY POSSIBLE"
+    },
+    {
+      "id": "ls-clean-8230-279154-0012",
+      "speaker": "8230",
+      "chapter": "279154",
+      "member": "LibriSpeech/test-clean/8230/279154/8230-279154-0012.flac",
+      "samples": 58240,
+      "sha256": "0a9e22c43c384cbf0e13c19d03033db1360772d36ba3455a5b299da239cbafb6",
+      "transcript": "FAMILIARITY IS A FEELING CAPABLE OF DEGREES"
+    },
+    {
+      "id": "ls-clean-8230-279154-0019",
+      "speaker": "8230",
+      "chapter": "279154",
+      "member": "LibriSpeech/test-clean/8230/279154/8230-279154-0019.flac",
+      "samples": 290320,
+      "sha256": "f93eaa48a6eff28cee1fb5364754735cb1cdf383d6b1f578b8e794e33271ae05",
+      "transcript": "IT WOULD SEEM THAT ONLY RATHER RECENT EVENTS CAN BE PLACED AT ALL ACCURATELY BY MEANS OF FEELINGS GIVING THEIR TEMPORAL RELATION TO THE PRESENT BUT IT IS CLEAR THAT SUCH FEELINGS MUST PLAY AN ESSENTIAL PART IN THE PROCESS OF DATING REMEMBERED EVENTS"
+    },
+    {
+      "id": "ls-clean-8230-279154-0020",
+      "speaker": "8230",
+      "chapter": "279154",
+      "member": "LibriSpeech/test-clean/8230/279154/8230-279154-0020.flac",
+      "samples": 125360,
+      "sha256": "079be9f35d0786283f743e37c6bcbeb910a3a0a4d2c3af112b586a88c6bafb75",
+      "transcript": "IF WE HAD RETAINED THE SUBJECT OR ACT IN KNOWLEDGE THE WHOLE PROBLEM OF MEMORY WOULD HAVE BEEN COMPARATIVELY SIMPLE"
+    },
+    {
+      "id": "ls-clean-8230-279154-0029",
+      "speaker": "8230",
+      "chapter": "279154",
+      "member": "LibriSpeech/test-clean/8230/279154/8230-279154-0029.flac",
+      "samples": 136640,
+      "sha256": "0969c5d192f5bca38502a52f56cb795965ecc9c87a6fa55320d98453426386ca",
+      "transcript": "THE FACT THAT A MAN CAN RECITE A POEM DOES NOT SHOW THAT HE REMEMBERS ANY PREVIOUS OCCASION ON WHICH HE HAS RECITED OR READ IT"
+    },
+    {
+      "id": "ls-clean-8455-210777-0005",
+      "speaker": "8455",
+      "chapter": "210777",
+      "member": "LibriSpeech/test-clean/8455/210777/8455-210777-0005.flac",
+      "samples": 90960,
+      "sha256": "71076fdfe5eee94d921cd58f9f193d01bb61ebc0bd56f2a684983a949c51a13b",
+      "transcript": "WE HAVE OUR LITTLE STRUGGLES HERE AS ELSEWHERE AND ALL THINGS CANNOT BE DONE BY ROSE WATER"
+    },
+    {
+      "id": "ls-clean-8455-210777-0011",
+      "speaker": "8455",
+      "chapter": "210777",
+      "member": "LibriSpeech/test-clean/8455/210777/8455-210777-0011.flac",
+      "samples": 106080,
+      "sha256": "1d46d73fc22a2c4e58b14534f553ffc9cdde5da0642b48b68163e8f21c098995",
+      "transcript": "I DID NOT MEAN SAID CAPTAIN BATTLEAX TO TOUCH UPON PUBLIC SUBJECTS AT SUCH A MOMENT AS THIS"
+    },
+    {
+      "id": "ls-clean-8455-210777-0014",
+      "speaker": "8455",
+      "chapter": "210777",
+      "member": "LibriSpeech/test-clean/8455/210777/8455-210777-0014.flac",
+      "samples": 65920,
+      "sha256": "7b90d597483daad47adbee80f9d4a2839a7e147f68f78aefb06cc102526115fe",
+      "transcript": "SIR KENNINGTON OVAL IS A VERY FINE PLAYER SAID MY WIFE"
+    },
+    {
+      "id": "ls-clean-8455-210777-0033",
+      "speaker": "8455",
+      "chapter": "210777",
+      "member": "LibriSpeech/test-clean/8455/210777/8455-210777-0033.flac",
+      "samples": 120160,
+      "sha256": "6cb2abdb6567c796e1b52e6da7cfa71eef801976c743969c2b9dcd63c20b05ab",
+      "transcript": "BUT YOUR POWER IS SO SUPERIOR TO ANY THAT I CAN ADVANCE AS TO MAKE US HERE FEEL THAT THERE IS NO DISGRACE IN YIELDING TO IT"
+    },
+    {
+      "id": "ls-clean-8455-210777-0070",
+      "speaker": "8455",
+      "chapter": "210777",
+      "member": "LibriSpeech/test-clean/8455/210777/8455-210777-0070.flac",
+      "samples": 95120,
+      "sha256": "4031823b3b171cb14c995deb6998c03cdd87e24fcc80f3e8c4651b3d7ecb956a",
+      "transcript": "AND THIS PLAN WAS ADOPTED TOO IN ORDER TO EXTRACT FROM ME A PROMISE THAT I WOULD DEPART IN PEACE"
+    },
+    {
+      "id": "ls-clean-8463-287645-0007",
+      "speaker": "8463",
+      "chapter": "287645",
+      "member": "LibriSpeech/test-clean/8463/287645/8463-287645-0007.flac",
+      "samples": 344000,
+      "sha256": "830f5fea8491e448bc81815e92c3c72dc207b5f1e618537395dee39656dc74e5",
+      "transcript": "ANOTHER CASE SAID JOHN WESLEY WAS A LITTLE GIRL HALF GROWN WHO WAS WASHING WINDOWS UP STAIRS ONE DAY AND UNLUCKILY FELL ASLEEP IN THE WINDOW AND IN THIS POSITION WAS FOUND BY HER MISTRESS IN A RAGE THE MISTRESS HIT HER A HEAVY SLAP KNOCKED HER OUT OF THE WINDOW AND SHE FELL TO THE PAVEMENT AND DIED IN A FEW HOURS FROM THE EFFECTS THEREOF"
+    },
+    {
+      "id": "ls-clean-8463-287645-0013",
+      "speaker": "8463",
+      "chapter": "287645",
+      "member": "LibriSpeech/test-clean/8463/287645/8463-287645-0013.flac",
+      "samples": 106640,
+      "sha256": "50f690743eee5f1bab98ed9daee486d4afa56d67f645675fcc12954ecaee7332",
+      "transcript": "AS TO HIS AGE AND ALSO THE NAME OF HIS MASTER JACOB'S STATEMENT VARIED SOMEWHAT FROM THE ADVERTISEMENT"
+    },
+    {
+      "id": "ls-clean-8463-294825-0011",
+      "speaker": "8463",
+      "chapter": "294825",
+      "member": "LibriSpeech/test-clean/8463/294825/8463-294825-0011.flac",
+      "samples": 34879,
+      "sha256": "0afd8e41ec36597d63abc1eeee04473442c50da718fcc7cea9dce20303d294e8",
+      "transcript": "HE'S SWIFTLY PUNISHED"
+    },
+    {
+      "id": "ls-clean-8463-294828-0004",
+      "speaker": "8463",
+      "chapter": "294828",
+      "member": "LibriSpeech/test-clean/8463/294828/8463-294828-0004.flac",
+      "samples": 37440,
+      "sha256": "6b237141ffd224e88a65901ede34c2bc0499b495d7e1ddc2b97afa7db2aae9ae",
+      "transcript": "BUT NOW NOTHING COULD HOLD ME BACK"
+    },
+    {
+      "id": "ls-clean-8463-294828-0014",
+      "speaker": "8463",
+      "chapter": "294828",
+      "member": "LibriSpeech/test-clean/8463/294828/8463-294828-0014.flac",
+      "samples": 91600,
+      "sha256": "7466967854c834bafbf21a1d77205c64c7b02fb6ecb44cdd7339eaa313600a86",
+      "transcript": "THERE WAS GOOD REASON TO STOP AND THINK EVEN FOR THE WORLD'S MOST EMOTIONLESS MAN"
+    },
+    {
+      "id": "ls-clean-8555-284447-0005",
+      "speaker": "8555",
+      "chapter": "284447",
+      "member": "LibriSpeech/test-clean/8555/284447/8555-284447-0005.flac",
+      "samples": 109280,
+      "sha256": "23df064fdaaf766dfce45ecdd14d13abaf824f3b91105c4c9eb23d505cec0c40",
+      "transcript": "THE ROOM OF THE GREAT KNIFE WAS HIGH AND BIG AND AROUND IT RAN ROWS OF BENCHES FOR THE SPECTATORS TO SIT UPON"
+    },
+    {
+      "id": "ls-clean-8555-284447-0019",
+      "speaker": "8555",
+      "chapter": "284447",
+      "member": "LibriSpeech/test-clean/8555/284447/8555-284447-0019.flac",
+      "samples": 164480,
+      "sha256": "68979985c2cb5b4710d8a99fed3420b5d1a9920990866f3c83461bd0839d59c2",
+      "transcript": "BEFORE ANY COULD STOP HIM HE BUTTED HIS MAJESTY SO FURIOUSLY THAT THE KING SOARED FAR INTO THE AIR AND TUMBLED IN A HEAP AMONG THE BENCHES WHERE HE LAY MOANING AND GROANING"
+    },
+    {
+      "id": "ls-clean-8555-284449-0005",
+      "speaker": "8555",
+      "chapter": "284449",
+      "member": "LibriSpeech/test-clean/8555/284449/8555-284449-0005.flac",
+      "samples": 40880,
+      "sha256": "2fee7f2698b4e64e9ddee7de6877d9fe47af70fd5f409507e2955b08982664bb",
+      "transcript": "WHEN HE FINISHED SHE SAID CHEERFULLY"
+    },
+    {
+      "id": "ls-clean-8555-284449-0015",
+      "speaker": "8555",
+      "chapter": "284449",
+      "member": "LibriSpeech/test-clean/8555/284449/8555-284449-0015.flac",
+      "samples": 81920,
+      "sha256": "6636b679a10e56de1c4412ca62c29f7a28f28f0ec96073f6f6f12f87f8845467",
+      "transcript": "I'LL NOT BE WICKED ANY MORE SIGHED THE OLD BOOLOOROO I'LL REFORM"
+    },
+    {
+      "id": "ls-clean-8555-292519-0015",
+      "speaker": "8555",
+      "chapter": "292519",
+      "member": "LibriSpeech/test-clean/8555/292519/8555-292519-0015.flac",
+      "samples": 45600,
+      "sha256": "e474dc458a71feca730b64ddc3be9205eb0cf092bf1e8189ff7266adf07dde4a",
+      "transcript": "HE HAD BROKEN INTO HER COURTYARD"
+    },
+    {
+      "id": "ls-clean-908-157963-0009",
+      "speaker": "908",
+      "chapter": "157963",
+      "member": "LibriSpeech/test-clean/908/157963/908-157963-0009.flac",
+      "samples": 64960,
+      "sha256": "7e886f77ab3bf3272030fa3df86e2fb8aad27fb5e40622eb0b675c12d6fc1890",
+      "transcript": "WHY SHOULD THE MISTRESS OF THE VALES OF HAR UTTER A SIGH"
+    },
+    {
+      "id": "ls-clean-908-157963-0011",
+      "speaker": "908",
+      "chapter": "157963",
+      "member": "LibriSpeech/test-clean/908/157963/908-157963-0011.flac",
+      "samples": 166320,
+      "sha256": "4c78f283d6e56319e087c27143d5c39b72cff671010f025c8bdfc91233b4fcd4",
+      "transcript": "WHICH THOU DOST SCATTER ON EVERY LITTLE BLADE OF GRASS THAT SPRINGS REVIVES THE MILKED COW AND TAMES THE FIRE BREATHING STEED"
+    },
+    {
+      "id": "ls-clean-908-31957-0007",
+      "speaker": "908",
+      "chapter": "31957",
+      "member": "LibriSpeech/test-clean/908/31957/908-31957-0007.flac",
+      "samples": 92800,
+      "sha256": "53eff5da47db5b5bf1d6c428e548153838f04e0a2b4aa1c4e40d260e6d1a1ba6",
+      "transcript": "COULD IT MEAN TO LAST A LOVE SET PENDULOUS BETWEEN SORROW AND SORROW"
+    },
+    {
+      "id": "ls-clean-908-31957-0018",
+      "speaker": "908",
+      "chapter": "31957",
+      "member": "LibriSpeech/test-clean/908/31957/908-31957-0018.flac",
+      "samples": 62640,
+      "sha256": "66616f2f184d0ee6610e80f4608713e690260e0e1a87cd662656695dd5209573",
+      "transcript": "BUT THOU ART NOT SUCH A LOVER MY BELOVED"
+    },
+    {
+      "id": "ls-clean-908-31957-0020",
+      "speaker": "908",
+      "chapter": "31957",
+      "member": "LibriSpeech/test-clean/908/31957/908-31957-0020.flac",
+      "samples": 94320,
+      "sha256": "7c98cc6f0c0dae2767e8cae566f5a4e4cde68cd1737e0b375be7396c75df0213",
+      "transcript": "I THANK ALL WHO HAVE LOVED ME IN THEIR HEARTS WITH THANKS AND LOVE FROM MINE"
+    }
+  ]
+}

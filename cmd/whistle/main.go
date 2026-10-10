@@ -1,4 +1,4 @@
-// Command whistle is the CLI of the pure-Go Whistle port. For now it only fetches the pinned model files; transcribe,
+// Command whistle is the CLI of the pure-Go Whistle port. It fetches the pinned model files and transcribes WAV files;
 // stream, embed and doctor follow in later phases (see PLAN.md).
 package main
 
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
@@ -19,7 +20,8 @@ func main() {
 	stop()
 
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "whistle:", err)
+		// The whistle package prefixes its errors with "whistle: " too; print the name once.
+		_, _ = fmt.Fprintln(os.Stderr, "whistle:", strings.TrimPrefix(err.Error(), "whistle: "))
 
 		os.Exit(1)
 	}
