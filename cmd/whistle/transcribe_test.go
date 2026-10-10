@@ -99,6 +99,45 @@ func TestTranscribeCmdJSON(t *testing.T) {
 	}
 }
 
+func TestTranscribeCmdWordTimestamps(t *testing.T) {
+	requireModel(t)
+
+	out, err := runCmd(t, "transcribe", "--model", cactPath, "--json", "--word-timestamps", clipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	word := `\{"word":"[^"]+","start":\d+\.\d\d,"end":\d+\.\d\d,"probability":[01]\.\d\d\d\}`
+	shape := regexp.MustCompile(`^\{"text":"[^"]*","language":"en","words":\[` + word + `(,` + word + `)*\],` +
+		`"ttft_ms":\d+\.\d,"decode_tps":\d+\.\d\}\n$`)
+
+	if !shape.MatchString(out) {
+		t.Errorf("stdout %q does not have the engine's shape with words", out)
+	}
+
+	var res whistle.Result
+
+	err = json.Unmarshal([]byte(out), &res)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Words) != len(strings.Fields(clipText)) || res.Words[0].Text != "Directed" {
+		t.Errorf("words = %+v, want the words of %q", res.Words, clipText)
+	}
+
+	out, err = runCmd(t, "transcribe", "--model", cactPath, "--word-timestamps", clipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+	if len(lines) != 1+len(res.Words) || lines[0] != clipText ||
+		!regexp.MustCompile(`^ +\d+\.\d\d - +\d+\.\d\d  Directed +\d\.\d\d$`).MatchString(lines[1]) {
+		t.Errorf("stdout = %q, want the text and a line per word", out)
+	}
+}
+
 func TestTranscribeCmdLimit(t *testing.T) {
 	requireModel(t)
 
