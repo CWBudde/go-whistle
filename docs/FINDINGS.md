@@ -1491,3 +1491,110 @@ safetensors). The rest is the 5-beam search and the engine's W2A8 arithmetic, wh
 **Fast regression.** `TestGreedyMatchesEngine` (no tag, skips without `models/`) decodes three short clips
 (LibriSpeech test-other and test-clean, FLEURS de). It requires the engine's language and text exactly, and the
 teacher-forced mean log-probability above floors just below the measured −0.0880 / −0.0548 / −0.0652.
+
+## F-025 — The decoding oracle corpus: depth, keywords, silence, limits, LibriSpeech (2026-10-10)
+
+**Purpose.** Phase 6 needs engine output beyond the 32 default transcripts: truncated ladders (6.4), keyword biasing
+(6.3), where the engine returns the empty JSON (6.6), the length limits (6.5) and a LibriSpeech subset for WER (6.6).
+Five `tools/oracle` subcommands record them, one `just` recipe each.
+
+**CLI, not the library.** Every recipe runs the `needle` CLI with `--audio-word-timestamps --threads 4`, the flags of
+the existing fixtures plus the thread pin. Only the CLI has `--audio-depth`: `needle_transcribe` takes language,
+keywords and word timestamps, but no depth. The CLI also gives every set the same normalised JSON as
+`testdata/oracle/<clip>.json` (`normaliseJSON`: timing fields dropped, keys sorted, values verbatim). Synthetic signals
+are written as 32-bit float WAVs, so the CLI reads exactly the float32 samples that `pcm_sha256` names. The silence
+and limits recipes also run `needle_transcribe` (libneedle3 via purego, `word_timestamps` 1) on the same samples. Its
+JSON equals the CLI's on all 320 sweep signals (the run fails otherwise) and on all 19 limit signals the CLI
+accepts. The two differ only at 0 samples (below). The engine prefixes CLI errors with `argv[0]`, so the tool runs
+the CLI as `needle` from the temp directory that holds the WAV, which keeps the messages free of paths.
+
+**Determinism.** 1, 2, 3, 4 and 8 threads give byte-identical JSON on all 32 clips. The default is "the device's fast
+cores, at most 4" (4 here); the pin only fixes the configuration across machines. Every recipe was run twice, and the
+second run left `git status` clean. The same holds for `oracle-run` and `oracle-probes` after the shared changes
+(thread pin, WAV writer, `probe.Spec` fields). The LibriSpeech audio was also fetched a second time, with the first
+copy moved aside: identical WAVs, identical `subset.json`.
+
+**Layout and size.** Each set has a `manifest.json` and one `transcripts.json`. The latter is an object keyed by fixture
+name whose values are the objects a per-clip `<name>.json` would hold. One file per transcript was the first layout:
+843 files, 1.47 MB of content, but 3.8 MB on disk, since the file system rounds every file up to a 4 KiB block. Now:
+
+| set (`testdata/oracle/`) | recipe                                                   | content                                                                   | files | bytes     | `du -sk` |
+| ------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------- | ----- | --------- | -------- |
+| `depth/`                 | `oracle-depth`                                           | 32 clips × depth 2–7                                                      | 2     | 353,800   | 348      |
+| `keywords/`              | `oracle-keywords`                                        | 53 cases over 19 clips, 7 languages: keyword file + transcript with it    | 55    | 142,170   | 356      |
+| `silence/`               | `oracle-silence`                                         | 320 signals: parameters, digest, empty or not, text (manifest only)       | 1     | 197,254   | 196      |
+| `limits/`                | `oracle-limits`                                          | 22 signals: CLI exit and stderr, `needle_transcribe` code and error, JSON | 2     | 22,503    | 24       |
+| `librispeech/`           | `oracle-librispeech` (audio: `oracle-librispeech-audio`) | 200 utterances: `subset.json` (ids, SHA-256, reference) + engine JSON     | 3     | 652,567   | 644      |
+| total                    |                                                          |                                                                           | 63    | 1,368,294 | 1,568    |
+
+**Depth.** `--audio-depth 8` is byte-identical to the default on 32/32 clips (`oracle depth` re-checks it on every run),
+so 8 is the full ladder. The CLI refuses 1 ("--audio-depth takes a layer count of 2 or more, not "1"") and fails to
+load the model at 9. Clips whose text equals the full-depth text: depth 2 7/32, 3 11/32, 4 11/32, 5 16/32, 6 15/32, 7
+19/32. Not monotone, so 6.4 compares per depth.
+
+**Keywords.** Cases are derived from the reference transcripts and the engine's own text. `oracle keywords` checks
+each kind against both (`checkKind`) and re-checks the run without keywords byte for byte against
+`testdata/oracle/<clip>.json`, which the manifest names as `without`. A keyword "hits" a text when its words occur
+consecutively in it after lower-casing and splitting at non-letters (apostrophes kept).
+
+| kind       | definition                                      | cases | text changed | all keywords hit with the file |
+| ---------- | ----------------------------------------------- | ----- | ------------ | ------------------------------ |
+| present    | a reference word the engine already writes      | 15    | 1            | 15                             |
+| missed     | a reference word the engine's text lacks        | 16    | 11           | 9                              |
+| distractor | a plausible word in neither text                | 8     | 2            | 2                              |
+| phrase     | a multi-word reference phrase                   | 12    | 8            | 8 (1 already before)           |
+| list       | several reference words and phrases in one file | 2     | 2            | 1                              |
+
+Biasing is strong but bounded. "Cowley's" (lower case too), "Paare", "Adoptionsplan", "aliviar", "accomunano", "the
+door" and "did it" appear. Two distractors win against the audio ("transfer" for "chance", "luchadoras"). Names far
+from the acoustics do not appear ("Fisichella", "Sanct", "gubernatora", "continuümmodel"). A file changes words
+outside its keywords too: "de-paare" keeps "Adduktionsplan", while the two-word list fixes both. 6.3 tunes against
+this mix.
+
+**Silence sweep.** `probe.SilenceSet` (new kinds `pink`, `step`, `speech`; `quantize16`) over two clips,
+`ls-clean-1320-122617-0003` (en) and `fleurs-de_de-10308608197319017935` (de). The manifest records every parameter
+exactly (linear gains and σ as float64, clip WAV digests, seeds), so the Go side regenerates each signal with
+`Spec.SignalWith` and checks `pcm_sha256`. Sums of products in the generator carry explicit `float64` conversions,
+so no architecture fuses them into an FMA. The Gaussian stream uses `math.Log`, `Sin` and `Cos`, as the F-019 probes
+do; the signals were generated on arm64, and a different last bit elsewhere would show as a digest mismatch.
+159 of 320 signals return exactly the empty JSON. Transitions (last non-empty, first empty):
+
+| family                                                     | result                                                                                                      |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| digital silence, 160 … 480,000 samples                     | always empty                                                                                                |
+| white noise −120 … 0 dBFS (10 dB steps), pink −120 … 0     | always empty: no absolute level opens the gate                                                              |
+| −40 dBFS white noise, middle second (25 %) +Δ dB louder    | Δ ≤ 2.65 empty, Δ ≥ 2.70 "Thank you." (0.05 dB steps)                                                       |
+| the same at −80 and −10 dBFS                               | Δ ≤ 2.6 empty, Δ ≥ 2.7: the threshold is a level ratio, not a level                                         |
+| middle second Δ dB quieter                                 | Δ ≥ −3.25 empty, Δ ≤ −3.5 not                                                                               |
+| +10 dB section of w samples in 64,000                      | w ≤ 480 empty, 560 … 57,600 not, ≥ 58,240 (91 %) empty: a spread between a high and a low percentile        |
+| speech × gain, float, 0 … −120 dB                          | never empty; text unchanged to −100 (en) / −90 (de), hallucinated below: an absolute floor in the front end |
+| speech × gain on the 16-bit grid                           | en: −87 dB "Thank you.", −87.5 empty; de: −82.5 not, −83 empty (0.5 dB steps)                               |
+| speech + white noise, σ = clip RMS · 10^(−SNR/20)          | en: −9.75 dB not, −10 empty; de: −15 not, −15.25 empty (0.25 dB steps)                                      |
+| speech padded with 1, 5, 10 s each side, 23 s before/after | never empty                                                                                                 |
+
+So the gate compares levels within the clip: steady signals at any level are silent, a 2.7 dB step of a quarter of
+the clip is not, and a 10 dB louder section opens it only while it covers between about 0.8 % (560 samples) and 90 %
+of the clip. 6.6 fits the measure and the threshold to these rows.
+
+**Limits** (`probe.LimitSet`; speech excerpts start 2 s into the en clip):
+
+| input                              | CLI                                             | `needle_transcribe`                                |
+| ---------------------------------- | ----------------------------------------------- | -------------------------------------------------- |
+| 0 samples                          | exit 1, `needle: silence-0.wav holds no audio`  | rc 0, exactly the empty JSON                       |
+| 1 sample (silence or speech) … 161 | the empty JSON                                  | the same                                           |
+| 1279, 1280, 1281 samples of speech | "you"                                           | the same                                           |
+| 480,000 samples                    | silence: the empty JSON; speech: its transcript | the same                                           |
+| 480,001 samples (silence, speech)  | exit 1, `needle: audio limit is 30 s`           | rc −1, `needle_last_error` = `audio limit is 30 s` |
+
+The limit is inclusive, and the length check runs before the silence gate. The CLI refuses an empty WAV; the
+library treats 0 samples as silence.
+
+**LibriSpeech subset.** `oracle librispeech-audio` streams all of `test-clean.tar.gz` (346,663,984 bytes, SHA-256
+`39fde525…6c23`, pinned in `lsArchiveSHA256`; about 45 s) and keeps, per speaker, the 5 utterances of at most 480,000
+samples with the smallest SHA-256 of `"go-whistle 6.1/<utterance id>"`. The rule does not depend on the tar order
+(`TestSelectSubset` reverses it). 40 speakers × 5 = 200 utterances, 1.49–28.41 s (mean 7.75 s), 4167 reference words.
+The WAVs go to `models/corpus/librispeech/` (git-ignored); `subset.json` holds ids, members, sample counts, WAV SHA-256
+and references. `oracle librispeech` fetches the audio when a WAV is missing or differs, and a re-fetch must reproduce
+the committed `subset.json`. The engine's WER on the subset is 221/4167 = 5.30 % (103 utterances without a word error),
+normalised by upper-casing and punctuation removal only. Upstream's 4.31 % is over all of test-clean with a fuller
+normaliser; 6.6 computes both sides with one.
