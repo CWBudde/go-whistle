@@ -95,7 +95,10 @@ func TestRender(t *testing.T) {
 		},
 		WER: &WER{Utterances: 200, Words: 4167, PackedErrors: 223, FloatErrors: 223, EngineErrors: 221},
 	}
-	e := &EngineResults{Version: "3.2.0", Threads: "4", Library: EngineLibrary{Clips: sampleSet(6, 1500)}}
+	e := &EngineResults{
+		Run: Run{Machine: Machine{CPU: "CPU X", Cores: 8}}, Version: "3.2.0", Threads: "4",
+		Library: EngineLibrary{Clips: sampleSet(6, 1500)},
+	}
 
 	var b bytes.Buffer
 
@@ -127,6 +130,63 @@ func TestRender(t *testing.T) {
 
 	if !strings.Contains(b.String(), "so it **fails**") {
 		t.Errorf("a 0.12 point difference does not fail the Accept:\n%s", b.String())
+	}
+}
+
+func TestRenderOtherMachine(t *testing.T) {
+	g := &GoResults{
+		Run:   Run{Machine: Machine{CPU: "CPU X", Cores: 8, OS: "os 1", Arch: "arm64"}},
+		Modes: []GoMode{{Mode: "packed", Clips: sampleSet(60, 800)}, {Mode: "float", Clips: sampleSet(58, 500)}},
+	}
+
+	for name, m := range map[string]Machine{
+		"other CPU":     {CPU: "CPU Y", Cores: 8, OS: "os 1", Arch: "arm64"},
+		"other cores":   {CPU: "CPU X", Cores: 4, OS: "os 1", Arch: "arm64"},
+		"other OS":      {CPU: "CPU X", Cores: 8, OS: "os 2", Arch: "arm64"},
+		"other arch":    {CPU: "CPU X", Cores: 8, OS: "os 1", Arch: "amd64"},
+		"unknown CPU":   {Cores: 8, OS: "os 1", Arch: "arm64"},
+		"engine absent": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := &EngineResults{Run: Run{Machine: m}, Library: EngineLibrary{Clips: sampleSet(6, 1500)}}
+
+			var b bytes.Buffer
+
+			err := Render(&b, g, e)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			out := b.String()
+			if strings.Contains(out, "this machine") || strings.Contains(out, "10.00×") {
+				t.Errorf("results from two machines are compared as one:\n%s", out)
+			}
+
+			if !strings.Contains(out, "come from different machines") ||
+				!strings.Contains(out, "| Go packed, CPU X ") {
+				t.Errorf("report does not say the machines differ:\n%s", out)
+			}
+		})
+	}
+}
+
+func TestSameMachine(t *testing.T) {
+	m := Machine{CPU: "CPU X", Cores: 8, CoreTypes: "4 P + 4 E", OS: "os 1", Arch: "arm64", GoVersion: "go1", MemoryGiB: 16}
+
+	n := m
+	n.GoVersion, n.MemoryGiB = "go2", 32 // the toolchain and the memory do not make another machine
+
+	if !SameMachine(m, n) {
+		t.Error("same hardware and OS is not the same machine")
+	}
+
+	n.CoreTypes = "8 P"
+	if SameMachine(m, n) {
+		t.Error("other core types count as the same machine")
+	}
+
+	if SameMachine(Machine{}, Machine{}) {
+		t.Error("two unknown machines count as the same machine")
 	}
 }
 

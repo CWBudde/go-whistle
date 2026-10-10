@@ -24,6 +24,15 @@ type Machine struct {
 	GoVersion string  `json:"go_version"`
 }
 
+// SameMachine reports whether a and b describe the same hardware and
+// software: CPU, cores, core types, OS and architecture. A side whose CPU is
+// unknown matches nothing, so its timings are never paired with the other
+// side's as one machine's.
+func SameMachine(a, b Machine) bool {
+	return a.CPU != "" && a.CPU == b.CPU && a.Cores == b.Cores && a.CoreTypes == b.CoreTypes && a.OS == b.OS &&
+		a.Arch == b.Arch
+}
+
 // StartRun describes a run starting now: date, commit, machine and the
 // load average. Finish completes it.
 func StartRun(ctx context.Context) Run {

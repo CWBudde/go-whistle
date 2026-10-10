@@ -30,10 +30,13 @@ func Render(w io.Writer, g *GoResults, e *EngineResults) error {
 		"PLAN.md 9.6 and the Phase 9 **Accept**. This file is generated from `" + GoResultsPath + "` (`just bench`)\n" +
 		"and `" + EngineResultsPath + "` (`just oracle-bench`); do not edit it by hand. Method and reading:\n" +
 		"`docs/FINDINGS.md` F-040.\n\n")
-	renderRuns(&b, g, e)
+
+	same := g != nil && e != nil && SameMachine(g.Run.Machine, e.Run.Machine)
+
+	renderRuns(&b, g, e, same)
 	renderAccept(&b, g)
-	renderSpeed(&b, g, e)
-	renderPublished(&b, g, e)
+	renderSpeed(&b, g, e, same)
+	renderPublished(&b, g, e, same)
 	renderMemory(&b, g, e)
 	renderMethod(&b)
 
@@ -45,7 +48,7 @@ func Render(w io.Writer, g *GoResults, e *EngineResults) error {
 	return nil
 }
 
-func renderRuns(b *strings.Builder, g *GoResults, e *EngineResults) {
+func renderRuns(b *strings.Builder, g *GoResults, e *EngineResults, same bool) {
 	var gr, er Run
 	if g != nil {
 		gr = g.Run
@@ -91,7 +94,17 @@ func renderRuns(b *strings.Builder, g *GoResults, e *EngineResults) {
 	b.WriteString("## Runs\n\n")
 	b.WriteString(t.String())
 	b.WriteString("\n")
+
+	if g != nil && e != nil && !same {
+		b.WriteString(differentMachines + "\n\n")
+	}
 }
+
+// differentMachines is the report's warning when the Go and the engine
+// results were measured on different machines (SameMachine).
+const differentMachines = "**The Go and the engine results come from different machines** (CPU, cores, OS or " +
+	"architecture differ), so this report does not compare them: re-run `just bench` and `just oracle-bench` on " +
+	"the same machine for the ratios."
 
 func renderAccept(b *strings.Builder, g *GoResults) {
 	b.WriteString("## WER: packed against float (Phase 9 Accept)\n\n")
@@ -157,7 +170,7 @@ func speedRows(t *table, sets [4]*Set) {
 	add("transcriptions timed (clips × passes)", func(s *Set) string { return fmt.Sprintf("%d × %d", s.Clips, s.Passes) })
 }
 
-func renderSpeed(b *strings.Builder, g *GoResults, e *EngineResults) {
+func renderSpeed(b *strings.Builder, g *GoResults, e *EngineResults, same bool) {
 	var pk, fl *GoMode
 	if g != nil {
 		pk, fl = g.mode("packed"), g.mode("float")
@@ -184,6 +197,10 @@ func renderSpeed(b *strings.Builder, g *GoResults, e *EngineResults) {
 
 		fmt.Fprintf(b, "## Speed: %s\n\n%s\n", title, t)
 
+		if g != nil && e != nil && !same {
+			b.WriteString("The Go and the engine columns come from different machines; compare within a side only.\n\n")
+		}
+
 		if k == 0 && e != nil && e.Library.OutsideClock.N > 0 {
 			fmt.Fprintf(b, "A `needle_transcribe` call takes its `ttft_ms` plus (n − 1) / `decode_tps` for the n tokens "+
 				"it returns, plus a median %.2f ms (p90 %.2f ms) that its own clock does not explain.\n\n",
@@ -200,15 +217,33 @@ func renderSpeed(b *strings.Builder, g *GoResults, e *EngineResults) {
 		"time.\n\n", t)
 }
 
-func renderPublished(b *strings.Builder, g *GoResults, e *EngineResults) {
+func renderPublished(b *strings.Builder, g *GoResults, e *EngineResults, same bool) {
 	t := newTable("median of the 32 clips", "TTFT (ms)", "decode (tok/s)", "TTFT / engine here",
 		"decode / engine here")
 	t.row("engine, "+PublishedMachine+", 5 beams (published)", ms(PublishedTTFTMS), tps(PublishedTPS), missing, missing)
 
+	// The engine here is the yardstick only when both sides ran on the same
+	// machine; otherwise each row names its own machine and has no ratio.
+	where := func(m Machine) string {
+		if same {
+			return "this machine"
+		}
+
+		return or(m.CPU)
+	}
+
 	var ref *Set
+
 	if e != nil && e.Library.Clips.TTFT.N > 0 {
-		ref = &e.Library.Clips
-		t.row("engine library, this machine", ms(ref.TTFT.Median), tps(ref.DecodeTPS.Median), ratio(1), ratio(1))
+		engineRatio := missing
+
+		if same {
+			ref = &e.Library.Clips
+			engineRatio = ratio(1)
+		}
+
+		t.row("engine library, "+where(e.Run.Machine), ms(e.Library.Clips.TTFT.Median),
+			tps(e.Library.Clips.DecodeTPS.Median), engineRatio, engineRatio)
 	}
 
 	if g != nil {
@@ -219,14 +254,19 @@ func renderPublished(b *strings.Builder, g *GoResults, e *EngineResults) {
 				tpsRatio = ratio(m.Clips.DecodeTPS.Median / ref.DecodeTPS.Median)
 			}
 
-			t.row("Go "+m.Mode+", this machine", ms(m.Clips.TTFT.Median), tps(m.Clips.DecodeTPS.Median), ttftRatio,
-				tpsRatio)
+			t.row("Go "+m.Mode+", "+where(g.Run.Machine), ms(m.Clips.TTFT.Median), tps(m.Clips.DecodeTPS.Median),
+				ttftRatio, tpsRatio)
 		}
 	}
 
-	fmt.Fprintf(b, "## Against the published figures\n\n%s\nThe published figures come from another machine and "+
-		"clip set; the engine on this machine is the yardstick. A TTFT ratio above 1 is slower than the engine, a "+
-		"decode ratio below 1 too.\n\n", t)
+	note := "The published figures come from another machine and clip set; the engine on the same machine is the " +
+		"yardstick. A TTFT ratio above 1 is slower than the engine, a decode ratio below 1 too."
+	if g != nil && e != nil && !same {
+		note = "The published figures come from another machine and clip set. The Go and the engine rows come from " +
+			"different machines too, so there are no ratios."
+	}
+
+	fmt.Fprintf(b, "## Against the published figures\n\n%s\n%s\n\n", t, note)
 }
 
 func renderMemory(b *strings.Builder, g *GoResults, e *EngineResults) {

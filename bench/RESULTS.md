@@ -84,7 +84,7 @@ A `needle_transcribe` call takes its `ttft_ms` plus (n − 1) / `decode_tps` for
 | Go packed, this machine                   |      60.4 |           1013 |              8.06× |                0.73× |
 | Go float, this machine                    |      57.5 |            604 |              7.67× |                0.44× |
 
-The published figures come from another machine and clip set; the engine on this machine is the yardstick. A TTFT ratio above 1 is slower than the engine, a decode ratio below 1 too.
+The published figures come from another machine and clip set; the engine on the same machine is the yardstick. A TTFT ratio above 1 is slower than the engine, a decode ratio below 1 too.
 
 ## Memory
 
