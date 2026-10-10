@@ -170,10 +170,14 @@ func (a *Attention) forward(x []float32, t int, mask Mask, rope *Rope, tr *attnT
 	}
 
 	q, k, v := a.project(x, t, tr)
-	a.normRotate(q, k, t, rope, tr)
+	a.normRotate(q, k, t, 0, rope, tr)
 
-	out := a.attend(q, k, v, t, mask, tr)
+	return a.output(x, t, a.attend(q, k, v, t, 0, mask, tr), tr), nil
+}
 
+// output is the sigmoid gate σ(gate_proj(x)) on the attention result out,
+// t rows of heads·v values, then the output projection.
+func (a *Attention) output(x []float32, t int, out []float32, tr *attnTrace) []float32 {
 	oW := a.heads * a.v
 	gate := make([]float32, t*oW)
 	linear(gate, x, t, a.gateProj, oW, a.dim)
@@ -190,7 +194,7 @@ func (a *Attention) forward(x []float32, t int, mask Mask, rope *Rope, tr *attnT
 	y := make([]float32, t*a.dim)
 	linear(y, out, t, a.outProj, a.dim, oW)
 
-	return y, nil
+	return y
 }
 
 // project returns q, k and v in row layout: the projections, then the
@@ -222,8 +226,8 @@ func (a *Attention) project(x []float32, t int, tr *attnTrace) (q, k, v []float3
 }
 
 // normRotate applies the per-head q/k norms and, if rope is set, the
-// rotation at each row's position, in place.
-func (a *Attention) normRotate(q, k []float32, t int, rope *Rope, tr *attnTrace) {
+// rotation at each row's position, off + row, in place.
+func (a *Attention) normRotate(q, k []float32, t, off int, rope *Rope, tr *attnTrace) {
 	// Every qk-wide chunk of a row is one head.
 	a.qNorm.Apply(q, q)
 	a.kNorm.Apply(k, k)
@@ -238,13 +242,13 @@ func (a *Attention) normRotate(q, k []float32, t int, rope *Rope, tr *attnTrace)
 
 	for i := range t {
 		for h := range a.heads {
-			off := (i*a.heads + h) * a.qk
-			rope.apply(q[off:off+a.qk], i)
+			o := (i*a.heads + h) * a.qk
+			rope.apply(q[o:o+a.qk], off+i)
 		}
 
 		for h := range a.kvHeads {
-			off := (i*a.kvHeads + h) * a.qk
-			rope.apply(k[off:off+a.qk], i)
+			o := (i*a.kvHeads + h) * a.qk
+			rope.apply(k[o:o+a.qk], off+i)
 		}
 	}
 
@@ -254,25 +258,28 @@ func (a *Attention) normRotate(q, k []float32, t int, rope *Rope, tr *attnTrace)
 }
 
 // attend is softmax(q kᵀ / √qk) v per query head with its KV head, the
-// heads concatenated per row. Masked logits are left out, which equals
-// upstream's float32-min fill: their weights are exactly 0.
-func (a *Attention) attend(q, k, v []float32, t int, mask Mask, tr *attnTrace) []float32 {
+// heads concatenated per row, for t query rows at positions off … off+t−1
+// against the keys and values of k and v (off + t rows when causal).
+// Masked logits are left out, which equals upstream's float32-min fill:
+// their weights are exactly 0.
+func (a *Attention) attend(q, k, v []float32, t, off int, mask Mask, tr *attnTrace) []float32 {
 	qW, kW, vW, oW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v, a.heads*a.v
+	keys := len(k) / kW
 	out := make([]float32, t*oW)
-	scores := make([]float32, t)
+	scores := make([]float32, keys)
 	scale := float32(math.Sqrt(float64(a.qk))) // jnp.sqrt(float32(qk)); upstream divides by it
 
 	if tr != nil {
-		tr.probs = make([]float32, a.heads*t*t)
+		tr.probs = make([]float32, a.heads*t*keys)
 	}
 
 	for h := range a.heads {
 		kv := a.kvHead(h)
 
 		for i := range t {
-			n := t
+			n := keys
 			if mask == MaskCausal {
-				n = i + 1
+				n = off + i + 1
 			}
 
 			qi := q[i*qW+h*a.qk : i*qW+(h+1)*a.qk]
@@ -290,7 +297,7 @@ func (a *Attention) attend(q, k, v []float32, t int, mask Mask, tr *attnTrace) [
 			}
 
 			if tr != nil {
-				copy(tr.probs[(h*t+i)*t:], s)
+				copy(tr.probs[(h*t+i)*keys:], s)
 			}
 		}
 	}

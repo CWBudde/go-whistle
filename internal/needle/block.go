@@ -17,7 +17,7 @@ import (
 //
 // Whistle's decoder layers add a gated cross-attention, which upstream's
 // Block does not contain; it is not part of this block (docs/FINDINGS.md
-// F-013).
+// F-013). Extend's Hooks let the decoder insert it (F-021).
 type Block struct {
 	dim int
 
@@ -72,12 +72,46 @@ func (b *Block) Forward(x []float32, t int, mask Mask, rope *Rope, engram *Engra
 	return b.forward(x, t, mask, rope, engram, nil)
 }
 
+// Hook adds a residual branch to h, t rows of the block's width, in place.
+type Hook func(h []float32, t int) error
+
+// Hooks are residual branches Extend inserts into the block; a nil hook is
+// skipped. Whistle's decoder puts its cross-attention at one of them
+// (docs/FINDINGS.md F-021).
+type Hooks struct {
+	BeforeAttn Hook // after the engram gate, before the self-attention
+	AfterAttn  Hook // between the self-attention and the MLP
+	AfterMLP   Hook // after the MLP's residual add
+}
+
+// Extend runs the block causally on x, t new rows of Dim values at the
+// positions c.Len() … c.Len()+t−1, with the self-attention's keys and
+// values cached in c, and returns t rows of Dim values. engram is the
+// site's keys and values of the new rows (Engram.Extend), nil away from
+// the sites. With empty hooks and an empty cache it equals Forward with
+// MaskCausal (docs/FINDINGS.md F-022).
+func (b *Block) Extend(x []float32, t int, c *KVCache, rope *Rope, engram *EngramKV, hooks Hooks,
+) ([]float32, error) {
+	attn := func(n []float32) ([]float32, error) { return b.attn.Extend(n, t, c, rope) }
+
+	return b.run(x, t, attn, engram, hooks, nil)
+}
+
 // blockTrace receives the intermediates for the parity tests.
 type blockTrace struct {
 	normIn, attn, postAttn, h, preHada, mlp []float32
 }
 
 func (b *Block) forward(x []float32, t int, mask Mask, rope *Rope, engram *EngramKV, tr *blockTrace,
+) ([]float32, error) {
+	attn := func(n []float32) ([]float32, error) { return b.attn.Forward(n, t, mask, rope) }
+
+	return b.run(x, t, attn, engram, Hooks{}, tr)
+}
+
+// run is the block around the self-attention attn, with the hooks.
+func (b *Block) run(x []float32, t int, attn func([]float32) ([]float32, error), engram *EngramKV, hooks Hooks,
+	tr *blockTrace,
 ) ([]float32, error) {
 	if t < 0 || len(x) != t*b.dim {
 		return nil, fmt.Errorf("needle: block input has %d values, want %d rows of %d", len(x), t, b.dim)
@@ -94,10 +128,15 @@ func (b *Block) forward(x []float32, t int, mask Mask, rope *Rope, engram *Engra
 		applyEngram(h, engram, t, b.dim, make([]float32, t))
 	}
 
+	err := runHook(hooks.BeforeAttn, h, t)
+	if err != nil {
+		return nil, err
+	}
+
 	n := make([]float32, len(h))
 	b.normIn.Apply(n, h)
 
-	a, err := b.attn.Forward(n, t, mask, rope)
+	a, err := attn(n)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +150,11 @@ func (b *Block) forward(x []float32, t int, mask Mask, rope *Rope, engram *Engra
 	// skip + σ(attn_gate) · x: the product is rounded first, no FMA.
 	for i, v := range a {
 		h[i] += float32(b.gate * v)
+	}
+
+	err = runHook(hooks.AfterAttn, h, t)
+	if err != nil {
+		return nil, err
 	}
 
 	p := make([]float32, len(h))
@@ -129,7 +173,20 @@ func (b *Block) forward(x []float32, t int, mask Mask, rope *Rope, engram *Engra
 		m[i] += v
 	}
 
+	err = runHook(hooks.AfterMLP, m, t)
+	if err != nil {
+		return nil, err
+	}
+
 	return m, nil
+}
+
+func runHook(hook Hook, h []float32, t int) error {
+	if hook == nil {
+		return nil
+	}
+
+	return hook(h, t)
 }
 
 // applyEngram is Block's engram gate for one site in place on x, t rows of

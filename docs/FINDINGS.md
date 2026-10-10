@@ -1332,3 +1332,162 @@ values on its axes, reaches `log=soft-76db pad=zero` by itself (`just encoder-pr
   scores 0.96400, under the hard clamp 0.99102. A per-frame energy gate fits some of these clicks, but no single
   threshold fits all of them, and none touches speech, whose quiet frames hold far more energy. So it stays out of
   `Best()`.
+
+## F-021 — The decoder's cross-attention: form and place in the block (U6) (2026-10-10)
+
+**Question.** U6: where does the gated cross-attention sit in a decoder layer, and in what form? Upstream's `Block`
+has none. The checkpoint holds, per layer, `cross_norm`, `cross_attn/{q,k,v,gate,out}_proj`, `cross_attn/{q,k}_norm`,
+`post_cross_norm` and the scalar `cross_gate` (F-006, `.cact` `crossNN.*`). The only oracle is the engine's transcript.
+
+**Instrument.** `internal/decoder` builds the decoder for one `Hypothesis`: twelve typed axes with named values, the
+zero value invalid, as `internal/encoder` (F-014). The harness `internal/decoder/probe_test.go` (build tag `oracle`,
+`just decoder-probe`) runs `encoder.Best()` once per clip and memory tap. It turns each committed engine transcript
+(`testdata/oracle/<clip>.json`) into target tokens: prompt, language token, `RefTokenizer` ids of the text, EOS. A
+hypothesis scores the mean, over the 32 clips, of the mean log-probability of those tokens in one teacher-forced pass.
+The top-1 accuracy, the language wins and the language token's rank are printed beside it. The engine decodes with 5
+beams and W2A8 numerics, so a perfect port does not reach log-probability 0 or top-1 1. One hypothesis on all 32 clips
+takes about 0.1 s on an Apple M5 Pro (15 cores).
+
+**Is the score meaningful?** `TestProbeBaselines`: the leader scores −0.1302 (top-1 0.9768, language 32/32). Fed
+the _next_ clip's encoder output, it scores −4.2232 (top-1 0.3283, language 25/32). That is a language model guessing
+from the prompt. The cross-attention therefore carries the transcript, and the gap of 4.1 nats per token leaves room
+to rank hypotheses.
+
+**Search.** Four stages, each the full product of its axes around a beam of 4: the cross-attention (`cross`, `qknorm`,
+`gate`, `residual`; 256 combinations), the embedding and the head (`scale`, `head`, `final`), the prompt and the target
+format (`prompt`, `lead`), and the memory tap with the switches (`memory`, `xrope`, `engram`). Then coordinate descent
+with escalating moves (single axes, then all 66 axis pairs, then whole stages; any change restarts from single axes)
+until no level moves the leader, then a per-axis sensitivity table. From the prior it took 2.6 min.
+
+- **From the prior** (upstream's `Block`/`Stack`/`SimpleAttentionNetwork` wherever they define something, and the
+  self-attention's form for the cross-attention), no stage and no descent level changed the leader. The prior is
+  `decoder.Best()`.
+- **From a start wrong on all twelve axes** (`WHISTLE_PROBE_KEY`, score −8255.9, top-1 0.0010), the stages reached
+  −5.0181. Their joint products ran around a cross-attention that was still wrong: `qknorm=unit gate=none`. The first
+  single-axis descent round then reached `Best()` (−0.1302); the single-axis, pair and stage rounds after it left it unchanged. The run took 3.6 min.
+
+**Winner** (`.cact` weights, Δ = the value's score − the leader's):
+
+| axis                  | winner                                                                    | alternatives (Δ logp, top-1, language wins)                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| place (`cross`)       | **between the self-attention and the MLP**, inside the mHC block function | after the MLP −0.1484 (0.919, 20/32); before the self-attention −1.0900 (0.748, 17/32); outside mHC, added to every lane −1.5188 (0.607, 20/32) |
+| q/k norm (`qknorm`)   | **ZCRMSNorm per head, gain 1 + scale**                                    | none −0.2098 (0.933); no gain −0.7983 (0.783); gain = scale −2.7037 (0.409)                                                                     |
+| gate (`gate`)         | **σ(gate_proj(cross_norm(h)))**, the attention input                      | σ(gate_proj(h)) of the residual −0.0863 (0.944); none −0.7254 (0.770); silu −1.4487 (0.629)                                                     |
+| residual (`residual`) | **h + σ(cross_gate) · post_cross_norm(out_proj(c))**                      | tanh(cross_gate) ±0 (identical); no post norm −4.2525 (0.509); raw cross_gate −8.9044 (0.271)                                                   |
+| rotation (`xrope`)    | **none**                                                                  | q at the token's position, k at the frame's, θ = 1e5: −0.3912 (0.868)                                                                           |
+| memory (`memory`)     | **`enc.final_norm` of the lane mean** (= `needle_embed`)                  | the lane mean before the norm −3.6391 (0.311, 24/32)                                                                                            |
+
+So a decoder layer is upstream's `Block` with one more residual between its two:
+
+```
+x += α · ev                                                         engram sites 3 and 7
+x += σ(attn_gate)  · post_attn_norm(self_attn(norm_in(x)))          causal, taps, RoPE 1e5
+x += σ(cross_gate) · post_cross_norm(cross_attn(cross_norm(x), m))  m = needle_embed, no mask, no RoPE
+x += hadamard_mlp(pre_hada_norm(x))
+```
+
+all inside the layer's mHC advance (`needle.Block.Extend` with `Hooks.AfterAttn`). The cross-attention is
+`MultiHeadAttention`'s shape without taps or GQA: 8 query and 8 KV heads, q/k 48 and v 64, per-head q/k ZCRMSNorm,
+softmax(q̂k̂ᵀ/√48)·v, the output times σ(gate_proj(x)), then `out_proj`. The keys and values of the memory are
+projected once per clip (`Decoder.Memory`). This also settles what F-015 left as "very likely": the decoder reads the
+encoder output after `enc.final_norm`, i.e. exactly `needle_embed`.
+
+**Ties.** σ(cross_gate) and tanh(cross_gate) are both 1 in float32, because every `cross_gate` is 22.0–22.8 (like the
+`attn_gate` values, 19.5–22.8). The two forms give identical scores, and no transcript can tell them apart. `Best()`
+keeps σ, the self-attention's form. Every other alternative costs at least 0.086 nats per token.
+
+**Weight sources.** The same leader on the float checkpoint scores −0.1970 (top-1 0.9465, language 32/32), against
+−0.1302 with the dequantised `.cact`. As for the encoder (F-014), the engine runs the quantised weights. The whole
+search on the float weights (`WHISTLE_PROBE_SRC=safetensors`, 2.7 min) ends at the same leader, and every alternative
+still loses. The closest are the gate from the residual (−0.0514), the cross-attention after the MLP (−0.1098,
+language 20/32) and no q/k norm (−0.1277).
+
+## F-022 — The decoder's KV cache: incremental decoding equals a full re-run (2026-10-10)
+
+**Question.** A token-by-token decoder must reproduce the whole-sequence forward pass. Three parts of the Needle 3
+block see earlier positions: the self-attention, the causal Q/K/V taps, and the engram (n-gram hashes over the last 3
+tokens, values tapped at dilation 3 over 4 taps). What state does each need?
+
+**State** (`internal/needle` `cache.go`):
+
+- `KVCache`, per layer: the normed and rotated keys and the values of every position, plus the raw Q/K/V projections
+  of the last `taps − 1 = 2` positions, which the next position's taps read. `Attention.Extend` projects the new
+  rows, applies the taps over history + new rows, norms and rotates them at their absolute positions, appends them,
+  and attends causally with the query offset.
+- `EngramCache`, per site: the last `MaxOrder − 1 = 2` tokens for the hashes, and the raw values (`e @ value_proj`)
+  of the last `(taps − 1) · dilation = 9` positions for the dilated taps. `Engram.Extend` uses the absolute position
+  for `ngram_ok` (t ≥ order − 1).
+- `Block.Extend` is `Block.Forward` with the cached attention and the `Hooks` (`BeforeAttn`, `AfterAttn`, `AfterMLP`)
+  that insert the cross-attention (F-021). `Forward` and `Extend` share one body, so every F-009 fixture still holds.
+  mHC and the MLP are per position and need no state.
+
+**Measured.**
+
+- `internal/needle` `TestAttentionExtendMatchesForward`, `TestEngramExtendMatchesForward` and
+  `TestBlockExtendMatchesForward` (random weights, with and without taps and engram) feed the same sequence in one
+  call, row by row, and in 2 + 4 + 3 pieces. Each must match `Forward` within the F-009 contract. One call matches
+  exactly (max |Δ| 0). Row by row, the attention is at most 5.96e-7 off and the engram 4.8e-7, which is the T-dependent
+  summation order of `MatMulTransB` (F-011).
+- `TestWhistleDecoderIncremental` runs the real layer 3 with engram site 0 on 12 positions: max |Δ| 6.1e-5 at
+  max |ref| 379 (2 % of the bound), cosine 1.000000000000.
+- `internal/decoder` `TestIncrementalMatchesFullRun` decodes a FLEURS-de clip greedily through the caches. It then
+  feeds the 38 tokens again in one pass with empty caches. Every position's 8199 logits agree within the contract
+  (worst max |Δ| 6.1e-5 at max |logit| 101), and so does every argmax: each greedy choice is the full re-run's.
+
+## F-023 — Decoder prompt, input scale and head (U7, part 1) (2026-10-10)
+
+**Question.** What token sequence starts a transcript, and how do the embedding and the head scale? PLAN.md listed
+`[bos]`, `[bos, <speech>]`, `[bos, <|lang|>]` and more as prompt candidates.
+
+**Embedding rows.** A trained row and an untrained one differ visibly in the float checkpoint. Text pieces, `<s>` (2),
+`</s>` (1) and the seven language tokens have RMS 2.5–3.5 per row. `<pad>`, `<unk>`, all 24 chat markers (ids 4–27,
+including `<speech>` and `</speech>`), 153 of the 256 byte pieces and a few JSON pieces sit at 8.3, the same level as
+pieces no transcript can contain. Whistle never trained `<speech>`, `</speech>` or `<pad>` as inputs. Of the specials,
+only `<s>`, the language tokens and `</s>` take part.
+
+**By score** (Δ against the leader's −0.1302, `.cact`, all 32 clips):
+
+| axis        | winner                                                            | alternatives (Δ logp, top-1, language wins)                                                                                                                                                            |
+| ----------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| prompt      | **`[<s>]`**, then `<\|lang\|>`, the text, `</s>`                  | `[<s>, <speech>]` −0.4236 (3/32); `[<s>, <speech>, </speech>]` −0.5716 (3/32); `[<pad>]` −0.6570 (4/32); `[<speech>]` −0.7252 (5/32); `[</s>]` −0.8315 (21/32); `[<speech>, </speech>]` −1.1358 (4/32) |
+| first word  | **no leading `▁`** (`Jeder …`, the tokenizer has no dummy prefix) | `▁Jeder …` −0.3202 (0.943)                                                                                                                                                                             |
+| input scale | **× √512** (`embed_scale`)                                        | × 1 −4.7279 (0.284)                                                                                                                                                                                    |
+| head        | **tied, x · Eᵀ** over all 8199 pieces                             | x · Eᵀ / √512 −7.8698 (same top-1; the logits are 22.6× too flat)                                                                                                                                      |
+| final norm  | **`stack/final_norm` of the lane mean**                           | the lane mean −37885 (0.214)                                                                                                                                                                           |
+| engram      | **on** (sites 3 and 7)                                            | off −0.1471 (0.913)                                                                                                                                                                                    |
+
+So decoding starts from `<s>` alone. The model's first prediction is the language token, and its last is `</s>`.
+That is upstream's `SimpleAttentionNetwork` input (embedding × √d_model) and output (`final_norm`, `x @ embedding.T`)
+unchanged. A `<speech>` marker, the one candidate with a speech-specific meaning, costs 0.42 nats per token and
+breaks language detection (3/32).
+
+## F-024 — Language detection and greedy decoding (U7, part 2) (2026-10-10)
+
+**Question.** How does the engine pick the language, and do greedy transcripts with F-021 to F-023 reproduce it?
+
+**Language step.** After `[<s>]`, the language token is the argmax over **all** 8199 logits on every clip: its rank
+is 0 on 32 of 32, with the `.cact` and with the safetensors weights. So an argmax over the seven tokens 8192–8198
+(what `Decoder.Greedy` does when no language is given) and an unrestricted argmax agree. A softmax restricted to the
+seven tokens has the same argmax. A fixed language replaces the token (`Greedy(enc, frames, "de")`); decoding then
+continues from it (`TestForcedLanguage`). The engine's own `language` field matched the corpus language on 32 of 32
+clips (F-002).
+
+**Greedy decoding** (`decoder.Best()`, `encoder.Best()`, language detected, stop at `</s>` or after 320 tokens;
+`TestProbeGreedy`). WER is over lower-cased words without punctuation and CER over the raw characters, both against
+the engine's text:
+
+| weights     | language | exact text | stopped at `</s>` | mean WER | max WER | mean CER | max CER |
+| ----------- | -------- | ---------- | ----------------- | -------- | ------- | -------- | ------- |
+| `.cact`     | 32/32    | 21/32      | 32/32             | 0.0496   | 0.3636  | 0.0188   | 0.1295  |
+| safetensors | 32/32    | 10/32      | 32/32             | 0.1114   | 0.6667  | 0.0543   | 0.2235  |
+
+With `.cact` weights, 18 of 20 LibriSpeech clips have WER 0 and 16 are character-exact. The differences are
+punctuation and quotes, one dropped "a", and "no chance for his body" → "no transfer of his body". The FLEURS
+differences are where the engine's own text is shaky. Polish CER is 0.13: the engine writes "wyzptów" and "ekologiczowe",
+for instance, which are not Polish words, and greedy decoding differs from such a beam choice. No clip loops or runs
+to the 320-token limit. Teacher forcing puts the engine's token at our top-1 for 97.7 % of positions (94.6 % with
+safetensors). The rest is the 5-beam search and the engine's W2A8 arithmetic, which Phase 6 and Phase 9 address.
+
+**Fast regression.** `TestGreedyMatchesEngine` (no tag, skips without `models/`) decodes three short clips
+(LibriSpeech test-other and test-clean, FLEURS de). It requires the engine's language and text exactly, and the
+teacher-forced mean log-probability above floors just below the measured −0.0880 / −0.0548 / −0.0652.

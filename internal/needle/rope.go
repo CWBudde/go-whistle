@@ -60,6 +60,11 @@ func (r *Rope) HeadDim() int { return 2 * r.half }
 // Len is the number of positions the tables cover.
 func (r *Rope) Len() int { return r.n }
 
+// Apply rotates one head vector x (HeadDim values) at position pos, which
+// must be below Len, in place. Whistle's decoder uses it for a rotated
+// cross-attention hypothesis (docs/FINDINGS.md F-021).
+func (r *Rope) Apply(x []float32, pos int) { r.apply(x, pos) }
+
 // apply rotates one head vector x (HeadDim values) at position pos in
 // place: with x1, x2 its first and last halves, [x1·cos − x2·sin,
 // x2·cos + x1·sin].
