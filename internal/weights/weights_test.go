@@ -627,6 +627,47 @@ func TestSafetensorsConfigNeedsQProj(t *testing.T) {
 	}
 }
 
+// TestSafetensorsDerivedGeometry: a config that cannot recompute a derived
+// record at its mapped shape is an error at open, not a panic or a huge
+// allocation on the first Tensor call.
+func TestSafetensorsDerivedGeometry(t *testing.T) {
+	fx := newFixture(t)
+
+	for _, tc := range []struct {
+		name  string
+		patch func(c *Config)
+		match string
+	}{
+		{"negative fft", func(c *Config) { c.FFT = -8 }, "audio.mel_filters"},
+		{"negative mels", func(c *Config) { c.Mels = -4 }, "audio.mel_filters"},
+		{"huge fft", func(c *Config) { c.FFT = 1 << 40 }, "audio.mel_filters"},
+		{"huge mels", func(c *Config) { c.Mels = 1 << 40 }, "audio.mel_filters"},
+		{"zero rate", func(c *Config) { c.Rate = 0 }, "audio.mel_filters"},
+		{"dim", func(c *Config) { c.Dim = 16 }, "hada_p1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := tinyConfig()
+			tc.patch(&cfg)
+
+			st := encodeSafetensors(t, []safetensors.Tensor{
+				{Name: "embedding/embedding", Shape: []int64{16, 8}, Data: fx.cactTensors["embedding"]},
+				{Name: "stack/q_proj/kernel", Shape: []int64{2, 8, 8}, Data: make([]float32, 2*8*8)},
+				{Name: "stack/mhc_phi_pre", Shape: []int64{2, 16, 2}, Data: make([]float32, 2*16*2)},
+				{Name: "pe_gate", Shape: []int64{1, 1}, Data: []float32{0.75}},
+			}, stConfig(cfg))
+
+			s, err := ParseSafetensors(st, Options{Names: fx.names})
+			if err == nil {
+				_ = s.Close()
+			}
+
+			if err == nil || !strings.Contains(err.Error(), tc.match) {
+				t.Errorf("error %v, want one mentioning %q", err, tc.match)
+			}
+		})
+	}
+}
+
 // TestParseDoesNotOwnBytes: a source parsed from caller bytes maps
 // nothing, and Close leaves the bytes alone.
 func TestParseDoesNotOwnBytes(t *testing.T) {

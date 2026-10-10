@@ -79,9 +79,48 @@ func newSafetensors(file *mapping, opts Options) (*Safetensors, error) {
 		return nil, err
 	}
 
+	err = checkDerived(cfg, entries)
+	if err != nil {
+		return nil, err
+	}
+
 	be := &safetensorsBackend{store: store, entries: entries, cfg: cfg}
 
 	return &Safetensors{newCore(entries, cfg, file, be)}, nil
+}
+
+// checkDerived requires a config that recomputes every derived record at
+// its mapped shape, so a malformed config fails here rather than as a panic
+// or a huge allocation in the first Tensor call.
+func checkDerived(cfg Config, entries []cact.Entry) error {
+	for _, e := range entries {
+		if e.Transform != cact.Derived {
+			continue
+		}
+
+		var ok bool
+
+		if _, perm := cact.HadaPermSeed(e.Name); perm {
+			ok = cfg.Dim > 0 && cfg.HadaN == numel(e.Shape)
+		} else {
+			switch e.Name {
+			case "audio.mel_filters":
+				ok = cfg.Rate > 0 && cfg.FFT > 0 && cfg.Mels > 0 && len(e.Shape) == 2 &&
+					cfg.FFT/2+1 == e.Shape[0] && cfg.Mels == e.Shape[1]
+			case manifestName:
+				ok = numel(e.Shape) == manifestLen
+			default:
+				ok = true // not recomputed: derive reports it unavailable
+			}
+		}
+
+		if !ok {
+			return fmt.Errorf("weights: %s: config (dim %d, rate %d, fft %d, mels %d) does not recompute shape %v",
+				e.Name, cfg.Dim, cfg.Rate, cfg.FFT, cfg.Mels, e.Shape)
+		}
+	}
+
+	return nil
 }
 
 // checkSource requires a source shape that e.Apply accepts: the layer
@@ -162,7 +201,7 @@ func (b *safetensorsBackend) derive(e cact.Entry) ([]float32, error) {
 		switch e.Name {
 		case "audio.mel_filters":
 			v = cact.SlaneyMel(b.cfg.Rate, b.cfg.FFT, b.cfg.Mels)
-		case "audio.manifest":
+		case manifestName:
 			v = b.cfg.manifestRecord()
 		default:
 			return nil, fmt.Errorf("weights: safetensors cannot recompute %s: %w", e.Name, ErrUnavailable)
