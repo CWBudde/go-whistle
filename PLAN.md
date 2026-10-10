@@ -998,6 +998,20 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       float32 (13.2×). Details and what 9.2 needs: `docs/FINDINGS.md` F-028.
 - [ ] 9.2 Run straight from the packed `.cact`: wire the 9.1 kernel into `needle`, `encoder` and `decoder` behind
       `weights.Source`. Memory target: under 64 MB RSS for the model.
+      (2026-10-10) — partial: the packed path runs the whole model and is `whistle.Load`'s default for `.cact`
+      (`WithFloatWeights()` keeps float). `weights.Options.Packed` makes the `.cact` source a `weights.Packer` whose
+      `Matrix(name)` serves each CQ record as a cached `cq.Matrix` without a float32 copy. `needle.Linear` (`Apply`,
+      `Row`, `Rows`) runs all 152 CQ tensors: the attention and cross-attention projections, `pw1`/`pw2`, the stem, the
+      mHC φ, the engram tables and projections, and the embedding with its tied head. `cq.NewGather` skips the lut copy
+      of the gather-only engram tables. Parity, packed against float: every transcript equal (32 clips, 192 depth cases,
+      53 keyword cases, 200 LibriSpeech utterances). Equal to the engine: 31/32 both ways. WER 5.35 % both (engine
+      5.30 %). `Embed` against `needle_embed`: 0.999827 against 0.999828. Memory (`just mem-probe`, M5 Pro): the model,
+      i.e. the live Go heap plus the resident `.cact` pages after `Load` and a 30 s `Transcribe`, is 34.1 MiB against
+      230.6 MiB, and the process is at 41.7 MiB after `Load`. But a 30 s `Transcribe` peaks at 127.6 MiB process RSS
+      (float 488.3 MiB): the stem's 29 MiB activation spike, the 10 MiB cross-attention memory and `GOGC` headroom. So
+      the 64 MB target holds for the weights, not for a 30 s run. Speed, the same process alternating: decode 1.56–1.59×
+      faster, `Load` 10 against 165 ms, but TTFT 2–8 % slower (batched products, the 2048-wide CQ4 φ tables). Open
+      levers for the peak and the TTFT: `docs/FINDINGS.md` F-037.
 - [ ] 9.3 Optional int8 activations and an int8 KV cache (`act_bits 8`, `kv_bits 8`) to mirror the engine's numerics,
       behind a flag.
 - [x] 9.4 Plan 9 assembly (NEON/AVX2) for the LUT GEMV, the FWHT, the Monarch Kronecker products and the
