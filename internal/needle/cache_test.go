@@ -427,14 +427,48 @@ func TestBlockExtendHooks(t *testing.T) {
 	errHook := errors.New("hook failed")
 	fail := func([]float32, int) error { return errHook }
 
+	// The rows after a two-row prefix, extended without a failure: what a
+	// retry after a failed hook must reproduce.
+	const pre = 2
+
+	var ref KVCache
+
+	_, err = b.Extend(x[:pre*dim], pre, &ref, rope, nil, Hooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want, err := b.Extend(x[pre*dim:], steps-pre, &ref, rope, nil, Hooks{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for name, hooks := range map[string]Hooks{
 		"BeforeAttn": {BeforeAttn: fail}, "AfterAttn": {AfterAttn: fail}, "AfterMLP": {AfterMLP: fail},
 	} {
 		var c KVCache
 
-		_, err := b.Extend(x, steps, &c, rope, nil, hooks)
+		_, err := b.Extend(x[:pre*dim], pre, &c, rope, nil, Hooks{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = b.Extend(x[pre*dim:], steps-pre, &c, rope, nil, hooks)
 		if !errors.Is(err, errHook) {
 			t.Errorf("%s: err %v, want %v", name, err, errHook)
+		}
+
+		if c.Len() != pre {
+			t.Errorf("%s: the failed Extend left %d positions, want %d", name, c.Len(), pre)
+		}
+
+		got, err := b.Extend(x[pre*dim:], steps-pre, &c, rope, nil, Hooks{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !slices.Equal(got, want) {
+			t.Errorf("%s: a retry after the failed hook differs from an uninterrupted Extend", name)
 		}
 	}
 }
