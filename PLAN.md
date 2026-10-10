@@ -648,17 +648,47 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       "250–3500 Hz" mask is ruled out), no pre-emphasis; window and reflect vs zero padding tie (F-018). Findings
       F-014 to F-018.
 
-## Phase 5 — Decoder + greedy decoding
+## Phase 5 — Decoder + greedy decoding — ✅ DONE (2026-10-10)
 
-- [ ] Cross-attention: per-layer `cross_norm → q`, encoder `k/v` projected once per clip and cached, q/k norm,
+- [x] Cross-attention: per-layer `cross_norm → q`, encoder `k/v` projected once per clip and cached, q/k norm,
       sigmoid gate, `post_cross_norm`, σ(`cross_gate`) residual. Decide where it sits in the block (after
       self-attention is the most likely) by fixture accuracy.
-- [ ] KV cache for self-attention, plus a rolling history for the Q/K/V taps and the engram n-grams.
-- [ ] Tied output head (logits = x · Eᵀ) and `sqrt(d)` input scaling.
-- [ ] Prompt-format candidates: `[bos]`, `[bos, <speech>]`, `[bos, <|lang|>]`, … Pick the one where greedy decoding
+      (2026-10-10) — between the self-attention and the MLP, inside the mHC block function
+      (`needle.Block.Extend` with `Hooks.AfterAttn`): `x += σ(cross_gate)·post_cross_norm(out_proj(softmax(q̂k̂ᵀ/√48)v
+    · σ(gate_proj(cross_norm(x)))))`, 8 heads of 48/64, per-head q/k ZCRMSNorm, no RoPE, over `needle_embed`
+      (`enc.final_norm` of the lane mean). Decided by teacher-forced mean log-probability of the engine transcripts,
+      32 clips, `.cact` (leader −0.1302, top-1 0.977): after the MLP −0.1484 (language 20/32), before the
+      self-attention −1.0900, outside mHC −1.5188; q/k norm none −0.2098, without gain −0.7983, gain = scale −2.7037;
+      gate from the un-normed residual −0.0863, none −0.7254, silu −1.4487; no post norm −4.2525, raw `cross_gate`
+      −8.9044; RoPE in the cross-attention −0.3912; memory before `enc.final_norm` −3.6391. σ and tanh of
+      `cross_gate` (22.0–22.8) are both 1 and tie exactly (`docs/FINDINGS.md` F-021).
+- [x] KV cache for self-attention, plus a rolling history for the Q/K/V taps and the engram n-grams.
+      (2026-10-10) — `needle.KVCache` (keys/values of every position plus the last 2 raw Q/K/V rows for the taps)
+      with `Attention.Extend`, and `needle.EngramCache` (last 2 tokens, last 9 raw value rows for the dilated taps)
+      with `Engram.Extend`; `decoder.State` holds one per layer and site. One call equals `Forward` exactly; row by
+      row within 6e-7 on random weights, 6.1e-5 at |ref| 379 on the real layer 3 with engram
+      (`TestWhistleDecoderIncremental`). `TestIncrementalMatchesFullRun`: a greedy decode through the caches and a
+      one-pass re-run agree on all 38 × 8199 logits within the F-009 contract and on every argmax (F-022).
+- [x] Tied output head (logits = x · Eᵀ) and `sqrt(d)` input scaling.
+      (2026-10-10) — embedding × √512 (× 1: −4.7279), `stack/final_norm` of the lane mean (without: −37885), tied head
+      x · Eᵀ over all 8199 pieces (÷ √512: −7.8698, same top-1) (F-023).
+- [x] Prompt-format candidates: `[bos]`, `[bos, <speech>]`, `[bos, <|lang|>]`, … Pick the one where greedy decoding
       reproduces the engine's language token and the first words.
-- [ ] Language detection: argmax (or softmax over 8192–8198) at the language step; a fixed language forces the token.
-- [ ] **Accept:** greedy transcripts are sensible on all fixtures and the language matches the engine on 100% of them.
+      (2026-10-10) — `[<s>]`, then `<|lang|>`, the text without a leading `▁`, `</s>`. `[<s>, <speech>]` −0.4236 and
+      language 3/32, `[<pad>]` −0.6570, `[<speech>]` −0.7252, `[</s>]` −0.8315, the other `<speech>`/`</speech>` forms
+      worse; `▁` before the first word −0.3202. The embedding rows agree: `<speech>`, `</speech>`, `<pad>` and all 24
+      chat markers sit at the untrained RMS 8.3, `<s>`, `</s>` and the language tokens at 2.5–3.5 like text (F-023).
+- [x] Language detection: argmax (or softmax over 8192–8198) at the language step; a fixed language forces the token.
+      (2026-10-10) — `decoder.Greedy(enc, frames, lang)`: argmax over the 7 language tokens after `[<s>]`, or the
+      forced one; then argmax until `</s>` or 320 tokens, decoded with `internal/tokenizer`. The language token is
+      also the unrestricted argmax (rank 0) on 32/32 clips with either weight source (F-024).
+- [x] **Accept:** greedy transcripts are sensible on all fixtures and the language matches the engine on 100% of them.
+      (2026-10-10) — `.cact` weights: language 32/32, text identical on 21/32, every clip stops at `</s>`, mean WER
+      0.0496 / CER 0.0188 against the engine's text, max CER 0.1295 (fleurs-pl_pl-10013271501230525766, where the
+      engine's own text has non-words). Safetensors: language 32/32, exact 10/32, mean CER 0.0543, max 0.2235. Search
+      harness `just decoder-probe` (beam 4 over four stages, then single-axis/pair/stage descent; 2.6 min from the
+      prior, 3.6 min from a start wrong on all 12 axes, both end at `decoder.Best()`); fast regression
+      `TestGreedyMatchesEngine` (three clips exact, no tag) (F-021 to F-024).
 
 ## Phase 6 — Engine-parity decoding
 
@@ -727,8 +757,8 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 | U3  | Encoder conv module (GLU?), macaron scale, `pe_gate` usage, positions                       | 4     | encoder cosine                    |
 | U4  | Meaning of the audio manifest values `3246, 1`                                              | 4/5   | inspection + experiments          |
 | U5  | Whether the encoder and decoder share the Hadamard permutations                             | 2/4   | block parity / encoder cosine     |
-| U6  | Cross-attention position in the block                                                       | 5     | greedy transcript parity          |
-| U7  | Decoder prompt format, language detection                                                   | 5     | language + first-token parity     |
+| U6  | Cross-attention position in the block — resolved: after the self-attention, F-021           | 5     | teacher-forced transcript score   |
+| U7  | Decoder prompt format, language detection — resolved: `[<s>]`, argmax language, F-023/F-024 | 5     | language + teacher-forced score   |
 | U8  | Beam length normalisation, EOS rules                                                        | 6     | transcript parity                 |
 | U9  | Keyword bias weight and revocation                                                          | 6     | keyword fixture parity            |
 | U10 | Silence gate measure and threshold                                                          | 6     | threshold sweep                   |
