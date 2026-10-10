@@ -809,9 +809,10 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
       mismatch by its log-probability margin (a near-tie), a miss the case shares with the run without keywords, or a
       documented search miss.
       (2026-10-10) — reworded by the user's decision; was: "transcripts with keywords equal the engine's on the keyword
-      fixtures at the same rate as without", which no variant of 3846 reached (best 46/53 against 50/53). Met at 46/53
-      (86.8 %): of the 7 mismatches, 3 are the Polish clip missed without keywords, 3 near-ties (0.0036, 0.0125, 0.0247
-      nats per token) and 1 search miss (`de-paare-missed`, a follow-up in Phase 10).
+      fixtures at the same rate as without". Before the PR #23 review fixes none of the 3846 grid variants reached it
+      (best 45/53 against 50/53); the grids were not re-run after the fixes, which bring `DefaultBias` to 46/53. Met
+      at 46/53 (86.8 %): of the 7 mismatches, 3 are the Polish clip missed without keywords, 3 near-ties (0.0036,
+      0.0125, 0.0247 nats per token) and 1 search miss (`de-paare-missed`, a follow-up in Phase 10).
       (2026-10-10) — with keywords 45/53 (84.9 %) against 50/53 (94.3 %) without on the same cases; the
       reference rate is 31/32 (96.9 %, F-026). Per kind, with / without: present 14/14, missed 13/15, distractor 7/8,
       phrase 10/11, list 1/2 of 15/16/8/12/2. Of the 8 mismatches, 3 are on the Polish clip we already miss without
@@ -1043,10 +1044,11 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       GEMM (q_proj 20.1 vs 7.7 µs, head 652 vs 192 µs). Memory: 16.63 MB for all CQ matrices against 218.77 MB as
       float32 (13.2×). Details and what 9.2 needs: `docs/FINDINGS.md` F-028.
 - [x] 9.2 Run straight from the packed `.cact`: wire the 9.1 kernel into `needle`, `encoder` and `decoder` behind
-      `weights.Source`. Memory target: under 64 MB RSS for the model.
-      (2026-10-10) — the target counts the model's weights, by the user's decision: the live Go heap plus the resident
-      `.cact` pages, 34.1 MiB (numbers below). The 127.6 MiB process peak of a 30 s `Transcribe` (activations and GC
-      headroom) is a separate goal that does not block 9.2 (F-037 "Open").
+      `weights.Source`. Memory target: the model's weights under 64 MB, counted as the live Go heap plus the resident
+      `.cact` pages (`just mem-probe`).
+      (2026-10-10) — target reworded by the user's decision; was: "under 64 MB RSS for the model". Process RSS is not
+      the measure: the weights are, 34.1 MiB (numbers below). The 127.6 MiB process peak of a 30 s `Transcribe`
+      (activations and GC headroom) is a separate goal that does not block 9.2 (F-037 "Open").
       (2026-10-10) — the packed path runs the whole model and is `whistle.Load`'s default for `.cact`
       (`WithFloatWeights()` keeps float). `weights.Options.Packed` makes the `.cact` source a `weights.Packer` whose
       `Matrix(name)` serves each CQ record as a cached `cq.Matrix` without a float32 copy. `needle.Linear` (`Apply`,
