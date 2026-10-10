@@ -113,6 +113,10 @@ decoder-probe *args:
 search-probe *args:
     go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbeBeam$' ./internal/search/ {{args}}
 
+# WER of the Go pipeline and of the engine on the LibriSpeech test-clean subset, and how often the transcripts are equal (audio: oracle-librispeech-audio)
+eval-librispeech:
+    WHISTLE_EVAL_LIBRISPEECH=1 go test -count=1 -v -timeout 60m -run 'TestEvalLibriSpeech$' ./whistle/
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
