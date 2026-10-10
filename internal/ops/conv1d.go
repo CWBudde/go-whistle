@@ -288,7 +288,14 @@ func prepareConv1D(
 		}
 	}
 
-	p.outLength = (p.length+leftPadding+rightPadding-dilation*(p.kernelSize-1)-1)/stride + 1
+	// Floor division: Go truncates a negative span toward zero, which
+	// would give one output for an input shorter than the kernel.
+	span := p.length + leftPadding + rightPadding - dilation*(p.kernelSize-1) - 1
+	if span < 0 {
+		return conv1DParams{}, nil, nil, fmt.Errorf("ops: conv1d produced non-positive output length (span %d)", span)
+	}
+
+	p.outLength = span/stride + 1
 	if p.outLength <= 0 {
 		return conv1DParams{}, nil, nil, fmt.Errorf("ops: conv1d produced non-positive output length %d", p.outLength)
 	}
