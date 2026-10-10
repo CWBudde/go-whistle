@@ -64,25 +64,8 @@ func (r Result) MarshalJSON() ([]byte, error) {
 	b = appendString(b, r.Language)
 
 	if r.Words != nil {
-		b = append(b, `,"words":[`...)
-
-		for i, w := range r.Words {
-			if i > 0 {
-				b = append(b, ',')
-			}
-
-			b = append(b, `{"word":`...)
-			b = appendString(b, w.Text)
-			b = append(b, `,"start":`...)
-			b = strconv.AppendFloat(b, w.Start.Seconds(), 'f', 2, 64)
-			b = append(b, `,"end":`...)
-			b = strconv.AppendFloat(b, w.End.Seconds(), 'f', 2, 64)
-			b = append(b, `,"probability":`...)
-			b = strconv.AppendFloat(b, w.Probability, 'f', 3, 64)
-			b = append(b, '}')
-		}
-
-		b = append(b, ']')
+		b = append(b, `,"words":`...)
+		b = appendWords(b, r.Words)
 	}
 
 	b = append(b, `,"ttft_ms":`...)
@@ -91,6 +74,31 @@ func (r Result) MarshalJSON() ([]byte, error) {
 	b = strconv.AppendFloat(b, r.DecodeTPS, 'f', 1, 64)
 
 	return append(b, '}'), nil
+}
+
+// appendWords appends words as the engine's JSON array: word, start, end and
+// probability per word, times in seconds with two decimals, probabilities
+// with three.
+func appendWords(b []byte, words []Word) []byte {
+	b = append(b, '[')
+
+	for i, w := range words {
+		if i > 0 {
+			b = append(b, ',')
+		}
+
+		b = append(b, `{"word":`...)
+		b = appendString(b, w.Text)
+		b = append(b, `,"start":`...)
+		b = strconv.AppendFloat(b, w.Start.Seconds(), 'f', 2, 64)
+		b = append(b, `,"end":`...)
+		b = strconv.AppendFloat(b, w.End.Seconds(), 'f', 2, 64)
+		b = append(b, `,"probability":`...)
+		b = strconv.AppendFloat(b, w.Probability, 'f', 3, 64)
+		b = append(b, '}')
+	}
+
+	return append(b, ']')
 }
 
 // resultJSON and wordJSON are the wire form UnmarshalJSON reads.
