@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,8 +33,9 @@ type probeRecord struct {
 	PCMSHA256      string `json:"pcm_sha256"`
 }
 
-// cmdProbes records needle_embed for every signal of probe.Set into cfg.outDir.
-func cmdProbes(cfg runConfig, log io.Writer) error {
+// cmdProbes records needle_embed for every signal of probe.Set into cfg.outDir. A cancelled ctx stops it between
+// probes.
+func cmdProbes(ctx context.Context, cfg runConfig, log io.Writer) error {
 	// The engine's telemetry is off for the oracle (the justfile recipe sets the same).
 	for k, v := range map[string]string{"NEEDLE_TELEMETRY": "0", "DO_NOT_TRACK": "1"} {
 		err := os.Setenv(k, v)
@@ -73,6 +75,11 @@ func cmdProbes(cfg runConfig, log io.Writer) error {
 	}
 
 	for _, s := range probe.Set() {
+		err := ctx.Err()
+		if err != nil {
+			return fmt.Errorf("probes: %w", err)
+		}
+
 		rec, err := recordProbe(cfg.outDir, eng, s, map[string]string{
 			"engine_version": pin["engine_version"], "engine_revision": pin["revision"], "model_sha256": model.SHA256,
 		})

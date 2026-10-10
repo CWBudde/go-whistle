@@ -67,6 +67,24 @@ func TestShapeElemCount_ZeroDim(t *testing.T) {
 	}
 }
 
+func TestShapeElemCount_Overflow(t *testing.T) {
+	// 3e9 · 4e9 overflows int64 to a negative count before the size checks.
+	_, err := shapeElemCount([]int64{3_000_000_000, 4_000_000_000})
+	if err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("shapeElemCount with an overflowing shape: got %v", err)
+	}
+
+	_, err = Zeros([]int64{3_000_000_000, 4_000_000_000})
+	if err == nil {
+		t.Fatal("Zeros with an overflowing shape: no error")
+	}
+
+	got, err := shapeElemCount([]int64{3_000_000_000, 0, 4_000_000_000})
+	if err != nil || got != 0 {
+		t.Fatalf("shapeElemCount with a zero dim between huge dims = %d, %v; want 0", got, err)
+	}
+}
+
 func TestLinearToCoord(t *testing.T) {
 	shape := []int64{2, 3, 4}
 	strides := computeStrides(shape)

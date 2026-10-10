@@ -204,6 +204,17 @@ func TestConv1DErrors(t *testing.T) {
 			groups:  1,
 			wantErr: "non-positive output length",
 		},
+		{
+			// (2 − 2 − 1)/2 truncates to 0 in Go: the output length must
+			// be floored, 0, not 1.
+			name:    "input shorter than the kernel by less than the stride",
+			input:   mustTensorT(t, []float32{1, 2}, []int64{1, 1, 2}),
+			kernel:  mustTensorT(t, []float32{1, 1, 1}, []int64{1, 1, 3}),
+			stride:  2,
+			dil:     1,
+			groups:  1,
+			wantErr: "non-positive output length",
+		},
 	}
 
 	for _, tc := range tests {

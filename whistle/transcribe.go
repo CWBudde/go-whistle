@@ -60,8 +60,9 @@ func (m *Model) Transcribe(pcm []float32, opts TranscribeOptions) (Result, error
 	return m.transcribe(pcm, opts, time.Now)
 }
 
-// TranscribeWAV is Transcribe on a RIFF WAV file: 8/16/24/32-bit PCM or
-// float, any channels and rate, mixed to mono and resampled to 16 kHz.
+// TranscribeWAV is Transcribe on a RIFF WAV file: 8/16/24/32-bit integer
+// PCM, any channels and rate, mixed to mono and resampled to 16 kHz. Like
+// the engine's wave reader it rejects IEEE float WAVs (frontend.FormatError).
 func (m *Model) TranscribeWAV(path string, opts TranscribeOptions) (Result, error) {
 	pcm, err := frontend.ReadWAV(path)
 	if err != nil {

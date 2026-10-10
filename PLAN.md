@@ -813,6 +813,9 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
       a model gap (the engine writes a non-keyword our model puts 2.4 nats lower); `de-paare-missed` is a search miss:
       weaker hypotheses with the shared keyword bonus end one token earlier and fill Whisper's 5 finished slots. No
       variant reaches 46. Fast regression `TestKeywordsMatchEngine` (F-029).
+      (2026-10-10) — after the PR #23 review fixes (suffix completions, order-independent bonus, bare spellings
+      anchored at the text start, byte pieces under `PerChar`) 46/53 (86.8 %): the anchoring makes
+      `de-diese-paare-phrase` equal; the Polish pair changes text but still differs (F-029).
 
 ### 6.4 Depth ladder (`internal/decoder`; needs 6.1)
 

@@ -28,7 +28,7 @@ func newTranscribeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "transcribe <wav>",
 		Short: "Transcribe a WAV file of at most 30 s",
-		Long: "Transcribe a RIFF WAV file (8/16/24/32-bit PCM or float, any channels and rate) of at most 30 s and\n" +
+		Long: "Transcribe a RIFF WAV file (8/16/24/32-bit integer PCM, any channels and rate) of at most 30 s and\n" +
 			"print the text, or with --json the engine's JSON object:\n" +
 			`  {"text":"...","language":"en","ttft_ms":0.0,"decode_tps":0.0}` + "\n\n" +
 			"Decoding is the engine's beam search (5 beams); silence gives the empty text. --keywords names a file of\n" +

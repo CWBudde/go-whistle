@@ -224,3 +224,42 @@ func TestStepRules(t *testing.T) {
 		t.Errorf("StopK with two finished: done %v, finished %d, err %v", done, len(s.fin), err)
 	}
 }
+
+// TestPickAtTokenLimit: a search that reaches the token limit before
+// StopK's Beams hypotheses have finished lets the best live ones compete
+// with the finished, as Whisper's finalize does, up to Beams of them; a
+// search StopK ended picks among the finished only.
+func TestPickAtTokenLimit(t *testing.T) {
+	o := Default()
+	o.Beams, o.Norm = 3, NormNone
+
+	short := &hyp{seq: []int{2, 9}, text: 2, adj: -5, sum: -5, eos: true}
+	good := &hyp{seq: []int{2, 9, 10}, text: 2, adj: -1, sum: -1}
+	worse := &hyp{seq: []int{2, 9, 11}, text: 2, adj: -2, sum: -2}
+	third := &hyp{seq: []int{2, 9, 12}, text: 2, adj: -0.5, sum: -0.5}
+
+	s := &beam{opt: o, fin: []*hyp{short}}
+
+	if got := s.pick([]*hyp{good, worse}, false); got != good {
+		t.Errorf("at the limit: picked adj %v, want the live −1", got.adj)
+	}
+
+	// Beams 3 with one finished admits the two best live by adj: third
+	// (−0.5) and good (−1), not worse.
+	if got := s.pick([]*hyp{worse, good, third}, false); got != third {
+		t.Errorf("at the limit, three live: picked adj %v, want −0.5", got.adj)
+	}
+
+	s.opt.Beams = 2
+	if got := s.pick([]*hyp{worse, third}, false); got != third {
+		t.Errorf("Beams 2: picked adj %v, want −0.5", got.adj)
+	}
+
+	if got := s.pick([]*hyp{good, worse}, true); got != short {
+		t.Errorf("stopped by StopK: picked adj %v, want the finished −5", got.adj)
+	}
+
+	if got := (&beam{opt: o}).pick([]*hyp{worse, good}, false); got != good {
+		t.Errorf("none finished: picked adj %v, want −1", got.adj)
+	}
+}

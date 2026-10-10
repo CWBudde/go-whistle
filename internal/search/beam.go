@@ -101,14 +101,32 @@ func run(d *decoder.Decoder, ex expander, root *decoder.State, opt Options) (Res
 		}
 	}
 
-	pool := s.fin
-	if len(pool) == 0 || (!done && opt.Stop != StopK) {
-		pool = append(slices.Clone(pool), alive...)
-	}
-
-	best := slices.MaxFunc(pool, func(a, b *hyp) int { return cmp.Compare(s.final(a), s.final(b)) })
+	best := s.pick(alive, done)
 
 	return result(d, best, s.final(best))
+}
+
+// pick is the hypothesis with the best final score among the finished
+// ones. Unless the stopping rule ended the search, that is, at the token
+// limit or with none finished, the live hypotheses compete too: under StopK
+// the best of them by adjusted log-probability until there are Beams
+// candidates, as Whisper's finalize fills its finished sequences
+// (docs/FINDINGS.md F-026), under the other rules all of them.
+func (s *beam) pick(alive []*hyp, done bool) *hyp {
+	pool := slices.Clone(s.fin)
+
+	if !done || len(pool) == 0 {
+		live := alive
+		if s.opt.Stop == StopK {
+			live = slices.Clone(alive)
+			slices.SortStableFunc(live, func(a, b *hyp) int { return cmp.Compare(b.adj, a.adj) })
+			live = live[:min(len(live), max(s.opt.Beams-len(pool), 0))]
+		}
+
+		pool = append(pool, live...)
+	}
+
+	return slices.MaxFunc(pool, func(a, b *hyp) int { return cmp.Compare(s.final(a), s.final(b)) })
 }
 
 // languageStep starts the hypotheses after the prompt: the forced
@@ -147,7 +165,8 @@ func languageStep(d *decoder.Decoder, ex expander, root *decoder.State, opt Opti
 		h := &hyp{
 			seq: append(slices.Clone(prompt), c.tok), text: start.text, langLP: c.lp, st: start.st, fed: start.fed,
 		}
-		if opt.Lang != LangArgmax {
+		// A forced language is no choice: only a detected one is scored.
+		if opt.Lang != LangArgmax && opt.Language == "" {
 			h.sum, h.adj = c.lp, c.lp
 		}
 

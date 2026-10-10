@@ -299,6 +299,37 @@ func TestGEMMRows(t *testing.T) {
 	}
 }
 
+// TestGEMMNoRows runs every kernel on matrices without rows: Out 0, which
+// New accepts, and empty Rows views on and off a 32-row block boundary.
+func TestGEMMNoRows(t *testing.T) {
+	rng := rand.New(rand.NewPCG(5, 6))
+
+	empty, err := New(randomPacked(rng, 0, 256, 128, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := New(randomPacked(rng, 64, 256, 128, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x := make([]float32, 2*256)
+	for i := range x {
+		x[i] = float32(rng.NormFloat64())
+	}
+
+	for name, v := range map[string]*Matrix{"out 0": empty, "rows 32..32": m.Rows(32, 32), "rows 5..5": m.Rows(5, 5)} {
+		for _, k := range kernels {
+			v.gemm(k, nil, x, 2)
+			v.gemm(k, nil, x[:256], 1)
+		}
+
+		v.GEMV(nil, x[:256])
+		t.Logf("%s: no panic", name)
+	}
+}
+
 // TestRow checks Row against the float64 dequantisation and Rows against
 // the full matrix.
 func TestRow(t *testing.T) {

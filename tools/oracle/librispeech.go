@@ -216,7 +216,10 @@ func ensureLibriSpeech(ctx context.Context, corpusDir, outDir string, log io.Wri
 			return old, fmt.Errorf("%s: %w", p, err)
 		}
 
-		if verifiedUtterances(corpusDir, old.Utterances) {
+		err = checkSubset(old)
+		if err != nil {
+			_, _ = fmt.Fprintf(log, "refetch  %s: %v\n", p, err)
+		} else if verifiedUtterances(corpusDir, old.Utterances) {
 			_, _ = fmt.Fprintf(log, "ok       %s: %d utterances (sha256 verified)\n", corpusDir, len(old.Utterances))
 
 			return old, nil
@@ -249,6 +252,99 @@ func ensureLibriSpeech(ctx context.Context, corpusDir, outDir string, log io.Wri
 	_, _ = fmt.Fprintf(log, "fetched  %s: %d utterances\n", corpusDir, len(sub.Utterances))
 
 	return sub, writeFile(p, js)
+}
+
+// checkSubset checks what a subset.json must hold before its WAVs alone vouch for it: the header fetchSubset
+// writes, lsPerSpeaker utterances of each of lsSpeakers speakers, sorted unique IDs that agree with their speaker,
+// chapter and archive member, lengths within the engine's limit, a transcript and a SHA-256 each. The selection
+// itself needs the archive; a subset that passes but differs from it fails when it is fetched again.
+func checkSubset(s lsSubset) error {
+	want := lsSubset{
+		Dataset: "LibriSpeech " + lsSplit, Archive: fmt.Sprintf(librispeechURL, lsSplit), ArchiveSHA256: lsArchiveSHA256,
+		Seed: lsSeed, Selection: lsSelectionRule,
+		AudioDir: filepath.ToSlash(filepath.Join("models", "corpus", datasetLibriSpeech)),
+	}
+
+	for _, f := range []struct{ name, got, want string }{
+		{"dataset", s.Dataset, want.Dataset},
+		{"archive", s.Archive, want.Archive},
+		{"archive_sha256", s.ArchiveSHA256, want.ArchiveSHA256},
+		{"seed", s.Seed, want.Seed},
+		{"selection", s.Selection, want.Selection},
+		{"audio_dir", s.AudioDir, want.AudioDir},
+	} {
+		if f.got != f.want {
+			return fmt.Errorf("subset %s is %q, want %q", f.name, f.got, f.want)
+		}
+	}
+
+	if len(s.Utterances) != lsSpeakers*lsPerSpeaker {
+		return fmt.Errorf("subset has %d utterances, want %d", len(s.Utterances), lsSpeakers*lsPerSpeaker)
+	}
+
+	perSpeaker := map[string]int{}
+
+	for i, u := range s.Utterances {
+		err := checkUtterance(u)
+		if err != nil {
+			return err
+		}
+
+		if i > 0 && u.ID <= s.Utterances[i-1].ID {
+			return fmt.Errorf("subset utterance %s is not after %s", u.ID, s.Utterances[i-1].ID)
+		}
+
+		perSpeaker[u.Speaker]++
+	}
+
+	if len(perSpeaker) != lsSpeakers {
+		return fmt.Errorf("subset has %d speakers, want %d", len(perSpeaker), lsSpeakers)
+	}
+
+	for spk, n := range perSpeaker {
+		if n != lsPerSpeaker {
+			return fmt.Errorf("subset speaker %s has %d utterances, want %d", spk, n, lsPerSpeaker)
+		}
+	}
+
+	return nil
+}
+
+// checkUtterance checks one subset entry against itself.
+func checkUtterance(u lsUtterance) error {
+	parts := strings.Split(strings.TrimPrefix(u.ID, "ls-clean-"), "-")
+
+	switch {
+	case !validID(u.ID) || !strings.HasPrefix(u.ID, "ls-clean-") || len(parts) != 3:
+		return fmt.Errorf("subset utterance id %q is not ls-clean-<speaker>-<chapter>-<n>", u.ID)
+	case parts[0] != u.Speaker || parts[1] != u.Chapter:
+		return fmt.Errorf("subset utterance %s: speaker %q, chapter %q", u.ID, u.Speaker, u.Chapter)
+	case u.Member != path.Join("LibriSpeech", lsSplit, u.Speaker, u.Chapter, strings.Join(parts, "-")+".flac"):
+		return fmt.Errorf("subset utterance %s: member %q", u.ID, u.Member)
+	case u.Samples < 1 || u.Samples > lsMaxSamples:
+		return fmt.Errorf("subset utterance %s: %d samples, want 1 to %d", u.ID, u.Samples, lsMaxSamples)
+	case strings.TrimSpace(u.Transcript) == "":
+		return fmt.Errorf("subset utterance %s: no transcript", u.ID)
+	case !isSHA256Hex(u.SHA256):
+		return fmt.Errorf("subset utterance %s: sha256 %q is not 64 lowercase hex digits", u.ID, u.SHA256)
+	}
+
+	return nil
+}
+
+// isSHA256Hex reports whether s is a SHA-256 digest in lowercase hex.
+func isSHA256Hex(s string) bool {
+	if len(s) != 2*sha256.Size {
+		return false
+	}
+
+	for _, r := range s {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+
+	return true
 }
 
 func verifiedUtterances(dir string, us []lsUtterance) bool {

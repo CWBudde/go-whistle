@@ -89,12 +89,24 @@ type Hooks struct {
 // values cached in c, and returns t rows of Dim values. engram is the
 // site's keys and values of the new rows (Engram.Extend), nil away from
 // the sites. With empty hooks and an empty cache it equals Forward with
-// MaskCausal (docs/FINDINGS.md F-022).
+// MaskCausal (docs/FINDINGS.md F-022). On an error c is left as it was, so
+// the rows can be extended again.
 func (b *Block) Extend(x []float32, t int, c *KVCache, rope *Rope, engram *EngramKV, hooks Hooks,
 ) ([]float32, error) {
 	attn := func(n []float32) ([]float32, error) { return b.attn.Extend(n, t, c, rope) }
 
-	return b.run(x, t, attn, engram, hooks, nil)
+	// Extend only appends to the keys and values and replaces the tap
+	// history, so the old slice headers are the old cache.
+	saved := *c
+
+	y, err := b.run(x, t, attn, engram, hooks, nil)
+	if err != nil {
+		*c = saved
+
+		return nil, err
+	}
+
+	return y, nil
 }
 
 // blockTrace receives the intermediates for the parity tests.

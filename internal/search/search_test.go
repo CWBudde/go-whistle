@@ -41,6 +41,35 @@ func TestOneBeamIsGreedy(t *testing.T) {
 	}
 }
 
+// TestForcedLanguageUnscored: a forced language token is not a choice, so
+// LangArgmaxScored and LangBeam leave its log-probability out of the score
+// and decode like LangArgmax.
+func TestForcedLanguageUnscored(t *testing.T) {
+	d, clips := loadSetup(t, "ls-other-3080-5040-0018")
+
+	opt := Default()
+	opt.Language = "fr"
+
+	want, err := Beam(d, clips[0].Mem, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, l := range []LangStep{LangArgmaxScored, LangBeam} {
+		opt.Lang = l
+
+		got, err := Beam(d, clips[0].Mem, opt)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got.Text != want.Text || got.Score != want.Score || got.LangLogProb != want.LangLogProb {
+			t.Errorf("language step %d: %q score %.6f, LangArgmax %q score %.6f", l, got.Text, got.Score, want.Text,
+				want.Score)
+		}
+	}
+}
+
 // fastClips are short clips (LibriSpeech test-other and test-clean, FLEURS
 // de) on which greedy decoding misses the engine's transcript and Default
 // reproduces it exactly (docs/FINDINGS.md F-026).

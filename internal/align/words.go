@@ -31,15 +31,17 @@ type Word struct {
 // whose piece starts with "▁" begins a word and every other token, byte
 // pieces included, continues it, so the engine's words are the transcript
 // split at its spaces, punctuation attached. Tokens that decode to nothing
-// (control pieces) join the current word.
+// (control and unknown pieces) join the current word, or the first word
+// when they come before it; only such tokens give no word.
 func Words(tok *tokenizer.Tokenizer, tokens []int) ([]Word, error) {
 	var (
-		out   []Word
-		start int
+		out     []Word
+		start   int
+		visible bool // tokens[start:] holds a token that decodes to text
 	)
 
 	flush := func(end int) error {
-		if end == start {
+		if !visible {
 			return nil
 		}
 
@@ -51,7 +53,7 @@ func Words(tok *tokenizer.Tokenizer, tokens []int) ([]Word, error) {
 		w := Word{Text: strings.TrimPrefix(text, " "), Start: start, End: end}
 		w.Core = core(tok, tokens, start, end)
 		out = append(out, w)
-		start = end
+		start, visible = end, false
 
 		return nil
 	}
@@ -66,6 +68,10 @@ func Words(tok *tokenizer.Tokenizer, tokens []int) ([]Word, error) {
 			if err != nil {
 				return nil, err
 			}
+		}
+
+		if t := tok.Type(id); t != tokenizer.TypeControl && t != tokenizer.TypeUnknown {
+			visible = true
 		}
 	}
 

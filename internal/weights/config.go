@@ -18,6 +18,9 @@ const languageTokens = 7
 // values of Config.manifest (docs/FINDINGS.md F-006).
 const manifestLen = 13
 
+// manifestName is the audio manifest record.
+const manifestName = "audio.manifest"
+
 // Config is the inference geometry, as both formats state it: the .cact
 // header and audio manifest, or the safetensors config (docs/FINDINGS.md
 // F-003, F-007). Training-only keys, the token ids (which the tokenizer
@@ -122,7 +125,7 @@ func (c *Config) setManifest(v []float32) error {
 // cactConfig reads the decoder geometry from the header and the encoder and
 // front end from the audio manifest (F-003).
 func cactConfig(f *cact.File, entries []cact.Entry) (Config, error) {
-	i := slices.IndexFunc(entries, func(e cact.Entry) bool { return e.Name == "audio.manifest" })
+	i := slices.IndexFunc(entries, func(e cact.Entry) bool { return e.Name == manifestName })
 	if i < 0 {
 		return Config{}, errors.New("weights: the name map has no audio.manifest")
 	}

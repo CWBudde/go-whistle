@@ -122,7 +122,7 @@ func explainDivergence(t *testing.T, m *Model, r streamFixtureRun, fx streamFixt
 
 	end := *fx.Calls[i].End
 	s.buf = append(s.buf, x[fed:end]...)
-	s.received = end
+	s.received = int64(end)
 	s.limit()
 	win := s.buf
 

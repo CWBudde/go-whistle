@@ -152,6 +152,17 @@ func TestStreamBookkeeping(t *testing.T) {
 	if s.limit(); len(s.buf) > MaxSamples || s.offset != 1280+13*1280 {
 		t.Errorf("limit twice: offset %d, %d samples", s.offset, len(s.buf))
 	}
+
+	// Stream positions past 2^31 samples (37 h) stay exact on 32-bit
+	// targets too.
+	const late = int64(1) << 40
+
+	s = &Stream{buf: make([]float32, MaxSamples+1280), offset: late, received: late + MaxSamples + 1280}
+	s.limit()
+
+	if s.offset != late+1280 || samplesDuration(s.offset) <= 0 || durationSamples(samplesDuration(s.offset)) != s.offset {
+		t.Errorf("late limit: offset %d, %v", s.offset, samplesDuration(s.offset))
+	}
 }
 
 // text is the words joined by spaces.
@@ -372,7 +383,7 @@ func replayStream(t testing.TB, m *Model, r streamFixtureRun, fx streamFixture, 
 		c := compareStreamCall(t, got, err, want)
 		if want.BufferStart != nil {
 			c.hasBufferStart = true
-			c.bufferStart = t0 == *want.BufferStart
+			c.bufferStart = t0 == int64(*want.BufferStart)
 		}
 
 		res.add(c, i, got, err, want)

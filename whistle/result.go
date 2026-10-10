@@ -56,6 +56,11 @@ func (r Result) MarshalJSON() ([]byte, error) {
 		return nil, fmt.Errorf("whistle: decode_tps %v is not a JSON number", r.DecodeTPS)
 	}
 
+	err := validWords(r.Words)
+	if err != nil {
+		return nil, err
+	}
+
 	b := make([]byte, 0, 96+len(r.Text)+64*len(r.Words))
 
 	b = append(b, `{"text":`...)
@@ -74,6 +79,17 @@ func (r Result) MarshalJSON() ([]byte, error) {
 	b = strconv.AppendFloat(b, r.DecodeTPS, 'f', 1, 64)
 
 	return append(b, '}'), nil
+}
+
+// validWords rejects a word probability that has no JSON number.
+func validWords(words []Word) error {
+	for _, w := range words {
+		if math.IsNaN(w.Probability) || math.IsInf(w.Probability, 0) {
+			return fmt.Errorf("whistle: probability %v of %q is not a JSON number", w.Probability, w.Text)
+		}
+	}
+
+	return nil
 }
 
 // appendWords appends words as the engine's JSON array: word, start, end and

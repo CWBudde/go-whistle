@@ -4,8 +4,13 @@ import (
 	"errors"
 	"math"
 	"math/rand/v2"
+	"runtime"
 	"slices"
 	"testing"
+	"time"
+	"unicode/utf8"
+
+	"github.com/cwbudde/go-whistle/internal/tokenizer"
 )
 
 func TestParseKeywords(t *testing.T) {
@@ -130,5 +135,200 @@ func TestNewKeywordsRejects(t *testing.T) {
 		if !errors.Is(err, ErrKeywords) {
 			t.Errorf("%s: %v, want ErrKeywords", b, err)
 		}
+	}
+}
+
+// TestKeywordOverlaps pins the review cases of the automaton: the bonus
+// does not depend on the order the keywords are inserted, a keyword that
+// completes as the suffix of a longer keyword's partial match earns its
+// completion and keeps its tokens when that match fails, and a bare
+// spelling matches only at the start of the text.
+func TestKeywordOverlaps(t *testing.T) {
+	b := Bias{Weight: 1, Revoke: 1, Complete: 0.5, Forms: FormSpace}
+
+	for _, order := range [][][]int{{{1, 2, 3}, {1, 2}}, {{1, 2}, {1, 2, 3}}} {
+		k := build(order, unit, b)
+		if got := k.Bonus([]int{1, 2, 3}, -1); got != 3+2*0.5 {
+			t.Errorf("keywords %v: Bonus(1 2 3) = %g, want 4", order, got)
+		}
+	}
+
+	k := build([][]int{{1, 2, 3, 4}, {2, 3}}, unit, b)
+
+	for _, tc := range []struct {
+		text []int
+		want float64
+	}{
+		{[]int{1, 2, 3}, 3 + 0.5},       // "2 3" completes inside "1 2 3 …"
+		{[]int{1, 2, 3, 7}, 2 + 0.5},    // the failure takes back "1" only
+		{[]int{1, 2, 3, 4}, 4 + 2*0.5},  // both complete
+		{[]int{1, 2, 3, 4, 7}, 4 + 1.0}, // and stay
+	} {
+		if got := k.Bonus(tc.text, -1); math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("Bonus(%v) = %g, want %g", tc.text, got, tc.want)
+		}
+	}
+
+	bare := build([][]int{{textStart, 5, 6}, {7}}, unit, b)
+
+	for _, tc := range []struct {
+		text []int
+		want float64
+	}{
+		{[]int{5, 6}, 2 + 0.5},
+		{[]int{7, 5, 6}, 1 + 0.5}, // "5 6" inside the text is no bare match
+		{[]int{5, 7}, 1 + 0.5},    // the failed bare start is taken back
+	} {
+		if got := bare.Bonus(tc.text, -1); math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("bare: Bonus(%v) = %g, want %g", tc.text, got, tc.want)
+		}
+
+		row := make([]float64, 8)
+		bare.Adjust(tc.text[:len(tc.text)-1], row)
+
+		want := tc.want - bare.Bonus(tc.text[:len(tc.text)-1], -1)
+		if last := tc.text[len(tc.text)-1]; math.Abs(row[last]-want) > 1e-12 {
+			t.Errorf("bare: Adjust(%v)[%d] = %g, want %g", tc.text[:len(tc.text)-1], last, row[last], want)
+		}
+	}
+}
+
+// TestKeywordPerCharBytes: under PerChar a keyword character spelled in
+// byte pieces earns one character's weight, not one per "<0xNN>" letter.
+func TestKeywordPerCharBytes(t *testing.T) {
+	d, _ := loadSetup(t)
+	tok := d.Tokenizer()
+
+	const kw = "🎵🎶" // two characters in byte pieces
+
+	ids := tok.Encode(kw)
+	if !slices.ContainsFunc(ids, func(id int) bool { return tok.Type(id) == tokenizer.TypeByte }) {
+		t.Fatalf("%q is no byte-fallback spelling: %v", kw, ids)
+	}
+
+	k, err := NewKeywords(tok, []string{kw}, Bias{Weight: 1, PerChar: true, Revoke: 1, Forms: FormBare})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := k.Bonus(ids, -1); got != 2 {
+		t.Errorf("Bonus(%q) = %g, want 2 characters", kw, got)
+	}
+
+	// Byte runs that are not valid UTF-8 count as the tokenizer decodes
+	// them: one U+FFFD per byte that starts no valid sequence.
+	for _, kw := range []string{"\x80", "a\x80b", "\xe6\x97", "\xe6\x97\xa5x", "\xc3\xa9\x80"} {
+		ids := tok.Encode(kw)
+
+		text, err := tok.Decode(ids)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		want := float64(utf8.RuneCountInString(text))
+
+		k, err := NewKeywords(tok, []string{kw}, Bias{Weight: 1, PerChar: true, Revoke: 1, Forms: FormBare})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got := k.Bonus(ids, -1); got != want {
+			t.Errorf("Bonus(%q) = %g, want %g characters (%q)", kw, got, want, text)
+		}
+	}
+
+	// A failed longer match keeps a completed prefix keyword's bonus even
+	// when the tail's shares are negative: "\xf0\x9f" (2 characters) inside
+	// "🎵x", whose fourth byte turns 3 characters into 1.
+	k, err = NewKeywords(tok, []string{"\xf0\x9f", "🎵x"}, Bias{Weight: 1, PerChar: true, Revoke: 1, Forms: FormBare})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := k.Bonus(tok.Encode("🎵"), tok.EOSID()); got != 2 {
+		t.Errorf("Bonus(🎵 + EOS) = %g, want the completed prefix's 2", got)
+	}
+}
+
+// TestKeywordLong: a spelling longer than 64 tokens works like a short one:
+// it completes, a failure takes back only the tokens no completed keyword
+// covers, and a keyword completed inside it past token 64 keeps its tokens.
+func TestKeywordLong(t *testing.T) {
+	const n = 100
+
+	long := make([]int, n)
+	for i := range long {
+		long[i] = 10 + i
+	}
+
+	inner := long[70:75] // also a keyword, completed at position 75
+	k := build([][]int{long, inner}, unit, Bias{Weight: 1, Revoke: 1, Complete: 0.5, Forms: FormSpace})
+
+	if got := k.Bonus(long, -1); got != n+2*0.5 {
+		t.Errorf("Bonus(long) = %g, want %g", got, n+2*0.5)
+	}
+
+	// The first 80 tokens, then a token outside the automaton: all but the
+	// five of the inner keyword are taken back.
+	if got := k.Bonus(append(slices.Clone(long[:80]), 99), -1); got != 5+0.5 {
+		t.Errorf("Bonus(long[:80] + miss) = %g, want 5.5", got)
+	}
+
+	row := make([]float64, 200)
+	k.Adjust(long[:n-1], row)
+
+	if want := 1 + 0.5; row[long[n-1]] != want {
+		t.Errorf("Adjust before the last token: %g, want %g", row[long[n-1]], want)
+	}
+}
+
+// TestKeywordLongMemory: the automaton of one long spelling stays linear in
+// its length (a full path per node would hold n(n+1)/2 weights, 1.6 GB here).
+func TestKeywordLongMemory(t *testing.T) {
+	const n = 20000
+
+	long := make([]int, n)
+	for i := range long {
+		long[i] = i
+	}
+
+	var before, after runtime.MemStats
+
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+
+	k := build([][]int{long}, unit, Bias{Weight: 1, Revoke: 1, Forms: FormSpace})
+
+	runtime.ReadMemStats(&after)
+
+	if grown := after.TotalAlloc - before.TotalAlloc; grown > 64<<20 {
+		t.Errorf("building a %d-token spelling allocated %d MB", n, grown>>20)
+	}
+
+	if got := k.Bonus(long, -1); got != n {
+		t.Errorf("Bonus = %g, want %d", got, n)
+	}
+}
+
+// TestKeywordLongPrefixLinear: following a long spelling token by token
+// costs time linear in its length (no ancestor walk on direct steps).
+func TestKeywordLongPrefixLinear(t *testing.T) {
+	const n = 20000
+
+	long := make([]int, n)
+	for i := range long {
+		long[i] = i
+	}
+
+	k := build([][]int{long}, unit, Bias{Weight: 1, Revoke: 1, Forms: FormSpace})
+
+	start := time.Now()
+
+	if got := k.Bonus(long[:n-1], -1); got != n-1 {
+		t.Errorf("Bonus = %g, want %d", got, n-1)
+	}
+
+	if d := time.Since(start); d > 50*time.Millisecond {
+		t.Errorf("following %d tokens took %v", n-1, d)
 	}
 }
