@@ -869,8 +869,16 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 
 ## Phase 8 — Streaming & embeddings
 
-- [ ] 8.1 Stream oracle (`tools/oracle`, `testdata/oracle/stream/`): `needle_stream_transcribe_process`/`_stop` with
+- [x] 8.1 Stream oracle (`tools/oracle`, `testdata/oracle/stream/`): `needle_stream_transcribe_process`/`_stop` with
       1 s chunks over the 32 clips, recording every call's output, plus two concatenated streams longer than 30 s.
+      (2026-10-10) — `just oracle-stream` (purego, exact chunks): 108 runs, 822 calls in `calls.json` (sample range,
+      rc, JSON without `pass_ms`) plus `manifest.json` (620 KB). The runs: the 32 clips at 1 s, 0.5 s and 2 s, 4
+      forced-language runs, `long-clean` (44.91 s), `long-other-gaps` (42.16 s), `long-silence-lead` (36.01 s) and 5
+      edge cases. Every run equals the CLI's `--audio-stream`; two runs are byte-identical. Each pass is
+      `needle_transcribe` of `[t0, received)` (470/470 committing calls), commits by LocalAgreement-2 on exact words
+      (816/816) and trims at the second-to-last committed sentence once the buffer exceeds 15 s (all 470 t0). The
+      final text equals offline on 18/32 clips at 1 s (14/32 at 0.5 s, 27/32 at 2 s), so the Accept needs the stream
+      fixtures. Beyond 30 s without commits is open (F-032).
 - [x] 8.2 `Embed`: the encoder output per 80 ms frame, the same layout as `needle_embed` (delivered with 6.5).
       (2026-10-10) — `(*Model).Embed(pcm)`: `Frames` rows of 512 values (`enc.final_norm` of the lane mean), at most
       30 s, no frame under 160 samples. Against `testdata/oracle/<clip>.embed.safetensors` (`TestEmbedMatchesEngine`):
@@ -938,7 +946,7 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 | U9  | Keyword bias weight and revocation                                                          | 6.3     | keyword fixture parity            |
 | U10 | Silence gate measure and threshold                                                          | 6.6     | threshold sweep                   |
 | U11 | Timestamp algorithm (heads/layers, DTW), word probability                                   | 7.2–7.3 | timestamp parity                  |
-| U12 | Streaming commit rule details, behaviour beyond 30 s                                        | 8.3–8.4 | stream parity                     |
+| U12 | Stream commit rule — resolved: LocalAgreement-2, 15 s sentence trim, F-032; > 30 s open     | 8.3–8.4 | stream parity                     |
 
 ## Non-goals
 
