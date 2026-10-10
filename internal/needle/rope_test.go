@@ -61,3 +61,28 @@ func TestRopeFixtureTables(t *testing.T) {
 	checkContract(t, "rope_cos", r.cos, wantCos)
 	checkContract(t, "rope_sin", r.sin, wantSin)
 }
+
+// TestRopeMix checks Mix(g) against (1 − g)·x + g·RoPE(x) on one head.
+func TestRopeMix(t *testing.T) {
+	r := NewRope(6, 4, 1e5)
+	x := []float32{0.3, -1.2, 0.7, 2.0, 0.1, -0.5}
+
+	for _, g := range []float32{0, 0.25, 1} {
+		m := r.Mix(g)
+
+		for pos := range 4 {
+			rot := append([]float32(nil), x...)
+			r.apply(rot, pos)
+
+			got := append([]float32(nil), x...)
+			m.apply(got, pos)
+
+			for i := range x {
+				want := (1-g)*x[i] + g*rot[i]
+				if math.Abs(float64(got[i]-want)) > 1e-6 {
+					t.Fatalf("g %v pos %d: [%d] = %v, want %v", g, pos, i, got[i], want)
+				}
+			}
+		}
+	}
+}
