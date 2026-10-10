@@ -17,7 +17,6 @@ import (
 	"slices"
 
 	"github.com/cwbudde/go-whistle/internal/needle"
-	"github.com/cwbudde/go-whistle/internal/tensor"
 	"github.com/cwbudde/go-whistle/internal/tokenizer"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
@@ -31,9 +30,9 @@ type Decoder struct {
 	vocab  int
 	lanes  int
 	qk     int
-	emb    []float32 // [vocab, dim], also the head
-	scale  float32   // input scale
-	head   float32   // logit scale
+	emb    needle.Linear // [vocab, dim], also the head
+	scale  float32       // input scale
+	head   float32       // logit scale
 	blocks []*needle.Block
 	cross  []*cross
 	mhc    []*needle.MHC
@@ -258,7 +257,9 @@ func (d *Decoder) Extend(s *State, tokens []int) ([]float32, error) {
 		}
 
 		row := x[i*d.dim : (i+1)*d.dim]
-		for c, v := range d.emb[tok*d.dim : (tok+1)*d.dim] {
+		d.emb.Row(row, tok)
+
+		for c, v := range row {
 			row[c] = v * d.scale
 		}
 	}
@@ -291,7 +292,7 @@ func (d *Decoder) Extend(s *State, tokens []int) ([]float32, error) {
 }
 
 func (d *Decoder) loadEmbedding(src weights.Source) error {
-	emb, shape, err := src.Tensor("embedding")
+	shape, err := src.Shape("embedding")
 	if err != nil {
 		return fmt.Errorf("decoder: embedding: %w", err)
 	}
@@ -300,7 +301,14 @@ func (d *Decoder) loadEmbedding(src weights.Source) error {
 		return fmt.Errorf("decoder: embedding has shape %v for %d pieces", shape, d.tok.Len())
 	}
 
-	d.emb, d.vocab, d.dim = emb, shape[0], shape[1]
+	// The input gather and the tied head share it, packed where src serves
+	// it packed (docs/FINDINGS.md F-037).
+	d.emb, err = needle.LoadLinear(src, "embedding", shape[0], shape[1])
+	if err != nil {
+		return fmt.Errorf("decoder: %w", err)
+	}
+
+	d.vocab, d.dim = shape[0], shape[1]
 	d.scale, d.head = 1, 1
 
 	if d.h.InputScale == ScaleSqrtDim {
@@ -489,7 +497,7 @@ func (d *Decoder) logits(x []float32, t int) []float32 {
 	}
 
 	out := make([]float32, t*d.vocab)
-	tensor.MatMulTransB(out, d.vocab, x, d.emb, t, d.vocab, d.dim)
+	d.emb.Apply(out, x, t)
 
 	if d.head != 1 {
 		for i := range out {

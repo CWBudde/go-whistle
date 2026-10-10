@@ -45,6 +45,7 @@ type Option func(*loadOptions)
 type loadOptions struct {
 	vocabulary string
 	noMmap     bool
+	float      bool
 }
 
 // WithVocabulary names the .cact file whose tokenizer the model uses. Only
@@ -59,6 +60,14 @@ func WithoutMmap() Option {
 	return func(o *loadOptions) { o.noMmap = true }
 }
 
+// WithFloatWeights runs a .cact model on its weights dequantised to
+// float32 (about 221 MB) instead of multiplying straight from the packed
+// CQ indices, the default (docs/FINDINGS.md F-037). A safetensors
+// checkpoint is float32 either way.
+func WithFloatWeights() Option {
+	return func(o *loadOptions) { o.float = true }
+}
+
 // vocabularyFile is the .cact Load looks for next to a safetensors file.
 const vocabularyFile = "whistle.cact"
 
@@ -66,14 +75,16 @@ const vocabularyFile = "whistle.cact"
 // whistle.safetensors checkpoint, and builds the model on it with the
 // encoder and decoder the oracle settled (docs/FINDINGS.md F-014 to F-024),
 // the engine's beam search (F-026) and its silence gate (F-031).
-// The .cact weights are the ones the engine runs; they match it best.
+// The .cact weights are the ones the engine runs; they match it best. Its
+// CQ tensors stay packed unless WithFloatWeights is given, and the model
+// reads them from the file until Close.
 func Load(path string, opts ...Option) (*Model, error) {
 	var o loadOptions
 	for _, opt := range opts {
 		opt(&o)
 	}
 
-	src, err := weights.Open(path, weights.Options{NoMmap: o.noMmap})
+	src, err := weights.Open(path, weights.Options{NoMmap: o.noMmap, Packed: !o.float})
 	if err != nil {
 		return nil, wrap(err)
 	}
@@ -163,7 +174,10 @@ func vocabulary(src weights.Source, path string, o loadOptions) (*tokenizer.Toke
 	return tok, nil
 }
 
-// Close releases the weight file. The model must not be used afterwards.
+// Close releases the weight file. The model must not be used afterwards,
+// and Close must not overlap a call: by default the model multiplies
+// straight from the mapped file (WithFloatWeights avoids that), so a use
+// after Close can fault.
 func (m *Model) Close() error {
 	return wrap(m.src.Close())
 }

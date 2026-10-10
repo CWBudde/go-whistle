@@ -2966,3 +2966,174 @@ of context from before the window. None is recorded, and recording more needs ne
 `Transcribe`'s. `pass_ms` is the call's wall time. Nothing pins its exact span in the engine (the stop's 0.0 aside).
 The sentence splitter is F-032's rule, not a Moses port: abbreviations such as "Mr." before a name would end a
 sentence. None occurs in the fixtures.
+
+## F-037 — The packed path: CQ matrices straight from `whistle.cact` in every linear layer (9.2) (2026-10-10)
+
+**Question.** Can the whole model run on F-028's packed CQ matrices (F-034's `lut` kernel) instead of the 221 MB of
+dequantised float32, with the same transcripts and WER, and does it fit PLAN.md 9.2's memory target of 64 MB?
+
+### Design
+
+**Source side** (`internal/weights`). `Options.Packed` opts a `.cact` source into the packed path; the zero `Options`
+keeps today's float behaviour, so every existing caller and fixture test is unchanged. A packed source is a
+`weights.Packer`: `Matrix(name)` returns the CQ record as a `*cq.Matrix` built from `cact.File.CQPacked`, and `false`
+for any other record, for a source in float mode and for safetensors (`weights.PackedMatrix` does the type assertion).
+The matrix is built once per name and cached like `Tensor`'s values (a per-name `sync.Once`; `Release` drops it, `Close`
+fails later calls with `ErrClosed`). No float32 copy is made. The matrix's index bytes alias the file data, so this is
+the one exception to F-007's aliasing rule: a packed matrix, and a model built on it, is valid until `Close` only.
+`whistle.Model.Close` already forbade later use; its doc now also says that `Close` must not overlap a call, because
+a read of an unmapped page faults instead of failing. A CQ width without a `cq` kernel (Whistle has only 2 and 4 bits)
+is served as not packed, so the model falls back to `Tensor` for it. `Cached()` lists the names the float32 cache holds, for the tests below.
+
+**Deferred lut copy** (`internal/cq`). `cq.New` builds F-034's blocked copy of index and norms at once. The new
+`cq.NewGather` leaves it to `Prepare` or the first `GEMM`, and `Bytes` counts it only once built. The source builds
+matrices with `NewGather`; the model calls `Prepare` for every matrix it multiplies by and not for the engram tables,
+which are only gathered. That saves the tables' blocked copy, 2 × 2.65 MB.
+
+**Model side** (`internal/needle`). `needle.Linear` holds an `[out, in]` matrix as float32 values or as a `*cq.Matrix`:
+`Apply(dst, x, rows)` is `tensor.MatMulTransB` or `Matrix.GEMM`, `Row` copies a row or dequantises it with `CQ`'s
+arithmetic (bit for bit), and `Rows(lo, hi)` is a row view. `needle.LoadLinear(src, name, out, in)` takes the packed
+matrix where the source serves one and the float32 tensor otherwise. Every CQ site uses it:
+
+| site                                                     | tensors                                               | call            |
+| -------------------------------------------------------- | ----------------------------------------------------- | --------------- |
+| self-attention, encoder and decoder (`needle.Attention`) | `q_proj`, `k_proj`, `v_proj`, `gate_proj`, `out_proj` | `Apply`         |
+| mHC (`needle.MHC`)                                       | `mhc_phi_pre`, `mhc_phi_post`, `mhc_phi_res` (CQ4)    | `Rows`, `Apply` |
+| engram (`needle.Engram`)                                 | `tables`                                              | `Row`           |
+| engram                                                   | `key_proj`, `value_proj`                              | `Apply`         |
+| encoder stem (`encoder.stem`)                            | `stem.pw_1`, `stem.pw_2`, `stem.out`                  | `Apply`         |
+| encoder conv module (`encoder.block`)                    | `pw1`, `pw2`                                          | `Apply`         |
+| cross-attention (`decoder.cross`)                        | `q_proj`, `k_proj`, `v_proj`, `gate_proj`, `out_proj` | `Apply`         |
+| token embedding and tied head (`decoder.Decoder`, CQ4)   | `embedding`                                           | `Row`, `Apply`  |
+
+That is all 152 CQ records. The FP16 records (norms, gates, taps, the Hadamard MLP's factors, `cond_u`/`cond_v`, the
+depthwise kernels) stay float32. The encoder's hypothesis wrapper (`permSource`) forwards `Matrix`, so the packed path
+survives it. `LoadMHC` still loads the stacked φ per layer, but the source's cache makes that one matrix per tensor,
+viewed per layer.
+
+**Load** (`whistle/model.go`). `Load` opens a `.cact` packed by default; `WithFloatWeights()` restores the float path.
+A safetensors checkpoint is float either way. The evidence below is why packed is the default.
+
+**Float caches.** Model code never calls `Tensor` on a packed name, so no float32 copy of a CQ tensor is made, let alone
+kept. `TestPackedMatchesFloat` (`internal/decoder`) loads the encoder and the decoder from one packed source and finds
+527 float32 tensors in its cache, none of them CQ.
+
+### Parity
+
+All numbers come from the Apple M5 Pro (arm64, `lut` NEON kernel). amd64 (AVX2, Docker emulation) and `purego` are
+noted where they differ.
+
+| check                                                              | packed                                      | float                 |
+| ------------------------------------------------------------------ | ------------------------------------------- | --------------------- |
+| `Linear`, 7 real tensors, 5 random rows, worst 1 − cos             | 1.02e-7 (embedding); purego 2.3e-13         | —                     |
+| `Attention` / mHC layer / engram on random input, 1 − cos vs float | 6.1e-8 / 6.0e-9 / 9.2e-9                    | —                     |
+| `Embed` vs `needle_embed`, mean frame cosine, 32 clips             | 0.999827 (amd64 0.999828)                   | 0.999828              |
+| `Embed` packed vs float, mean frame 1 − cos / worst frame cosine   | 4.8e-8 / 0.999945 (amd64 7.0e-8 / 0.999893) | —                     |
+| greedy decoding, 32 clips: transcripts equal packed vs float       | 32/32 (amd64 32/32)                         | —                     |
+| teacher-forced mean log p of the engine's texts, max \|Δ\|         | 7.2e-5 (amd64 1.9e-4, purego 1.9e-7)        | —                     |
+| `Transcribe` (beam search) equal to the engine, 32 clips           | 31/32                                       | 31/32                 |
+| `Transcribe` packed equal to float, 32 clips                       | 32/32                                       | —                     |
+| depth ladder 2–7 (`testdata/oracle/depth`), equal to the engine    | 161/192                                     | 161/192               |
+| depth ladder, packed equal to float                                | 192/192                                     | —                     |
+| keyword cases (`testdata/oracle/keywords`), equal to the engine    | 45/53                                       | 45/53                 |
+| keyword cases, packed equal to float                               | 53/53                                       | —                     |
+| LibriSpeech subset (`just eval-librispeech`), WER                  | 223/4167 = **5.35 %**                       | 223/4167 = **5.35 %** |
+| LibriSpeech, text equal to the engine's                            | 181/200                                     | 181/200               |
+| LibriSpeech, packed equal to float                                 | 200/200                                     | —                     |
+
+The miss on the 32 clips is F-026's Polish search miss in both modes. On every transcript compared (32 + 192 + 53 + 200),
+packed and float give the same text and language, so the WER is unchanged (0.00 points; the Phase 9 Accept allows 0.1).
+The depth and keyword runs used a throwaway driver over `Transcribe` with `Depth` and `Keywords`; the committed tests
+cover their fast subsets (`TestTranscribeDepthMatchesEngine`, `TestTranscribeKeywordsMatchEngine`), which now run packed.
+The engine's own W2A8 numerics are much further away (F-024) than the lut kernel's table rounding (F-034).
+
+### Memory
+
+`just mem-probe` (`TestMemProbe`, `internal/weights`) runs its own test binary twice as a child, once per mode. Each
+child reads the first corpus clip tiled to 30 s, then runs `Load` and one `Transcribe` and reports:
+
+- `ru_maxrss` before `Load` (the test binary and the clip), after it and after the `Transcribe`;
+- the live Go heap after a GC right after `Load`, and again at the end;
+- the resident pages of the `.cact` mapping at the end (`vmmap` on darwin, `/proc/self/smaps` on linux).
+
+The model's memory is defined as the live Go heap plus the resident `.cact` pages. That leaves out the binary, the
+runtime's free heap and the GC's not yet collected garbage. M5 Pro, `GOGC=100`, MiB:
+
+| MiB                                        | packed    | float |
+| ------------------------------------------ | --------- | ----- |
+| process before `Load` (`ru_maxrss`)        | 12.0      | 12.1  |
+| process after `Load` (`ru_maxrss`)         | **41.7**  | 242.8 |
+| live Go heap after `Load` (clip 1.8 incl.) | 20.1      | 216.3 |
+| process peak over the 30 s `Transcribe`    | **127.6** | 488.3 |
+| live Go heap at the end                    | 19.4      | 214.5 |
+| resident `.cact` pages at the end          | 14.7      | 16.1  |
+| **model: live heap + `.cact` pages**       | **34.1**  | 230.6 |
+
+The linux/amd64 child (emulated, so its baseline is 50 MiB) agrees: model 36.5 against 230.9 MiB, with `RssFile` 22.1
+MiB (binary and mapping) and `RssAnon` 122.9 MiB at the end.
+
+Where the packed heap goes after `Load` (allocation profile): the lut blocked copies 10.6 MiB, the widened FP16 norms of
+the matrices 1.7 MiB, the FP16 records as float32 2.3 MiB, the tokenizer 0.9 MiB. The `.cact` pages are resident because
+`Prepare` and the FP16 decode read them once. Afterwards the lut kernel reads only its blocked copy, and `Row` reads the
+embedding's and the engram tables' pages.
+
+So the weights take 34 MiB against 231, 6.8× less, and the process stays under 64 MiB after `Load` (41.7). A 30 s
+`Transcribe` still peaks at 127.6 MiB. That is not weights but activations and GC headroom, and the float path has
+them too:
+
+- The stem's first conv outputs 1500 × 40 × 128 floats, 29.3 MiB, live at once: the 50 MiB live heap at the sixth GC,
+  19 ms into the run (`GODEBUG=gctrace=1`).
+- The cross-attention memory of 8 layers × 375 frames × (384 + 512) floats is 10.3 MiB for the whole decode.
+- `GOGC=100` lets the heap grow to twice the live heap before a collection: 70–100 MiB. Under `GOMEMLIMIT=40MiB` the peak
+  is still 91.5 MiB, because the stem's spike alone needs a 64 MiB heap.
+
+### Speed
+
+`TestSpeedProbe` (`WHISTLE_SPEED_PROBE=1`, `internal/weights`) loads both modes in one process and alternates them over
+the 32 clips, three timed passes after a warm-up, and over the 30 s clip (six runs). Four runs on the M5 Pro while other
+sessions kept the load average at 3.5–5.7, so the absolute numbers sit above F-035's; the ratios come from the same
+process and the same minutes:
+
+| median                      | packed        | float         | packed vs float         |
+| --------------------------- | ------------- | ------------- | ----------------------- |
+| `Load`                      | 9.9–10.9 ms   | 160–170 ms    | 16× faster              |
+| TTFT, 32 clips              | 69.9–73.1 ms  | 65.2–71.0 ms  | 2–7 % slower            |
+| decode rate, 32 clips       | 765–792 tok/s | 487–497 tok/s | 1.56–1.59×              |
+| TTFT, 30 s clip             | 320–373 ms    | 302–357 ms    | 4–8 % slower            |
+| LibriSpeech, 200 utterances | RTF 0.0188    | RTF 0.0210    | 1.12× (sequential runs) |
+
+Decoding runs one row per beam, where F-034 measured the lut GEMV 1.05–3.2× faster than the NEON float GEMV: the decode
+rate gains 56–59 %. The time to the first token is dominated by the encoder and the cross-attention memory, which multiply
+375 rows at once. There the lut kernel runs one activation per pass over the index, while the float GEMM reuses each
+weight across four rows (F-034, "Batches"). The CQ4 φ add a 2048-wide table build per row for only 4 or 16 outputs, three
+times per layer on the same input. A throwaway 30 s `Embed` benchmark under the same load took 328 ms packed against
+320 ms float. In its profile,
+table building and FWHT take 9 %, and `runtime.madvise` (the GC returning memory) 13 %.
+
+### Tests and tolerances
+
+No existing tolerance moved, and no fixture changed. The `internal/needle`, `internal/encoder` and `internal/decoder`
+tests and fixtures still open their sources with the zero `Options`, so they still run the float path bit for bit: the
+float `Linear` calls `tensor.MatMulTransB` with the arguments `linear` used, and a throwaway check hashed the float
+encoder output and the decoder logits of the prompt plus three tokens on the three fast clips, equal to `origin/main`'s
+bit for bit. The `whistle` tests now run the packed
+default and pass with their thresholds as they were (`TestEmbedMatchesEngine` 0.999827 against its 0.999 floor). New
+regressions, model-gated and skipped without `models/`, with bounds just outside the worst measured architecture:
+
+- `TestWhistlePacked`, `TestWhistlePackedLifecycle` (`internal/weights`): 152 packed records, shapes, cache, rows bit
+  for bit against `Tensor`, no float decode.
+- `TestLinear`, `TestWhistleLinearPacked`, `TestWhistleModulesPacked` (`internal/needle`): 1 − cos ≤ 2e-7.
+- `TestNewGather` (`internal/cq`): the deferred copy equals `New`'s, concurrently and through an early `Rows` view.
+- `TestBestPackedMatchesFloat` (`internal/encoder`): mean cosine to `needle_embed` ≥ 0.9998 and within 2e-5 of float;
+  packed vs float mean frame 1 − cos ≤ 6e-7, worst frame ≥ 0.99985.
+- `TestPackedMatchesFloat` (`internal/decoder`): greedy transcripts equal, |Δ mean log p| ≤ 3e-4, no CQ tensor in the
+  float32 cache.
+
+### Open
+
+- **The 64 MB target for a whole 30 s `Transcribe`.** The weights fit (34 MiB), the process does not (127.6 MiB peak).
+  The levers are outside 9.2's wiring: run the stem in time chunks (removes the 29 MiB spike), keep the cross-attention
+  memory in int8 (9.3), let the application set `GOMEMLIMIT`, and move the lut copy out of the Go heap or into the file
+  pages it duplicates (F-034's in-register transpose), so that the GC does not double it.
+- **TTFT.** Sharing one FWHT of an activation between the matrices that read it (q/k/v, the three φ, k/v of the memory),
+  and 9.5's parallelism over row blocks for the batched products.

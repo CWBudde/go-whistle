@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/cwbudde/go-whistle/internal/needle"
 	"github.com/cwbudde/go-whistle/internal/ops"
 	"github.com/cwbudde/go-whistle/internal/tensor"
 	"github.com/cwbudde/go-whistle/internal/weights"
@@ -28,8 +29,8 @@ type stem struct {
 
 	w   *tensor.Tensor    // [3, 3, 1, C]
 	dw  [2]*tensor.Tensor // [3, 3, 1, C]
-	pw  [2][]float32      // [C, C] (out, in)
-	out []float32         // [dim, mels'·C]
+	pw  [2]needle.Linear  // [C, C] (out, in)
+	out needle.Linear     // [dim, mels'·C]
 	dim int
 	in  int // stem/out's input width
 
@@ -52,7 +53,7 @@ func loadStem(src weights.Source, h Hypothesis, mels int) (*stem, error) {
 			return nil, err
 		}
 
-		s.pw[k], err = matrix(src, fmt.Sprintf("stem.pw_%d", k+1), s.channels, s.channels)
+		s.pw[k], err = needle.LoadLinear(src, fmt.Sprintf("stem.pw_%d", k+1), s.channels, s.channels)
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +70,7 @@ func loadStem(src weights.Source, h Hypothesis, mels int) (*stem, error) {
 
 	s.dim, s.in = shape[0], shape[1]
 
-	s.out, err = matrix(src, "stem.out", s.dim, s.in)
+	s.out, err = needle.LoadLinear(src, "stem.out", s.dim, s.in)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +202,7 @@ func (s *stem) forward(mel []float32, frames, mels int) ([]float32, int, error) 
 		applyAct(d, s.h.StemDWAct)
 
 		y := make([]float32, len(d))
-		tensor.MatMulTransB(y, s.channels, d, s.pw[k], len(d)/s.channels, s.channels, s.channels)
+		s.pw[k].Apply(y, d, len(d)/s.channels)
 		applyAct(y, s.h.StemPWAct)
 		copy(d, y)
 	}
@@ -232,7 +233,7 @@ func (s *stem) forward(mel []float32, frames, mels int) ([]float32, int, error) 
 	}
 
 	out := make([]float32, t*s.dim)
-	tensor.MatMulTransB(out, s.dim, flat, s.out, t, s.dim, s.in)
+	s.out.Apply(out, flat, t)
 
 	return out, t, nil
 }

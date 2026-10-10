@@ -13,6 +13,7 @@ import (
 	"math"
 
 	"github.com/cwbudde/go-whistle/internal/cact"
+	"github.com/cwbudde/go-whistle/internal/cq"
 	"github.com/cwbudde/go-whistle/internal/frontend"
 	"github.com/cwbudde/go-whistle/internal/needle"
 	"github.com/cwbudde/go-whistle/internal/weights"
@@ -305,6 +306,12 @@ func (s permSource) Tensor(name string) ([]float32, []int, error) {
 	default:
 		return s.Source.Tensor(name)
 	}
+}
+
+// Matrix serves the packed matrices of the wrapped source, if any
+// (weights.Packer): the wrapper only replaces the permutations.
+func (s permSource) Matrix(name string) (*cq.Matrix, bool, error) {
+	return weights.PackedMatrix(s.Source, name)
 }
 
 // withPerms wraps src so that LoadHadamardMLP reads the permutations of

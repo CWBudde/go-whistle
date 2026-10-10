@@ -412,6 +412,72 @@ func TestGEMMConcurrent(t *testing.T) {
 	wg.Wait()
 }
 
+// TestNewGather checks the deferred lut copy (docs/FINDINGS.md F-037): a
+// NewGather matrix holds no blocked copy until Prepare or its first GEMM,
+// then equals New's matrix bit for bit, in Row too, and also through a
+// Rows view built before the copy, under concurrent first products.
+func TestNewGather(t *testing.T) {
+	rng := rand.New(rand.NewPCG(17, 18))
+	p := randomPacked(rng, 70, 384, 128, 2)
+
+	eager, err := New(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x := make([]float32, 3*384)
+	for i := range x {
+		x[i] = float32(rng.NormFloat64())
+	}
+
+	want := make([]float32, 3*30)
+	eager.Rows(33, 63).GEMM(want, x, 3)
+
+	for _, prepare := range []bool{false, true} {
+		lazy, err := NewGather(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		packed := len(p.Index) + 4*70*3 + 4*4
+		if got := lazy.Bytes(); got != packed {
+			t.Errorf("NewGather: Bytes %d before any product, want %d", got, packed)
+		}
+
+		row, ref := make([]float32, 384), make([]float32, 384)
+		lazy.Row(row, 41)
+		eager.Row(ref, 41)
+
+		if !slices.Equal(row, ref) {
+			t.Error("NewGather: Row differs from New's")
+		}
+
+		view := lazy.Rows(33, 63)
+		if prepare {
+			lazy.Prepare()
+		}
+
+		var wg sync.WaitGroup
+
+		for range 4 {
+			wg.Go(func() {
+				got := make([]float32, len(want))
+				view.GEMM(got, x, 3)
+
+				if !slices.Equal(got, want) {
+					t.Errorf("prepare %v: the deferred copy's product differs from New's", prepare)
+				}
+			})
+		}
+
+		wg.Wait()
+
+		if got, full := lazy.Bytes(), eager.Bytes(); got != full {
+			t.Errorf("prepare %v: Bytes %d after a product, New's %d", prepare, got, full)
+		}
+	}
+}
+
 func TestNewErrors(t *testing.T) {
 	rng := rand.New(rand.NewPCG(7, 8))
 	good := randomPacked(rng, 2, 128, 128, 2)
