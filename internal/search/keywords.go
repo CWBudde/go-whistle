@@ -511,6 +511,10 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 // keyword. It is signed, so a negative PerChar share is taken back too
 // and the dropped tokens' net bonus goes.
 func (k *Keywords) revoke(n, drop int, cov bitset) float64 {
+	if drop == 0 {
+		return 0 // a direct step: nothing to walk
+	}
+
 	lost := 0.0
 
 	for a := n; k.depth[a] > 0; a = k.up[a] {

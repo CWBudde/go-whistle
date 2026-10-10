@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"slices"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/cwbudde/go-whistle/internal/tokenizer"
@@ -306,5 +307,28 @@ func TestKeywordLongMemory(t *testing.T) {
 
 	if got := k.Bonus(long, -1); got != n {
 		t.Errorf("Bonus = %g, want %d", got, n)
+	}
+}
+
+// TestKeywordLongPrefixLinear: following a long spelling token by token
+// costs time linear in its length (no ancestor walk on direct steps).
+func TestKeywordLongPrefixLinear(t *testing.T) {
+	const n = 20000
+
+	long := make([]int, n)
+	for i := range long {
+		long[i] = i
+	}
+
+	k := build([][]int{long}, unit, Bias{Weight: 1, Revoke: 1, Forms: FormSpace})
+
+	start := time.Now()
+
+	if got := k.Bonus(long[:n-1], -1); got != n-1 {
+		t.Errorf("Bonus = %g, want %d", got, n-1)
+	}
+
+	if d := time.Since(start); d > 50*time.Millisecond {
+		t.Errorf("following %d tokens took %v", n-1, d)
 	}
 }
