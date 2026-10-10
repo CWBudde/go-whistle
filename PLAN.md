@@ -590,7 +590,7 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       re-derived over 250–3500 Hz (the shipped bank is full band) and a time-domain band-pass (no stated shape)
       (`docs/FINDINGS.md` F-012).
 
-## Phase 4 — Encoder (reverse engineering) — ✅ DONE (2026-10-10)
+## Phase 4 — Encoder (reverse engineering)
 
 - [x] Stem: a 2-D conv with candidate strides (2,2) on all three convs vs. stride only on the depthwise stages; padding
       SAME or VALID; activation (SiLU, GELU or none) after each stage. Pin the frame count: 3000 → 375.
