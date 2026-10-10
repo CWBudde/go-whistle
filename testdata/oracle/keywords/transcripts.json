@@ -1,0 +1,4958 @@
+{
+  "de-adaptionsplan-distractor": {
+    "language": "de",
+    "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+    "words": [
+      {
+        "word": "Diese",
+        "start": 1.20,
+        "end": 1.60,
+        "probability": 0.999
+      },
+      {
+        "word": "Bare",
+        "start": 1.60,
+        "end": 1.92,
+        "probability": 0.605
+      },
+      {
+        "word": "können",
+        "start": 1.92,
+        "end": 2.40,
+        "probability": 0.999
+      },
+      {
+        "word": "sich",
+        "start": 2.40,
+        "end": 2.64,
+        "probability": 0.999
+      },
+      {
+        "word": "für",
+        "start": 2.64,
+        "end": 2.88,
+        "probability": 1.000
+      },
+      {
+        "word": "einen",
+        "start": 2.88,
+        "end": 3.12,
+        "probability": 0.997
+      },
+      {
+        "word": "Adduktionsplan",
+        "start": 3.12,
+        "end": 4.24,
+        "probability": 0.861
+      },
+      {
+        "word": "für",
+        "start": 4.24,
+        "end": 5.04,
+        "probability": 0.999
+      },
+      {
+        "word": "ihr",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.990
+      },
+      {
+        "word": "Baby",
+        "start": 5.20,
+        "end": 5.60,
+        "probability": 0.866
+      },
+      {
+        "word": "entscheiden.",
+        "start": 5.60,
+        "end": 6.16,
+        "probability": 0.998
+      }
+    ]
+  },
+  "de-adoptionsplan-missed": {
+    "language": "de",
+    "text": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+    "words": [
+      {
+        "word": "Diese",
+        "start": 1.20,
+        "end": 1.60,
+        "probability": 0.999
+      },
+      {
+        "word": "Bare",
+        "start": 1.60,
+        "end": 1.92,
+        "probability": 0.605
+      },
+      {
+        "word": "können",
+        "start": 1.92,
+        "end": 2.40,
+        "probability": 0.999
+      },
+      {
+        "word": "sich",
+        "start": 2.40,
+        "end": 2.64,
+        "probability": 0.999
+      },
+      {
+        "word": "für",
+        "start": 2.64,
+        "end": 2.88,
+        "probability": 1.000
+      },
+      {
+        "word": "einen",
+        "start": 2.88,
+        "end": 3.12,
+        "probability": 0.997
+      },
+      {
+        "word": "Adoptionsplan",
+        "start": 3.12,
+        "end": 4.24,
+        "probability": 0.585
+      },
+      {
+        "word": "für",
+        "start": 4.24,
+        "end": 5.04,
+        "probability": 0.999
+      },
+      {
+        "word": "ihr",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.990
+      },
+      {
+        "word": "Baby",
+        "start": 5.20,
+        "end": 5.60,
+        "probability": 0.870
+      },
+      {
+        "word": "entscheiden.",
+        "start": 5.60,
+        "end": 6.16,
+        "probability": 0.998
+      }
+    ]
+  },
+  "de-baby-present": {
+    "language": "de",
+    "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+    "words": [
+      {
+        "word": "Diese",
+        "start": 1.20,
+        "end": 1.60,
+        "probability": 0.999
+      },
+      {
+        "word": "Bare",
+        "start": 1.60,
+        "end": 1.92,
+        "probability": 0.605
+      },
+      {
+        "word": "können",
+        "start": 1.92,
+        "end": 2.40,
+        "probability": 0.999
+      },
+      {
+        "word": "sich",
+        "start": 2.40,
+        "end": 2.64,
+        "probability": 0.999
+      },
+      {
+        "word": "für",
+        "start": 2.64,
+        "end": 2.88,
+        "probability": 1.000
+      },
+      {
+        "word": "einen",
+        "start": 2.88,
+        "end": 3.12,
+        "probability": 0.997
+      },
+      {
+        "word": "Adduktionsplan",
+        "start": 3.12,
+        "end": 4.24,
+        "probability": 0.861
+      },
+      {
+        "word": "für",
+        "start": 4.24,
+        "end": 5.04,
+        "probability": 0.999
+      },
+      {
+        "word": "ihr",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.990
+      },
+      {
+        "word": "Baby",
+        "start": 5.20,
+        "end": 5.60,
+        "probability": 0.866
+      },
+      {
+        "word": "entscheiden.",
+        "start": 5.60,
+        "end": 6.16,
+        "probability": 0.998
+      }
+    ]
+  },
+  "de-diese-paare-phrase": {
+    "language": "de",
+    "text": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+    "words": [
+      {
+        "word": "Diese",
+        "start": 1.20,
+        "end": 1.60,
+        "probability": 0.999
+      },
+      {
+        "word": "Paare",
+        "start": 1.60,
+        "end": 2.00,
+        "probability": 0.246
+      },
+      {
+        "word": "können",
+        "start": 2.00,
+        "end": 2.40,
+        "probability": 1.000
+      },
+      {
+        "word": "sich",
+        "start": 2.40,
+        "end": 2.64,
+        "probability": 0.999
+      },
+      {
+        "word": "für",
+        "start": 2.64,
+        "end": 2.88,
+        "probability": 1.000
+      },
+      {
+        "word": "einen",
+        "start": 2.88,
+        "end": 3.12,
+        "probability": 0.998
+      },
+      {
+        "word": "Adoptionsplan",
+        "start": 3.12,
+        "end": 4.24,
+        "probability": 0.685
+      },
+      {
+        "word": "für",
+        "start": 4.24,
+        "end": 5.04,
+        "probability": 0.999
+      },
+      {
+        "word": "ihr",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.987
+      },
+      {
+        "word": "Baby",
+        "start": 5.20,
+        "end": 5.60,
+        "probability": 0.867
+      },
+      {
+        "word": "entscheiden.",
+        "start": 5.60,
+        "end": 6.16,
+        "probability": 0.998
+      }
+    ]
+  },
+  "de-fast-jeder-phrase": {
+    "language": "de",
+    "text": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, fast jeder beklagt sich über die Transportsysteme.",
+    "words": [
+      {
+        "word": "Jeder",
+        "start": 0.72,
+        "end": 0.96,
+        "probability": 0.987
+      },
+      {
+        "word": "nimmt",
+        "start": 0.96,
+        "end": 1.20,
+        "probability": 0.997
+      },
+      {
+        "word": "an",
+        "start": 1.20,
+        "end": 1.36,
+        "probability": 0.974
+      },
+      {
+        "word": "der",
+        "start": 1.36,
+        "end": 1.44,
+        "probability": 0.999
+      },
+      {
+        "word": "Gesellschaft",
+        "start": 1.44,
+        "end": 2.00,
+        "probability": 0.998
+      },
+      {
+        "word": "Teil",
+        "start": 2.00,
+        "end": 2.24,
+        "probability": 0.909
+      },
+      {
+        "word": "und",
+        "start": 2.24,
+        "end": 2.40,
+        "probability": 0.225
+      },
+      {
+        "word": "benutzt",
+        "start": 2.40,
+        "end": 2.72,
+        "probability": 0.957
+      },
+      {
+        "word": "Transportsysteme,",
+        "start": 2.72,
+        "end": 3.68,
+        "probability": 0.922
+      },
+      {
+        "word": "fast",
+        "start": 4.24,
+        "end": 4.40,
+        "probability": 0.219
+      },
+      {
+        "word": "jeder",
+        "start": 4.40,
+        "end": 4.64,
+        "probability": 0.995
+      },
+      {
+        "word": "beklagt",
+        "start": 4.64,
+        "end": 5.12,
+        "probability": 0.718
+      },
+      {
+        "word": "sich",
+        "start": 5.12,
+        "end": 5.28,
+        "probability": 1.000
+      },
+      {
+        "word": "über",
+        "start": 5.28,
+        "end": 5.44,
+        "probability": 1.000
+      },
+      {
+        "word": "die",
+        "start": 5.44,
+        "end": 5.60,
+        "probability": 0.999
+      },
+      {
+        "word": "Transportsysteme.",
+        "start": 5.60,
+        "end": 6.56,
+        "probability": 0.987
+      }
+    ]
+  },
+  "de-gesellschaft-present": {
+    "language": "de",
+    "text": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+    "words": [
+      {
+        "word": "Jeder",
+        "start": 0.72,
+        "end": 0.96,
+        "probability": 0.987
+      },
+      {
+        "word": "nimmt",
+        "start": 0.96,
+        "end": 1.20,
+        "probability": 0.997
+      },
+      {
+        "word": "an",
+        "start": 1.20,
+        "end": 1.36,
+        "probability": 0.974
+      },
+      {
+        "word": "der",
+        "start": 1.36,
+        "end": 1.44,
+        "probability": 0.999
+      },
+      {
+        "word": "Gesellschaft",
+        "start": 1.44,
+        "end": 2.00,
+        "probability": 0.998
+      },
+      {
+        "word": "Teil",
+        "start": 2.00,
+        "end": 2.24,
+        "probability": 0.909
+      },
+      {
+        "word": "und",
+        "start": 2.24,
+        "end": 2.40,
+        "probability": 0.225
+      },
+      {
+        "word": "benutzt",
+        "start": 2.40,
+        "end": 2.72,
+        "probability": 0.957
+      },
+      {
+        "word": "Transportsysteme,",
+        "start": 2.72,
+        "end": 3.68,
+        "probability": 0.922
+      },
+      {
+        "word": "was",
+        "start": 4.24,
+        "end": 4.40,
+        "probability": 0.750
+      },
+      {
+        "word": "jeder",
+        "start": 4.40,
+        "end": 4.64,
+        "probability": 0.988
+      },
+      {
+        "word": "beklagt",
+        "start": 4.64,
+        "end": 5.12,
+        "probability": 0.751
+      },
+      {
+        "word": "sich",
+        "start": 5.12,
+        "end": 5.28,
+        "probability": 0.859
+      },
+      {
+        "word": "über",
+        "start": 5.28,
+        "end": 5.44,
+        "probability": 1.000
+      },
+      {
+        "word": "die",
+        "start": 5.44,
+        "end": 5.60,
+        "probability": 0.999
+      },
+      {
+        "word": "Transportsysteme.",
+        "start": 5.60,
+        "end": 6.56,
+        "probability": 0.988
+      }
+    ]
+  },
+  "de-paare-adoptionsplan-list": {
+    "language": "de",
+    "text": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+    "words": [
+      {
+        "word": "Diese",
+        "start": 1.20,
+        "end": 1.60,
+        "probability": 0.999
+      },
+      {
+        "word": "Paare",
+        "start": 1.60,
+        "end": 2.00,
+        "probability": 0.246
+      },
+      {
+        "word": "können",
+        "start": 2.00,
+        "end": 2.40,
+        "probability": 1.000
+      },
+      {
+        "word": "sich",
+        "start": 2.40,
+        "end": 2.64,
+        "probability": 0.999
+      },
+      {
+        "word": "für",
+        "start": 2.64,
+        "end": 2.88,
+        "probability": 1.000
+      },
+      {
+        "word": "einen",
+        "start": 2.88,
+        "end": 3.12,
+        "probability": 0.998
+      },
+      {
+        "word": "Adoptionsplan",
+        "start": 3.12,
+        "end": 4.24,
+        "probability": 0.582
+      },
+      {
+        "word": "für",
+        "start": 4.24,
+        "end": 5.04,
+        "probability": 0.999
+      },
+      {
+        "word": "ihr",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.986
+      },
+      {
+        "word": "Baby",
+        "start": 5.20,
+        "end": 5.60,
+        "probability": 0.869
+      },
+      {
+        "word": "entscheiden.",
+        "start": 5.60,
+        "end": 6.16,
+        "probability": 0.998
+      }
+    ]
+  },
+  "de-paare-missed": {
+    "language": "de",
+    "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+    "words": [
+      {
+        "word": "Diese",
+        "start": 1.20,
+        "end": 1.60,
+        "probability": 0.999
+      },
+      {
+        "word": "Paare",
+        "start": 1.60,
+        "end": 2.00,
+        "probability": 0.246
+      },
+      {
+        "word": "können",
+        "start": 2.00,
+        "end": 2.40,
+        "probability": 1.000
+      },
+      {
+        "word": "sich",
+        "start": 2.40,
+        "end": 2.64,
+        "probability": 0.999
+      },
+      {
+        "word": "für",
+        "start": 2.64,
+        "end": 2.88,
+        "probability": 1.000
+      },
+      {
+        "word": "einen",
+        "start": 2.88,
+        "end": 3.12,
+        "probability": 0.998
+      },
+      {
+        "word": "Adduktionsplan",
+        "start": 3.12,
+        "end": 4.24,
+        "probability": 0.865
+      },
+      {
+        "word": "für",
+        "start": 4.24,
+        "end": 5.04,
+        "probability": 0.999
+      },
+      {
+        "word": "ihr",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.987
+      },
+      {
+        "word": "Baby",
+        "start": 5.20,
+        "end": 5.60,
+        "probability": 0.877
+      },
+      {
+        "word": "entscheiden.",
+        "start": 5.60,
+        "end": 6.16,
+        "probability": 0.998
+      }
+    ]
+  },
+  "en-chance-present": {
+    "language": "en",
+    "text": "But there was no chance for his body there, and the head would not go first.",
+    "words": [
+      {
+        "word": "But",
+        "start": 0.24,
+        "end": 0.40,
+        "probability": 0.954
+      },
+      {
+        "word": "there",
+        "start": 0.40,
+        "end": 0.48,
+        "probability": 0.999
+      },
+      {
+        "word": "was",
+        "start": 0.48,
+        "end": 0.64,
+        "probability": 0.996
+      },
+      {
+        "word": "no",
+        "start": 0.64,
+        "end": 0.80,
+        "probability": 1.000
+      },
+      {
+        "word": "chance",
+        "start": 0.80,
+        "end": 1.12,
+        "probability": 0.288
+      },
+      {
+        "word": "for",
+        "start": 1.12,
+        "end": 1.20,
+        "probability": 0.999
+      },
+      {
+        "word": "his",
+        "start": 1.20,
+        "end": 1.36,
+        "probability": 0.998
+      },
+      {
+        "word": "body",
+        "start": 1.36,
+        "end": 1.60,
+        "probability": 0.997
+      },
+      {
+        "word": "there,",
+        "start": 1.60,
+        "end": 1.84,
+        "probability": 0.989
+      },
+      {
+        "word": "and",
+        "start": 1.92,
+        "end": 2.00,
+        "probability": 0.949
+      },
+      {
+        "word": "the",
+        "start": 2.00,
+        "end": 2.08,
+        "probability": 0.963
+      },
+      {
+        "word": "head",
+        "start": 2.08,
+        "end": 2.16,
+        "probability": 0.973
+      },
+      {
+        "word": "would",
+        "start": 2.16,
+        "end": 2.32,
+        "probability": 0.984
+      },
+      {
+        "word": "not",
+        "start": 2.32,
+        "end": 2.40,
+        "probability": 0.994
+      },
+      {
+        "word": "go",
+        "start": 2.40,
+        "end": 2.56,
+        "probability": 0.999
+      },
+      {
+        "word": "first.",
+        "start": 2.56,
+        "end": 2.80,
+        "probability": 0.993
+      }
+    ]
+  },
+  "en-cowleys-lower-missed": {
+    "language": "en",
+    "text": "Here are some verses of Cowley's. Tell me how you like them.",
+    "words": [
+      {
+        "word": "Here",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.367
+      },
+      {
+        "word": "are",
+        "start": 0.80,
+        "end": 0.88,
+        "probability": 0.997
+      },
+      {
+        "word": "some",
+        "start": 0.88,
+        "end": 1.04,
+        "probability": 1.000
+      },
+      {
+        "word": "verses",
+        "start": 1.04,
+        "end": 1.36,
+        "probability": 0.963
+      },
+      {
+        "word": "of",
+        "start": 1.36,
+        "end": 1.52,
+        "probability": 0.973
+      },
+      {
+        "word": "Cowley's.",
+        "start": 1.52,
+        "end": 2.16,
+        "probability": 0.515
+      },
+      {
+        "word": "Tell",
+        "start": 2.64,
+        "end": 2.80,
+        "probability": 0.893
+      },
+      {
+        "word": "me",
+        "start": 2.80,
+        "end": 2.96,
+        "probability": 1.000
+      },
+      {
+        "word": "how",
+        "start": 2.96,
+        "end": 3.04,
+        "probability": 0.883
+      },
+      {
+        "word": "you",
+        "start": 3.04,
+        "end": 3.12,
+        "probability": 0.993
+      },
+      {
+        "word": "like",
+        "start": 3.12,
+        "end": 3.28,
+        "probability": 0.914
+      },
+      {
+        "word": "them.",
+        "start": 3.28,
+        "end": 3.52,
+        "probability": 0.998
+      }
+    ]
+  },
+  "en-cowleys-missed": {
+    "language": "en",
+    "text": "Here are some verses of Cowley's. Tell me how you like them.",
+    "words": [
+      {
+        "word": "Here",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.367
+      },
+      {
+        "word": "are",
+        "start": 0.80,
+        "end": 0.88,
+        "probability": 0.997
+      },
+      {
+        "word": "some",
+        "start": 0.88,
+        "end": 1.04,
+        "probability": 1.000
+      },
+      {
+        "word": "verses",
+        "start": 1.04,
+        "end": 1.36,
+        "probability": 0.963
+      },
+      {
+        "word": "of",
+        "start": 1.36,
+        "end": 1.52,
+        "probability": 0.973
+      },
+      {
+        "word": "Cowley's.",
+        "start": 1.52,
+        "end": 2.16,
+        "probability": 0.515
+      },
+      {
+        "word": "Tell",
+        "start": 2.64,
+        "end": 2.80,
+        "probability": 0.893
+      },
+      {
+        "word": "me",
+        "start": 2.80,
+        "end": 2.96,
+        "probability": 1.000
+      },
+      {
+        "word": "how",
+        "start": 2.96,
+        "end": 3.04,
+        "probability": 0.883
+      },
+      {
+        "word": "you",
+        "start": 3.04,
+        "end": 3.12,
+        "probability": 0.993
+      },
+      {
+        "word": "like",
+        "start": 3.12,
+        "end": 3.28,
+        "probability": 0.914
+      },
+      {
+        "word": "them.",
+        "start": 3.28,
+        "end": 3.52,
+        "probability": 0.998
+      }
+    ]
+  },
+  "en-curses-distractor": {
+    "language": "en",
+    "text": "Here are some verses of colonies. Tell me how you like them.",
+    "words": [
+      {
+        "word": "Here",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.367
+      },
+      {
+        "word": "are",
+        "start": 0.80,
+        "end": 0.88,
+        "probability": 0.997
+      },
+      {
+        "word": "some",
+        "start": 0.88,
+        "end": 1.04,
+        "probability": 1.000
+      },
+      {
+        "word": "verses",
+        "start": 1.04,
+        "end": 1.36,
+        "probability": 0.963
+      },
+      {
+        "word": "of",
+        "start": 1.36,
+        "end": 1.52,
+        "probability": 0.973
+      },
+      {
+        "word": "colonies.",
+        "start": 1.52,
+        "end": 2.08,
+        "probability": 0.774
+      },
+      {
+        "word": "Tell",
+        "start": 2.64,
+        "end": 2.80,
+        "probability": 0.912
+      },
+      {
+        "word": "me",
+        "start": 2.80,
+        "end": 2.96,
+        "probability": 1.000
+      },
+      {
+        "word": "how",
+        "start": 2.96,
+        "end": 3.04,
+        "probability": 0.909
+      },
+      {
+        "word": "you",
+        "start": 3.04,
+        "end": 3.12,
+        "probability": 0.994
+      },
+      {
+        "word": "like",
+        "start": 3.12,
+        "end": 3.28,
+        "probability": 0.924
+      },
+      {
+        "word": "them.",
+        "start": 3.28,
+        "end": 3.52,
+        "probability": 0.999
+      }
+    ]
+  },
+  "en-devils-present": {
+    "language": "en",
+    "text": "By the belly of St. James, what shall we poor devils drink the while?",
+    "words": [
+      {
+        "word": "By",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.634
+      },
+      {
+        "word": "the",
+        "start": 0.80,
+        "end": 0.96,
+        "probability": 0.996
+      },
+      {
+        "word": "belly",
+        "start": 0.96,
+        "end": 1.28,
+        "probability": 0.767
+      },
+      {
+        "word": "of",
+        "start": 1.28,
+        "end": 1.44,
+        "probability": 0.999
+      },
+      {
+        "word": "St.",
+        "start": 1.44,
+        "end": 1.68,
+        "probability": 0.959
+      },
+      {
+        "word": "James,",
+        "start": 1.76,
+        "end": 2.24,
+        "probability": 0.999
+      },
+      {
+        "word": "what",
+        "start": 2.80,
+        "end": 2.88,
+        "probability": 0.879
+      },
+      {
+        "word": "shall",
+        "start": 2.88,
+        "end": 3.20,
+        "probability": 0.995
+      },
+      {
+        "word": "we",
+        "start": 3.20,
+        "end": 3.36,
+        "probability": 0.990
+      },
+      {
+        "word": "poor",
+        "start": 3.36,
+        "end": 3.60,
+        "probability": 0.908
+      },
+      {
+        "word": "devils",
+        "start": 3.60,
+        "end": 4.00,
+        "probability": 0.995
+      },
+      {
+        "word": "drink",
+        "start": 4.00,
+        "end": 4.40,
+        "probability": 1.000
+      },
+      {
+        "word": "the",
+        "start": 4.40,
+        "end": 4.64,
+        "probability": 0.969
+      },
+      {
+        "word": "while?",
+        "start": 4.64,
+        "end": 4.96,
+        "probability": 0.933
+      }
+    ]
+  },
+  "en-did-it-phrase": {
+    "language": "en",
+    "text": "Can you tell with what instruments they did it?",
+    "words": [
+      {
+        "word": "Can",
+        "start": 0.00,
+        "end": 0.80,
+        "probability": 0.287
+      },
+      {
+        "word": "you",
+        "start": 0.80,
+        "end": 1.04,
+        "probability": 0.993
+      },
+      {
+        "word": "tell",
+        "start": 1.04,
+        "end": 1.36,
+        "probability": 0.999
+      },
+      {
+        "word": "with",
+        "start": 1.36,
+        "end": 1.68,
+        "probability": 0.971
+      },
+      {
+        "word": "what",
+        "start": 1.68,
+        "end": 1.92,
+        "probability": 0.996
+      },
+      {
+        "word": "instruments",
+        "start": 1.92,
+        "end": 2.48,
+        "probability": 0.993
+      },
+      {
+        "word": "they",
+        "start": 2.48,
+        "end": 2.72,
+        "probability": 0.991
+      },
+      {
+        "word": "did",
+        "start": 2.72,
+        "end": 2.88,
+        "probability": 0.997
+      },
+      {
+        "word": "it?",
+        "start": 2.88,
+        "end": 3.28,
+        "probability": 0.123
+      }
+    ]
+  },
+  "en-looked-distractor": {
+    "language": "en",
+    "text": "She found a door, but it was locked outside.",
+    "words": [
+      {
+        "word": "She",
+        "start": 0.40,
+        "end": 0.56,
+        "probability": 0.986
+      },
+      {
+        "word": "found",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.995
+      },
+      {
+        "word": "a",
+        "start": 0.80,
+        "end": 0.96,
+        "probability": 0.822
+      },
+      {
+        "word": "door,",
+        "start": 0.96,
+        "end": 1.12,
+        "probability": 0.999
+      },
+      {
+        "word": "but",
+        "start": 1.28,
+        "end": 1.36,
+        "probability": 0.999
+      },
+      {
+        "word": "it",
+        "start": 1.36,
+        "end": 1.44,
+        "probability": 0.998
+      },
+      {
+        "word": "was",
+        "start": 1.44,
+        "end": 1.60,
+        "probability": 0.999
+      },
+      {
+        "word": "locked",
+        "start": 1.60,
+        "end": 1.92,
+        "probability": 0.999
+      },
+      {
+        "word": "outside.",
+        "start": 1.92,
+        "end": 2.32,
+        "probability": 0.974
+      }
+    ]
+  },
+  "en-no-chance-phrase": {
+    "language": "en",
+    "text": "But there was no chance for his body there, and the head would not go first.",
+    "words": [
+      {
+        "word": "But",
+        "start": 0.24,
+        "end": 0.40,
+        "probability": 0.954
+      },
+      {
+        "word": "there",
+        "start": 0.40,
+        "end": 0.48,
+        "probability": 0.999
+      },
+      {
+        "word": "was",
+        "start": 0.48,
+        "end": 0.64,
+        "probability": 0.996
+      },
+      {
+        "word": "no",
+        "start": 0.64,
+        "end": 0.80,
+        "probability": 1.000
+      },
+      {
+        "word": "chance",
+        "start": 0.80,
+        "end": 1.12,
+        "probability": 0.288
+      },
+      {
+        "word": "for",
+        "start": 1.12,
+        "end": 1.20,
+        "probability": 0.999
+      },
+      {
+        "word": "his",
+        "start": 1.20,
+        "end": 1.36,
+        "probability": 0.998
+      },
+      {
+        "word": "body",
+        "start": 1.36,
+        "end": 1.60,
+        "probability": 0.997
+      },
+      {
+        "word": "there,",
+        "start": 1.60,
+        "end": 1.84,
+        "probability": 0.989
+      },
+      {
+        "word": "and",
+        "start": 1.92,
+        "end": 2.00,
+        "probability": 0.949
+      },
+      {
+        "word": "the",
+        "start": 2.00,
+        "end": 2.08,
+        "probability": 0.963
+      },
+      {
+        "word": "head",
+        "start": 2.08,
+        "end": 2.16,
+        "probability": 0.973
+      },
+      {
+        "word": "would",
+        "start": 2.16,
+        "end": 2.32,
+        "probability": 0.984
+      },
+      {
+        "word": "not",
+        "start": 2.32,
+        "end": 2.40,
+        "probability": 0.994
+      },
+      {
+        "word": "go",
+        "start": 2.40,
+        "end": 2.56,
+        "probability": 0.999
+      },
+      {
+        "word": "first.",
+        "start": 2.56,
+        "end": 2.80,
+        "probability": 0.993
+      }
+    ]
+  },
+  "en-sanct-james-phrase": {
+    "language": "en",
+    "text": "By the belly of St. James, what shall we poor devils drink the while?",
+    "words": [
+      {
+        "word": "By",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.634
+      },
+      {
+        "word": "the",
+        "start": 0.80,
+        "end": 0.96,
+        "probability": 0.996
+      },
+      {
+        "word": "belly",
+        "start": 0.96,
+        "end": 1.28,
+        "probability": 0.767
+      },
+      {
+        "word": "of",
+        "start": 1.28,
+        "end": 1.44,
+        "probability": 0.999
+      },
+      {
+        "word": "St.",
+        "start": 1.44,
+        "end": 1.68,
+        "probability": 0.959
+      },
+      {
+        "word": "James,",
+        "start": 1.76,
+        "end": 2.24,
+        "probability": 0.999
+      },
+      {
+        "word": "what",
+        "start": 2.80,
+        "end": 2.88,
+        "probability": 0.879
+      },
+      {
+        "word": "shall",
+        "start": 2.88,
+        "end": 3.20,
+        "probability": 0.995
+      },
+      {
+        "word": "we",
+        "start": 3.20,
+        "end": 3.36,
+        "probability": 0.990
+      },
+      {
+        "word": "poor",
+        "start": 3.36,
+        "end": 3.60,
+        "probability": 0.908
+      },
+      {
+        "word": "devils",
+        "start": 3.60,
+        "end": 4.00,
+        "probability": 0.995
+      },
+      {
+        "word": "drink",
+        "start": 4.00,
+        "end": 4.40,
+        "probability": 1.000
+      },
+      {
+        "word": "the",
+        "start": 4.40,
+        "end": 4.64,
+        "probability": 0.969
+      },
+      {
+        "word": "while?",
+        "start": 4.64,
+        "end": 4.96,
+        "probability": 0.933
+      }
+    ]
+  },
+  "en-sanct-missed": {
+    "language": "en",
+    "text": "By the belly of St. James, what shall we poor devils drink the while?",
+    "words": [
+      {
+        "word": "By",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.634
+      },
+      {
+        "word": "the",
+        "start": 0.80,
+        "end": 0.96,
+        "probability": 0.996
+      },
+      {
+        "word": "belly",
+        "start": 0.96,
+        "end": 1.28,
+        "probability": 0.767
+      },
+      {
+        "word": "of",
+        "start": 1.28,
+        "end": 1.44,
+        "probability": 0.999
+      },
+      {
+        "word": "St.",
+        "start": 1.44,
+        "end": 1.68,
+        "probability": 0.959
+      },
+      {
+        "word": "James,",
+        "start": 1.76,
+        "end": 2.24,
+        "probability": 0.999
+      },
+      {
+        "word": "what",
+        "start": 2.80,
+        "end": 2.88,
+        "probability": 0.879
+      },
+      {
+        "word": "shall",
+        "start": 2.88,
+        "end": 3.20,
+        "probability": 0.995
+      },
+      {
+        "word": "we",
+        "start": 3.20,
+        "end": 3.36,
+        "probability": 0.990
+      },
+      {
+        "word": "poor",
+        "start": 3.36,
+        "end": 3.60,
+        "probability": 0.908
+      },
+      {
+        "word": "devils",
+        "start": 3.60,
+        "end": 4.00,
+        "probability": 0.995
+      },
+      {
+        "word": "drink",
+        "start": 4.00,
+        "end": 4.40,
+        "probability": 1.000
+      },
+      {
+        "word": "the",
+        "start": 4.40,
+        "end": 4.64,
+        "probability": 0.969
+      },
+      {
+        "word": "while?",
+        "start": 4.64,
+        "end": 4.96,
+        "probability": 0.933
+      }
+    ]
+  },
+  "en-scout-present": {
+    "language": "en",
+    "text": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+    "words": [
+      {
+        "word": "There",
+        "start": 0.40,
+        "end": 0.56,
+        "probability": 0.993
+      },
+      {
+        "word": "was",
+        "start": 0.56,
+        "end": 0.72,
+        "probability": 0.944
+      },
+      {
+        "word": "something",
+        "start": 0.72,
+        "end": 1.04,
+        "probability": 0.989
+      },
+      {
+        "word": "in",
+        "start": 1.04,
+        "end": 1.28,
+        "probability": 0.998
+      },
+      {
+        "word": "his",
+        "start": 1.28,
+        "end": 1.44,
+        "probability": 0.999
+      },
+      {
+        "word": "air",
+        "start": 1.44,
+        "end": 1.68,
+        "probability": 0.706
+      },
+      {
+        "word": "and",
+        "start": 1.68,
+        "end": 1.84,
+        "probability": 0.662
+      },
+      {
+        "word": "manner",
+        "start": 1.84,
+        "end": 2.24,
+        "probability": 0.788
+      },
+      {
+        "word": "that",
+        "start": 2.24,
+        "end": 2.48,
+        "probability": 0.995
+      },
+      {
+        "word": "betrayed",
+        "start": 2.48,
+        "end": 2.88,
+        "probability": 1.000
+      },
+      {
+        "word": "to",
+        "start": 2.88,
+        "end": 3.04,
+        "probability": 0.996
+      },
+      {
+        "word": "the",
+        "start": 3.04,
+        "end": 3.20,
+        "probability": 0.997
+      },
+      {
+        "word": "scout",
+        "start": 3.20,
+        "end": 3.52,
+        "probability": 0.944
+      },
+      {
+        "word": "the",
+        "start": 3.52,
+        "end": 3.84,
+        "probability": 0.980
+      },
+      {
+        "word": "utter",
+        "start": 3.84,
+        "end": 4.16,
+        "probability": 0.999
+      },
+      {
+        "word": "confusion",
+        "start": 4.16,
+        "end": 4.72,
+        "probability": 0.999
+      },
+      {
+        "word": "of",
+        "start": 4.72,
+        "end": 4.96,
+        "probability": 0.999
+      },
+      {
+        "word": "the",
+        "start": 4.96,
+        "end": 5.04,
+        "probability": 0.994
+      },
+      {
+        "word": "state",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.892
+      },
+      {
+        "word": "of",
+        "start": 5.20,
+        "end": 5.44,
+        "probability": 1.000
+      },
+      {
+        "word": "his",
+        "start": 5.44,
+        "end": 5.60,
+        "probability": 0.999
+      },
+      {
+        "word": "mind.",
+        "start": 5.60,
+        "end": 5.84,
+        "probability": 1.000
+      }
+    ]
+  },
+  "en-stout-distractor": {
+    "language": "en",
+    "text": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+    "words": [
+      {
+        "word": "There",
+        "start": 0.40,
+        "end": 0.56,
+        "probability": 0.993
+      },
+      {
+        "word": "was",
+        "start": 0.56,
+        "end": 0.72,
+        "probability": 0.944
+      },
+      {
+        "word": "something",
+        "start": 0.72,
+        "end": 1.04,
+        "probability": 0.989
+      },
+      {
+        "word": "in",
+        "start": 1.04,
+        "end": 1.28,
+        "probability": 0.998
+      },
+      {
+        "word": "his",
+        "start": 1.28,
+        "end": 1.44,
+        "probability": 0.999
+      },
+      {
+        "word": "air",
+        "start": 1.44,
+        "end": 1.68,
+        "probability": 0.706
+      },
+      {
+        "word": "and",
+        "start": 1.68,
+        "end": 1.84,
+        "probability": 0.662
+      },
+      {
+        "word": "manner",
+        "start": 1.84,
+        "end": 2.24,
+        "probability": 0.788
+      },
+      {
+        "word": "that",
+        "start": 2.24,
+        "end": 2.48,
+        "probability": 0.995
+      },
+      {
+        "word": "betrayed",
+        "start": 2.48,
+        "end": 2.88,
+        "probability": 1.000
+      },
+      {
+        "word": "to",
+        "start": 2.88,
+        "end": 3.04,
+        "probability": 0.996
+      },
+      {
+        "word": "the",
+        "start": 3.04,
+        "end": 3.20,
+        "probability": 0.997
+      },
+      {
+        "word": "scout",
+        "start": 3.20,
+        "end": 3.52,
+        "probability": 0.944
+      },
+      {
+        "word": "the",
+        "start": 3.52,
+        "end": 3.84,
+        "probability": 0.980
+      },
+      {
+        "word": "utter",
+        "start": 3.84,
+        "end": 4.16,
+        "probability": 0.999
+      },
+      {
+        "word": "confusion",
+        "start": 4.16,
+        "end": 4.72,
+        "probability": 0.999
+      },
+      {
+        "word": "of",
+        "start": 4.72,
+        "end": 4.96,
+        "probability": 0.999
+      },
+      {
+        "word": "the",
+        "start": 4.96,
+        "end": 5.04,
+        "probability": 0.994
+      },
+      {
+        "word": "state",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.892
+      },
+      {
+        "word": "of",
+        "start": 5.20,
+        "end": 5.44,
+        "probability": 1.000
+      },
+      {
+        "word": "his",
+        "start": 5.44,
+        "end": 5.60,
+        "probability": 0.999
+      },
+      {
+        "word": "mind.",
+        "start": 5.60,
+        "end": 5.84,
+        "probability": 1.000
+      }
+    ]
+  },
+  "en-the-door-phrase": {
+    "language": "en",
+    "text": "She found the door, but it was locked outside.",
+    "words": [
+      {
+        "word": "She",
+        "start": 0.40,
+        "end": 0.56,
+        "probability": 0.986
+      },
+      {
+        "word": "found",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.995
+      },
+      {
+        "word": "the",
+        "start": 0.80,
+        "end": 0.96,
+        "probability": 0.160
+      },
+      {
+        "word": "door,",
+        "start": 0.96,
+        "end": 1.12,
+        "probability": 1.000
+      },
+      {
+        "word": "but",
+        "start": 1.28,
+        "end": 1.36,
+        "probability": 0.999
+      },
+      {
+        "word": "it",
+        "start": 1.36,
+        "end": 1.44,
+        "probability": 0.998
+      },
+      {
+        "word": "was",
+        "start": 1.44,
+        "end": 1.60,
+        "probability": 0.999
+      },
+      {
+        "word": "locked",
+        "start": 1.60,
+        "end": 1.92,
+        "probability": 0.999
+      },
+      {
+        "word": "outside.",
+        "start": 1.92,
+        "end": 2.32,
+        "probability": 0.974
+      }
+    ]
+  },
+  "en-transfer-distractor": {
+    "language": "en",
+    "text": "But there was no transfer of his body there, and the head would not go first.",
+    "words": [
+      {
+        "word": "But",
+        "start": 0.24,
+        "end": 0.40,
+        "probability": 0.954
+      },
+      {
+        "word": "there",
+        "start": 0.40,
+        "end": 0.48,
+        "probability": 0.999
+      },
+      {
+        "word": "was",
+        "start": 0.48,
+        "end": 0.64,
+        "probability": 0.996
+      },
+      {
+        "word": "no",
+        "start": 0.64,
+        "end": 0.80,
+        "probability": 1.000
+      },
+      {
+        "word": "transfer",
+        "start": 0.80,
+        "end": 1.20,
+        "probability": 0.704
+      },
+      {
+        "word": "of",
+        "start": 1.20,
+        "end": 1.28,
+        "probability": 0.301
+      },
+      {
+        "word": "his",
+        "start": 1.28,
+        "end": 1.44,
+        "probability": 0.991
+      },
+      {
+        "word": "body",
+        "start": 1.44,
+        "end": 1.60,
+        "probability": 0.996
+      },
+      {
+        "word": "there,",
+        "start": 1.60,
+        "end": 1.84,
+        "probability": 0.994
+      },
+      {
+        "word": "and",
+        "start": 1.92,
+        "end": 2.00,
+        "probability": 0.948
+      },
+      {
+        "word": "the",
+        "start": 2.00,
+        "end": 2.08,
+        "probability": 0.962
+      },
+      {
+        "word": "head",
+        "start": 2.08,
+        "end": 2.16,
+        "probability": 0.970
+      },
+      {
+        "word": "would",
+        "start": 2.16,
+        "end": 2.32,
+        "probability": 0.983
+      },
+      {
+        "word": "not",
+        "start": 2.32,
+        "end": 2.40,
+        "probability": 0.995
+      },
+      {
+        "word": "go",
+        "start": 2.40,
+        "end": 2.56,
+        "probability": 0.999
+      },
+      {
+        "word": "first.",
+        "start": 2.56,
+        "end": 2.80,
+        "probability": 0.993
+      }
+    ]
+  },
+  "en-uncas-present": {
+    "language": "en",
+    "text": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+    "words": [
+      {
+        "word": "Four",
+        "start": 0.40,
+        "end": 0.64,
+        "probability": 0.875
+      },
+      {
+        "word": "or",
+        "start": 0.64,
+        "end": 0.80,
+        "probability": 0.994
+      },
+      {
+        "word": "five",
+        "start": 0.80,
+        "end": 1.04,
+        "probability": 0.997
+      },
+      {
+        "word": "of",
+        "start": 1.04,
+        "end": 1.20,
+        "probability": 0.999
+      },
+      {
+        "word": "the",
+        "start": 1.20,
+        "end": 1.28,
+        "probability": 0.999
+      },
+      {
+        "word": "latter",
+        "start": 1.28,
+        "end": 1.52,
+        "probability": 0.989
+      },
+      {
+        "word": "only",
+        "start": 1.52,
+        "end": 1.84,
+        "probability": 0.910
+      },
+      {
+        "word": "lingered",
+        "start": 1.84,
+        "end": 2.24,
+        "probability": 0.998
+      },
+      {
+        "word": "about",
+        "start": 2.24,
+        "end": 2.48,
+        "probability": 0.993
+      },
+      {
+        "word": "the",
+        "start": 2.48,
+        "end": 2.64,
+        "probability": 0.999
+      },
+      {
+        "word": "door",
+        "start": 2.64,
+        "end": 2.80,
+        "probability": 1.000
+      },
+      {
+        "word": "of",
+        "start": 2.80,
+        "end": 3.04,
+        "probability": 0.991
+      },
+      {
+        "word": "the",
+        "start": 3.04,
+        "end": 3.12,
+        "probability": 0.997
+      },
+      {
+        "word": "prison",
+        "start": 3.12,
+        "end": 3.44,
+        "probability": 0.973
+      },
+      {
+        "word": "of",
+        "start": 3.44,
+        "end": 3.52,
+        "probability": 0.994
+      },
+      {
+        "word": "Uncas,",
+        "start": 3.52,
+        "end": 3.92,
+        "probability": 0.880
+      },
+      {
+        "word": "wary",
+        "start": 4.16,
+        "end": 4.48,
+        "probability": 0.730
+      },
+      {
+        "word": "but",
+        "start": 4.48,
+        "end": 4.72,
+        "probability": 0.669
+      },
+      {
+        "word": "close",
+        "start": 4.72,
+        "end": 5.04,
+        "probability": 0.993
+      },
+      {
+        "word": "observers",
+        "start": 5.04,
+        "end": 5.68,
+        "probability": 0.997
+      },
+      {
+        "word": "of",
+        "start": 5.68,
+        "end": 5.84,
+        "probability": 0.993
+      },
+      {
+        "word": "the",
+        "start": 5.84,
+        "end": 6.00,
+        "probability": 0.999
+      },
+      {
+        "word": "manner",
+        "start": 6.00,
+        "end": 6.32,
+        "probability": 0.926
+      },
+      {
+        "word": "of",
+        "start": 6.32,
+        "end": 6.40,
+        "probability": 0.998
+      },
+      {
+        "word": "their",
+        "start": 6.40,
+        "end": 6.56,
+        "probability": 0.996
+      },
+      {
+        "word": "captive.",
+        "start": 6.56,
+        "end": 7.04,
+        "probability": 0.998
+      }
+    ]
+  },
+  "en-verses-of-cowleys-phrase": {
+    "language": "en",
+    "text": "Here are some verses of Cowley's. Tell me how you like them.",
+    "words": [
+      {
+        "word": "Here",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.367
+      },
+      {
+        "word": "are",
+        "start": 0.80,
+        "end": 0.88,
+        "probability": 0.997
+      },
+      {
+        "word": "some",
+        "start": 0.88,
+        "end": 1.04,
+        "probability": 1.000
+      },
+      {
+        "word": "verses",
+        "start": 1.04,
+        "end": 1.36,
+        "probability": 0.963
+      },
+      {
+        "word": "of",
+        "start": 1.36,
+        "end": 1.52,
+        "probability": 0.973
+      },
+      {
+        "word": "Cowley's.",
+        "start": 1.52,
+        "end": 2.16,
+        "probability": 0.515
+      },
+      {
+        "word": "Tell",
+        "start": 2.64,
+        "end": 2.80,
+        "probability": 0.893
+      },
+      {
+        "word": "me",
+        "start": 2.80,
+        "end": 2.96,
+        "probability": 1.000
+      },
+      {
+        "word": "how",
+        "start": 2.96,
+        "end": 3.04,
+        "probability": 0.883
+      },
+      {
+        "word": "you",
+        "start": 3.04,
+        "end": 3.12,
+        "probability": 0.993
+      },
+      {
+        "word": "like",
+        "start": 3.12,
+        "end": 3.28,
+        "probability": 0.914
+      },
+      {
+        "word": "them.",
+        "start": 3.28,
+        "end": 3.52,
+        "probability": 0.998
+      }
+    ]
+  },
+  "en-verses-present": {
+    "language": "en",
+    "text": "Here are some verses of colonies. Tell me how you like them.",
+    "words": [
+      {
+        "word": "Here",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.367
+      },
+      {
+        "word": "are",
+        "start": 0.80,
+        "end": 0.88,
+        "probability": 0.997
+      },
+      {
+        "word": "some",
+        "start": 0.88,
+        "end": 1.04,
+        "probability": 1.000
+      },
+      {
+        "word": "verses",
+        "start": 1.04,
+        "end": 1.36,
+        "probability": 0.963
+      },
+      {
+        "word": "of",
+        "start": 1.36,
+        "end": 1.52,
+        "probability": 0.973
+      },
+      {
+        "word": "colonies.",
+        "start": 1.52,
+        "end": 2.08,
+        "probability": 0.774
+      },
+      {
+        "word": "Tell",
+        "start": 2.64,
+        "end": 2.80,
+        "probability": 0.912
+      },
+      {
+        "word": "me",
+        "start": 2.80,
+        "end": 2.96,
+        "probability": 1.000
+      },
+      {
+        "word": "how",
+        "start": 2.96,
+        "end": 3.04,
+        "probability": 0.909
+      },
+      {
+        "word": "you",
+        "start": 3.04,
+        "end": 3.12,
+        "probability": 0.994
+      },
+      {
+        "word": "like",
+        "start": 3.12,
+        "end": 3.28,
+        "probability": 0.924
+      },
+      {
+        "word": "them.",
+        "start": 3.28,
+        "end": 3.52,
+        "probability": 0.999
+      }
+    ]
+  },
+  "es-aliviar-el-dolor-phrase": {
+    "language": "es",
+    "text": "No ha podido tomarse medicamentos para aliviar el dolor porque está prohibido su uso en los juegos.",
+    "words": [
+      {
+        "word": "No",
+        "start": 0.96,
+        "end": 1.12,
+        "probability": 0.990
+      },
+      {
+        "word": "ha",
+        "start": 1.12,
+        "end": 1.20,
+        "probability": 0.995
+      },
+      {
+        "word": "podido",
+        "start": 1.20,
+        "end": 1.52,
+        "probability": 1.000
+      },
+      {
+        "word": "tomarse",
+        "start": 1.52,
+        "end": 2.00,
+        "probability": 0.994
+      },
+      {
+        "word": "medicamentos",
+        "start": 2.00,
+        "end": 2.72,
+        "probability": 0.999
+      },
+      {
+        "word": "para",
+        "start": 2.72,
+        "end": 2.96,
+        "probability": 0.996
+      },
+      {
+        "word": "aliviar",
+        "start": 2.96,
+        "end": 3.28,
+        "probability": 0.709
+      },
+      {
+        "word": "el",
+        "start": 3.28,
+        "end": 3.44,
+        "probability": 0.995
+      },
+      {
+        "word": "dolor",
+        "start": 3.44,
+        "end": 3.76,
+        "probability": 0.999
+      },
+      {
+        "word": "porque",
+        "start": 3.76,
+        "end": 4.08,
+        "probability": 0.887
+      },
+      {
+        "word": "está",
+        "start": 4.08,
+        "end": 4.32,
+        "probability": 0.991
+      },
+      {
+        "word": "prohibido",
+        "start": 4.32,
+        "end": 4.88,
+        "probability": 0.996
+      },
+      {
+        "word": "su",
+        "start": 4.88,
+        "end": 5.04,
+        "probability": 0.580
+      },
+      {
+        "word": "uso",
+        "start": 5.04,
+        "end": 5.28,
+        "probability": 0.999
+      },
+      {
+        "word": "en",
+        "start": 5.28,
+        "end": 5.36,
+        "probability": 0.768
+      },
+      {
+        "word": "los",
+        "start": 5.36,
+        "end": 5.52,
+        "probability": 0.999
+      },
+      {
+        "word": "juegos.",
+        "start": 5.52,
+        "end": 5.92,
+        "probability": 0.999
+      }
+    ]
+  },
+  "es-aliviar-missed": {
+    "language": "es",
+    "text": "No ha podido tomarse medicamentos para aliviar el dolor porque está prohibido su uso en los juegos.",
+    "words": [
+      {
+        "word": "No",
+        "start": 0.96,
+        "end": 1.12,
+        "probability": 0.990
+      },
+      {
+        "word": "ha",
+        "start": 1.12,
+        "end": 1.20,
+        "probability": 0.995
+      },
+      {
+        "word": "podido",
+        "start": 1.20,
+        "end": 1.52,
+        "probability": 1.000
+      },
+      {
+        "word": "tomarse",
+        "start": 1.52,
+        "end": 2.00,
+        "probability": 0.994
+      },
+      {
+        "word": "medicamentos",
+        "start": 2.00,
+        "end": 2.72,
+        "probability": 0.999
+      },
+      {
+        "word": "para",
+        "start": 2.72,
+        "end": 2.96,
+        "probability": 0.996
+      },
+      {
+        "word": "aliviar",
+        "start": 2.96,
+        "end": 3.28,
+        "probability": 0.709
+      },
+      {
+        "word": "el",
+        "start": 3.28,
+        "end": 3.44,
+        "probability": 0.995
+      },
+      {
+        "word": "dolor",
+        "start": 3.44,
+        "end": 3.76,
+        "probability": 0.999
+      },
+      {
+        "word": "porque",
+        "start": 3.76,
+        "end": 4.08,
+        "probability": 0.887
+      },
+      {
+        "word": "está",
+        "start": 4.08,
+        "end": 4.32,
+        "probability": 0.991
+      },
+      {
+        "word": "prohibido",
+        "start": 4.32,
+        "end": 4.88,
+        "probability": 0.996
+      },
+      {
+        "word": "su",
+        "start": 4.88,
+        "end": 5.04,
+        "probability": 0.580
+      },
+      {
+        "word": "uso",
+        "start": 5.04,
+        "end": 5.28,
+        "probability": 0.999
+      },
+      {
+        "word": "en",
+        "start": 5.28,
+        "end": 5.36,
+        "probability": 0.768
+      },
+      {
+        "word": "los",
+        "start": 5.36,
+        "end": 5.52,
+        "probability": 0.999
+      },
+      {
+        "word": "juegos.",
+        "start": 5.52,
+        "end": 5.92,
+        "probability": 0.999
+      }
+    ]
+  },
+  "es-homenaje-present": {
+    "language": "es",
+    "text": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+    "words": [
+      {
+        "word": "Los",
+        "start": 0.72,
+        "end": 0.96,
+        "probability": 1.000
+      },
+      {
+        "word": "luchadores",
+        "start": 0.96,
+        "end": 1.44,
+        "probability": 1.000
+      },
+      {
+        "word": "compañeros",
+        "start": 1.44,
+        "end": 2.16,
+        "probability": 0.995
+      },
+      {
+        "word": "de",
+        "start": 2.16,
+        "end": 2.24,
+        "probability": 0.853
+      },
+      {
+        "word": "Luna",
+        "start": 2.24,
+        "end": 2.56,
+        "probability": 0.845
+      },
+      {
+        "word": "también",
+        "start": 2.56,
+        "end": 3.12,
+        "probability": 0.994
+      },
+      {
+        "word": "le",
+        "start": 3.12,
+        "end": 3.28,
+        "probability": 0.532
+      },
+      {
+        "word": "rindieron",
+        "start": 3.28,
+        "end": 3.76,
+        "probability": 0.958
+      },
+      {
+        "word": "homenaje.",
+        "start": 3.76,
+        "end": 4.32,
+        "probability": 0.990
+      }
+    ]
+  },
+  "es-luchadoras-distractor": {
+    "language": "es",
+    "text": "Los luchadoras compañeros de Luna también le rindieron homenaje.",
+    "words": [
+      {
+        "word": "Los",
+        "start": 0.72,
+        "end": 0.96,
+        "probability": 1.000
+      },
+      {
+        "word": "luchadoras",
+        "start": 0.96,
+        "end": 1.60,
+        "probability": 0.612
+      },
+      {
+        "word": "compañeros",
+        "start": 1.60,
+        "end": 2.16,
+        "probability": 0.990
+      },
+      {
+        "word": "de",
+        "start": 2.16,
+        "end": 2.24,
+        "probability": 0.848
+      },
+      {
+        "word": "Luna",
+        "start": 2.24,
+        "end": 2.56,
+        "probability": 0.858
+      },
+      {
+        "word": "también",
+        "start": 2.56,
+        "end": 3.12,
+        "probability": 0.994
+      },
+      {
+        "word": "le",
+        "start": 3.12,
+        "end": 3.28,
+        "probability": 0.576
+      },
+      {
+        "word": "rindieron",
+        "start": 3.28,
+        "end": 3.76,
+        "probability": 0.958
+      },
+      {
+        "word": "homenaje.",
+        "start": 3.76,
+        "end": 4.32,
+        "probability": 0.988
+      }
+    ]
+  },
+  "es-medicamentos-present": {
+    "language": "es",
+    "text": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+    "words": [
+      {
+        "word": "No",
+        "start": 0.96,
+        "end": 1.12,
+        "probability": 0.990
+      },
+      {
+        "word": "ha",
+        "start": 1.12,
+        "end": 1.20,
+        "probability": 0.995
+      },
+      {
+        "word": "podido",
+        "start": 1.20,
+        "end": 1.52,
+        "probability": 1.000
+      },
+      {
+        "word": "tomarse",
+        "start": 1.52,
+        "end": 2.00,
+        "probability": 0.994
+      },
+      {
+        "word": "medicamentos",
+        "start": 2.00,
+        "end": 2.72,
+        "probability": 0.999
+      },
+      {
+        "word": "para",
+        "start": 2.72,
+        "end": 2.96,
+        "probability": 0.996
+      },
+      {
+        "word": "lidiar",
+        "start": 2.96,
+        "end": 3.28,
+        "probability": 0.811
+      },
+      {
+        "word": "el",
+        "start": 3.28,
+        "end": 3.44,
+        "probability": 0.976
+      },
+      {
+        "word": "dolor",
+        "start": 3.44,
+        "end": 3.76,
+        "probability": 0.998
+      },
+      {
+        "word": "porque",
+        "start": 3.76,
+        "end": 4.08,
+        "probability": 0.887
+      },
+      {
+        "word": "está",
+        "start": 4.08,
+        "end": 4.32,
+        "probability": 0.991
+      },
+      {
+        "word": "prohibido",
+        "start": 4.32,
+        "end": 4.88,
+        "probability": 0.996
+      },
+      {
+        "word": "su",
+        "start": 4.88,
+        "end": 5.04,
+        "probability": 0.577
+      },
+      {
+        "word": "uso",
+        "start": 5.04,
+        "end": 5.28,
+        "probability": 0.999
+      },
+      {
+        "word": "en",
+        "start": 5.28,
+        "end": 5.36,
+        "probability": 0.775
+      },
+      {
+        "word": "los",
+        "start": 5.36,
+        "end": 5.52,
+        "probability": 0.998
+      },
+      {
+        "word": "juegos.",
+        "start": 5.52,
+        "end": 5.92,
+        "probability": 0.999
+      }
+    ]
+  },
+  "fr-cristal-distractor": {
+    "language": "fr",
+    "text": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+    "words": [
+      {
+        "word": "Les",
+        "start": 0.24,
+        "end": 0.48,
+        "probability": 0.695
+      },
+      {
+        "word": "deux",
+        "start": 0.48,
+        "end": 0.80,
+        "probability": 0.999
+      },
+      {
+        "word": "composés",
+        "start": 0.80,
+        "end": 1.28,
+        "probability": 0.968
+      },
+      {
+        "word": "réagissent",
+        "start": 1.28,
+        "end": 1.84,
+        "probability": 0.995
+      },
+      {
+        "word": "là",
+        "start": 1.84,
+        "end": 2.00,
+        "probability": 0.995
+      },
+      {
+        "word": "avec",
+        "start": 2.00,
+        "end": 2.24,
+        "probability": 0.997
+      },
+      {
+        "word": "l'autre",
+        "start": 2.24,
+        "end": 2.56,
+        "probability": 0.943
+      },
+      {
+        "word": "pour",
+        "start": 2.56,
+        "end": 2.64,
+        "probability": 0.952
+      },
+      {
+        "word": "former",
+        "start": 2.64,
+        "end": 2.96,
+        "probability": 0.914
+      },
+      {
+        "word": "des",
+        "start": 2.96,
+        "end": 3.12,
+        "probability": 0.914
+      },
+      {
+        "word": "Christos",
+        "start": 3.12,
+        "end": 3.44,
+        "probability": 0.704
+      },
+      {
+        "word": "qui",
+        "start": 3.44,
+        "end": 3.60,
+        "probability": 0.979
+      },
+      {
+        "word": "peuvent",
+        "start": 3.60,
+        "end": 3.84,
+        "probability": 0.867
+      },
+      {
+        "word": "bloquer",
+        "start": 3.84,
+        "end": 4.16,
+        "probability": 0.967
+      },
+      {
+        "word": "la",
+        "start": 4.16,
+        "end": 4.24,
+        "probability": 0.998
+      },
+      {
+        "word": "fonction",
+        "start": 4.24,
+        "end": 4.56,
+        "probability": 0.974
+      },
+      {
+        "word": "régionale",
+        "start": 4.56,
+        "end": 5.04,
+        "probability": 0.921
+      },
+      {
+        "word": "en",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.910
+      },
+      {
+        "word": "déclarer",
+        "start": 5.20,
+        "end": 5.68,
+        "probability": 0.952
+      },
+      {
+        "word": "des",
+        "start": 5.68,
+        "end": 5.76,
+        "probability": 0.684
+      },
+      {
+        "word": "chercheurs",
+        "start": 5.76,
+        "end": 6.16,
+        "probability": 0.997
+      },
+      {
+        "word": "de",
+        "start": 6.16,
+        "end": 6.32,
+        "probability": 0.984
+      },
+      {
+        "word": "l'université.",
+        "start": 6.32,
+        "end": 6.96,
+        "probability": 0.906
+      }
+    ]
+  },
+  "fr-cristaux-missed": {
+    "language": "fr",
+    "text": "Les deux composés réagissent là avec l'autre pour former des cristaux qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+    "words": [
+      {
+        "word": "Les",
+        "start": 0.24,
+        "end": 0.48,
+        "probability": 0.695
+      },
+      {
+        "word": "deux",
+        "start": 0.48,
+        "end": 0.80,
+        "probability": 0.999
+      },
+      {
+        "word": "composés",
+        "start": 0.80,
+        "end": 1.28,
+        "probability": 0.968
+      },
+      {
+        "word": "réagissent",
+        "start": 1.28,
+        "end": 1.84,
+        "probability": 0.995
+      },
+      {
+        "word": "là",
+        "start": 1.84,
+        "end": 2.00,
+        "probability": 0.995
+      },
+      {
+        "word": "avec",
+        "start": 2.00,
+        "end": 2.24,
+        "probability": 0.997
+      },
+      {
+        "word": "l'autre",
+        "start": 2.24,
+        "end": 2.56,
+        "probability": 0.943
+      },
+      {
+        "word": "pour",
+        "start": 2.56,
+        "end": 2.64,
+        "probability": 0.952
+      },
+      {
+        "word": "former",
+        "start": 2.64,
+        "end": 2.96,
+        "probability": 0.914
+      },
+      {
+        "word": "des",
+        "start": 2.96,
+        "end": 3.12,
+        "probability": 0.914
+      },
+      {
+        "word": "cristaux",
+        "start": 3.12,
+        "end": 3.52,
+        "probability": 0.775
+      },
+      {
+        "word": "qui",
+        "start": 3.52,
+        "end": 3.60,
+        "probability": 0.976
+      },
+      {
+        "word": "peuvent",
+        "start": 3.60,
+        "end": 3.84,
+        "probability": 0.868
+      },
+      {
+        "word": "bloquer",
+        "start": 3.84,
+        "end": 4.16,
+        "probability": 0.970
+      },
+      {
+        "word": "la",
+        "start": 4.16,
+        "end": 4.24,
+        "probability": 0.998
+      },
+      {
+        "word": "fonction",
+        "start": 4.24,
+        "end": 4.56,
+        "probability": 0.978
+      },
+      {
+        "word": "régionale",
+        "start": 4.56,
+        "end": 5.04,
+        "probability": 0.918
+      },
+      {
+        "word": "en",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.909
+      },
+      {
+        "word": "déclarer",
+        "start": 5.20,
+        "end": 5.68,
+        "probability": 0.948
+      },
+      {
+        "word": "des",
+        "start": 5.68,
+        "end": 5.76,
+        "probability": 0.775
+      },
+      {
+        "word": "chercheurs",
+        "start": 5.76,
+        "end": 6.16,
+        "probability": 0.997
+      },
+      {
+        "word": "de",
+        "start": 6.16,
+        "end": 6.32,
+        "probability": 0.983
+      },
+      {
+        "word": "l'université.",
+        "start": 6.32,
+        "end": 6.96,
+        "probability": 0.910
+      }
+    ]
+  },
+  "fr-cristaux-renale-declare-list": {
+    "language": "fr",
+    "text": "Les deux composés réagissent là avec l'autre pour former des cristaux qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+    "words": [
+      {
+        "word": "Les",
+        "start": 0.24,
+        "end": 0.48,
+        "probability": 0.695
+      },
+      {
+        "word": "deux",
+        "start": 0.48,
+        "end": 0.80,
+        "probability": 0.999
+      },
+      {
+        "word": "composés",
+        "start": 0.80,
+        "end": 1.28,
+        "probability": 0.968
+      },
+      {
+        "word": "réagissent",
+        "start": 1.28,
+        "end": 1.84,
+        "probability": 0.995
+      },
+      {
+        "word": "là",
+        "start": 1.84,
+        "end": 2.00,
+        "probability": 0.995
+      },
+      {
+        "word": "avec",
+        "start": 2.00,
+        "end": 2.24,
+        "probability": 0.997
+      },
+      {
+        "word": "l'autre",
+        "start": 2.24,
+        "end": 2.56,
+        "probability": 0.943
+      },
+      {
+        "word": "pour",
+        "start": 2.56,
+        "end": 2.64,
+        "probability": 0.952
+      },
+      {
+        "word": "former",
+        "start": 2.64,
+        "end": 2.96,
+        "probability": 0.914
+      },
+      {
+        "word": "des",
+        "start": 2.96,
+        "end": 3.12,
+        "probability": 0.914
+      },
+      {
+        "word": "cristaux",
+        "start": 3.12,
+        "end": 3.52,
+        "probability": 0.775
+      },
+      {
+        "word": "qui",
+        "start": 3.52,
+        "end": 3.60,
+        "probability": 0.976
+      },
+      {
+        "word": "peuvent",
+        "start": 3.60,
+        "end": 3.84,
+        "probability": 0.868
+      },
+      {
+        "word": "bloquer",
+        "start": 3.84,
+        "end": 4.16,
+        "probability": 0.970
+      },
+      {
+        "word": "la",
+        "start": 4.16,
+        "end": 4.24,
+        "probability": 0.998
+      },
+      {
+        "word": "fonction",
+        "start": 4.24,
+        "end": 4.56,
+        "probability": 0.978
+      },
+      {
+        "word": "régionale",
+        "start": 4.56,
+        "end": 5.04,
+        "probability": 0.918
+      },
+      {
+        "word": "en",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.909
+      },
+      {
+        "word": "déclarer",
+        "start": 5.20,
+        "end": 5.68,
+        "probability": 0.948
+      },
+      {
+        "word": "des",
+        "start": 5.68,
+        "end": 5.76,
+        "probability": 0.775
+      },
+      {
+        "word": "chercheurs",
+        "start": 5.76,
+        "end": 6.16,
+        "probability": 0.997
+      },
+      {
+        "word": "de",
+        "start": 6.16,
+        "end": 6.32,
+        "probability": 0.983
+      },
+      {
+        "word": "l'université.",
+        "start": 6.32,
+        "end": 6.96,
+        "probability": 0.910
+      }
+    ]
+  },
+  "fr-fisichella-missed": {
+    "language": "fr",
+    "text": "Jan Carlo Fittiella a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+    "words": [
+      {
+        "word": "Jan",
+        "start": 1.36,
+        "end": 1.60,
+        "probability": 0.824
+      },
+      {
+        "word": "Carlo",
+        "start": 1.60,
+        "end": 2.00,
+        "probability": 0.708
+      },
+      {
+        "word": "Fittiella",
+        "start": 2.00,
+        "end": 2.80,
+        "probability": 0.667
+      },
+      {
+        "word": "a",
+        "start": 2.80,
+        "end": 3.04,
+        "probability": 0.956
+      },
+      {
+        "word": "perdu",
+        "start": 3.04,
+        "end": 3.28,
+        "probability": 0.992
+      },
+      {
+        "word": "le",
+        "start": 3.28,
+        "end": 3.44,
+        "probability": 0.999
+      },
+      {
+        "word": "contrôle",
+        "start": 3.44,
+        "end": 3.76,
+        "probability": 0.998
+      },
+      {
+        "word": "de",
+        "start": 3.76,
+        "end": 3.84,
+        "probability": 0.999
+      },
+      {
+        "word": "sa",
+        "start": 3.84,
+        "end": 3.92,
+        "probability": 0.955
+      },
+      {
+        "word": "voiture",
+        "start": 3.92,
+        "end": 4.32,
+        "probability": 0.986
+      },
+      {
+        "word": "et",
+        "start": 4.32,
+        "end": 4.48,
+        "probability": 0.988
+      },
+      {
+        "word": "a",
+        "start": 4.48,
+        "end": 4.56,
+        "probability": 0.998
+      },
+      {
+        "word": "terminé",
+        "start": 4.56,
+        "end": 4.96,
+        "probability": 1.000
+      },
+      {
+        "word": "la",
+        "start": 4.96,
+        "end": 5.04,
+        "probability": 0.995
+      },
+      {
+        "word": "course",
+        "start": 5.04,
+        "end": 5.28,
+        "probability": 0.985
+      },
+      {
+        "word": "peu",
+        "start": 5.28,
+        "end": 5.68,
+        "probability": 0.911
+      },
+      {
+        "word": "après",
+        "start": 5.68,
+        "end": 5.92,
+        "probability": 0.999
+      },
+      {
+        "word": "le",
+        "start": 5.92,
+        "end": 6.08,
+        "probability": 0.967
+      },
+      {
+        "word": "démarrage.",
+        "start": 6.08,
+        "end": 6.56,
+        "probability": 0.918
+      }
+    ]
+  },
+  "fr-giancarlo-fisichella-phrase": {
+    "language": "fr",
+    "text": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+    "words": [
+      {
+        "word": "Jan",
+        "start": 1.36,
+        "end": 1.60,
+        "probability": 0.824
+      },
+      {
+        "word": "Carlo",
+        "start": 1.60,
+        "end": 2.00,
+        "probability": 0.708
+      },
+      {
+        "word": "Fitierla",
+        "start": 2.00,
+        "end": 2.80,
+        "probability": 0.503
+      },
+      {
+        "word": "a",
+        "start": 2.80,
+        "end": 3.04,
+        "probability": 0.955
+      },
+      {
+        "word": "perdu",
+        "start": 3.04,
+        "end": 3.28,
+        "probability": 0.993
+      },
+      {
+        "word": "le",
+        "start": 3.28,
+        "end": 3.44,
+        "probability": 0.999
+      },
+      {
+        "word": "contrôle",
+        "start": 3.44,
+        "end": 3.76,
+        "probability": 0.998
+      },
+      {
+        "word": "de",
+        "start": 3.76,
+        "end": 3.84,
+        "probability": 0.999
+      },
+      {
+        "word": "sa",
+        "start": 3.84,
+        "end": 4.00,
+        "probability": 0.955
+      },
+      {
+        "word": "voiture",
+        "start": 4.00,
+        "end": 4.32,
+        "probability": 0.986
+      },
+      {
+        "word": "et",
+        "start": 4.32,
+        "end": 4.48,
+        "probability": 0.986
+      },
+      {
+        "word": "a",
+        "start": 4.48,
+        "end": 4.56,
+        "probability": 0.997
+      },
+      {
+        "word": "terminé",
+        "start": 4.56,
+        "end": 4.96,
+        "probability": 1.000
+      },
+      {
+        "word": "la",
+        "start": 4.96,
+        "end": 5.04,
+        "probability": 0.995
+      },
+      {
+        "word": "course",
+        "start": 5.04,
+        "end": 5.28,
+        "probability": 0.985
+      },
+      {
+        "word": "peu",
+        "start": 5.28,
+        "end": 5.68,
+        "probability": 0.915
+      },
+      {
+        "word": "après",
+        "start": 5.68,
+        "end": 5.92,
+        "probability": 0.999
+      },
+      {
+        "word": "le",
+        "start": 5.92,
+        "end": 6.08,
+        "probability": 0.965
+      },
+      {
+        "word": "démarrage.",
+        "start": 6.08,
+        "end": 6.56,
+        "probability": 0.918
+      }
+    ]
+  },
+  "fr-renale-missed": {
+    "language": "fr",
+    "text": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+    "words": [
+      {
+        "word": "Les",
+        "start": 0.24,
+        "end": 0.48,
+        "probability": 0.695
+      },
+      {
+        "word": "deux",
+        "start": 0.48,
+        "end": 0.80,
+        "probability": 0.999
+      },
+      {
+        "word": "composés",
+        "start": 0.80,
+        "end": 1.28,
+        "probability": 0.968
+      },
+      {
+        "word": "réagissent",
+        "start": 1.28,
+        "end": 1.84,
+        "probability": 0.995
+      },
+      {
+        "word": "là",
+        "start": 1.84,
+        "end": 2.00,
+        "probability": 0.995
+      },
+      {
+        "word": "avec",
+        "start": 2.00,
+        "end": 2.24,
+        "probability": 0.997
+      },
+      {
+        "word": "l'autre",
+        "start": 2.24,
+        "end": 2.56,
+        "probability": 0.943
+      },
+      {
+        "word": "pour",
+        "start": 2.56,
+        "end": 2.64,
+        "probability": 0.952
+      },
+      {
+        "word": "former",
+        "start": 2.64,
+        "end": 2.96,
+        "probability": 0.914
+      },
+      {
+        "word": "des",
+        "start": 2.96,
+        "end": 3.12,
+        "probability": 0.914
+      },
+      {
+        "word": "Christos",
+        "start": 3.12,
+        "end": 3.44,
+        "probability": 0.704
+      },
+      {
+        "word": "qui",
+        "start": 3.44,
+        "end": 3.60,
+        "probability": 0.979
+      },
+      {
+        "word": "peuvent",
+        "start": 3.60,
+        "end": 3.84,
+        "probability": 0.867
+      },
+      {
+        "word": "bloquer",
+        "start": 3.84,
+        "end": 4.16,
+        "probability": 0.967
+      },
+      {
+        "word": "la",
+        "start": 4.16,
+        "end": 4.24,
+        "probability": 0.998
+      },
+      {
+        "word": "fonction",
+        "start": 4.24,
+        "end": 4.56,
+        "probability": 0.974
+      },
+      {
+        "word": "régionale",
+        "start": 4.56,
+        "end": 5.04,
+        "probability": 0.921
+      },
+      {
+        "word": "en",
+        "start": 5.04,
+        "end": 5.20,
+        "probability": 0.910
+      },
+      {
+        "word": "déclarer",
+        "start": 5.20,
+        "end": 5.68,
+        "probability": 0.952
+      },
+      {
+        "word": "des",
+        "start": 5.68,
+        "end": 5.76,
+        "probability": 0.684
+      },
+      {
+        "word": "chercheurs",
+        "start": 5.76,
+        "end": 6.16,
+        "probability": 0.997
+      },
+      {
+        "word": "de",
+        "start": 6.16,
+        "end": 6.32,
+        "probability": 0.984
+      },
+      {
+        "word": "l'université.",
+        "start": 6.32,
+        "end": 6.96,
+        "probability": 0.906
+      }
+    ]
+  },
+  "fr-voiture-present": {
+    "language": "fr",
+    "text": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+    "words": [
+      {
+        "word": "Jan",
+        "start": 1.36,
+        "end": 1.60,
+        "probability": 0.824
+      },
+      {
+        "word": "Carlo",
+        "start": 1.60,
+        "end": 2.00,
+        "probability": 0.708
+      },
+      {
+        "word": "Fitierla",
+        "start": 2.00,
+        "end": 2.80,
+        "probability": 0.503
+      },
+      {
+        "word": "a",
+        "start": 2.80,
+        "end": 3.04,
+        "probability": 0.955
+      },
+      {
+        "word": "perdu",
+        "start": 3.04,
+        "end": 3.28,
+        "probability": 0.993
+      },
+      {
+        "word": "le",
+        "start": 3.28,
+        "end": 3.44,
+        "probability": 0.999
+      },
+      {
+        "word": "contrôle",
+        "start": 3.44,
+        "end": 3.76,
+        "probability": 0.998
+      },
+      {
+        "word": "de",
+        "start": 3.76,
+        "end": 3.84,
+        "probability": 0.999
+      },
+      {
+        "word": "sa",
+        "start": 3.84,
+        "end": 4.00,
+        "probability": 0.955
+      },
+      {
+        "word": "voiture",
+        "start": 4.00,
+        "end": 4.32,
+        "probability": 0.986
+      },
+      {
+        "word": "et",
+        "start": 4.32,
+        "end": 4.48,
+        "probability": 0.986
+      },
+      {
+        "word": "a",
+        "start": 4.48,
+        "end": 4.56,
+        "probability": 0.997
+      },
+      {
+        "word": "terminé",
+        "start": 4.56,
+        "end": 4.96,
+        "probability": 1.000
+      },
+      {
+        "word": "la",
+        "start": 4.96,
+        "end": 5.04,
+        "probability": 0.995
+      },
+      {
+        "word": "course",
+        "start": 5.04,
+        "end": 5.28,
+        "probability": 0.985
+      },
+      {
+        "word": "peu",
+        "start": 5.28,
+        "end": 5.68,
+        "probability": 0.915
+      },
+      {
+        "word": "après",
+        "start": 5.68,
+        "end": 5.92,
+        "probability": 0.999
+      },
+      {
+        "word": "le",
+        "start": 5.92,
+        "end": 6.08,
+        "probability": 0.965
+      },
+      {
+        "word": "démarrage.",
+        "start": 6.08,
+        "end": 6.56,
+        "probability": 0.918
+      }
+    ]
+  },
+  "it-accomunano-missed": {
+    "language": "it",
+    "text": "Eppure gli uccelli hanno molte caratteristiche che vi accomunano ai dinosauri.",
+    "words": [
+      {
+        "word": "Eppure",
+        "start": 1.20,
+        "end": 1.52,
+        "probability": 0.992
+      },
+      {
+        "word": "gli",
+        "start": 1.52,
+        "end": 1.76,
+        "probability": 0.972
+      },
+      {
+        "word": "uccelli",
+        "start": 1.76,
+        "end": 2.24,
+        "probability": 0.956
+      },
+      {
+        "word": "hanno",
+        "start": 2.24,
+        "end": 2.48,
+        "probability": 0.992
+      },
+      {
+        "word": "molte",
+        "start": 2.48,
+        "end": 2.72,
+        "probability": 1.000
+      },
+      {
+        "word": "caratteristiche",
+        "start": 2.72,
+        "end": 3.68,
+        "probability": 0.999
+      },
+      {
+        "word": "che",
+        "start": 3.68,
+        "end": 3.84,
+        "probability": 0.994
+      },
+      {
+        "word": "vi",
+        "start": 3.84,
+        "end": 4.00,
+        "probability": 0.470
+      },
+      {
+        "word": "accomunano",
+        "start": 4.00,
+        "end": 4.72,
+        "probability": 0.778
+      },
+      {
+        "word": "ai",
+        "start": 4.72,
+        "end": 4.88,
+        "probability": 0.974
+      },
+      {
+        "word": "dinosauri.",
+        "start": 4.88,
+        "end": 5.60,
+        "probability": 0.924
+      }
+    ]
+  },
+  "it-li-accomunano-phrase": {
+    "language": "it",
+    "text": "Eppure gli uccelli hanno molte caratteristiche che li accomunano ai dinosauri.",
+    "words": [
+      {
+        "word": "Eppure",
+        "start": 1.20,
+        "end": 1.52,
+        "probability": 0.992
+      },
+      {
+        "word": "gli",
+        "start": 1.52,
+        "end": 1.76,
+        "probability": 0.972
+      },
+      {
+        "word": "uccelli",
+        "start": 1.76,
+        "end": 2.24,
+        "probability": 0.956
+      },
+      {
+        "word": "hanno",
+        "start": 2.24,
+        "end": 2.48,
+        "probability": 0.992
+      },
+      {
+        "word": "molte",
+        "start": 2.48,
+        "end": 2.72,
+        "probability": 1.000
+      },
+      {
+        "word": "caratteristiche",
+        "start": 2.72,
+        "end": 3.68,
+        "probability": 0.999
+      },
+      {
+        "word": "che",
+        "start": 3.68,
+        "end": 3.84,
+        "probability": 0.994
+      },
+      {
+        "word": "li",
+        "start": 3.84,
+        "end": 4.00,
+        "probability": 0.563
+      },
+      {
+        "word": "accomunano",
+        "start": 4.00,
+        "end": 4.72,
+        "probability": 0.799
+      },
+      {
+        "word": "ai",
+        "start": 4.72,
+        "end": 4.88,
+        "probability": 0.969
+      },
+      {
+        "word": "dinosauri.",
+        "start": 4.88,
+        "end": 5.60,
+        "probability": 0.927
+      }
+    ]
+  },
+  "it-montagna-present": {
+    "language": "it",
+    "text": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+    "words": [
+      {
+        "word": "L'incidente",
+        "start": 0.96,
+        "end": 1.68,
+        "probability": 0.996
+      },
+      {
+        "word": "è",
+        "start": 1.68,
+        "end": 1.84,
+        "probability": 0.862
+      },
+      {
+        "word": "avvenuto",
+        "start": 1.84,
+        "end": 2.32,
+        "probability": 0.997
+      },
+      {
+        "word": "in",
+        "start": 2.32,
+        "end": 2.40,
+        "probability": 1.000
+      },
+      {
+        "word": "alta",
+        "start": 2.40,
+        "end": 2.64,
+        "probability": 0.879
+      },
+      {
+        "word": "montagna",
+        "start": 2.64,
+        "end": 3.28,
+        "probability": 0.998
+      },
+      {
+        "word": "e",
+        "start": 3.28,
+        "end": 3.68,
+        "probability": 0.928
+      },
+      {
+        "word": "si",
+        "start": 3.68,
+        "end": 3.92,
+        "probability": 0.997
+      },
+      {
+        "word": "ritiene",
+        "start": 3.92,
+        "end": 4.32,
+        "probability": 0.997
+      },
+      {
+        "word": "sia",
+        "start": 4.32,
+        "end": 4.56,
+        "probability": 0.859
+      },
+      {
+        "word": "stato",
+        "start": 4.56,
+        "end": 4.88,
+        "probability": 1.000
+      },
+      {
+        "word": "causato",
+        "start": 4.88,
+        "end": 5.36,
+        "probability": 0.999
+      },
+      {
+        "word": "da",
+        "start": 5.36,
+        "end": 5.60,
+        "probability": 0.994
+      },
+      {
+        "word": "fuoco",
+        "start": 5.60,
+        "end": 5.92,
+        "probability": 0.981
+      },
+      {
+        "word": "nemico.",
+        "start": 5.92,
+        "end": 6.32,
+        "probability": 0.964
+      }
+    ]
+  },
+  "it-montagne-distractor": {
+    "language": "it",
+    "text": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+    "words": [
+      {
+        "word": "L'incidente",
+        "start": 0.96,
+        "end": 1.68,
+        "probability": 0.996
+      },
+      {
+        "word": "è",
+        "start": 1.68,
+        "end": 1.84,
+        "probability": 0.862
+      },
+      {
+        "word": "avvenuto",
+        "start": 1.84,
+        "end": 2.32,
+        "probability": 0.997
+      },
+      {
+        "word": "in",
+        "start": 2.32,
+        "end": 2.40,
+        "probability": 1.000
+      },
+      {
+        "word": "alta",
+        "start": 2.40,
+        "end": 2.64,
+        "probability": 0.879
+      },
+      {
+        "word": "montagna",
+        "start": 2.64,
+        "end": 3.28,
+        "probability": 0.998
+      },
+      {
+        "word": "e",
+        "start": 3.28,
+        "end": 3.68,
+        "probability": 0.928
+      },
+      {
+        "word": "si",
+        "start": 3.68,
+        "end": 3.92,
+        "probability": 0.997
+      },
+      {
+        "word": "ritiene",
+        "start": 3.92,
+        "end": 4.32,
+        "probability": 0.997
+      },
+      {
+        "word": "sia",
+        "start": 4.32,
+        "end": 4.56,
+        "probability": 0.859
+      },
+      {
+        "word": "stato",
+        "start": 4.56,
+        "end": 4.88,
+        "probability": 1.000
+      },
+      {
+        "word": "causato",
+        "start": 4.88,
+        "end": 5.36,
+        "probability": 0.999
+      },
+      {
+        "word": "da",
+        "start": 5.36,
+        "end": 5.60,
+        "probability": 0.994
+      },
+      {
+        "word": "fuoco",
+        "start": 5.60,
+        "end": 5.92,
+        "probability": 0.981
+      },
+      {
+        "word": "nemico.",
+        "start": 5.92,
+        "end": 6.32,
+        "probability": 0.964
+      }
+    ]
+  },
+  "it-uccelli-present": {
+    "language": "it",
+    "text": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+    "words": [
+      {
+        "word": "Eppure",
+        "start": 1.20,
+        "end": 1.52,
+        "probability": 0.992
+      },
+      {
+        "word": "gli",
+        "start": 1.52,
+        "end": 1.76,
+        "probability": 0.972
+      },
+      {
+        "word": "uccelli",
+        "start": 1.76,
+        "end": 2.24,
+        "probability": 0.956
+      },
+      {
+        "word": "hanno",
+        "start": 2.24,
+        "end": 2.48,
+        "probability": 0.992
+      },
+      {
+        "word": "molte",
+        "start": 2.48,
+        "end": 2.72,
+        "probability": 1.000
+      },
+      {
+        "word": "caratteristiche",
+        "start": 2.72,
+        "end": 3.68,
+        "probability": 0.999
+      },
+      {
+        "word": "che",
+        "start": 3.68,
+        "end": 3.84,
+        "probability": 0.994
+      },
+      {
+        "word": "vi",
+        "start": 3.84,
+        "end": 4.00,
+        "probability": 0.470
+      },
+      {
+        "word": "accumulano",
+        "start": 4.00,
+        "end": 4.64,
+        "probability": 0.930
+      },
+      {
+        "word": "ai",
+        "start": 4.64,
+        "end": 4.88,
+        "probability": 0.948
+      },
+      {
+        "word": "dinosauri.",
+        "start": 4.88,
+        "end": 5.60,
+        "probability": 0.933
+      }
+    ]
+  },
+  "nl-continuummodel-missed": {
+    "language": "nl",
+    "text": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+    "words": [
+      {
+        "word": "Volgens",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.618
+      },
+      {
+        "word": "Angel",
+        "start": 0.80,
+        "end": 1.12,
+        "probability": 0.743
+      },
+      {
+        "word": "2006",
+        "start": 1.12,
+        "end": 1.92,
+        "probability": 0.821
+      },
+      {
+        "word": "kunnen",
+        "start": 1.92,
+        "end": 2.00,
+        "probability": 0.985
+      },
+      {
+        "word": "organisaties",
+        "start": 2.00,
+        "end": 2.56,
+        "probability": 0.976
+      },
+      {
+        "word": "beter",
+        "start": 2.56,
+        "end": 2.88,
+        "probability": 0.999
+      },
+      {
+        "word": "presteren",
+        "start": 2.88,
+        "end": 3.36,
+        "probability": 0.987
+      },
+      {
+        "word": "met",
+        "start": 3.36,
+        "end": 3.52,
+        "probability": 0.981
+      },
+      {
+        "word": "een",
+        "start": 3.52,
+        "end": 3.60,
+        "probability": 0.997
+      },
+      {
+        "word": "aanpak",
+        "start": 3.60,
+        "end": 4.00,
+        "probability": 0.997
+      },
+      {
+        "word": "op",
+        "start": 4.00,
+        "end": 4.16,
+        "probability": 0.998
+      },
+      {
+        "word": "basis",
+        "start": 4.16,
+        "end": 4.40,
+        "probability": 1.000
+      },
+      {
+        "word": "van",
+        "start": 4.40,
+        "end": 4.64,
+        "probability": 1.000
+      },
+      {
+        "word": "het",
+        "start": 4.64,
+        "end": 4.72,
+        "probability": 0.982
+      },
+      {
+        "word": "continuummodel.",
+        "start": 4.72,
+        "end": 5.60,
+        "probability": 0.646
+      }
+    ]
+  },
+  "nl-dragen-de-ziekte-phrase": {
+    "language": "nl",
+    "text": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+    "words": [
+      {
+        "word": "Vanke",
+        "start": 0.72,
+        "end": 1.20,
+        "probability": 0.574
+      },
+      {
+        "word": "strafreziekte",
+        "start": 1.20,
+        "end": 1.68,
+        "probability": 0.560
+      },
+      {
+        "word": "bij",
+        "start": 1.68,
+        "end": 1.84,
+        "probability": 0.681
+      },
+      {
+        "word": "zich",
+        "start": 1.84,
+        "end": 2.00,
+        "probability": 0.494
+      },
+      {
+        "word": "en",
+        "start": 2.00,
+        "end": 2.16,
+        "probability": 0.340
+      },
+      {
+        "word": "dragen",
+        "start": 2.16,
+        "end": 2.40,
+        "probability": 0.405
+      },
+      {
+        "word": "het",
+        "start": 2.40,
+        "end": 2.56,
+        "probability": 0.904
+      },
+      {
+        "word": "via",
+        "start": 2.56,
+        "end": 2.72,
+        "probability": 0.926
+      },
+      {
+        "word": "mugen",
+        "start": 2.72,
+        "end": 3.12,
+        "probability": 0.694
+      },
+      {
+        "word": "overal",
+        "start": 3.12,
+        "end": 3.52,
+        "probability": 0.762
+      },
+      {
+        "word": "mensen.",
+        "start": 3.52,
+        "end": 3.76,
+        "probability": 0.981
+      }
+    ]
+  },
+  "nl-muggen-missed": {
+    "language": "nl",
+    "text": "Vanke strafreziekte bij zich en dragen het via muggen overal mensen.",
+    "words": [
+      {
+        "word": "Vanke",
+        "start": 0.72,
+        "end": 1.20,
+        "probability": 0.574
+      },
+      {
+        "word": "strafreziekte",
+        "start": 1.20,
+        "end": 1.68,
+        "probability": 0.560
+      },
+      {
+        "word": "bij",
+        "start": 1.68,
+        "end": 1.84,
+        "probability": 0.681
+      },
+      {
+        "word": "zich",
+        "start": 1.84,
+        "end": 2.00,
+        "probability": 0.494
+      },
+      {
+        "word": "en",
+        "start": 2.00,
+        "end": 2.16,
+        "probability": 0.340
+      },
+      {
+        "word": "dragen",
+        "start": 2.16,
+        "end": 2.40,
+        "probability": 0.405
+      },
+      {
+        "word": "het",
+        "start": 2.40,
+        "end": 2.56,
+        "probability": 0.904
+      },
+      {
+        "word": "via",
+        "start": 2.56,
+        "end": 2.72,
+        "probability": 0.926
+      },
+      {
+        "word": "muggen",
+        "start": 2.72,
+        "end": 3.12,
+        "probability": 0.663
+      },
+      {
+        "word": "overal",
+        "start": 3.12,
+        "end": 3.52,
+        "probability": 0.699
+      },
+      {
+        "word": "mensen.",
+        "start": 3.52,
+        "end": 3.76,
+        "probability": 0.978
+      }
+    ]
+  },
+  "nl-organisaties-present": {
+    "language": "nl",
+    "text": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+    "words": [
+      {
+        "word": "Volgens",
+        "start": 0.56,
+        "end": 0.80,
+        "probability": 0.618
+      },
+      {
+        "word": "Angel",
+        "start": 0.80,
+        "end": 1.12,
+        "probability": 0.743
+      },
+      {
+        "word": "2006",
+        "start": 1.12,
+        "end": 1.92,
+        "probability": 0.821
+      },
+      {
+        "word": "kunnen",
+        "start": 1.92,
+        "end": 2.00,
+        "probability": 0.985
+      },
+      {
+        "word": "organisaties",
+        "start": 2.00,
+        "end": 2.56,
+        "probability": 0.976
+      },
+      {
+        "word": "beter",
+        "start": 2.56,
+        "end": 2.88,
+        "probability": 0.999
+      },
+      {
+        "word": "presteren",
+        "start": 2.88,
+        "end": 3.36,
+        "probability": 0.987
+      },
+      {
+        "word": "met",
+        "start": 3.36,
+        "end": 3.52,
+        "probability": 0.981
+      },
+      {
+        "word": "een",
+        "start": 3.52,
+        "end": 3.60,
+        "probability": 0.997
+      },
+      {
+        "word": "aanpak",
+        "start": 3.60,
+        "end": 4.00,
+        "probability": 0.997
+      },
+      {
+        "word": "op",
+        "start": 4.00,
+        "end": 4.16,
+        "probability": 0.998
+      },
+      {
+        "word": "basis",
+        "start": 4.16,
+        "end": 4.40,
+        "probability": 1.000
+      },
+      {
+        "word": "van",
+        "start": 4.40,
+        "end": 4.64,
+        "probability": 1.000
+      },
+      {
+        "word": "het",
+        "start": 4.64,
+        "end": 4.72,
+        "probability": 0.982
+      },
+      {
+        "word": "continuummodel.",
+        "start": 4.72,
+        "end": 5.60,
+        "probability": 0.646
+      }
+    ]
+  },
+  "nl-varkens-missed": {
+    "language": "nl",
+    "text": "Varkensdragelen ziet erbij, zich aandragen het via mugen overal mensen.",
+    "words": [
+      {
+        "word": "Varkensdragelen",
+        "start": 0.88,
+        "end": 1.36,
+        "probability": 0.380
+      },
+      {
+        "word": "ziet",
+        "start": 1.36,
+        "end": 1.60,
+        "probability": 0.462
+      },
+      {
+        "word": "erbij,",
+        "start": 1.60,
+        "end": 1.84,
+        "probability": 0.863
+      },
+      {
+        "word": "zich",
+        "start": 2.00,
+        "end": 2.00,
+        "probability": 0.695
+      },
+      {
+        "word": "aandragen",
+        "start": 2.00,
+        "end": 2.40,
+        "probability": 0.500
+      },
+      {
+        "word": "het",
+        "start": 2.40,
+        "end": 2.56,
+        "probability": 0.830
+      },
+      {
+        "word": "via",
+        "start": 2.56,
+        "end": 2.72,
+        "probability": 0.934
+      },
+      {
+        "word": "mugen",
+        "start": 2.72,
+        "end": 3.12,
+        "probability": 0.709
+      },
+      {
+        "word": "overal",
+        "start": 3.12,
+        "end": 3.52,
+        "probability": 0.787
+      },
+      {
+        "word": "mensen.",
+        "start": 3.52,
+        "end": 3.76,
+        "probability": 0.973
+      }
+    ]
+  },
+  "pl-dziewietnastu-policjantow-phrase": {
+    "language": "pl",
+    "text": "Zgodnie z oświadczeniem Burego Bernatorowi Śródranych płodzi w ją nas opolicjantów.",
+    "words": [
+      {
+        "word": "Zgodnie",
+        "start": 0.96,
+        "end": 1.44,
+        "probability": 0.983
+      },
+      {
+        "word": "z",
+        "start": 1.44,
+        "end": 1.52,
+        "probability": 0.990
+      },
+      {
+        "word": "oświadczeniem",
+        "start": 1.52,
+        "end": 2.16,
+        "probability": 0.969
+      },
+      {
+        "word": "Burego",
+        "start": 2.16,
+        "end": 2.48,
+        "probability": 0.451
+      },
+      {
+        "word": "Bernatorowi",
+        "start": 2.48,
+        "end": 3.20,
+        "probability": 0.692
+      },
+      {
+        "word": "Śródranych",
+        "start": 3.20,
+        "end": 3.68,
+        "probability": 0.915
+      },
+      {
+        "word": "płodzi",
+        "start": 3.68,
+        "end": 4.16,
+        "probability": 0.715
+      },
+      {
+        "word": "w",
+        "start": 4.16,
+        "end": 4.24,
+        "probability": 0.819
+      },
+      {
+        "word": "ją",
+        "start": 4.24,
+        "end": 4.48,
+        "probability": 0.791
+      },
+      {
+        "word": "nas",
+        "start": 4.48,
+        "end": 4.80,
+        "probability": 0.580
+      },
+      {
+        "word": "opolicjantów.",
+        "start": 4.80,
+        "end": 5.68,
+        "probability": 0.734
+      }
+    ]
+  },
+  "pl-francja-present": {
+    "language": "pl",
+    "text": "W większość mniejszych wyzptów to narody niezależne lub wspierzone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+    "words": [
+      {
+        "word": "W",
+        "start": 0.40,
+        "end": 0.56,
+        "probability": 0.978
+      },
+      {
+        "word": "większość",
+        "start": 0.56,
+        "end": 1.04,
+        "probability": 0.904
+      },
+      {
+        "word": "mniejszych",
+        "start": 1.04,
+        "end": 1.52,
+        "probability": 0.986
+      },
+      {
+        "word": "wyzptów",
+        "start": 1.52,
+        "end": 2.16,
+        "probability": 0.776
+      },
+      {
+        "word": "to",
+        "start": 2.16,
+        "end": 2.16,
+        "probability": 0.176
+      },
+      {
+        "word": "narody",
+        "start": 2.16,
+        "end": 2.40,
+        "probability": 0.734
+      },
+      {
+        "word": "niezależne",
+        "start": 2.40,
+        "end": 2.96,
+        "probability": 0.993
+      },
+      {
+        "word": "lub",
+        "start": 2.96,
+        "end": 3.20,
+        "probability": 0.844
+      },
+      {
+        "word": "wspierzone",
+        "start": 3.20,
+        "end": 3.60,
+        "probability": 0.703
+      },
+      {
+        "word": "z",
+        "start": 3.60,
+        "end": 3.76,
+        "probability": 0.488
+      },
+      {
+        "word": "Francją",
+        "start": 3.76,
+        "end": 4.16,
+        "probability": 0.987
+      },
+      {
+        "word": "i",
+        "start": 4.16,
+        "end": 4.32,
+        "probability": 0.366
+      },
+      {
+        "word": "słynące",
+        "start": 4.32,
+        "end": 4.72,
+        "probability": 0.867
+      },
+      {
+        "word": "ekologiczowe",
+        "start": 4.72,
+        "end": 5.44,
+        "probability": 0.876
+      },
+      {
+        "word": "nadwalskie",
+        "start": 5.44,
+        "end": 6.00,
+        "probability": 0.744
+      },
+      {
+        "word": "miejscowości",
+        "start": 6.00,
+        "end": 6.56,
+        "probability": 0.968
+      },
+      {
+        "word": "wypoczynkowe.",
+        "start": 6.56,
+        "end": 7.28,
+        "probability": 0.967
+      }
+    ]
+  },
+  "pl-gubernatora-missed": {
+    "language": "pl",
+    "text": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+    "words": [
+      {
+        "word": "Zgodnie",
+        "start": 0.96,
+        "end": 1.44,
+        "probability": 0.983
+      },
+      {
+        "word": "z",
+        "start": 1.44,
+        "end": 1.52,
+        "probability": 0.990
+      },
+      {
+        "word": "oświadczeniem",
+        "start": 1.52,
+        "end": 2.16,
+        "probability": 0.969
+      },
+      {
+        "word": "wyreguber",
+        "start": 2.16,
+        "end": 2.64,
+        "probability": 0.665
+      },
+      {
+        "word": "na",
+        "start": 2.64,
+        "end": 2.80,
+        "probability": 0.459
+      },
+      {
+        "word": "towarów",
+        "start": 2.80,
+        "end": 3.12,
+        "probability": 0.686
+      },
+      {
+        "word": "śródranych",
+        "start": 3.12,
+        "end": 3.76,
+        "probability": 0.871
+      },
+      {
+        "word": "płodzi",
+        "start": 3.76,
+        "end": 4.16,
+        "probability": 0.736
+      },
+      {
+        "word": "w",
+        "start": 4.16,
+        "end": 4.24,
+        "probability": 0.833
+      },
+      {
+        "word": "ją",
+        "start": 4.24,
+        "end": 4.48,
+        "probability": 0.761
+      },
+      {
+        "word": "nas",
+        "start": 4.48,
+        "end": 4.80,
+        "probability": 0.589
+      },
+      {
+        "word": "obolicjantów.",
+        "start": 4.80,
+        "end": 5.68,
+        "probability": 0.772
+      }
+    ]
+  },
+  "pl-luksusowe-missed": {
+    "language": "pl",
+    "text": "W większość mniejszych wyzptów to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+    "words": [
+      {
+        "word": "W",
+        "start": 0.40,
+        "end": 0.56,
+        "probability": 0.978
+      },
+      {
+        "word": "większość",
+        "start": 0.56,
+        "end": 1.04,
+        "probability": 0.904
+      },
+      {
+        "word": "mniejszych",
+        "start": 1.04,
+        "end": 1.52,
+        "probability": 0.986
+      },
+      {
+        "word": "wyzptów",
+        "start": 1.52,
+        "end": 2.16,
+        "probability": 0.776
+      },
+      {
+        "word": "to",
+        "start": 2.16,
+        "end": 2.16,
+        "probability": 0.176
+      },
+      {
+        "word": "narody",
+        "start": 2.16,
+        "end": 2.40,
+        "probability": 0.734
+      },
+      {
+        "word": "niezależne",
+        "start": 2.40,
+        "end": 2.96,
+        "probability": 0.993
+      },
+      {
+        "word": "lub",
+        "start": 2.96,
+        "end": 3.20,
+        "probability": 0.844
+      },
+      {
+        "word": "wspomnieżone",
+        "start": 3.20,
+        "end": 3.60,
+        "probability": 0.817
+      },
+      {
+        "word": "z",
+        "start": 3.60,
+        "end": 3.76,
+        "probability": 0.793
+      },
+      {
+        "word": "Francją",
+        "start": 3.76,
+        "end": 4.16,
+        "probability": 0.983
+      },
+      {
+        "word": "i",
+        "start": 4.16,
+        "end": 4.32,
+        "probability": 0.324
+      },
+      {
+        "word": "słynące",
+        "start": 4.32,
+        "end": 4.72,
+        "probability": 0.867
+      },
+      {
+        "word": "ekologiczowe",
+        "start": 4.72,
+        "end": 5.44,
+        "probability": 0.871
+      },
+      {
+        "word": "nadwalskie",
+        "start": 5.44,
+        "end": 6.00,
+        "probability": 0.751
+      },
+      {
+        "word": "miejscowości",
+        "start": 6.00,
+        "end": 6.56,
+        "probability": 0.967
+      },
+      {
+        "word": "wypoczynkowe.",
+        "start": 6.56,
+        "end": 7.28,
+        "probability": 0.966
+      }
+    ]
+  },
+  "pl-wysp-missed": {
+    "language": "pl",
+    "text": "W większość mniejszych wysp to narody niezależne lub wspomnieżone z Francją, micłynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+    "words": [
+      {
+        "word": "W",
+        "start": 0.40,
+        "end": 0.56,
+        "probability": 0.978
+      },
+      {
+        "word": "większość",
+        "start": 0.56,
+        "end": 1.04,
+        "probability": 0.904
+      },
+      {
+        "word": "mniejszych",
+        "start": 1.04,
+        "end": 1.52,
+        "probability": 0.986
+      },
+      {
+        "word": "wysp",
+        "start": 1.52,
+        "end": 1.92,
+        "probability": 0.681
+      },
+      {
+        "word": "to",
+        "start": 1.92,
+        "end": 2.08,
+        "probability": 0.401
+      },
+      {
+        "word": "narody",
+        "start": 2.08,
+        "end": 2.40,
+        "probability": 0.755
+      },
+      {
+        "word": "niezależne",
+        "start": 2.40,
+        "end": 2.96,
+        "probability": 0.992
+      },
+      {
+        "word": "lub",
+        "start": 2.96,
+        "end": 3.20,
+        "probability": 0.834
+      },
+      {
+        "word": "wspomnieżone",
+        "start": 3.20,
+        "end": 3.60,
+        "probability": 0.808
+      },
+      {
+        "word": "z",
+        "start": 3.60,
+        "end": 3.76,
+        "probability": 0.770
+      },
+      {
+        "word": "Francją,",
+        "start": 3.76,
+        "end": 4.16,
+        "probability": 0.984
+      },
+      {
+        "word": "micłynące",
+        "start": 4.24,
+        "end": 4.72,
+        "probability": 0.797
+      },
+      {
+        "word": "ekologiczowe",
+        "start": 4.72,
+        "end": 5.44,
+        "probability": 0.865
+      },
+      {
+        "word": "nadwalskie",
+        "start": 5.44,
+        "end": 6.00,
+        "probability": 0.751
+      },
+      {
+        "word": "miejscowości",
+        "start": 6.00,
+        "end": 6.56,
+        "probability": 0.968
+      },
+      {
+        "word": "wypoczynkowe.",
+        "start": 6.56,
+        "end": 7.28,
+        "probability": 0.967
+      }
+    ]
+  },
+  "pl-zgodnie-present": {
+    "language": "pl",
+    "text": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+    "words": [
+      {
+        "word": "Zgodnie",
+        "start": 0.96,
+        "end": 1.44,
+        "probability": 0.983
+      },
+      {
+        "word": "z",
+        "start": 1.44,
+        "end": 1.52,
+        "probability": 0.990
+      },
+      {
+        "word": "oświadczeniem",
+        "start": 1.52,
+        "end": 2.16,
+        "probability": 0.969
+      },
+      {
+        "word": "wyreguber",
+        "start": 2.16,
+        "end": 2.64,
+        "probability": 0.665
+      },
+      {
+        "word": "na",
+        "start": 2.64,
+        "end": 2.80,
+        "probability": 0.459
+      },
+      {
+        "word": "towarów",
+        "start": 2.80,
+        "end": 3.12,
+        "probability": 0.686
+      },
+      {
+        "word": "śródranych",
+        "start": 3.12,
+        "end": 3.76,
+        "probability": 0.871
+      },
+      {
+        "word": "płodzi",
+        "start": 3.76,
+        "end": 4.16,
+        "probability": 0.736
+      },
+      {
+        "word": "w",
+        "start": 4.16,
+        "end": 4.24,
+        "probability": 0.833
+      },
+      {
+        "word": "ją",
+        "start": 4.24,
+        "end": 4.48,
+        "probability": 0.761
+      },
+      {
+        "word": "nas",
+        "start": 4.48,
+        "end": 4.80,
+        "probability": 0.589
+      },
+      {
+        "word": "obolicjantów.",
+        "start": 4.80,
+        "end": 5.68,
+        "probability": 0.772
+      }
+    ]
+  }
+}

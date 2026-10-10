@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -18,6 +19,7 @@ type engine struct {
 	load      func(cact *byte, n uint64) int32
 	lastError func() string
 	embed     func(input *byte, pcm *float32, samples int32, out *float32, capacity int32) int32
+	transcr   func(pcm *float32, samples int32, language, keywords *byte, words int32, out *byte, capacity int32) int32
 }
 
 // platformDir names the engine/<platform> directory that scripts/fetch-engine.sh writes for this machine.
@@ -64,6 +66,7 @@ func openEngine(dir string, cact []byte) (*engine, error) {
 	purego.RegisterLibFunc(&e.load, lib, "needle_load")
 	purego.RegisterLibFunc(&e.lastError, lib, "needle_last_error")
 	purego.RegisterLibFunc(&e.embed, lib, "needle_embed")
+	purego.RegisterLibFunc(&e.transcr, lib, "needle_transcribe")
 
 	rc := e.load(&cact[0], uint64(len(cact)))
 	runtime.KeepAlive(cact)
@@ -96,4 +99,42 @@ func (e *engine) embedSpeech(pcm []float32) ([]float32, error) {
 	}
 
 	return out, nil
+}
+
+// transcribeOutCap is the JSON buffer needle_transcribe writes into; 30 s of speech with word times needs ~40 KB.
+const transcribeOutCap = 1 << 20
+
+// libResult is needle_transcribe's outcome: its return code, its JSON and, on failure, needle_last_error. Empty and
+// SameAsCLI are filled in by the limits run.
+type libResult struct {
+	RC        int32  `json:"rc"`
+	Error     string `json:"error,omitempty"`
+	Empty     bool   `json:"empty"`
+	SameAsCLI bool   `json:"same_as_cli"`
+	out       []byte
+}
+
+// transcribePCM runs needle_transcribe on 16 kHz mono pcm with language detection, no keywords and word times on.
+// An empty pcm is passed as a valid pointer with zero samples.
+func (e *engine) transcribePCM(pcm []float32) libResult {
+	buf := make([]byte, transcribeOutCap)
+	ptr := new(float32)
+
+	if len(pcm) > 0 {
+		ptr = &pcm[0]
+	}
+
+	rc := e.transcr(ptr, int32(len(pcm)), nil, nil, 1, &buf[0], int32(len(buf))) // #nosec G115 -- at most 30 s.
+	runtime.KeepAlive(pcm)
+
+	if rc < 0 {
+		return libResult{RC: rc, Error: e.lastError()}
+	}
+
+	n := bytes.IndexByte(buf, 0)
+	if n < 0 {
+		n = len(buf)
+	}
+
+	return libResult{RC: rc, out: buf[:n]}
 }

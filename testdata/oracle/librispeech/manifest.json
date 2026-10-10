@@ -1,0 +1,1224 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "model": {
+    "repo": "Cactus-Compute/whistle",
+    "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    "file": "whistle.cact",
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "command": "needle --audio-word-timestamps",
+  "threads": "4",
+  "subset": "subset.json",
+  "transcripts": "transcripts.json: \u003cid\u003e",
+  "wer_rule": "word edit distance over the reference's words; both sides upper-cased and split at every character other than a letter, digit or apostrophe; no other normalisation (numbers, abbreviations)",
+  "words": 4167,
+  "errors": 221,
+  "wer": 0.053035757139428846,
+  "utterances": [
+    {
+      "id": "ls-clean-1089-134686-0025",
+      "text": "A gentle kick from the tall boy in the bench behind urged Stephen to ask a difficult question.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1089-134686-0037",
+      "text": "In the silence their dark fire kindled the dusk into a tawny glow.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1089-134691-0013",
+      "text": "Itle and embittering finally to argue against his own dispassionate certitude, that the commandment of love bade us not to love our neighbour as ourselves with the same amount and intensity of love, but to love him as ourselves with the same kind of love.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-1089-134691-0017",
+      "text": "The Europe they had come from lay out there beyond the Irish sea, Europe of strange tongues and valleyed and would be girt and citadelled and of entrenched and marshaled races.",
+      "language": "en",
+      "errors": 4
+    },
+    {
+      "id": "ls-clean-1089-134691-0020",
+      "text": "Hello, Stephanos! Here comes the deadliest.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-1188-133604-0017",
+      "text": "That a style is restrained or severe does not mean that it is also erroneous.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1188-133604-0023",
+      "text": "The Colorist says: \"First of all, as my delicious parake was Ruby, so this nasty viper shall be black.\" And then is the question: \"Can I round him off, even though he is black, and make him slimy, and yet springing and close down, clotted like a pool of black blood on the earth all the same?",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-1188-133604-0024",
+      "text": "Nothing will be more precious to you, I think, in the practical study of art than the conviction, which will force itself on you more and more every hour. Of the way all things are bound together, little and great, in spirit and in matter.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1188-133604-0027",
+      "text": "Now here is Raffaell, exactly between the two, trees still drawn leaf by leaf, wholly formal, but beautiful mist coming gradually into the distance.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-1188-133604-0030",
+      "text": "He knows them both.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-121-121726-0004",
+      "text": "Heaven! a good place to be raised too.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-121-121726-0013",
+      "text": "Tied to a woman.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-121-123859-0001",
+      "text": "Oh, 'tis the first, 'tis flattery in my scene, And my great mind most kingly drinks it up. Mine I well knows what with his gust is green, And to his palate doth prepare the cup, If it be poisoned, 'tis the lesser sin, That mine I loves it, and doth first begin.",
+      "language": "en",
+      "errors": 9
+    },
+    {
+      "id": "ls-clean-121-127105-0004",
+      "text": "The story is written.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-121-127105-0019",
+      "text": "Mrs. Griffin, however, expressed the need for little more light.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-1221-135766-0004",
+      "text": "This outward mutability indicated, and did not more than fairly express the various properties of her inner life.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1221-135766-0006",
+      "text": "They were now illuminated by the morning radiance of a young child's disposition, but, later in the day of earthly existence, might be prolific of the storm and whirlwind.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1221-135766-0013",
+      "text": "Pearl was a born outcast of the infantile world.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1221-135767-0000",
+      "text": "Hester Prince went one day to the mansion of Governor Bellingham, with a pair of gloves which she had fringed and embroidered to his order, and which were to be worn on some great occasion of state; bore, though the chances of a popular election had caused this former ruler to descend a step or two from the highest rank, he still held an honourable and influential place among the colonial magistracy.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-1221-135767-0012",
+      "text": "They approached the door, which was of an arched form, and flanked on each side by a narrow tower or projection of the edifice, in both of which were lattice windows, the wooden shutters to close over them at need.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1284-1180-0006",
+      "text": "At the foot of the mountain that separated the country of the Munchkins from the country of the Gillikins, the path divided.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1284-1180-0014",
+      "text": "Ojo had never eaten such a fine meal in all his life.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1284-1180-0019",
+      "text": "\"You must know,\" said Margulot, when they were all seated together on the broad window seat, \"that my husband foolishly gave away all the powder of life he first made to old Mambi the Witch, who used to live in the country of the Killakins to the north of here.",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-1284-1181-0009",
+      "text": "She ran to her husband's side at once, and helped him lift the four cattle from the fire.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-1284-1181-0014",
+      "text": "He selected a small gold bottle, with a pepper box top, so that the powder might be sprinkled on any object through the small holes.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1320-122612-0001",
+      "text": "The dues were suffered to exhale, and the sun had dispersed the mists, and was shedding a strong and clear light in the forest when the travellers resumed their journey.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-1320-122612-0002",
+      "text": "After proceeding a few miles, the progress of Hakai, who led the advance, became more deliberate and watchful.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-1320-122617-0015",
+      "text": "But the bear, instead of obeying, maintained the seat it had taken, and growled.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1320-122617-0027",
+      "text": "As soon as these dispositions were made, the scout turned to David and gave him his parting instructions.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1320-122617-0040",
+      "text": "He had no occasion to delay, for at the next instant a burst of cries filled the outer air and ran along the whole extent of the village.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1580-141083-0003",
+      "text": "Without his scrap books, his chemicals, and his homely untidiness, he was an incomfortable man.",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-1580-141083-0009",
+      "text": "The alternative was that some one passing had observed the key in the door, had known that I was out and had entered to look at the papers.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-1580-141083-0010",
+      "text": "I gave him a little brandy and left him collapsed in a chair while I made a most careful examination of the room.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1580-141084-0030",
+      "text": "\"Just close the door,\" said Holmes.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1580-141084-0040",
+      "text": "He returned, carrying his jumping shoes, which are provided as you are aware with several sharp spikes.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1995-1826-0003",
+      "text": "\"Better go,\" he ad counsels, intentiously.",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-1995-1826-0011",
+      "text": "Here she was teaching dirty children in the smell of confused odors and bodily perspiration, was to her at times unbearable.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-1995-1837-0012",
+      "text": "He splashed and stamped along farther and farther onward until he neared the rampart of the clearing, and put foot upon the tree bridge.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-1995-1837-0019",
+      "text": "He sat down, weak, bewildered, and one thought was uppermost. \"Sora!\"",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-1995-1837-0021",
+      "text": "The hope and dream of harvest was upon the land.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-2094-142345-0005",
+      "text": "Several closed horses, a pillion, a spinning wheel, and an old box wide open and stuffed full of coloured rags.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-2094-142345-0015",
+      "text": "To all appearance Molly had got through her after dinner work in an exemplary manner, had cleaned herself with great dispatch, and now came to ask submissively if she should sit down to her spinning till Milky Way.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-2094-142345-0023",
+      "text": "You are aaron, for sitting down to your work, a little while after its time to put by.\"",
+      "language": "en",
+      "errors": 5
+    },
+    {
+      "id": "ls-clean-2094-142345-0054",
+      "text": "\"Oh, sir,\" said Mrs. Poyser, rather alarmed, \"you wouldn't like it at all.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-2094-142345-0056",
+      "text": "I think I should be doing you a service to turn you out of such a place.\"",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-2300-131720-0004",
+      "text": "Owing to his insistence on low pressure, direct current for use in densely populated districts as the only safe and truly universal, profitable way of delivering electrical energy to the consumers, Edison has been frequently spoken of as an opponent of the alternating current.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-2300-131720-0011",
+      "text": "But when it came to be a question of lighting a scattered suburb, a group of dwellings on the outskirts, a remote country residence, or a farmhouse, the alternating current in all elements save its danger was Andy's ideal.",
+      "language": "en",
+      "errors": 4
+    },
+    {
+      "id": "ls-clean-2300-131720-0023",
+      "text": "I think he was perhaps more appreciative that I was of the discipline of the Edison Construction Department, and thought it would be well for us to wait until the morning of the fourth before we started up.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-2300-131720-0034",
+      "text": "The others, having been in operation too short a time to show definite results, although they also went quickly to a dividend basis.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-2300-131720-0038",
+      "text": "He felt he was up against it, and that perhaps another kind of a job would suit him better.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-237-126133-0016",
+      "text": "\"Oh, now, Japsur, I must go by my very own self.\"",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-237-126133-0024",
+      "text": "And the old gentleman was so delighted with his success that he had to burst out into a series of short, happy bits of laughter that occupied quite a space of time.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-237-134493-0017",
+      "text": "Any one thereabouts would have told you that this was one of the richest farms on the divide, and that the farmer was a woman, Alexander Bergson.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-237-134500-0016",
+      "text": "\"I don't know all of them, but I know Lindon's are.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-237-134500-0029",
+      "text": "I don't want to stand around on the gone.",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-260-123288-0000",
+      "text": "The royings become lost in the distance.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-260-123288-0003",
+      "text": "The electric light can scarcely penetrate to the dense curtain which is dropped over the theatre on which the battle of the elements is about to be waged.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-260-123288-0018",
+      "text": "The raft bears on still to the south east.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-260-123288-0020",
+      "text": "Each of us is lashed as some part of the raft.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-260-123288-0021",
+      "text": "The waves rise above our heads.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-2830-3980-0000",
+      "text": "In every way they sought to undermine the authority of St. Paul.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-2830-3980-0026",
+      "text": "First, too.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-2830-3980-0042",
+      "text": "The world brands this a pernicious doctrine.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-2830-3980-0062",
+      "text": "Not for a crown, or a kingdom, or our goodness, before our sins.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-2830-3980-0063",
+      "text": "Underscore these words, for they are full of comfort for sore consciences.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-2961-960-0002",
+      "text": "In the supposed depths of this dialogue the Neo Platonists found hidden meanings and connections with the Jewish and Christian Scriptures, and out of them they illicit a doctrine quite at variance with the Spirit of Plato.",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-2961-960-0003",
+      "text": "They were absorbed in his theology, and were under the dominion of his name; while that, which was truly great and truly characteristic in him, his effort to realize and connect abstractions, was not understood by them at all.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-2961-960-0015",
+      "text": "The style and plan of the Timias differ greatly from that of any other of the Platonic dialogues.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-2961-961-0004",
+      "text": "Listen then, Socrates, to a tale of Solence, who, being the friend of droppeders by great grandfather, told it to my grandfather Critias, and he told me.",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-2961-961-0016",
+      "text": "I will briefly describe them to you, and it shall read the account of them at your leisure in the sacred registers.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-3570-5694-0001",
+      "text": "The utility of consumption as an evidence of wealth is to be classed as a derivative growth.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-3570-5694-0017",
+      "text": "The wearing of uniforms or liveries implies a considerable degree of dependence, and may even be said to be a mark of servitude, real or ostensible.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-3570-5694-0022",
+      "text": "The livery becomes obnoxious to nearly all who are required to wear it.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-3570-5695-0000",
+      "text": "In a general way, though not wholly nor consistently, these two groups coincide.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-3570-5696-0005",
+      "text": "Throughout the entire evolution of conspicuous expenditure, whether of goods or of services or human life, runs the obvious implication that in order to effectually men the consumer's good fame, it must be an expenditure of superfluities.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-3575-170457-0028",
+      "text": "Keswick, March 22, 1837. Dear Madame.",
+      "language": "en",
+      "errors": 6
+    },
+    {
+      "id": "ls-clean-3575-170457-0030",
+      "text": "Of this second letter also she spoke, and told me that it contained an invitation for her to go and see the poet if ever she visited the lakes.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-3575-170457-0040",
+      "text": "Indeed, there were only one or two strangers who could be admitted among the sisters without producing the same results.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-3575-170457-0048",
+      "text": "He refused at first to listen to the careful advice. It was repugnant to his liberal nature.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-3575-170457-0051",
+      "text": "At tea time they were sad and silent, and the meal went away and touched by any of the three.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-3729-6852-0001",
+      "text": "Without saying it positively, she made me understand that being herself an illustrious member of the Republic of Letters, she was well aware that she was speaking to an insect.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-3729-6852-0002",
+      "text": "In order to please her, I spoke to her of the Abbey Conti, and I had occasion to quote two lines of that profound writer.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-3729-6852-0035",
+      "text": "\"It seems to me,\" I replied, \"that such approval, such ratification of the opinion expressed by the king, the princes of the blood, etc., is rather a proof of the affection felt for them by the nation, for the French carry that affection to such an extent that they believe them infallible.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-3729-6852-0039",
+      "text": "He himself recited the same passage in French, and politely pointed out the parts in which he thought that I had improved on the original.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-3729-6852-0046",
+      "text": "His housekeeper had the management of everything. She never allowed him to be in need of anything, and she gave no account of his money, which she kept altogether, because he never asked her to render any accounts.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4077-13751-0002",
+      "text": "Instead of but six regularly affiliated members, and at most two score of adherents, the organization numbers to day many hundred thousand souls.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-4077-13751-0013",
+      "text": "Their sufferings have never yet been fitly chronicled by human scribe.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4077-13754-0002",
+      "text": "It was through Floyd's advice that Buchanan ordered the military expedition to Utah, ostensibly to install certain federal officials and to repress an alleged infantile rebellion, which in fact had never come into existence, but in reality to further the interests of the secessionists.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4077-13754-0007",
+      "text": "We believe in a little resurrection, and an actual hereafter, in which future states shall be recognised every scientified and authorized relationship existing here on earth, of parent and child, brother and sister, husband and wife.",
+      "language": "en",
+      "errors": 4
+    },
+    {
+      "id": "ls-clean-4077-13754-0011",
+      "text": "Federal judges and United States attorneys in Utah, who were not Mormons nor lovers of Mormonism, refused to entertain complaints, or prosecute cases under the law, because of its manifest injustice and inadequacy.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4446-2273-0008",
+      "text": "I've managed to save something every year, and that with helping my three sisters now and then, and tidying poor cousin Mike over bad seasons.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-4446-2273-0019",
+      "text": "\"Come, we'll have our coffee in the other room, and you can smoke.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4446-2273-0022",
+      "text": "They were both remembering what the woman had said when she took the money. \"God give you a happy love!\"",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4446-2273-0036",
+      "text": "Alexander clenched the two hands at his sides.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-4446-2275-0039",
+      "text": "I must know about you.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4507-16021-0002",
+      "text": "Thus, idleness is the mother.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4507-16021-0027",
+      "text": "Funition, very good!",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-4507-16021-0030",
+      "text": "Assuredly, if the tongue which a nation or a province has spoken is worthy of interest, the language which has been spoken by a misery is still more worthy of attention and study.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4507-16021-0033",
+      "text": "Do we really know the mountain well when we are not acquainted with the cavern?",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4507-16021-0058",
+      "text": "The flame is the enemy of the wing.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4970-29095-0011",
+      "text": "Does he think thee could stand it six months?",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-4970-29095-0018",
+      "text": "Ruth asked the enthusiasts if they would like to live in such a sounding muslim, with its great halls and echoing rooms, and no comfortable place in it for the accommodation of any body.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-4970-29095-0022",
+      "text": "Is the going to the yearly meeting roof? asked one of the girls.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-4970-29095-0033",
+      "text": "Let a box woman are put into, measured for it, and put in young. If we go anywhere it's in a box, veiled and pinioned, and shut in by disabilities.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-4970-29095-0038",
+      "text": "Ruth was glad to hear that Philip had made a push into the world, and she was sure that his talent and courage would make away for him.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-4992-23283-0009",
+      "text": "\"Oh, my Lord!\" cried Miss Woodley, with a most forcible accent, \"you are the last person on earth she would pardon me for entrusting.\"",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4992-23283-0018",
+      "text": "To relieve her from both, he laid his hand with force upon his heart, and said, \"Do you believe me?\"",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-4992-41797-0001",
+      "text": "\"Well, as I say, it's an awful queer world. They clap all the burglars and jail and the murderers and the wife beaters. I always thought a general reproof would be enough punishment for a wife beater, because he probably has a lot of provocation that nobody knows. And the fire bugs can't think of the right name something like Sunday Aries. And the breakers are the peace, and what not, and yet the law has nothing to say to a man like Han Lord.",
+      "language": "en",
+      "errors": 17
+    },
+    {
+      "id": "ls-clean-4992-41797-0005",
+      "text": "Done, he ain't done a thing he ordered since he was born.",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-4992-41797-0020",
+      "text": "Nancy's curly chestnut crop shone in the sun, and all of stick black plates looked blacker by contrast.",
+      "language": "en",
+      "errors": 4
+    },
+    {
+      "id": "ls-clean-5105-28233-0003",
+      "text": "We don't spend tops, is a favourite saying, amongst artillery officers, indicating that they do not shirk their duty by frivolous pursuits. But it must be confessed that servite act, being naturally idle, was very much given to spinning tops.",
+      "language": "en",
+      "errors": 4
+    },
+    {
+      "id": "ls-clean-5105-28233-0008",
+      "text": "When a private in the eighth cavalry he had been on the point of quitting the army at twenty eight years of age, but unexpectedly he had been appointed orderly to Captain Servadek.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-5105-28240-0009",
+      "text": "Slightly changing her course, she first struck her main sail, and in order to facilitate the movements of her helmsman, soon carried nothing but her two top sales, Brigantine and Jib.",
+      "language": "en",
+      "errors": 4
+    },
+    {
+      "id": "ls-clean-5105-28240-0015",
+      "text": "For some moments he seemed perfectly stupefied, and then recovering himself he began to overwhelm the count with a torrent of questions.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-5105-28241-0018",
+      "text": "Its depth remained invariable, still four or at most five fathoms; and although its bottom was assiduously dredged, it was only to prove it barren of marine production of any type.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-5142-33396-0000",
+      "text": "At another time Harold asked.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-5142-33396-0014",
+      "text": "Thirty men, one after another, raised their horns and said.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-5142-33396-0042",
+      "text": "So no tails got out to the neighbors. Besides, it was a lonely place, and by good luck no one came that way.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-5142-33396-0065",
+      "text": "\"Soft heart,\" he said gently to her. \"Then to torcle. Well, let him go, torcle.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-5142-33396-0068",
+      "text": "So I lived, and now I'm your tooth thrall. Well, it is the luck of war.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-5639-40744-0008",
+      "text": "\"Who touches me? Am I in bed?\"",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-5639-40744-0024",
+      "text": "One day when the boy was sent by his grandfather with a message to a relation, he passed along a street in which there was a great concourse of horsemen.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-5639-40744-0027",
+      "text": "Thus saying, impressing the crucifix to her breast, she fell fainting into the arms of Donna Estefania, who as a gentlewoman, to whose sex pity is a natural as cruelty as to man, instantly pressed her lips to those of the fainting girl, shedding over her so many tears, that there needed no other sprinkling of water to recover Leocadia from her soon.",
+      "language": "en",
+      "errors": 7
+    },
+    {
+      "id": "ls-clean-5639-40744-0028",
+      "text": "\"I have great things to tell you, senor,\" said Don Estefania to her husband. \"The cream and substance of which is this, the fainting girl before you is your daughter, and the boy is your grandson.",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-5639-40744-0036",
+      "text": "His mother had left her to him as being her destined protector; but when she saw that he too was insensible, she was near making a third, and would have done so, had he not come to himself.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-5683-32865-0007",
+      "text": "\"I'm glad you like it,\" says Wilder, chuckling benignantly on it over his shoulder.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-5683-32866-0010",
+      "text": "\"Well, you know, Rady, women like wicked fellows. It is contrast, I suppose, but they do, and I'm sure from what Brackton has said to me, I know him intimately, that Dorcas likes him, and I can't conceive why they are not married.\"",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-5683-32866-0017",
+      "text": "I am very uneasy about it, whatever it is.\" \"I can't help it.\"",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-5683-32866-0026",
+      "text": "I boldly lighted my cheroot.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-5683-32879-0002",
+      "text": "So there came a step and a little rustling of feminine draperies. The small door opened and Rachel entered, with her hand extended and a pale smile of welcome.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-61-70968-0025",
+      "text": "\"Come to me, men. Here, here!\" He raised his voice still louder.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-61-70968-0042",
+      "text": "Montfiche called out for Robin to give him an arm.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-61-70968-0050",
+      "text": "He made an effort to hide his condition from them all, and Robin felt his fingers tighten upon his arm.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-61-70970-0016",
+      "text": "We will go out together to the bower. There is a way down to the court from my window.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-61-70970-0030",
+      "text": "\"Save me, masters, but you startled me rarely.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-672-122797-0040",
+      "text": "And the whole night the tree stood still, and in deep thought.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-672-122797-0050",
+      "text": "They snuffed about the fur tree and rustled among the branches.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-672-122797-0054",
+      "text": "\"I know no such place,\" said the tree.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-672-122797-0055",
+      "text": "And then he told all about his youth, and the little mice had never heard the like before, and they listened and said.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-672-122797-0057",
+      "text": "Yes, in reality, those were happy times.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-6829-68769-0005",
+      "text": "\"He was soft hearted and impetuous,\" said Beth, \"and being in love he didn't stop to count the cost.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-6829-68769-0033",
+      "text": "It was better for him to think the girl unfeeling meant to know the truth.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-6829-68769-0050",
+      "text": "Beth uneasy at his silence nudged him.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-6829-68771-0018",
+      "text": "For a moment Beth stood staring, while the new maid regarded her with composure and of slight smile upon her beautiful face.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-6829-68771-0024",
+      "text": "For the first time the maid seemed a little confused, and her gaze wandered from the face of her visitor.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-6930-75918-0016",
+      "text": "\"Yes, I need repose. Many things have agitated me to day, both in mind and body. When you return to morrow, I shall no longer be the same man.\"",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-6930-76324-0003",
+      "text": "Now what is the sense of it? Two innocent babies like that.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-6930-76324-0011",
+      "text": "They were in me terribly, and besides, I'd like to see what this lovely furniture looks like without such quantities of dust all over it. Good scheme, sin!",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-6930-76324-0014",
+      "text": "This thought, however, did not enter the heads of the enthusiastic pair.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-6930-76324-0028",
+      "text": "Well, I am convinced that the boarded up house mystery happened not earlier than April 16th, 1861, and probably not much later.",
+      "language": "en",
+      "errors": 6
+    },
+    {
+      "id": "ls-clean-7021-79740-0012",
+      "text": "said she, pointing to the playthings. \"See?\"",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7021-79759-0001",
+      "text": "That is comparatively nothing.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7021-85628-0003",
+      "text": "Now this knife was a splendid one, though half the blade was gone, and the handle was a little cracked, and Anders knew that one is almost a man, as soon as one has a jack knife.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7021-85628-0021",
+      "text": "He still held on to it with both hands as he rushed into his mother's cottage.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7021-85628-0025",
+      "text": "But his mother hugged him close.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7127-75946-0003",
+      "text": "\"Gentlemen, dear posts!\" were upon Saint Aignan, and Villa Roy took their leave.",
+      "language": "en",
+      "errors": 6
+    },
+    {
+      "id": "ls-clean-7127-75946-0020",
+      "text": "Far from its sire, your majesty, having given no directions about it, the musicians have retained it.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-7127-75947-0011",
+      "text": "\"Remain, I implore you. The evening is most lovely.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7127-75947-0017",
+      "text": "\"What, already here?\" they said to her.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7127-75947-0025",
+      "text": "Exquisite soft turf of the woods, the happiness which your friendship confers upon me.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7176-88083-0000",
+      "text": "All about him was a tumult of bright and broken color, scattered in broad splashes.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7176-88083-0010",
+      "text": "The cat growled softly, picked up the prize in her jaws, and trotted into the bushes to devour it.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7176-92135-0008",
+      "text": "Lind me your ear for 10 minutes, and you shall learn just what stagecraft is.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-7176-92135-0024",
+      "text": "To be or not to be, that is the question whether it is nobler.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-7176-92135-0045",
+      "text": "Lord John, taking out Gold's sacred case from his left hand upper waistcoat pocket.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-7729-102255-0001",
+      "text": "This was at the March Election, 1855.",
+      "language": "en",
+      "errors": 3
+    },
+    {
+      "id": "ls-clean-7729-102255-0012",
+      "text": "Several hundred free state men promptly responded to the summons.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7729-102255-0033",
+      "text": "As he had promised to protect the hotel, the reassured citizens began to laugh at their own fears.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7729-102255-0042",
+      "text": "RELOCATED FOOTNOTE Governor Robinson being on his way east, the steamboat on which he was traveling stopped at Lexington Missouri.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-7729-102255-0043",
+      "text": "In a few days an officer came with a requisition from Governor Shannon, and took the prisoner by land of Westport, and afterwards from there to Kansas City and Leavenworth.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-8224-274381-0000",
+      "text": "Though thrown into prison for this enterprise, and detained some time, he was not discouraged, but still continued, by his countenance and protection, to infuse spirit into the distressed rilists.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-8224-274381-0001",
+      "text": "Among other persons of distinction who united themselves to him was Lord Napier of Merchistan, son of the famous inventor of the logarithms, the person to whom the title of a great man is more justly due than to any other whom his country ever produced.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-8224-274381-0003",
+      "text": "The king's ears were now open to Montrose's councils, who proposed none but the boldest and most daring, agreeably to the desperate state of the royal cause in Scotland.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-8224-274381-0008",
+      "text": "With these and some reinforcements of the Athol men and Mukdonnuts whom he had recalled, Montrose fell suddenly upon our guile's country, and let loose upon it all the rage of war, carrying off the cattle, burning the houses, and putting the inhabitants to the sword.",
+      "language": "en",
+      "errors": 6
+    },
+    {
+      "id": "ls-clean-8224-274384-0005",
+      "text": "Another preacher, after reproaching him to his face with his misgovernment, ordered this psalm to be sung.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8230-279154-0003",
+      "text": "And what sort of evidence is logically possible?",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8230-279154-0012",
+      "text": "Familiarity is a filling capable of degrees.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-8230-279154-0019",
+      "text": "It would seem that only rather recent events can be placed at all accurately by means of feelings giving their temporal relation to the present; but it is clear that such feelings must play an essential part in the process of dating remembered events.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8230-279154-0020",
+      "text": "If we had retained the subject or act in knowledge, the whole problem of memory would have been comparatively simple.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8230-279154-0029",
+      "text": "The fact that a man can recite a poem does not show that he remembers any previous occasion on which he has recited or read it.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8455-210777-0005",
+      "text": "We have our little struggles here as elsewhere, and all things cannot be done by rose water.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8455-210777-0011",
+      "text": "\"I did not mean,\" said Captain Battle Acts, \"to touch upon public subjects at such a moment as this.\"",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-8455-210777-0014",
+      "text": "\"Sir Kennington Oval is a very fine player,\" said my wife.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8455-210777-0033",
+      "text": "But your power is so superior to any that I can advance, as to make us here feel that there is no disgrace in yielding to it.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8455-210777-0070",
+      "text": "And this plan was adopted, too, in order to extract from me a promise that I would depart in peace.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8463-287645-0007",
+      "text": "\"Another case,\" said John Westley, \"was a little girl, half grown, who was washing windows upstairs one day, and unluckily fell asleep in the window, and in this position was found by her mistress. In a rage the mistress hid her, a heavy slap, knocked her out of the window, and she fell to the pavement, and died in a few hours from the effects thereof.",
+      "language": "en",
+      "errors": 4
+    },
+    {
+      "id": "ls-clean-8463-287645-0013",
+      "text": "As to his age, and also the name of his master, Jacob's statement varied somewhat from the advertisement.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8463-294825-0011",
+      "text": "He is swiftly punished.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-8463-294828-0004",
+      "text": "But now nothing could hold me back.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8463-294828-0014",
+      "text": "There was good reason to stop and think, even for the world's most emotionless man.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8555-284447-0005",
+      "text": "The room of the great knife was high and big, and around it ran rows of benches for the spectators to sit upon.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8555-284447-0019",
+      "text": "Before any could stop him, he butted his majesty so furiously that the king sword far into the air, and tumbled in a heap among the benches, where he lay mounting and groaning.",
+      "language": "en",
+      "errors": 2
+    },
+    {
+      "id": "ls-clean-8555-284449-0005",
+      "text": "\"When he finished,\" she said cheerfully.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-8555-284449-0015",
+      "text": "\"I'll not be wicked any more,\" sighed the old boulevard. \"I'll reform.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-8555-292519-0015",
+      "text": "He had broken into her courtyard.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-908-157963-0009",
+      "text": "Why should the mistress of the veils of heart, but to resign?",
+      "language": "en",
+      "errors": 5
+    },
+    {
+      "id": "ls-clean-908-157963-0011",
+      "text": "Which thou dust scatter on every little blade of grass that springs, revives the milked cow, and tames the fire breathing steed.",
+      "language": "en",
+      "errors": 1
+    },
+    {
+      "id": "ls-clean-908-31957-0007",
+      "text": "Could it mean to last a love set pendulous between sorrow and sorrow?",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-908-31957-0018",
+      "text": "But thou art not such a lover, my beloved.",
+      "language": "en",
+      "errors": 0
+    },
+    {
+      "id": "ls-clean-908-31957-0020",
+      "text": "I think all who have loved me in their hearts, with thanks and love from mine.",
+      "language": "en",
+      "errors": 1
+    }
+  ]
+}
