@@ -276,11 +276,88 @@ func (m *MHC) mix(stream []float32, t int, hRes, hPost, y []float32) []float32 {
 
 // sinkhorn is architecture.py _sinkhorn on one n×n matrix of logits, in
 // place: iters × (subtract each row's logsumexp, then each column's), then
-// exp. Staying in the log domain keeps any finite logits finite, where a
-// direct exp overflows float32 above 88.7; each logsumexp shifts by its
-// maximum as jax.nn.logsumexp does. The columns of the result sum to 1 up
-// to float32 rounding, its rows up to the residual of iters iterations.
+// exp. The columns of the result sum to 1 up to float32 rounding, its rows
+// up to the residual of iters iterations.
+//
+// Subtracting a row's logsumexp is dividing the row of exp(logits) by its
+// sum, so sinkhornExp runs the same iteration on exp(logits − max) in
+// float64, with n² exps instead of 2·n·(n+1)·iters exps and logs. Where
+// the logits are not finite or spread too far for float64, sinkhornLog
+// runs upstream's log-domain form (docs/FINDINGS.md F-035).
 func sinkhorn(k []float32, n, iters int) {
+	if !sinkhornExp(k, n, iters) {
+		sinkhornLog(k, n, iters)
+	}
+}
+
+// sinkhornExpRange bounds the logits' spread plus 2·iters·ln n for
+// sinkhornExp. Every entry of exp(logits − max) starts in [e^−spread, 1]
+// and stays at most 1, and each normalisation divides it by a sum of at
+// most n, so all entries stay above e^−700 ≈ 1e-304, inside float64's
+// normal range, and no sum is 0.
+const sinkhornExpRange = 700
+
+// sinkhornExp is sinkhorn in the exp domain in float64. It returns false
+// without writing k if the logits are out of sinkhornExpRange.
+func sinkhornExp(k []float32, n, iters int) bool {
+	lo, hi := slices.Min(k), slices.Max(k)
+	spread := float64(hi) - float64(lo)
+
+	if math.IsInf(spread, 0) || math.IsNaN(spread) ||
+		spread+2*float64(iters)*math.Log(float64(n)) > sinkhornExpRange {
+		return false
+	}
+
+	var buf [16]float64
+
+	e := buf[:]
+	if n*n > len(buf) {
+		e = make([]float64, n*n)
+	}
+
+	e = e[:n*n]
+	for i, v := range k {
+		e[i] = math.Exp(float64(v) - float64(hi))
+	}
+
+	for range iters {
+		for r := range n {
+			row := e[r*n : (r+1)*n]
+
+			var s float64
+			for _, v := range row {
+				s += v
+			}
+
+			for c := range row {
+				row[c] /= s
+			}
+		}
+
+		for c := range n {
+			var s float64
+			for r := range n {
+				s += e[r*n+c]
+			}
+
+			for r := range n {
+				e[r*n+c] /= s
+			}
+		}
+	}
+
+	for i, v := range e {
+		k[i] = float32(v)
+	}
+
+	return true
+}
+
+// sinkhornLog is sinkhorn in the log domain in float32, as upstream
+// computes it. Staying in the log domain keeps any finite logits finite,
+// where a direct exp overflows float32 above 88.7; each logsumexp shifts
+// by its maximum as jax.nn.logsumexp does.
+func sinkhornLog(k []float32, n, iters int) {
 	for range iters {
 		for r := range n {
 			row := k[r*n : (r+1)*n]

@@ -568,3 +568,73 @@ func TestMHCFixture(t *testing.T) {
 	in1, _ := fx.get("layer1.stream_in")
 	mhcFixtureStep(t, fx, m1, b1, in1, steps, rope, "layer1")
 }
+
+// TestSinkhornExpMatchesLog: wherever sinkhornExp applies, it equals the
+// log-domain form and upstream's float64 transcription within float32
+// rounding, for Whistle's 4 lanes and for widths that do not fit its
+// stack buffer; out of range it declines and leaves the logits alone
+// (docs/FINDINGS.md F-035).
+func TestSinkhornExpMatchesLog(t *testing.T) {
+	for _, n := range []int{1, 2, 3, 4, 5, 8} {
+		for _, scale := range []float64{0.1, 1, 4, 20} {
+			r := rand.New(rand.NewPCG(uint64(n), uint64(scale*10)))
+			logits := randVec(r, n*n, scale)
+
+			for i := range n {
+				logits[i*(n+1)] += 4
+			}
+
+			exp, log := slices.Clone(logits), slices.Clone(logits)
+			if !sinkhornExp(exp, n, mhcSinkhornIters) {
+				t.Fatalf("n %d scale %v: sinkhornExp declined logits in range", n, scale)
+			}
+
+			sinkhornLog(log, n, mhcSinkhornIters)
+
+			if d := maxAbsDiff64(exp, toFloat64(log)); d > 1e-6 {
+				t.Errorf("n %d scale %v: exp and log domain differ by %.3g", n, scale, d)
+			}
+
+			want := refSinkhorn(toFloat64(logits), n, mhcSinkhornIters)
+			if d := maxAbsDiff64(exp, want); d > 2e-7 {
+				t.Errorf("n %d scale %v: exp domain %.3g from float64", n, scale, d)
+			}
+		}
+	}
+
+	// Near the edge of the range (spread 640 + 2·20·ln 4 ≈ 695) the exp
+	// domain still agrees with the log domain.
+	edge := []float32{0, 320, -320, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}
+	exp, log := slices.Clone(edge), slices.Clone(edge)
+
+	if !sinkhornExp(exp, 4, mhcSinkhornIters) {
+		t.Fatal("sinkhornExp declined a spread of 640")
+	}
+
+	sinkhornLog(log, 4, mhcSinkhornIters)
+
+	if d := maxAbsDiff64(exp, toFloat64(log)); d > 1e-6 {
+		t.Errorf("spread 640: exp and log domain differ by %.3g", d)
+	}
+
+	inf := float32(math.Inf(1))
+	nan := float32(math.NaN())
+
+	for name, logits := range map[string][]float32{
+		"spread": {0, 350, -350, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
+		"+inf":   {0, inf, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		"-inf":   {0, -inf, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		"nan":    {0, nan, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	} {
+		k := slices.Clone(logits)
+		if sinkhornExp(k, 4, mhcSinkhornIters) {
+			t.Errorf("%s: sinkhornExp accepted %v", name, logits)
+		}
+
+		for i := range k {
+			if math.Float32bits(k[i]) != math.Float32bits(logits[i]) {
+				t.Errorf("%s: sinkhornExp wrote entry %d", name, i)
+			}
+		}
+	}
+}
