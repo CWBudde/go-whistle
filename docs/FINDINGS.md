@@ -1894,3 +1894,185 @@ than float32. Over all 152 CQ matrices (`TestWhistleAllMatrices`): 16.63 MB pack
   8-bit tables) and 9.5 have to recover the speed.
 - The sums run in a different order than the float path's. That changes outputs by about 1e-7 relative, so tests pinned
   bit for bit to the float path need tolerances or new fixtures.
+
+## F-031 — The silence gate, beam search in `Transcribe`, and the LibriSpeech check (U10) (2026-10-10)
+
+**Question.** U10: by which measure and threshold does the engine decide that a clip is silence and return the empty
+JSON without decoding? F-025's sweep says that it compares levels within the clip. Steady noise at any level is
+empty. A middle second 2.70 dB louder opens the gate at every base level. A 10 dB louder section opens it only while
+it covers between 560 samples and 90 % of the clip. Then: does the pipeline with the gate and F-026's beam search
+reproduce the engine (PLAN.md 6.6 **Accept**)?
+
+### The gate
+
+**Evidence.** The 320 sweep signals and the 22 limit signals, regenerated from their manifests by `tools/oracle/probe`
+and checked against `pcm_sha256` (on darwin/arm64, and on linux/amd64 in a container, so the digests also hold on the
+CI's architecture). Two of the 342 are over 30 s, which is an error before the gate (F-025). That leaves 340 verdicts,
+170 empty and 170 transcribed. A limit signal takes `needle_transcribe`'s verdict, because the CLI refuses an empty
+WAV that the library treats as silence.
+
+**Harness.** `internal/silence/fit_test.go` (tag `oracle`;
+`go test -tags oracle -count=1 -v -run TestFitGate ./internal/silence/`, 5 s) scores 340 measures. Each measure is a
+band × a percentile pair × a percentile definition, and every one turns a clip into a spread in dB.
+
+- Bands: the time-domain mean square of 400 samples every 160; the power spectrogram's flat FFT bins (all, or 8–112 =
+  250–3500 Hz); its mel energy summed over channels 0–79, 2–79 and every range from 5, 6 or 7 to 56, 57, 58 or 59.
+- Pairs: p99−p10, p99−p9, p99−p11, p98−p10, p99.5−p10, p95−p10, p99−p5, p99−p20, max−min and p90−p10.
+- Definitions: nearest rank, or numpy's linear interpolation.
+
+For each measure the harness finds the threshold with the fewest misclassified signals. When none is wrong, it
+reports the interval of thresholds that separate the two classes. An earlier, wider exploration had also tried
+non-overlapping frames of 160–1280 samples, frame peaks instead of energies, absolute floors of 10⁻²⁰ to 10⁻¹⁰, the
+geometric mean of the mel channels, and per-channel log-mel spreads averaged (or taken as the median, max or min) over
+the channels. All of them stayed at 8 or more errors.
+
+**Leaderboard** (excerpt; errors at the best threshold, and the separating interval of the spread in dB):
+
+| measure                                   | wrong | interval / misclassified                                       |
+| ----------------------------------------- | ----- | -------------------------------------------------------------- |
+| **mel 6–57, p99−p10, nearest rank**       | **0** | **(4.985, 5.011], contains 5 dB**                              |
+| mel 6–56, p99−p9 rank                     | 0     | (5.039, 5.089]                                                 |
+| mel 5–58, p99−p9 rank                     | 0     | (4.980, 5.030]                                                 |
+| mel 6–57, p99−p9 rank                     | 0     | (5.006, 5.056]                                                 |
+| mel 6–56, p99−p10 rank                    | 0     | (5.024, 5.069]                                                 |
+| mel 5–57 / 5–58 / 5–59, p99−p10 rank      | 0     | (4.945, 4.979] / (4.949, 4.990] / (4.907, 4.942]               |
+| mel 6–58 (centre in 250–3500 Hz), p99−p10 | 1     | step-m40-2.65                                                  |
+| mel 7–57 / 7–58 / 7–59, p99−p10           | 2–3   | en-snr-m9.5, en-snr-m9.75 (and width-57600 for 7–57)           |
+| any band, p99−p11                         | ≥ 1   | width-57600: the 10 % quiet share falls below p11              |
+| mel 2–79, p99−p10                         | 8     | the step and SNR transitions, speech-1279                      |
+| bins 8–112 (flat 250–3500 Hz), p99−p9     | 12    | the step transitions                                           |
+| mel 0–79, p99−p10                         | 15    | all 7 pink noise levels, the steps                             |
+| bins 0–256 (flat full band), p99−p10      | 27    | pink noise: its low frequencies make the frame level fluctuate |
+| time domain 400/160, p99−p9               | 29    | pink noise, the steps                                          |
+
+**Winner** (`internal/silence`, `whistle.Load` builds it). The measure starts from the front end's power spectrogram:
+400-sample symmetric Hann windows centred every 160 samples, zero padded, `len(pcm) / 160` frames (F-012, F-020).
+Per frame it sums the mel energy over channels 6 to 57 (centres 261–3307 Hz, Slaney bank = `audio.mel_filters`,
+F-006) and takes 10·log10 of the sum. A frame without energy is −∞. The spread is the nearest-rank 99th percentile of
+these levels minus the 10th. It is 0 without frames or when the 99th is −∞, and +∞ when only the 10th is. A clip
+whose spread is at most **5 dB** is silence.
+
+The mel-weighted band, not the flat FFT band, is what passes the steps. Flat bins weight 2–3.5 kHz far more than the
+mel channels do.
+
+Per family, at the winner (largest spread of an empty signal, smallest of a transcribed one):
+
+| family                          | empty: largest spread | transcribed: smallest spread |
+| ------------------------------- | --------------------- | ---------------------------- |
+| digital silence (7 lengths)     | 0                     | —                            |
+| white noise −120 … 0 dBFS       | 2.331 (white-m110)    | —                            |
+| pink noise −120 … 0 dBFS        | 3.461 (pink-m60)      | —                            |
+| step at −40 dBFS (+Δ and −Δ)    | 4.985 (+2.65 dB)      | 5.035 (+2.70 dB)             |
+| step at −80 and −10 dBFS        | 4.935 (+2.6 dB)       | 5.035 (+2.7 dB)              |
+| +10 dB section, width w         | 3.624 (w = 58,240)    | 5.051 (w = 57,600)           |
+| speech + noise, en              | 4.893 (SNR −10 dB)    | 5.011 (SNR −9.75 dB)         |
+| speech + noise, de              | 4.943 (SNR −15.25 dB) | 5.071 (SNR −15 dB)           |
+| speech × gain (float), padded   | —                     | 43.9; +∞ with padding        |
+| speech on the 16-bit grid       | 0 (en −87.5, de −83)  | +∞ (en −87, de −82.5)        |
+| limits: 1–161 samples / 1279 on | 0                     | 9.455 (speech-1279)          |
+
+Some rows are decided by rank alone, not by level:
+
+- On the 16-bit grid, speech at −87.5 dB (en) keeps 3 non-zero samples of 100,560, and at −87 dB 13. Below about
+  1 % of frames with any energy, the 99th percentile is −∞ and the clip is silence; above it, the 10th percentile is
+  −∞ and the spread infinite. The de clip turns at 1 sample against 11.
+- 160 and 161 samples are one frame, a spread of 0. The engine returns the empty JSON for them too; before the gate,
+  `Transcribe` decoded that one encoder frame.
+- With 1279 samples there are 7 frames, and the spread is their max − min, 9.455 dB.
+
+**What the sweep does not decide.**
+
+- The band edges, to a channel: 5 or 6 to 56 or 57 all separate the classes with p99−p9 or p99−p10. Channel 58
+  (centre 3437 Hz, inside the band) costs one step signal.
+- p9 or p10.
+- The threshold beyond the separating interval.
+- The window (periodic Hann: (4.989, 5.007]) and reflect against zero padding (reflect: (4.973, 4.999], 0 wrong).
+  Frames that stay inside the clip lose 4 signals, pre-emphasis 36.
+
+The winner is the natural pair, p99−p10 with nearest rank, on the band whose interval holds a round 5 dB. Real speech
+is far from the threshold: the 32 corpus clips have spreads of at least 41.7 dB, the 200 LibriSpeech utterances at
+least 36.4 dB.
+
+**Reading.** cactuscompute.com/whistle says the front end is "band-limited to 250-3500 Hz". F-018 found no such limit
+on the encoder's input. The gate is where a 250–3500 Hz band fits the engine: without it, 8 or more of the 340 verdicts
+are wrong (mel 2–79), pink noise opens the gate (full band), and so do the steps (flat bins).
+
+**Tests.**
+
+- `TestGateMatchesEngine` (no tag, committed fixtures only, under 1 s): 340 of 340 verdicts equal to the engine, plus
+  the 2 rejected by length.
+- Unit tests for `Percentile`, `Spread` and `Levels`, and synthetic signals for `Silent`.
+- `TestFramingIsTheEncoders`: the gate's framing is `encoder.Best()`'s.
+
+### The pipeline
+
+- `Transcribe` checks the length (`ErrTooLong` over 480,000 samples), then runs the gate. A silent clip returns
+  `Result{}` without decoding: the engine's JSON without word timestamps,
+  `{"text":"","language":"","ttft_ms":0.0,"decode_tps":0.0}`. With timestamps (Phase 7) it will return `Silence()`.
+  Fewer than 160 samples are always silence.
+- Decoding is `search.Beam(d, mem, search.Default())` (F-026) behind the `strategy` seam. Greedy decoding stays as a
+  strategy for tests (`TestGreedyStrategy`).
+- The clock keeps F-027's semantics. The search runs as a whole, so it is read through `Options.Adjust`. The search
+  calls the hook for every live hypothesis of a step after the decoder ran it, and all of them hold the same number of
+  text tokens. So the first call stops the TTFT clock at the first step after the language token, and the first call
+  of every later step counts one token. `decode_tps` is thus a rate over the search's steps, which continue after the
+  winner's EOS until 5 hypotheses have finished. An `Adjust` already in the options (keywords, 6.3) runs after the
+  clock (`TestBeamClock`).
+- Keywords and depths 2–7 still return `ErrNotSupported`; they follow 6.3 and 6.4.
+
+**32 fixture clips through `Transcribe`** (`TestTranscribeMatchesEngine`, all 32 without `-short`):
+
+- 31 of 32 (96.9 %) equal the engine's `text` and `language` exactly. Each transcript also equals `search.Beam` on the
+  same encoder output.
+- The one miss, `fleurs-pl_pl-10047713455444904767`, is F-026's search miss. Under our model the engine's text scores
+  higher, but its prefix falls out of the beam at text token 43, 0.135 nats behind the fifth live hypothesis.
+- Median TTFT 91.8 ms, median 478 tok/s (Apple M5 Pro, the beams on all cores, machine shared).
+
+**Sweep and limits through `Transcribe`** (`TestTranscribeSilenceSweep`, `TestTranscribeLimits`):
+
+- All 159 empty sweep signals give exactly the empty JSON.
+- The transcribed signals nearest the threshold in every family give text, mostly the engine's "Thank you.". The
+  exception is en-snr-m9.75, where both texts are hallucinations.
+- All 22 limit signals behave like the engine: 2 errors, 12 empty, 8 transcribed. The text equals the engine's on 6 of
+  the 8. speech-4000 gives "Nerdy." against "I don't know.". speech-480000 (the en clip padded to 30 s) gives "and the
+  manner" against "in the manner".
+
+### LibriSpeech test-clean subset
+
+`just eval-librispeech` (`TestEvalLibriSpeech`, run only with `WHISTLE_EVAL_LIBRISPEECH` set; it needs the model and
+`just oracle-librispeech-audio`) transcribes the 200 utterances of F-025's subset with `TranscribeWAV` and checks each
+WAV's SHA-256 against `subset.json`. It applies the manifest's `wer_rule` to both sides through `internal/eval`: word
+edit distance over the reference's words, split at every rune other than a letter, digit or apostrophe, case folded.
+`eval.Words` lower-cases where the rule upper-cases, which is the same on this ASCII text. On the engine's transcripts
+the rule reproduces `manifest.json` exactly (221 errors in 4167 words, and every utterance's count).
+
+| quantity                                 | value                                                                        |
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
+| WER, Go pipeline                         | 223/4167 = **5.35 %**                                                        |
+| WER, engine                              | 221/4167 = **5.30 %**                                                        |
+| difference                               | **+0.05 percentage points** (bound ±0.3)                                     |
+| text equal to the engine's               | 181/200 (90.5 %); words after the rule 189/200 (94.5 %)                      |
+| language equal                           | 200/200                                                                      |
+| utterances with fewer / more errors      | 3 / 4                                                                        |
+| speed (M5 Pro, shared machine, two runs) | 42.5–66.0 s for 1549.4 s of audio, RTF 0.027–0.043, 212–330 ms per utterance |
+
+**The 19 differing texts.**
+
+- 8 differ only in punctuation or case: a comma, "?" after "girls" instead of after "roof", "who, as a gentlewoman".
+- 11 differ in words, mostly names and rare words: "Margalot"/"Margulot", "cendiaries"/"Sunday Aries",
+  "Mokdomots"/"Mukdonnuts", "hit"/"hid".
+- To classify them, the eval teacher-forces both texts under our model. Ours uses the search's own tokens. The
+  engine's uses the tokenizer's spelling, a lower bound on its best spelling (F-026). The score is Σ log p of the text
+  and EOS over the text tokens.
+- Our model prefers our text on 17 of the 19, by 0.0003 to 0.0251 nats per token (median 0.0034). On the other 2 the
+  engine's text scores higher, by 0.0005 and 0.0007 per token: search misses, as on the Polish clip.
+- Every margin is far below the W2A8 noise that keeps teacher forcing at 97.7 % top-1 agreement with the engine
+  (F-024). The differences are near-ties that the two numerics resolve differently, not a missing rule.
+
+### Result (PLAN.md 6.6 **Accept**)
+
+- Fixtures: 31 of 32 transcripts (96.9 %) equal the engine's, at least 95 %, and the miss is explained in F-026.
+- LibriSpeech test-clean subset: our WER is 5.35 % against the engine's 5.30 %. That is +0.05 percentage points, within
+  0.3.
+- Both parts hold for beam search without keywords at full depth. Keywords (6.3) and the depth ladder (6.4) are not
+  merged yet, and `Transcribe` rejects them.
