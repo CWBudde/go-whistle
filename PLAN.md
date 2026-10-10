@@ -806,10 +806,22 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 
 ## Phase 9 — Native quantised path & performance
 
-- [ ] 9.1 CQ LUT GEMV kernel (`internal/cq`, plus an additive raw-blob accessor in `internal/cact`): a 2/4-bit LUT GEMV
+- [x] 9.1 CQ LUT GEMV kernel (`internal/cq`, plus an additive raw-blob accessor in `internal/cact`): a 2/4-bit LUT GEMV
       in the rotated (Hadamard) domain. Apply FWHT-128 to the activation groups once and multiply by the codebook
       values, instead of dequantising the weights. Pure Go. **Accept:** equal to dequantise + GEMV at cosine
       ≥ 0.99999 on real `.cact` tensors, with a benchmark against the float GEMV.
+      (2026-10-10) — `cact.File.CQPacked` returns a CQ record as stored (index bitstream and FP16 norms aliasing the
+      file, widths, group, shape, codebook); `TestWhistleCQPacked` decodes all 152 records from it to exactly `CQ`.
+      `cq.Matrix` (`New`, `GEMV`, `GEMM`, `Rows`, `Row`) rotates each activation group once by FWHT-128 / √128 and
+      sums per-activation 16-entry nibble tables over the packed index words; `GEMM` interleaves the tables of four
+      activations so one index decode feeds four lookups. The `gather` reference stays; a 256-entry byte table lost
+      on every shape but `pw1` and was removed. All 152 CQ tensors are stored `[out, in]` and qualify as is; the mHC
+      φ need `Rows` per layer, and the embedding and engram gathers use `Row`. `TestWhistleGEMM` on 11 real tensors
+      (CQ2 q/k/v/out/pw1/stem/engram table, CQ4 embedding head and φ) against `CQ` + `tensor.MatMulTransB`: worst
+      1 − cos 1.7e-13 for any kernel, max |Δ| ≤ 5.7e-7 of max |y|. Single-threaded on the M5 Pro, the pure-Go kernel
+      is 1.15–2.4× faster than the pure-Go float loop on 9 of 10 shapes, but 2.2–5.7× slower than the NEON float
+      GEMM (q_proj 20.1 vs 7.7 µs, head 652 vs 192 µs). Memory: 16.63 MB for all CQ matrices against 218.77 MB as
+      float32 (13.2×). Details and what 9.2 needs: `docs/FINDINGS.md` F-028.
 - [ ] 9.2 Run straight from the packed `.cact`: wire the 9.1 kernel into `needle`, `encoder` and `decoder` behind
       `weights.Source`. Memory target: under 64 MB RSS for the model.
 - [ ] 9.3 Optional int8 activations and an int8 KV cache (`act_bits 8`, `kv_bits 8`) to mirror the engine's numerics,
