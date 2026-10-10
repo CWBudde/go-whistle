@@ -185,8 +185,7 @@ func (e *Engram) forward(tokens []int, tr *engramTrace) (*EngramKV, error) {
 	}
 
 	k, vRaw := make([]float32, t*e.dim), make([]float32, t*e.dim)
-	e.keyProj.Apply(k, emb, t)
-	e.valProj.Apply(vRaw, emb, t)
+	ApplyShared([][]float32{k, vRaw}, emb, t, e.keyProj, e.valProj)
 
 	if tr != nil {
 		tr.indices, tr.ngramOK, tr.e, tr.vRaw = idx, ok, emb, slices.Clone(vRaw)

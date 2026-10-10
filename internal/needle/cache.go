@@ -50,10 +50,7 @@ func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float3
 	}
 
 	qW, kW, vW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v
-	q, k, v := make([]float32, t*qW), make([]float32, t*kW), make([]float32, t*vW)
-	a.qProj.Apply(q, x, t)
-	a.kProj.Apply(k, x, t)
-	a.vProj.Apply(v, x, t)
+	q, k, v, gate := a.projections(x, t)
 
 	if a.taps > 0 {
 		q = a.extendTaps(q, t, qW, a.qTaps, &c.qHist)
@@ -67,7 +64,7 @@ func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float3
 	out := a.attend(q, c.k, c.v, t, c.n, MaskCausal, nil)
 	c.n += t
 
-	return a.output(x, t, out, nil), nil
+	return a.output(t, out, gate, nil), nil
 }
 
 // extendTaps applies the causal taps to t new raw rows z of width values,
@@ -139,8 +136,7 @@ func (e *Engram) Extend(tokens []int, c *EngramCache) (*EngramKV, error) {
 	}
 
 	k, vRaw := make([]float32, t*e.dim), make([]float32, t*e.dim)
-	e.keyProj.Apply(k, emb, t)
-	e.valProj.Apply(vRaw, emb, t)
+	ApplyShared([][]float32{k, vRaw}, emb, t, e.keyProj, e.valProj)
 
 	rh := len(c.vRaw) / e.dim
 	all := append(slices.Clone(c.vRaw), vRaw...)

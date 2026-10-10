@@ -171,23 +171,24 @@ func (a *Attention) forward(x []float32, t int, mask Mask, rope *Rope, tr *attnT
 		return nil, err
 	}
 
-	q, k, v := a.project(x, t, tr)
+	q, k, v, gate := a.project(x, t, tr)
 	a.normRotate(q, k, t, 0, rope, tr)
 
-	return a.output(x, t, a.attend(q, k, v, t, 0, mask, tr), tr), nil
+	return a.output(t, a.attend(q, k, v, t, 0, mask, tr), gate, tr), nil
 }
 
-// output is the sigmoid gate σ(gate_proj(x)) on the attention result out,
-// t rows of heads·v values, then the output projection.
-func (a *Attention) output(x []float32, t int, out []float32, tr *attnTrace) []float32 {
+// output is the sigmoid gate σ(gate) on the attention result out, t rows
+// of heads·v values, gate holding gate_proj(x), then the output
+// projection.
+func (a *Attention) output(t int, out, gate []float32, tr *attnTrace) []float32 {
 	oW := a.heads * a.v
-	gate := make([]float32, t*oW)
-	a.gateProj.Apply(gate, x, t)
 
-	for i, g := range gate {
-		gate[i] = sigmoid(g)
-		out[i] *= gate[i]
-	}
+	forRows(t, gateRows, func(lo, hi int) {
+		for i := lo * oW; i < hi*oW; i++ {
+			gate[i] = sigmoid(gate[i])
+			out[i] *= gate[i]
+		}
+	})
 
 	if tr != nil {
 		tr.gate, tr.gated = gate, slices.Clone(out)
@@ -199,21 +200,29 @@ func (a *Attention) output(x []float32, t int, out []float32, tr *attnTrace) []f
 	return y
 }
 
-// project returns q, k and v in row layout: the projections, then the
-// causal taps if the block has them.
-func (a *Attention) project(x []float32, t int, tr *attnTrace) (q, k, v []float32) {
+// projections returns the four projections of x in row layout: q, k, v
+// and the gate's input. All four read x, so they share its rotation and
+// tables where packed (ApplyShared, docs/FINDINGS.md F-038).
+func (a *Attention) projections(x []float32, t int) (q, k, v, gate []float32) {
+	qW, kW, vW, oW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v, a.heads*a.v
+	q, k, v, gate = make([]float32, t*qW), make([]float32, t*kW), make([]float32, t*vW), make([]float32, t*oW)
+	ApplyShared([][]float32{q, k, v, gate}, x, t, a.qProj, a.kProj, a.vProj, a.gateProj)
+
+	return q, k, v, gate
+}
+
+// project returns q, k and v in row layout, the projections followed by
+// the causal taps if the block has them, and gate_proj(x).
+func (a *Attention) project(x []float32, t int, tr *attnTrace) (q, k, v, gate []float32) {
 	qW, kW, vW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v
-	q, k, v = make([]float32, t*qW), make([]float32, t*kW), make([]float32, t*vW)
-	a.qProj.Apply(q, x, t)
-	a.kProj.Apply(k, x, t)
-	a.vProj.Apply(v, x, t)
+	q, k, v, gate = a.projections(x, t)
 
 	if tr != nil {
 		tr.qProj, tr.kProj, tr.vProj = slices.Clone(q), slices.Clone(k), slices.Clone(v)
 	}
 
 	if a.taps == 0 {
-		return q, k, v
+		return q, k, v, gate
 	}
 
 	q = applyTaps(q, t, qW, a.qTaps, a.taps, 1)
@@ -224,7 +233,7 @@ func (a *Attention) project(x []float32, t int, tr *attnTrace) (q, k, v []float3
 		tr.qTapped, tr.kTapped, tr.vTapped = slices.Clone(q), slices.Clone(k), slices.Clone(v)
 	}
 
-	return q, k, v
+	return q, k, v, gate
 }
 
 // normRotate applies the per-head q/k norms and, if rope is set, the
@@ -346,53 +355,92 @@ func (a *Attention) attendRows(q, k, v []float32, t, off int, mask Mask, tr *att
 // tensor.MatMulTransB. The weights of masked keys are set to 0, so they
 // add exact zeros to P·V. The sums run in the GEMM's order instead of one
 // key after the other.
+//
+// Every query head and row is independent and writes its own part of the
+// output, so the (head, row) pairs run on tensor.Parallel, in blocks of
+// rows that start at multiples of 4 within a head: there the GEMMs' 4-row
+// blocks stay as in one call per head, and every output is the same bit
+// for bit for any worker count (docs/FINDINGS.md F-038).
 func (a *Attention) attendGEMM(q, k, v []float32, t, off int, mask Mask, tr *attnTrace) []float32 {
 	qW, kW, vW, oW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v, a.heads*a.v
 	keys := len(k) / kW
 	out := make([]float32, t*oW)
-	qh, kh, vT := make([]float32, t*a.qk), make([]float32, keys*a.qk), make([]float32, a.v*keys)
-	probs := make([]float32, t*keys)
+	kh, vT := make([]float32, a.kvHeads*keys*a.qk), make([]float32, a.kvHeads*a.v*keys)
 	scale := a.attendScale()
-	group := a.heads / a.kvHeads
 
 	for kv := range a.kvHeads {
+		khv, vTv := kh[kv*keys*a.qk:(kv+1)*keys*a.qk], vT[kv*a.v*keys:(kv+1)*a.v*keys]
+
 		for j := range keys {
-			copy(kh[j*a.qk:(j+1)*a.qk], k[j*kW+kv*a.qk:j*kW+(kv+1)*a.qk])
+			copy(khv[j*a.qk:(j+1)*a.qk], k[j*kW+kv*a.qk:j*kW+(kv+1)*a.qk])
 
 			for d, x := range v[j*vW+kv*a.v : j*vW+(kv+1)*a.v] {
-				vT[d*keys+j] = x
+				vTv[d*keys+j] = x
 			}
-		}
-
-		for h := kv * group; h < (kv+1)*group; h++ {
-			for i := range t {
-				copy(qh[i*a.qk:(i+1)*a.qk], q[i*qW+h*a.qk:i*qW+(h+1)*a.qk])
-			}
-
-			tensor.MatMulTransB(probs, keys, qh, kh, t, keys, a.qk)
-
-			for i := range t {
-				row := probs[i*keys : (i+1)*keys]
-				n := keysAt(keys, off, i, mask)
-
-				for j := range row[:n] {
-					row[j] /= scale
-				}
-
-				softmaxInPlace(row[:n])
-				clear(row[n:])
-
-				if tr != nil {
-					copy(tr.probs[(h*t+i)*keys:], row)
-				}
-			}
-
-			tensor.MatMulTransB(out[h*a.v:], oW, probs, vT, t, a.v, keys)
 		}
 	}
 
+	// rows runs query head h on rows [r0, r1) with scratch qh and probs.
+	rows := func(h, r0, r1 int, qh, probs []float32) {
+		kv := a.kvHead(h)
+		khv, vTv := kh[kv*keys*a.qk:(kv+1)*keys*a.qk], vT[kv*a.v*keys:(kv+1)*a.v*keys]
+		m := r1 - r0
+		qh, probs = qh[:m*a.qk], probs[:m*keys]
+
+		for i := range m {
+			copy(qh[i*a.qk:(i+1)*a.qk], q[(r0+i)*qW+h*a.qk:(r0+i)*qW+(h+1)*a.qk])
+		}
+
+		tensor.MatMulTransB(probs, keys, qh, khv, m, keys, a.qk)
+
+		for i := range m {
+			row := probs[i*keys : (i+1)*keys]
+			n := keysAt(keys, off, r0+i, mask)
+
+			for j := range row[:n] {
+				row[j] /= scale
+			}
+
+			softmaxInPlace(row[:n])
+			clear(row[n:])
+
+			if tr != nil {
+				copy(tr.probs[(h*t+r0+i)*keys:], row)
+			}
+		}
+
+		tensor.MatMulTransB(out[r0*oW+h*a.v:], oW, probs, vTv, m, a.v, keys)
+	}
+
+	// The pairs are numbered h·tp + row, with each head's rows padded to
+	// tp, a multiple of 4. A row costs about keys · (qk + v)
+	// multiply-adds, as many again in the softmax; a piece takes at least
+	// attendPieceFMAs.
+	tp := (t + 3) &^ 3
+	perRow := keys * (a.qk + a.v)
+	grain := ((attendPieceFMAs+perRow-1)/perRow + 3) &^ 3
+
+	tensor.Parallel(a.heads*tp, grain, func(lo, hi int) {
+		qh, probs := make([]float32, (hi-lo)*a.qk), make([]float32, (hi-lo)*keys)
+
+		for p := lo; p < hi; {
+			h, r0 := p/tp, p%tp
+			r1 := min(tp, r0+hi-p)
+
+			if r0 < t {
+				rows(h, r0, min(r1, t), qh, probs)
+			}
+
+			p += r1 - r0
+		}
+	})
+
 	return out
 }
+
+// attendPieceFMAs is the least work of one piece of attendGEMM, some
+// 20 µs on one core.
+const attendPieceFMAs = 1 << 19
 
 // applyTaps is the causal tap conv Σ_j taps[j] · shift_right(z, d·j) over
 // t rows of width values, summed in upstream's order j = 0, 1, …, with

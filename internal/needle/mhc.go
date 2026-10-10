@@ -191,16 +191,18 @@ func (m *MHC) forward(stream []float32, t int, block func([]float32) ([]float32,
 
 	u := make([]float32, t*c)
 
-	for i := range t {
-		ui := u[i*c : (i+1)*c]
-		for k := range n {
-			hPre[i*n+k] = sigmoid(hPre[i*n+k])
-			tensor.Axpy(ui, hPre[i*n+k], stream[(i*n+k)*c:(i*n+k+1)*c])
-			hPost[i*n+k] = 2 * sigmoid(hPost[i*n+k])
-		}
+	forRows(t, mhcRows, func(lo, hi int) {
+		for i := lo; i < hi; i++ {
+			ui := u[i*c : (i+1)*c]
+			for k := range n {
+				hPre[i*n+k] = sigmoid(hPre[i*n+k])
+				tensor.Axpy(ui, hPre[i*n+k], stream[(i*n+k)*c:(i*n+k+1)*c])
+				hPost[i*n+k] = 2 * sigmoid(hPost[i*n+k])
+			}
 
-		sinkhorn(hRes[i*n*n:(i+1)*n*n], n, mhcSinkhornIters)
-	}
+			sinkhorn(hRes[i*n*n:(i+1)*n*n], n, mhcSinkhornIters)
+		}
+	})
 
 	if tr != nil {
 		tr.hPre, tr.hPost, tr.hRes, tr.u = hPre, hPost, hRes, slices.Clone(u)
@@ -230,12 +232,12 @@ func (m *MHC) forward(stream []float32, t int, block func([]float32) ([]float32,
 // logits returns the three heads' logits for the rows of nx: h_pre and
 // h_post (t, n), h_res (t, n, n). The products are rounded before the adds
 // (the conversions rule out FMA), as upstream's elementwise jnp ops are.
+// The three φ read nx, so they share its rotation and tables where packed
+// (ApplyShared, docs/FINDINGS.md F-038).
 func (m *MHC) logits(nx []float32, t int) (pre, post, res []float32) {
 	n := m.lanes
 	pre, post, res = make([]float32, t*n), make([]float32, t*n), make([]float32, t*n*n)
-	m.phiPre.Apply(pre, nx, t)
-	m.phiPost.Apply(post, nx, t)
-	m.phiRes.Apply(res, nx, t)
+	ApplyShared([][]float32{pre, post, res}, nx, t, m.phiPre, m.phiPost, m.phiRes)
 
 	for i := range t {
 		for k := range n {
@@ -256,21 +258,23 @@ func (m *MHC) mix(stream []float32, t int, hRes, hPost, y []float32) []float32 {
 	n, c := m.lanes, m.dim
 	out := make([]float32, len(stream))
 
-	for i := range t {
-		yi := y[i*c : (i+1)*c]
+	forRows(t, mhcRows, func(lo, hi int) {
+		for i := lo; i < hi; i++ {
+			yi := y[i*c : (i+1)*c]
 
-		for a := range n {
-			o := out[(i*n+a)*c : (i*n+a+1)*c]
-			for b := range n {
-				tensor.Axpy(o, hRes[(i*n+a)*n+b], stream[(i*n+b)*c:(i*n+b+1)*c])
-			}
+			for a := range n {
+				o := out[(i*n+a)*c : (i*n+a+1)*c]
+				for b := range n {
+					tensor.Axpy(o, hRes[(i*n+a)*n+b], stream[(i*n+b)*c:(i*n+b+1)*c])
+				}
 
-			hp := hPost[i*n+a]
-			for k, v := range yi {
-				o[k] += float32(hp * v)
+				hp := hPost[i*n+a]
+				for k, v := range yi {
+					o[k] += float32(hp * v)
+				}
 			}
 		}
-	}
+	})
 
 	return out
 }

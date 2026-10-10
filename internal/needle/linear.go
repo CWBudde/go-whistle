@@ -61,6 +61,36 @@ func (l Linear) Apply(dst, x []float32, rows int) {
 	tensor.MatMulTransB(dst, l.out, x, l.w, rows, l.out, l.in)
 }
 
+// ApplyShared sets dsts[k] = x · ls[k]ᵀ for linears that read the same x,
+// rows × In: Apply for each, except that the packed ones run through
+// cq.GEMMs together, which rotates and tabulates each row of x once for
+// all of them instead of once per matrix (docs/FINDINGS.md F-038). Every
+// dsts[k] equals ls[k].Apply's result bit for bit.
+func ApplyShared(dsts [][]float32, x []float32, rows int, ls ...Linear) {
+	if len(dsts) != len(ls) {
+		panic(fmt.Sprintf("needle: ApplyShared of %d linears into %d outputs", len(ls), len(dsts)))
+	}
+
+	var (
+		ms []*cq.Matrix
+		ds [][]float32
+	)
+
+	for k, l := range ls {
+		if l.q == nil {
+			l.Apply(dsts[k], x, rows)
+
+			continue
+		}
+
+		ms, ds = append(ms, l.q), append(ds, dsts[k][:rows*l.out])
+	}
+
+	if len(ms) > 0 {
+		cq.GEMMs(ms, ds, x[:rows*ls[0].in], rows)
+	}
+}
+
 // Row writes row r of W to dst (len In): the values for float32, and the
 // row dequantised as cact.CQ does it, bit for bit, when packed. It serves
 // the gathers: the token embedding and the engram tables.

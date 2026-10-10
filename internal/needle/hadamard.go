@@ -172,9 +172,25 @@ func (h *HadamardMLP) forward(x []float32, t int, tr *hadaTrace) ([]float32, err
 	}
 
 	out := make([]float32, t*n)
+
+	// Rows are independent: the trace collects them in order, so only an
+	// untraced run splits them (docs/FINDINGS.md F-038).
+	if tr != nil {
+		h.rows(x, out, logits, 0, t, tr)
+	} else {
+		forRows(t, hadamardRows, func(lo, hi int) { h.rows(x, out, logits, lo, hi, nil) })
+	}
+
+	return out, nil
+}
+
+// rows runs forward's rows [lo, hi) of x into out, with the conditional
+// logits of all rows in logits.
+func (h *HadamardMLP) rows(x, out, logits []float32, lo, hi int, tr *hadaTrace) {
+	n := h.n
 	cond, z, y, k := make([]float32, n), make([]float32, n), make([]float32, n), make([]float32, n)
 
-	for i := range t {
+	for i := lo; i < hi; i++ {
 		xi, oi := x[i*n:(i+1)*n], out[i*n:(i+1)*n]
 
 		// cond = 1 + softmax(x @ cond_v) @ cond_u
@@ -233,8 +249,6 @@ func (h *HadamardMLP) forward(x []float32, t int, tr *hadaTrace) ([]float32, err
 			oi[c] *= d
 		}
 	}
-
-	return out, nil
 }
 
 // mix writes stage s's Kronecker apply of z to dst, gathered through the
