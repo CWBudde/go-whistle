@@ -415,7 +415,6 @@ func TestTranscribeOptionsRejected(t *testing.T) {
 		unsupp  bool
 		message string
 	}{
-		{"timestamps", TranscribeOptions{WordTimestamps: true}, true, "word timestamps"},
 		{"depth 1", TranscribeOptions{Depth: 1}, false, "outside 2..8"},
 		{"depth 9", TranscribeOptions{Depth: 9}, false, "outside 2..8"},
 		{"language", TranscribeOptions{Language: "xx"}, false, `unknown language "xx"`},
@@ -426,7 +425,9 @@ func TestTranscribeOptionsRejected(t *testing.T) {
 		}
 	}
 
-	for _, opts := range []TranscribeOptions{{Depth: 8}, {Depth: 2}, {Depth: 7}, {Keywords: []string{"Siobhan"}}} {
+	for _, opts := range []TranscribeOptions{
+		{Depth: 8}, {Depth: 2}, {Depth: 7}, {Keywords: []string{"Siobhan"}}, {WordTimestamps: true},
+	} {
 		_, err := m.Transcribe(pcm, opts)
 		if err != nil {
 			t.Errorf("%+v: %v", opts, err)

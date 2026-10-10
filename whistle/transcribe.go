@@ -3,13 +3,16 @@ package whistle
 import (
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/cwbudde/go-whistle/internal/align"
 	"github.com/cwbudde/go-whistle/internal/decoder"
 	"github.com/cwbudde/go-whistle/internal/frontend"
 	"github.com/cwbudde/go-whistle/internal/search"
+	"github.com/cwbudde/go-whistle/internal/silence"
 )
 
 var (
@@ -35,8 +38,10 @@ type TranscribeOptions struct {
 	// white space collapsed; empty entries are dropped. An entry holding
 	// newlines is split like the engine's --audio-keywords file.
 	Keywords []string
-	// WordTimestamps adds Result.Words. Not yet supported (PLAN.md
-	// Phase 7).
+	// WordTimestamps adds Result.Words: every word with its start, end and
+	// probability, as the engine's --audio-word-timestamps
+	// (docs/FINDINGS.md F-033). It costs one more decoder pass over the
+	// transcript.
 	WordTimestamps bool
 	// Depth is the number of decoder layers to run, 2 up to the full 8; 0
 	// is full. It is the engine's endpoint-preserving ladder
@@ -50,7 +55,7 @@ type TranscribeOptions struct {
 // the engine treats as silence (F-031: digital silence, steady noise, too
 // little level contrast in the speech band, fewer than 160 samples) gives
 // the empty result without decoding: Result{}, the engine's JSON without
-// word timestamps.
+// word timestamps, or Silence() with them.
 func (m *Model) Transcribe(pcm []float32, opts TranscribeOptions) (Result, error) {
 	return m.transcribe(pcm, opts, time.Now)
 }
@@ -89,12 +94,13 @@ func (m *Model) transcribe(pcm []float32, opts TranscribeOptions, now func() tim
 	// The length check comes first, then the gate (F-025).
 	clk := newClock(now)
 
-	silent, err := m.gate.Silent(pcm)
+	// The gate's levels also place the first word (F-033).
+	levels, err := m.gate.Levels(pcm)
 	if err != nil {
 		return Result{}, wrap(err)
 	}
 
-	if silent || m.enc.Frames(len(pcm)) == 0 {
+	if silence.Spread(levels) <= silence.ThresholdDB || m.enc.Frames(len(pcm)) == 0 {
 		return silentResult(opts), nil
 	}
 
@@ -109,7 +115,9 @@ func (m *Model) transcribe(pcm []float32, opts TranscribeOptions, now func() tim
 		return Result{}, wrap(err)
 	}
 
-	out, err := m.strategy.decode(m.decoder(opts.Depth), mem, req, clk)
+	d := m.decoder(opts.Depth)
+
+	out, err := m.strategy.decode(d, mem, req, clk)
 	if err != nil {
 		return Result{}, wrap(err)
 	}
@@ -119,7 +127,93 @@ func (m *Model) transcribe(pcm []float32, opts TranscribeOptions, now func() tim
 		return Result{}, wrap(err)
 	}
 
-	return Result{Text: text, Language: out.lang, TTFT: clk.ttft(), DecodeTPS: clk.tps()}, nil
+	res := Result{Text: text, Language: out.lang, TTFT: clk.ttft(), DecodeTPS: clk.tps()}
+
+	if opts.WordTimestamps {
+		res.Words, err = timeWords(d, mem, out, levels, len(pcm))
+		if err != nil {
+			return Result{}, wrap(err)
+		}
+	}
+
+	return res, nil
+}
+
+// timeWords times the transcript out (docs/FINDINGS.md F-033): one
+// teacher-forced pass of d over the prompt, the language token, the text
+// tokens and EOS with the cross-attention captured, then Whisper's
+// alignment on it (align.Default). The probabilities are the pass' own,
+// without keyword bias. Times are on the 80 ms frame grid, at most the last
+// grid point within the clip's samples.
+func timeWords(d *decoder.Decoder, mem *decoder.Memory, out decoded, levels []float64, samples int) ([]Word, error) {
+	lang := -1
+
+	for _, l := range d.Languages() {
+		if l.Code == out.lang {
+			lang = l.ID
+		}
+	}
+
+	if lang < 0 {
+		return nil, fmt.Errorf("word timestamps: language %q", out.lang)
+	}
+
+	prompt := d.Prompt()
+	seq := append(append(prompt, lang), out.tokens...)
+	seq = append(seq, d.Tokenizer().EOSID())
+
+	var attn []decoder.Attention
+
+	s := d.NewState(mem)
+	s.SetCapture(func(a decoder.Attention) { attn = append(attn, a) })
+
+	logits, err := d.Extend(s, seq)
+	if err != nil {
+		return nil, fmt.Errorf("word timestamps: %w", err)
+	}
+
+	first, v := len(prompt)+1, d.Vocab()
+	logp := make([]float64, len(out.tokens))
+
+	for k, tok := range out.tokens {
+		logp[k] = logSoftmaxAt(logits[(first+k-1)*v:(first+k)*v], tok)
+	}
+
+	in := align.Input{Attn: attn, First: first, Tokens: len(out.tokens), Frames: mem.Frames(), Levels: levels}
+
+	timed, err := align.Align(d.Tokenizer(), out.tokens, logp, in, align.Default())
+	if err != nil {
+		return nil, fmt.Errorf("word timestamps: %w", err)
+	}
+
+	last := samples / int(SampleRate*FrameDuration/time.Second) // the last grid point within the clip
+	words := make([]Word, len(timed))
+
+	for i, w := range timed {
+		words[i] = Word{
+			Text:        w.Text,
+			Start:       time.Duration(min(w.Start, last)) * FrameDuration,
+			End:         time.Duration(min(w.End, last)) * FrameDuration,
+			Probability: w.Probability,
+		}
+	}
+
+	return words, nil
+}
+
+// logSoftmaxAt is log softmax(v)[i] in float64.
+func logSoftmaxAt(v []float32, i int) float64 {
+	m := math.Inf(-1)
+	for _, x := range v {
+		m = math.Max(m, float64(x))
+	}
+
+	var s float64
+	for _, x := range v {
+		s += math.Exp(float64(x) - m)
+	}
+
+	return float64(v[i]) - m - math.Log(s)
 }
 
 // silentResult is the engine's result for a silent clip: Silence() with word
@@ -136,10 +230,6 @@ func silentResult(opts TranscribeOptions) Result {
 func (m *Model) check(opts TranscribeOptions) error {
 	if opts.Language != "" && !slices.Contains(m.Languages(), opts.Language) {
 		return fmt.Errorf("whistle: unknown language %q, want one of %s", opts.Language, strings.Join(m.Languages(), ", "))
-	}
-
-	if opts.WordTimestamps {
-		return fmt.Errorf("whistle: word timestamps: %w", ErrNotSupported)
 	}
 
 	if opts.Depth != 0 && (opts.Depth < 2 || opts.Depth > m.layers) {
