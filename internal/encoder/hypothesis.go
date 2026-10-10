@@ -256,7 +256,7 @@ func Best() Hypothesis {
 		Frontend: frontend.Options{
 			Window: frontend.HannSymmetric, Padding: frontend.PadZero, Spectrum: frontend.Power,
 			Log: frontend.LogWhisper, Norm: frontend.NormChannel, Band: frontend.BandFull,
-			Preemphasis: frontend.PreemphNone,
+			Preemphasis: frontend.PreemphNone, Dither: frontend.DitherNone,
 		},
 		StemStride: StrideAll, StemPad: PadSymmetric, StemKernel: KernelTimeMel, StemFlatten: FlattenChannelMel,
 		StemConvAct: ActSiLU, StemDWAct: ActNone, StemPWAct: ActSiLU, InputScale: ScaleOne,
