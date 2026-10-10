@@ -1,6 +1,7 @@
 package search
 
 import (
+	"fmt"
 	"math"
 	"slices"
 	"testing"
@@ -142,5 +143,122 @@ func TestAdjust(t *testing.T) {
 
 	if math.Abs(r.LangLogProb-f.LogProbs[0]) > 1e-4 {
 		t.Errorf("language log p %.6f, teacher-forced %.6f", r.LangLogProb, f.LogProbs[0])
+	}
+}
+
+// depthClips are short clips whose engine transcript at --audio-depth 2
+// and 4 differs from the full depth's, and which Default on
+// decoder.WithDepth reproduces at both (docs/FINDINGS.md F-030).
+var depthClips = []string{
+	"ls-other-8280-266249-0032",
+	"ls-clean-260-123440-0007",
+	"ls-clean-7729-102255-0012",
+}
+
+// depthFloors are Default's ranking scores on depthClips at depth 2 and 4,
+// measured with the .cact weights (d2 −0.3097, −0.1498, −0.1133; d4
+// −0.1675, −0.1146, −0.0719) and floored just below.
+var depthFloors = map[int][]float64{2: {-0.32, -0.16, -0.12}, 4: {-0.18, -0.12, -0.08}}
+
+// TestDepthMatchesEngine beam-decodes depthClips with Default at ladder
+// depths 2 and 4 and requires the engine's text at that depth
+// (testdata/oracle/depth), which is not its full-depth text, and a
+// ranking score above depthFloors.
+func TestDepthMatchesEngine(t *testing.T) {
+	d, clips := loadSetup(t, depthClips...)
+	texts := depthTexts(t)
+
+	for _, depth := range []int{2, 4} {
+		dd, err := d.WithDepth(depth)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for i, c := range clips {
+			want := texts[fmt.Sprintf("%s.d%d", c.ID, depth)]
+
+			r, err := Beam(dd, c.Mem, Default())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			t.Logf("d%d %s: %q, score %.4f; full depth %q", depth, c.ID, r.Text, r.Score, c.Text)
+
+			if want.Text == c.Text {
+				t.Errorf("d%d %s: the fixture equals the full depth's text", depth, c.ID)
+			}
+
+			if r.Language != want.Language || r.Text != want.Text || !r.EOS {
+				t.Errorf("d%d %s: got [%s] %q (EOS %v), engine [%s] %q", depth, c.ID, r.Language, r.Text, r.EOS,
+					want.Language, want.Text)
+			}
+
+			if r.Score < depthFloors[depth][i] {
+				t.Errorf("d%d %s: score %.4f below %.2f", depth, c.ID, r.Score, depthFloors[depth][i])
+			}
+		}
+	}
+}
+
+// keywordFast are keyword fixture cases on short clips that Default with
+// DefaultBias reproduces (docs/FINDINGS.md F-029), in manifest order: a
+// lower-cased missed name the engine writes capitalised, a distractor that
+// loses against the audio, one that wins, and a list of two keywords.
+var keywordFast = []string{
+	"en-cowleys-lower-missed",
+	"en-curses-distractor",
+	"en-transfer-distractor",
+	"de-paare-adoptionsplan-list",
+}
+
+// keywordFloors are their ranking scores with the bonus, measured with the
+// .cact weights (0.1520, −0.1575, 0.0545, 0.1944) and floored just below.
+var keywordFloors = []float64{0.14, -0.17, 0.04, 0.18}
+
+// TestKeywordsMatchEngine beam-decodes keywordFast with Default and the
+// Adjust of their keyword files under DefaultBias, and requires the
+// engine's text with the keywords, a ranking score above keywordFloors,
+// and, where the engine's text changes, a change of ours.
+func TestKeywordsMatchEngine(t *testing.T) {
+	cases := keywordCases(t, keywordFast...)
+
+	var ids []string
+	for _, c := range cases {
+		if !slices.Contains(ids, c.Clip) {
+			ids = append(ids, c.Clip)
+		}
+	}
+
+	d, clips := loadSetup(t, ids...)
+
+	for i, c := range cases {
+		cl := clips[slices.Index(ids, c.Clip)]
+
+		kw, err := NewKeywords(d.Tokenizer(), c.Keywords, DefaultBias())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		opt := Default()
+		opt.Adjust = kw.Adjust
+
+		r, err := Beam(d, cl.Mem, opt)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("%s %q: %q, score %.4f", c.Name, c.Keywords, r.Text, r.Score)
+
+		if r.Text != c.TextWith || r.Language != c.Language || !r.EOS {
+			t.Errorf("%s: got [%s] %q (EOS %v), engine [%s] %q", c.Name, r.Language, r.Text, r.EOS, c.Language, c.TextWith)
+		}
+
+		if c.Changed == (cl.Text == r.Text) {
+			t.Errorf("%s: the engine's text changed %v, ours %v", c.Name, c.Changed, cl.Text != r.Text)
+		}
+
+		if r.Score < keywordFloors[i] {
+			t.Errorf("%s: score %.4f below %.2f", c.Name, r.Score, keywordFloors[i])
+		}
 	}
 }

@@ -113,6 +113,14 @@ decoder-probe *args:
 search-probe *args:
     go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbeBeam$' ./internal/search/ {{args}}
 
+# Beam-decode every clip at ladder depths 2..8 against the committed engine --audio-depth transcripts (WHISTLE_PROBE_MISSES)
+depth-probe *args:
+    go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbeDepth$' ./internal/search/ {{args}}
+
+# Score the keyword biasing variants against the committed engine keyword transcripts and report the leader (WHISTLE_PROBE_TOP/KEY)
+keywords-probe *args:
+    go test -tags oracle -count=1 -v -timeout 120m -run 'TestProbeKeywords$' ./internal/search/ {{args}}
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
