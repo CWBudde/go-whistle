@@ -1491,3 +1491,113 @@ safetensors). The rest is the 5-beam search and the engine's W2A8 arithmetic, wh
 **Fast regression.** `TestGreedyMatchesEngine` (no tag, skips without `models/`) decodes three short clips
 (LibriSpeech test-other and test-clean, FLEURS de). It requires the engine's language and text exactly, and the
 teacher-forced mean log-probability above floors just below the measured −0.0880 / −0.0548 / −0.0652.
+
+## F-028 — CQ GEMV in the rotated domain, straight from the packed `.cact` (2026-10-10)
+
+**Question.** Can a linear layer multiply by a CQ matrix without dequantising it, and how fast is that in pure Go?
+Which Whistle tensors can use it as stored?
+
+**Maths.** `cact.CQ` dequantises row r, group g as w = H · c · n / √G, with c the addressed codebook levels, n the FP16
+norm and H the ±1 Sylvester matrix (F-004). H is symmetric, so w · x_g = n · (c · x̂_g) with x̂_g = H · x_g / √G. A
+product therefore rotates each 128-wide group of the activation once (FWHT-128 and the 1/√G scale) and is then a
+gather-and-accumulate over the packed indices, scaled by one norm per group. Padding columns past `In` get zeros in
+x, which drops them as `CQ` does.
+
+**Code.** `cact.File.CQPacked(i)` returns a CQ record as stored: the index bitstream and the FP16 norms (both alias
+the file data), the record and index widths, the group, the shape and the codebook `CQ` uses. `cq.New` builds a
+`Matrix` from it for 2 and 4 bits; it keeps the index bytes and widens the norms to float32 once. `GEMV(dst, x)` and
+`GEMM(dst, x, rows)` compute y = W · x. `Rows(lo, hi)` is a view of a row range, and `Row(dst, r)` dequantises one row
+with `CQ`'s arithmetic, bit for bit. `internal/cq` has its own copy of the FWHT, because 9.4 will vectorise the
+activation side.
+
+**Kernels** (pure Go, no assembly):
+
+| kernel             | per index byte                                                                                    | role                             |
+| ------------------ | ------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `gather`           | decode each index, `cb[idx] · x̂[k]`                                                               | reference                        |
+| `nibble`           | two lookups in 16-entry tables built per activation, one per index nibble (2 bits: an index pair) | GEMV, and GEMM rows left over    |
+| `nibble4`          | the same tables for four activations interleaved: one index decode feeds four adjacent entries    | GEMM, four activations at a time |
+| byte LUT, rejected | one lookup in a 256-entry table per index byte, built from the two nibble tables per activation   | removed                          |
+
+The nibble kernels read eight index bytes as one little-endian word and the tables through fixed-size array pointers, so
+a word costs one bounds check. On arm64 a lookup is then about three integer instructions, one load and a float add. The
+byte table saves half the lookups but costs 256 entries per index byte to build and leaves L1 (128 KB for a 512-wide CQ2
+row). In one 0.2 s run before its removal, it won only on `pw1` (40.4 vs 47.4 µs) and lost everywhere else, e.g. 24.2 vs
+19.4 µs on `q_proj`, 151 vs 58 µs on `phi_res` and 728 vs 658 µs on the head. So `best()` is `nibble4`, which runs
+`nibble` for fewer than four rows.
+
+**Which tensors qualify.** All 152 CQ records of `whistle.cact` (145 CQ2, 7 CQ4, group 128) are stored `[out, in]`.
+That is the orientation the float path multiplies by (`internal/needle` `linear` → `MatMulTransB(dst, out, x, w, …)`),
+so the kernel needs no transform at run time. `Entry.Transform` maps safetensors to `.cact`; the stored bytes already
+include it:
+
+- `transpose` (143 Flax Dense kernels: q/k/v/gate/out of the self- and cross-attentions, `pw1`, `pw2`, the engram
+  `key_proj`/`value_proj`, `stem.pw_1`, `stem.pw_2`, `stem.out`): `GEMV`/`GEMM` as they are.
+- `lane-major` (the six mHC φ): the stored `(L·lanes, n·C)` stacks all layers. Layer l is `Rows(4l, 4l+4)` for
+  φ_pre/φ_post and `Rows(16l, 16l+16)` for φ_res, the slices `mhc.go` takes (`TestWhistlePhiRows`).
+- `reshape` (`embedding`, the two engram tables): the tied head is `GEMV`/`GEMM` over the 8199 embedding rows. The
+  input embedding and the engram tables are row gathers, which `Row` serves without dequantising the rest.
+
+1-bit, 3-bit and ternary records do not occur in Whistle, and `New` rejects them. The safetensors backend has no packed
+form, so it keeps the float path.
+
+**Accuracy** (`TestWhistleGEMM`): each kernel against `cact.CQ(i)` followed by `tensor.MatMulTransB`, on five
+activation rows (four Gaussian, one Gaussian cubed for heavy tails), so `nibble4` runs one block of four plus one
+leftover row. The worst of the five rows:
+
+| tensor                   | CQ  | shape   | rows    | float NEON | float purego | `gather` | `nibble` | `nibble4` | MB float32 | MB packed |
+| ------------------------ | --- | ------- | ------- | ---------- | ------------ | -------- | -------- | --------- | ---------- | --------- |
+| k_proj (96, 512) CQ2     | 1   | 1.84 µs | 8.88 µs | 50.8 µs    | 7.25 µs      | 7.29 µs  | 0.197    | 0.0138    |
+| q_proj (384, 512) CQ2    | 1   | 7.70 µs | 34.4 µs | 204 µs     | 20.2 µs      | 20.1 µs  | 0.786    | 0.0553    |
+| out (512, 512) CQ2       | 1   | 10.6 µs | 45.9 µs | 274 µs     | 25.6 µs      | 25.8 µs  | 1.049    | 0.0737    |
+| pw1 (1024, 512) CQ2      | 1   | 22.8 µs | 91.7 µs | 601 µs     | 49.7 µs      | 50.2 µs  | 2.097    | 0.1475    |
+| stem.out (512, 1280) CQ2 | 1   | 28.1 µs | 127 µs  | 651 µs     | 61.2 µs      | 61.5 µs  | 2.621    | 0.1843    |
+| phi_res (128, 2048) CQ4  | 1   | 9.69 µs | 52.3 µs | 264 µs     | 55.8 µs      | 55.6 µs  | 1.049    | 0.1393    |
+| head (8199, 512) CQ4     | 1   | 192 µs  | 748 µs  | 4.19 ms    | 653 µs       | 652 µs   | 16.79    | 2.230     |
+| q_proj (384, 512) CQ2    | 5   | 20.4 µs | 173 µs  | 982 µs     | 96.1 µs      | 76.9 µs  | 0.786    | 0.0553    |
+| head (8199, 512) CQ4     | 5   | 464 µs  | 3.71 ms | 20.9 ms    | 3.27 ms      | 2.33 ms  | 16.79    | 2.230     |
+| q_proj (384, 512) CQ2    | 375 | 1.21 ms | 12.9 ms | 73.4 ms    | 7.22 ms      | 5.43 ms  | 0.786    | 0.0553    |
+
+The Accept asks for cosine ≥ 0.99999, i.e. 1 − cos ≤ 1e-5. The worst kernel is almost eight orders of magnitude below
+it: both sides compute the same product in float32, in a different order. The largest |Δ| is 5.7e-7 of max |y| (5.4e-7
+for `nibble4`). `Row` equals `CQ`'s rows bit for bit. On random matrices (`TestKernels`, groups 8 to 128, every padding
+case), every kernel stays within the float32 bound γ(In + log2 G + 8) · Σ_g n · Σ_k |cb| · Σ_j |x_j| / √G of a float64
+reference built with the explicit Hadamard matrix.
+
+**Speed** (`BenchmarkGEMM`, Apple M5 Pro, `-cpu 1`, mean of 3 × 0.5 s, random packed matrices of each shape). The
+float baseline is `tensor.MatMulTransB` on the dequantised matrix: the NEON kernel by default, the Go loop under
+`-tags purego`. The CQ kernels are pure Go in both builds.
+
+| shape                    | rows | float NEON | float purego | `gather` | `nibble` | `nibble4` | MB float32 | MB packed |
+| ------------------------ | ---- | ---------- | ------------ | -------- | -------- | --------- | ---------- | --------- |
+| k_proj (96, 512) CQ2     | 1    | 1.78 µs    | 10.1 µs      | 49.8 µs  | 7.03 µs  | 7.14 µs   | 0.197      | 0.0138    |
+| q_proj (384, 512) CQ2    | 1    | 7.54 µs    | 36.6 µs      | 198 µs   | 19.5 µs  | 19.9 µs   | 0.786      | 0.0553    |
+| out (512, 512) CQ2       | 1    | 10.6 µs    | 46.7 µs      | 282 µs   | 26.6 µs  | 27.3 µs   | 1.049      | 0.0737    |
+| pw1 (1024, 512) CQ2      | 1    | 23.6 µs    | 92.8 µs      | 562 µs   | 49.6 µs  | 49.9 µs   | 2.097      | 0.1475    |
+| stem.out (512, 1280) CQ2 | 1    | 26.8 µs    | 128 µs       | 700 µs   | 64.8 µs  | 64.3 µs   | 2.621      | 0.1843    |
+| phi_res (128, 2048) CQ4  | 1    | 10.3 µs    | 52.8 µs      | 283 µs   | 59.9 µs  | 60.7 µs   | 1.049      | 0.1393    |
+| head (8199, 512) CQ4     | 1    | 206 µs     | 749 µs       | 4.22 ms  | 653 µs   | 656 µs    | 16.79      | 2.230     |
+| q_proj (384, 512) CQ2    | 5    | 20.3 µs    | 186 µs       | 995 µs   | 96.2 µs  | 77.2 µs   | 0.786      | 0.0553    |
+| head (8199, 512) CQ4     | 5    | 470 µs     | 3.72 ms      | 21.1 ms  | 3.27 ms  | 2.33 ms   | 16.79      | 2.230     |
+| q_proj (384, 512) CQ2    | 375  | 1.21 ms    | 13.0 ms      | 73.9 ms  | 7.23 ms  | 6.25 ms   | 0.786      | 0.0553    |
+
+Pure Go against pure Go, `nibble4` is 1.15× (head) to 2.4× (375 encoder frames) faster than the float loop on every
+shape except the CQ4 φ_res, where it is 1.06× slower. Against the NEON float GEMM it is 2.2× (stem.out, pw1) to 5.7×
+(φ_res) slower: the float kernel does four FMAs per vector instruction, while the lookups are scalar. Batching four
+activations saves 20 % (q_proj, 5 rows) to 29 % (head, 5 rows) against `nibble`, because the index decode is shared.
+
+**Memory.** "MB packed" is `Matrix.Bytes`: the index bytes, the float32 norms and the codebook. Per weight this is
+2.25 bits for CQ2 and 4.25 for CQ4 (the file's 2.125 and 4.125 plus the widened norms), i.e. 14.2× and 7.5× less
+than float32. Over all 152 CQ matrices (`TestWhistleAllMatrices`): 16.63 MB packed against 218.77 MB as float32
+(13.2×). The index bytes alias the `.cact` data, so with an mmap-ed file only the norms (1.7 MB) are new heap.
+
+**Consequences for 9.2.**
+
+- `weights.Source` needs a way to hand out `cact.Packed` (for example an optional interface on the `.cact` backend), and
+  the linear call sites need to call `Matrix.GEMM` when a tensor is packed. Every site multiplies by `[out, in]`
+  already; φ needs `Rows`, and the embedding and engram gathers need `Row`.
+- Single-threaded, the packed path is slower than today's NEON float path on every shape. It wins only on memory (13×).
+  9.4 (a NEON LUT kernel, for example vector loads of the four interleaved entries of `nibble4`, or `TBL` lookups in
+  8-bit tables) and 9.5 have to recover the speed.
+- The sums run in a different order than the float path's. That changes outputs by about 1e-7 relative, so tests pinned
+  bit for bit to the float path need tolerances or new fixtures.
