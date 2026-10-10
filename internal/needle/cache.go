@@ -19,6 +19,19 @@ type KVCache struct {
 // Len is the number of positions in the cache.
 func (c *KVCache) Len() int { return c.n }
 
+// Fork returns a cache with c's positions that extends independently of c
+// (docs/FINDINGS.md F-026). The two share the keys and values so far
+// without a copy: Extend only appends to them, and the fork's slices are
+// capped at their length, so its first append moves its rows to a new
+// array while c may keep appending in place. The tap history is replaced,
+// never written, on every Extend, so it is shared as is.
+func (c *KVCache) Fork() KVCache {
+	return KVCache{
+		n: c.n, qHist: c.qHist, kHist: c.kHist, vHist: c.vHist,
+		k: slices.Clip(c.k), v: slices.Clip(c.v),
+	}
+}
+
 // Extend runs the causal attention on x, t new rows of Dim values at the
 // positions Len() … Len()+t−1, appends their keys and values to c and
 // returns t rows of Dim values. On an empty cache it equals Forward with
@@ -85,6 +98,11 @@ type EngramCache struct {
 
 // Len is the number of positions in the cache.
 func (c *EngramCache) Len() int { return c.n }
+
+// Fork returns a cache with c's positions that extends independently of c
+// (docs/FINDINGS.md F-026). Extend replaces the token and value history
+// instead of writing into it, so the fork shares both.
+func (c *EngramCache) Fork() EngramCache { return *c }
 
 // Extend returns the keys and values of the tokens that continue the
 // sequence in c, each len(tokens) rows of Dim values, and advances c. On
