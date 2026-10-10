@@ -61,6 +61,30 @@ oracle-run:
 oracle-probes:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle probes
 
+# Record Needle 3 engine transcripts at --audio-depth 2..7 for the corpus into testdata/oracle/depth
+oracle-depth:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle depth
+
+# Record Needle 3 engine transcripts with and without keyword files into testdata/oracle/keywords
+oracle-keywords:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle keywords
+
+# Record the Needle 3 engine's empty-JSON silence sweep into testdata/oracle/silence
+oracle-silence:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle silence
+
+# Record the Needle 3 engine's length limits (0 … 480,001 samples) into testdata/oracle/limits
+oracle-limits:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle limits
+
+# Fetch the seeded LibriSpeech test-clean subset (200 utterances) into models/corpus/librispeech
+oracle-librispeech-audio:
+    go run -tags oracle ./tools/oracle librispeech-audio
+
+# Record Needle 3 engine transcripts of the LibriSpeech subset into testdata/oracle/librispeech (fetches the audio first)
+oracle-librispeech:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle librispeech
+
 # Regenerate the sentencepiece fixture for internal/tokenizer (testdata/tokenizer); --needle3 <tokenizer.model> cross-checks
 tokenizer-fixture *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/tokenizer_fixture.py {{args}}
