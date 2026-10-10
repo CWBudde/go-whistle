@@ -2076,3 +2076,119 @@ the rule reproduces `manifest.json` exactly (221 errors in 4167 words, and every
   0.3.
 - Both parts hold for beam search without keywords at full depth. Keywords (6.3) and the depth ladder (6.4) are not
   merged yet, and `Transcribe` rejects them.
+
+## F-032 — The stream oracle: LocalAgreement-2 with a 15 s sentence trim (U12, part 1) (2026-10-10)
+
+**Purpose.** 8.3 (the commit rule) and 8.4 (buffers beyond 30 s) are fitted against the engine's live API. `oracle
+stream` (`just oracle-stream`) records every `needle_stream_transcribe_process` and `needle_stream_transcribe_stop`
+call into `testdata/oracle/stream/`. Both symbols are now bound in `tools/oracle/engine.go` (purego), so the chunks
+are exact. Keywords are always off. `NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1` are set as in every recipe.
+
+**Sets.** One stream per run; the stop of each run ends it, so the next run starts a new one.
+
+| set        | runs | content                                                                                                   | calls |
+| ---------- | ---- | --------------------------------------------------------------------------------------------------------- | ----- |
+| `clips`    | 32   | every corpus clip in 1 s chunks, language detected                                                        | 192   |
+| `chunks`   | 64   | every clip in 0.5 s and in 2 s chunks                                                                     | 471   |
+| `language` | 4    | 1 s chunks, forced: the de and fr clips whose first pass detects English, an en clip, the de clip as en   | 28    |
+| `long`     | 3    | `long-clean`: 9 test-clean clips back to back, 44.91 s                                                    | 125   |
+|            |      | `long-other-gaps`: 9 test-other clips with 0.5 s of zeros between them, 42.16 s                           |       |
+|            |      | `long-silence-lead`: 32.5 s of zeros, then `ls-clean-6930-75918-0000`, 36.01 s                            |       |
+| `edge`     | 5    | a stop without a call, a 0-sample call, 0-sample calls after 3 s of speech, one call of 30 s, of 30 s + 1 | 6     |
+
+The manifest names each run's clips, `lead_samples`, `gap_samples`, `chunk_samples` (or `call_samples`) and language,
+plus `pcm_sha256` of the float32 samples, so the Go side rebuilds every stream from `testdata/audio` and checks it.
+`calls.json` holds, per run, every call's index, sample range `[start, end)`, return code, error and normalised JSON,
+then the stop's. Normalised: `pass_ms` dropped (a timing), keys sorted, values verbatim. Together 541,815 + 86,158
+bytes, 620 KB on disk.
+
+**Checks in the recipe.** Outside the edge set a run fails unless every call returns rc ≥ 0, rc equals the number of
+`words`, `text` is the words joined by spaces, `received` is the samples fed so far / 16000 to a hundredth, `pass_ms`
+is > 0 on every process call and 0.0 on every stop, and the CLI agrees (below).
+
+**What a call does.** Each rule below is checked against every call of the fixtures.
+
+1. **One pass per call.** Every process call re-transcribes the buffer, whatever the chunk length: 0.25 s, 0.5 s, 1 s
+   and 2 s chunks and 0-sample calls all report `pass_ms` > 0. The header's "about one second at a time" is advice,
+   not a gate.
+2. **A pass is `needle_transcribe` of the buffer.** For each call that commits words, the tool searches the buffer
+   start t0 such that `needle_transcribe` on `[t0, end)`, in the stream's language, ends with the call's committed
+   words followed by `pending`. The committed words must match in text, in `start` and `end` (shifted by t0) and in
+   `probability`. Candidates: the previous t0, then the ends of the committed words. Such a t0 exists for 470 of 470
+   calls (`buffer_start`). There is no prompt from the committed text, unlike whisper_streaming's 200-character
+   `init_prompt`. `language` is the pass's own: without a forced language, 10 of 32 clips at 1 s change language
+   between calls (the de clip's first second gives `[en] "Eden."`), and 0 of 32 at 2 s. Forcing the clip's language
+   changes only the first call (de: "Hier dann...", fr: "Merci.").
+3. **Words already committed are dropped** (`dropped`: how many leading words of the pass precede the call's words).
+   The pass keeps the words starting after the end of the last committed word minus 0.1 s. If the first kept word
+   starts within 1 s of that end, it also drops the longest n-gram (n ≤ 5) that repeats the committed tail. This
+   predicts `dropped` on 470 of 470 calls. Without the n-gram step: 438. With a margin of 0, 0.05 or 0.2 s instead of
+   0.1 s: 148, 459, 469.
+4. **Commit rule: LocalAgreement-2.** A call commits the longest common prefix of the previous call's `pending` words
+   and this pass's remaining words, compared as exact strings. Case and punctuation count: "Transportsysteme." does
+   not agree with "Transportsysteme,". This holds on 816 of 816 process calls. rc is the number of committed words,
+   `text` the committed words joined by spaces, `pending` the rest of the pass.
+5. **Trim: completed sentences at 15 s.** After a call that committed words, if `received` − t0 > 15 s, t0 moves to
+   the end of the second-to-last sentence of all committed words. A sentence ends at a word ending in `.`, `?` or `!`
+   (closing quotes allowed) when the next word starts with a capital letter or a digit. So "broke up. and all" is one
+   sentence, as in a Moses splitter. This reproduces all 470 inferred buffer starts, with 6 trims, all in the long
+   runs: 12.72, 23.12 and 34.32 s in `long-clean`, 8.32 and 21.52 s in `long-other-gaps`. A threshold of 14.5 s gives
+   458 of 470, 15.5 s 469 of 470. Items 2 to 5 are ufal whisper_streaming's `OnlineASRProcessor` (LocalAgreement-2,
+   `buffer_trimming="sentence"`, 15 s) with `needle_transcribe` as the ASR and no prompt.
+6. **Stop.** No pass (`pass_ms` 0.0). It commits the last call's `pending` verbatim, with the times and probabilities
+   of that pass: 103 of 103 runs, 42 of them non-empty. Then the stream is gone. A stop without a stream returns
+   `{"text":"","words":[],"pending":"","language":"","received":0.00,"pass_ms":0.0}`, rc 0.
+7. **`received`** is the audio fed so far, in seconds. Until the first trim it is n · (1/16000) printed to two
+   decimals: 50,160 samples print as "3.14", where n / 16000 prints "3.13" (`receivedText`). After a trim it can be one
+   hundredth lower: in 2 calls of `long-other-gaps`, 674,480 samples (42.155 s) print as "42.15". The engine therefore
+   adds a buffer offset and the buffer length, not a sample count. The exact form is open; t0 + (n − t0) / 16000 in
+   float64 gives "42.16".
+8. **Beyond 30 s.** `received` keeps counting (stops at 44.91, 42.16 and 36.01). While sentences get committed, the
+   trim keeps every pass under 30 s. In `long-silence-lead`, 32 s of zeros give empty passes (language "", `pass_ms`
+   about 1 ms, no error). Once the speech arrives, the passes at 33 to 36 s are not `needle_transcribe` of any single
+   window `[t0, received)` on a 0.04 s grid. A brute-force search finds windows that reproduce each call's text, but
+   no t0 and no window length serves 33, 34, 35 and 36 s together. The stop commits "Current Court returned to its
+   place amidst the tents." (offline: "Concord …"). How the engine bounds a buffer that has nothing to trim at is
+   open for 8.4.
+9. **Edges.** A 0-sample first call returns the stop's empty JSON. 0-sample calls after 3 s of speech run a pass on
+   the unchanged buffer. It agrees with the previous one and commits all of `pending` (9 words), which flushes without
+   ending the stream. A 480,000-sample call is accepted. A 480,001-sample call returns rc −1 with `needle_last_error`
+   `audio limit is 30 s` and is not counted: the following stop reports `received` 0.00.
+
+`needle.h` describes only the commit ("the words two consecutive passes agree on"), `pending`, the 30 s per call and
+the stop. Items 1 to 3, 5, 7, 8 and 9, the exact-string agreement and the "no pass at stop" are not in the header.
+
+**CLI cross-check.** `needle --audio-stream --audio-chunk S [--audio-language L] --audio-word-timestamps --threads 4`
+on each run's samples (a float WAV) prints one line per call with rc > 0, then the stop's line. Nothing is printed for
+the other calls. After dropping `pass_ms`, these lines equal the library's outputs on all 103 non-edge runs; the
+recipe fails otherwise. In stream mode the words are printed with or without `--audio-word-timestamps`.
+`--audio-chunk` refuses 31 ("takes seconds between 0 and 30").
+
+**Final text against offline (the Phase 8 Accept).** Text: all committed words of a run joined by spaces. Offline:
+`testdata/oracle/<clip>.json`, or for the long runs the clips' texts joined by spaces. Word errors are the edit
+distance over space-split words. Normalised: lower case, punctuation removed.
+
+| chunks             | runs equal | word errors / offline words | runs equal normalised | median commit delay |
+| ------------------ | ---------- | --------------------------- | --------------------- | ------------------- |
+| 0.5 s              | 14 / 32    | 31 / 459 (6.8 %)            | 21 / 32               | 0.76 s              |
+| 1 s                | 18 / 32    | 19 / 459 (4.1 %)            | 24 / 32               | 1.48 s              |
+| 2 s                | 27 / 32    | 9 / 459 (2.0 %)             | 27 / 32               | 2.64 s              |
+| 1 s, forced (4)    | 2 / 4      | 10 / 59                     |                       |                     |
+| long runs, 1 s (3) | 0 / 3      | 23 / 254 (9.1 %)            |                       |                     |
+
+The commit delay is `received` at the committing call minus the word's `end`. At 1 s the engine's own stream misses
+the offline text on 14 of 32 clips, for four reasons:
+
+- case and punctuation at commit boundaries: "broke up. and all", where offline has "broke up, and all";
+  "Free State" for "free state";
+- a lost opening quote: `You` for `"You`;
+- a word committed from a pass over less audio: "transfer" for "chance", "Billy" for "belly", "Bahre" for "Bare";
+- a word dropped between two agreements: "Vanke bij zich" for "Vanke strafreziekte bij zich".
+
+So the Accept as worded ("the final committed text equals the offline transcript") does not hold for the engine at
+1 s chunks. 8.3 should compare its stream with these fixtures call by call, and with the offline text only on the 18
+clips where the engine's own stream equals it.
+
+**Determinism.** The library has no thread setting. It runs on its default, the fast cores (at most 4, here 4), and
+F-025 found the transcripts identical at 1 to 8 threads. Every run also checks the library against the CLI at
+`--threads 4`. `just oracle-stream` was run twice, and the second run left `git status` clean.
