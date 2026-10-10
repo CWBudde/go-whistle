@@ -4,6 +4,7 @@
 //
 //	go run -tags oracle ./tools/oracle clips   # fetch the clip corpus into testdata/audio
 //	go run -tags oracle ./tools/oracle run     # record needle transcripts and embeddings into testdata/oracle
+//	go run -tags oracle ./tools/oracle probes  # record embeddings of the synthetic probes into testdata/oracle/probes
 //
 // It loads the closed-source Needle 3 engine (the needle CLI and libneedle3 through purego), so it lives behind the
 // oracle build tag and never ships with the library or the whistle CLI.
@@ -21,7 +22,11 @@ import (
 	"syscall"
 )
 
-const usage = "usage: oracle clips [-audio dir] | oracle run [-audio dir] [-out dir] [-models dir] [-engine dir]"
+// cmdNameProbes is the probes subcommand's name.
+const cmdNameProbes = "probes"
+
+const usage = "usage: oracle clips [-audio dir] | oracle run [-audio dir] [-out dir] [-models dir] [-engine dir] | " +
+	"oracle probes [-out dir] [-models dir] [-engine dir]"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -53,22 +58,32 @@ func dispatch(ctx context.Context, args []string, log io.Writer) error {
 		}
 
 		return cmdClips(ctx, *audio, log)
-	case "run":
+	case "run", cmdNameProbes:
 		plat, err := platformDir()
 		if err != nil {
 			return err
 		}
 
-		out := fs.String("out", filepath.Join("testdata", "oracle"), "fixture output directory")
+		defOut := filepath.Join("testdata", "oracle")
+		if args[0] == cmdNameProbes {
+			defOut = filepath.Join(defOut, "probes")
+		}
+
+		out := fs.String("out", defOut, "fixture output directory")
 		models := fs.String("models", filepath.Join("models", "whistle"), "directory holding whistle.cact")
 		eng := fs.String("engine", filepath.Join("engine", plat), "directory holding needle and libneedle3")
 
 		err = fs.Parse(args[1:])
 		if err != nil {
-			return fmt.Errorf("run: %w", err)
+			return fmt.Errorf("%s: %w", args[0], err)
 		}
 
-		return cmdRun(ctx, runConfig{audioDir: *audio, outDir: *out, modelDir: *models, engineDir: *eng}, log)
+		cfg := runConfig{audioDir: *audio, outDir: *out, modelDir: *models, engineDir: *eng}
+		if args[0] == cmdNameProbes {
+			return cmdProbes(cfg, log)
+		}
+
+		return cmdRun(ctx, cfg, log)
 	default:
 		return fmt.Errorf("unknown command %q\n%s", args[0], usage)
 	}
