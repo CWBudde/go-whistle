@@ -117,6 +117,19 @@ func runFlags(fs *flag.FlagSet, cfg *config, args []string) error {
 		return fmt.Errorf("run: %w", err)
 	}
 
+	switch {
+	case cfg.warmUp < 0:
+		return fmt.Errorf("run: -warmup %d: want 0 or more\n%s", cfg.warmUp, usage)
+	case cfg.passes < 1:
+		return fmt.Errorf("run: -passes %d: want at least 1 timed pass over the clips\n%s", cfg.passes, usage)
+	case cfg.long < 1:
+		return fmt.Errorf("run: -long %d: want at least 1 timed 30 s run\n%s", cfg.long, usage)
+	case cfg.loads < 1:
+		return fmt.Errorf("run: -loads %d: want at least 1 timed Load\n%s", cfg.loads, usage)
+	case *procs < 0:
+		return fmt.Errorf("run: -procs %d: want 0 (the default) or more\n%s", *procs, usage)
+	}
+
 	if *procs > 0 {
 		runtime.GOMAXPROCS(*procs)
 	}

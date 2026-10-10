@@ -87,6 +87,15 @@ func TestDispatchErrors(t *testing.T) {
 		}
 	}
 
+	for _, flags := range [][]string{
+		{"-warmup=0", "-passes=0"}, {"-passes=-1"}, {"-warmup=-1"}, {"-long=0"}, {"-loads=0"}, {"-procs=-2"},
+	} {
+		err := dispatch(t.Context(), append([]string{"run"}, flags...), &log, &log)
+		if err == nil || !strings.Contains(err.Error(), "want") || !strings.Contains(err.Error(), "usage") {
+			t.Errorf("run %q: %v", flags, err)
+		}
+	}
+
 	err := dispatch(t.Context(), []string{"run", "-model", filepath.Join(t.TempDir(), "none.cact")}, &log, &log)
 	if err == nil || !strings.Contains(err.Error(), "whistle download") {
 		t.Errorf("run without a model: %v", err)

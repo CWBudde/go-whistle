@@ -167,6 +167,12 @@ func timeClips(cfg config, res *bench.GoResults, models [2]*whistle.Model, clips
 		}
 	}
 
+	// runFlags asks for at least one pass, so pass 0 ran; the check keeps an
+	// empty run an error instead of an index panic.
+	if len(first[0]) != len(clips) || len(first[1]) != len(clips) {
+		return fmt.Errorf("no pass over the %d clips ran (warm-up %d, passes %d)", len(clips), cfg.warmUp, cfg.passes)
+	}
+
 	for k := range modes {
 		m := &res.Modes[k]
 		m.Clips = samples[k].Set(len(clips))
