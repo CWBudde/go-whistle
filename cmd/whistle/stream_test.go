@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -146,6 +147,24 @@ func equalPCM(a, b []float32) bool {
 	return true
 }
 
+// sliceSource plays decoded samples in chunks.
+type sliceSource struct {
+	pcm   []float32
+	chunk int
+}
+
+func (s *sliceSource) next() ([]float32, error) {
+	if len(s.pcm) == 0 {
+		return nil, io.EOF
+	}
+
+	n := min(s.chunk, len(s.pcm))
+	c := s.pcm[:n]
+	s.pcm = s.pcm[n:]
+
+	return c, nil
+}
+
 func TestSliceSource(t *testing.T) {
 	src := &sliceSource{pcm: make([]float32, 5), chunk: 2}
 
@@ -252,6 +271,35 @@ func (b blockingSource) next() ([]float32, error) {
 }
 
 // Ctrl-C (a cancelled context) stops the stream even while stdin blocks.
+// cancelledCtx has ended, but its Err stays nil, so that runStream reaches
+// its select with both Done and the reader's closed channel ready.
+type cancelledCtx struct{ done chan struct{} }
+
+func (cancelledCtx) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (c cancelledCtx) Done() <-chan struct{}     { return c.done }
+func (cancelledCtx) Err() error                  { return nil }
+func (cancelledCtx) Value(any) any               { return nil }
+
+// A closed reader channel stops the stream; it never feeds an empty chunk.
+// The race is random: without the check most runs of 2000 rounds fail.
+func TestRunStreamClosedReader(t *testing.T) {
+	for range 2000 {
+		f := &fakeStream{results: fakeResults()}
+		ctx := cancelledCtx{make(chan struct{})}
+		close(ctx.done)
+
+		err := runStream(ctx, f, &sliceSource{pcm: make([]float32, 1<<20), chunk: 1600},
+			streamConfig{chunk: 1600}, io.Discard)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if slices.Contains(f.fed, 0) || f.stopped != 1 {
+			t.Fatalf("fed %v, stopped %d", f.fed, f.stopped)
+		}
+	}
+}
+
 func TestRunStreamCancel(t *testing.T) {
 	f := &fakeStream{results: fakeResults()}
 	src := blockingSource{release: make(chan struct{})}

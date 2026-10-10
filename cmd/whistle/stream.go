@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"strings"
 	"time"
 
@@ -73,6 +74,10 @@ func newStreamCmd() *cobra.Command {
 			src, err := openSource(path, format, n, cmd.InOrStdin())
 			if err != nil {
 				return err
+			}
+
+			if c, ok := src.(io.Closer); ok {
+				defer func() { _ = c.Close() }()
 			}
 
 			opts := whistle.StreamOptions{Language: language}
@@ -145,35 +150,55 @@ func openSource(path, format string, chunk int, stdin io.Reader) (chunkSource, e
 		}
 	}
 
-	pcm, err := frontend.ReadWAV(path)
+	f, err := os.Open(path) // #nosec G304 -- the user names the file.
 	if err != nil {
 		return nil, fileError(path, err)
 	}
 
-	if len(pcm) == 0 {
-		return nil, fmt.Errorf("%s %w", path, whistle.ErrNoAudio)
+	src, err := newWAVSource(f, chunk)
+	if err != nil {
+		_ = f.Close()
+
+		if errors.Is(err, whistle.ErrNoAudio) {
+			return nil, fmt.Errorf("%s %w", path, err)
+		}
+
+		return nil, fileError(path, err)
 	}
 
-	return &sliceSource{pcm: pcm, chunk: chunk}, nil
+	return src, nil
 }
 
-// sliceSource plays decoded samples in chunks.
-type sliceSource struct {
-	pcm   []float32
+// wavSource plays a WAV file in chunks, decoding a chunk at a time, so that
+// memory does not grow with the recording's length.
+type wavSource struct {
+	f     *os.File
+	wav   *frontend.WAVStream
 	chunk int
 }
 
-func (s *sliceSource) next() ([]float32, error) {
-	if len(s.pcm) == 0 {
-		return nil, io.EOF
+func newWAVSource(f *os.File, chunk int) (*wavSource, error) {
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
 	}
 
-	n := min(s.chunk, len(s.pcm))
-	c := s.pcm[:n]
-	s.pcm = s.pcm[n:]
+	wav, err := frontend.OpenWAV(f, info.Size())
+	if err != nil {
+		return nil, err
+	}
 
-	return c, nil
+	if wav.Frames() == 0 {
+		return nil, whistle.ErrNoAudio
+	}
+
+	return &wavSource{f: f, wav: wav, chunk: chunk}, nil
 }
+
+// Close closes the file.
+func (w *wavSource) Close() error { return w.f.Close() }
+
+func (w *wavSource) next() ([]float32, error) { return w.wav.Read(w.chunk) }
 
 // pcmSource reads raw little-endian PCM, width bytes per sample.
 type pcmSource struct {
@@ -259,12 +284,9 @@ func runStream(ctx context.Context, s streamer, src chunkSource, cfg streamConfi
 			return p.stop(s.Stop())
 		}
 
-		var c read
-
-		select {
-		case <-ctx.Done():
+		c, ok := receive(ctx, chunks)
+		if !ok {
 			return p.stop(s.Stop())
-		case c = <-chunks:
 		}
 
 		if errors.Is(c.err, io.EOF) {
@@ -290,6 +312,18 @@ func runStream(ctx context.Context, s streamer, src chunkSource, cfg streamConfi
 		if err != nil {
 			return err
 		}
+	}
+}
+
+// receive is the reader's next chunk; false when ctx ends. The reader
+// closes chunks without a send when ctx ends, and that receive can win over
+// ctx.Done: it must stop the stream, not feed an empty Process call.
+func receive(ctx context.Context, chunks <-chan read) (read, bool) {
+	select {
+	case <-ctx.Done():
+		return read{}, false
+	case c, ok := <-chunks:
+		return c, ok
 	}
 }
 
