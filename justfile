@@ -85,6 +85,10 @@ oracle-librispeech-audio:
 oracle-librispeech:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle librispeech
 
+# Record the Needle 3 engine's stream API calls (1 s, 0.5 s, 2 s chunks, forced language, > 30 s) into testdata/oracle/stream
+oracle-stream:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle stream
+
 # Regenerate the sentencepiece fixture for internal/tokenizer (testdata/tokenizer); --needle3 <tokenizer.model> cross-checks
 tokenizer-fixture *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/tokenizer_fixture.py {{args}}

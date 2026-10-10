@@ -112,8 +112,9 @@ func writeManifest(dir string, v any) error {
 	return writeFile(filepath.Join(dir, "manifest.json"), append(js, '\n'))
 }
 
-// runIn runs the needle CLI in dir on the WAV dir/name, so that the engine's messages name the file only by name.
-func (o *oracle) runIn(ctx context.Context, dir, name string) (cliResult, error) {
+// runIn runs the needle CLI in dir on the WAV dir/name with the extra flags, so that the engine's messages name the
+// file only by name.
+func (o *oracle) runIn(ctx context.Context, dir, name string, extra ...string) (cliResult, error) {
 	needle, err := filepath.Abs(o.needle())
 	if err != nil {
 		return cliResult{}, fmt.Errorf("engine path: %w", err)
@@ -124,7 +125,7 @@ func (o *oracle) runIn(ctx context.Context, dir, name string) (cliResult, error)
 		return cliResult{}, fmt.Errorf("model path: %w", err)
 	}
 
-	return runNeedle(ctx, dir, needle, model, name)
+	return runNeedle(ctx, dir, needle, model, name, extra...)
 }
 
 // writeTempWAV writes pcm as a float WAV dir/<name>.wav and returns its file name.
