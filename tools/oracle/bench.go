@@ -45,6 +45,23 @@ func (c benchConfig) check() error {
 	return nil
 }
 
+// benchPCM decodes a clip's WAV. needle_transcribe gets the samples as
+// they are, while whistle-bench resamples to 16 kHz, so any other rate is
+// rejected rather than timed as different audio.
+func benchPCM(raw []byte) ([]float32, error) {
+	pcm, rate, err := readWAV(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	if rate != sampleRate {
+		return nil, fmt.Errorf("sample rate %d Hz, want %d: the engine library gets the samples as they are", rate,
+			sampleRate)
+	}
+
+	return pcm, nil
+}
+
 // benchClip is one clip with its samples, its WAV and the committed
 // fixture's transcript.
 type benchClip struct {
@@ -98,7 +115,7 @@ func cmdBench(ctx context.Context, cfg benchConfig, log io.Writer) error {
 
 	res.Run.Inputs, err = bench.InputsOf(modelPath, cfg.audioDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("inputs: %w", err)
 	}
 
 	res.CLI, err = benchCLI(ctx, cfg, filepath.Join(cfg.engineDir, "needle"), modelPath, clips, long, log)
@@ -143,7 +160,7 @@ func benchClips(cfg benchConfig, tmp string) ([]benchClip, benchClip, error) {
 			return nil, benchClip{}, fmt.Errorf("%s: %w", c.ID, err)
 		}
 
-		pcm, _, err := readWAV(raw)
+		pcm, err := benchPCM(raw)
 		if err != nil {
 			return nil, benchClip{}, fmt.Errorf("%s: %w", c.ID, err)
 		}
