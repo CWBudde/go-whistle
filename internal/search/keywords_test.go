@@ -235,6 +235,18 @@ func TestKeywordPerCharBytes(t *testing.T) {
 			t.Errorf("Bonus(%q) = %g, want %g characters (%q)", kw, got, want, text)
 		}
 	}
+
+	// A failed longer match keeps a completed prefix keyword's bonus even
+	// when the tail's shares are negative: "\xf0\x9f" (2 characters) inside
+	// "🎵x", whose fourth byte turns 3 characters into 1.
+	k, err = NewKeywords(tok, []string{"\xf0\x9f", "🎵x"}, Bias{Weight: 1, PerChar: true, Revoke: 1, Forms: FormBare})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := k.Bonus(tok.Encode("🎵"), tok.EOSID()); got != 2 {
+		t.Errorf("Bonus(🎵 + EOS) = %g, want the completed prefix's 2", got)
+	}
 }
 
 // TestKeywordLong: a spelling longer than 64 tokens works like a short one:

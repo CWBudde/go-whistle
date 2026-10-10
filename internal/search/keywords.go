@@ -508,7 +508,8 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 
 // revoke is the bonus taken back when the match at node n drops its
 // first drop tokens: theirs, except for those cov marks as in a completed
-// keyword.
+// keyword. It is signed, so a negative PerChar share is taken back too
+// and the dropped tokens' net bonus goes.
 func (k *Keywords) revoke(n, drop int, cov bitset) float64 {
 	lost := 0.0
 
@@ -518,7 +519,7 @@ func (k *Keywords) revoke(n, drop int, cov bitset) float64 {
 		}
 	}
 
-	return -k.bias.Revoke * max(lost, 0)
+	return -k.bias.Revoke * lost
 }
 
 // changes is what Adjust adds after text, given the model's log p: all to
