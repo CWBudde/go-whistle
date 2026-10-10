@@ -794,15 +794,42 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
 
 ### 6.3 Keyword biasing (`internal/search`, `internal/tokenizer`; needs 6.1)
 
-- [ ] Tokenise the keywords, build an Aho-Corasick automaton over token ids, add a bonus as a match advances and revoke
+- [x] Tokenise the keywords, build an Aho-Corasick automaton over token ids, add a bonus as a match advances and revoke
       it on failure. Tune the weight and the revocation against the 6.1 keyword fixtures (U9).
+      (2026-10-10) — `search.NewKeywords(tok, keywords, search.DefaultBias())`, whose `Adjust` plugs into
+      `Options.Adjust`; `search.ParseKeywords` reads the engine's newline format. `just keywords-probe` scores 3846
+      variants in three grids (weight per token or per character, revocation, completion bonus, spellings, phrase
+      splitting, a renormalised logit bias, the final pick by the model, five search rules) on a memo that is exact for
+      biased searches; the real search equals it on 53/53. Winner: 2 nats per matched token, all of it revoked when a
+      partial match fails, +1 on completion, the keyword after a space and bare, as written and with its first letter
+      upper- and lower-cased, on Whisper's search unchanged: 45/53. Alternatives: no revocation 42, half 44; per
+      character 43; split phrases 43; completion bonus alone 34; logit bias 29; model-only final pick 41; other search
+      rules 44 (and 47/53 without keywords). `internal/tokenizer` needed nothing new (F-029).
 - [ ] **Accept:** transcripts with keywords equal the engine's on the keyword fixtures at the same rate as without.
+      partial: (2026-10-10) — with keywords 45/53 (84.9 %) against 50/53 (94.3 %) without on the same cases; the
+      reference rate is 31/32 (96.9 %, F-026). Per kind, with / without: present 14/14, missed 13/15, distractor 7/8,
+      phrase 10/11, list 1/2 of 15/16/8/12/2. Of the 8 mismatches, 3 are on the Polish clip we already miss without
+      keywords; 3 are near-ties or small model gaps (0.0036, 0.0125, 0.0247 nats per token); `de-diese-paare-phrase` is
+      a model gap (the engine writes a non-keyword our model puts 2.4 nats lower); `de-paare-missed` is a search miss:
+      weaker hypotheses with the shared keyword bonus end one token earlier and fill Whisper's 5 finished slots. No
+      variant reaches 46. Fast regression `TestKeywordsMatchEngine` (F-029).
 
 ### 6.4 Depth ladder (`internal/decoder`; needs 6.1)
 
-- [ ] `Depth` option: run the decoder layers given by the bisection order 0, 7, 3, 5, 1, 2, 4, 6, truncated to N.
+- [x] `Depth` option: run the decoder layers given by the bisection order 0, 7, 3, 5, 1, 2, 4, 6, truncated to N.
       Port `_ladder_layer_order` (`architecture.py`).
+      (2026-10-10) — `decoder.LadderOrder`, `decoder.LadderLayers` and `(*Decoder).WithDepth(n)`: upstream's
+      sub-network (`Stack` with `exit_depth`, `ladder_slice`). The chosen layers run in order with their own weights,
+      the others pass the stream on, the i-th active layer takes mHC lane i mod 4 (`needle.MHC.WithLane`), an engram
+      site acts only at an active layer, the final norm stays; weights and `Memory` are shared, depth 8 equals the
+      decoder logit for logit. Lanes by position beat the layer's own lane at every depth (d2–d7: 24/27/29/29/28/24
+      against 13/10/15/15/22/23 of 32) (F-030).
 - [ ] **Accept:** transcripts at depths 2–7 equal the 6.1 depth fixtures at the same rate as the full depth does.
+      partial: (2026-10-10) — `just depth-probe`, `search.Default()` on `WithDepth`: depth 2 24/32, 3 27/32, 4 29/32,
+      5 29/32, 6 28/32, 7 24/32 (161/192 = 83.9 %) against 31/32 at full depth; greedy 18–22/32. All 31 mismatches
+      are near-ties: 23 model gaps of at most 0.0288 nats per text token (median 0.0025) and 8 search misses of at
+      most 0.0196. The engine's own text at depth N equals its full-depth text on only 7–19 of 32. Fast regression
+      `TestDepthMatchesEngine` (F-030).
 
 ### 6.5 Public pipeline & limits (`whistle/`, `cmd/whistle`)
 
@@ -935,7 +962,7 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 | U6  | Cross-attention position in the block — resolved: after the self-attention, F-021           | 5       | teacher-forced transcript score   |
 | U7  | Decoder prompt format, language detection — resolved: `[<s>]`, argmax language, F-023/F-024 | 5       | language + teacher-forced score   |
 | U8  | Beam length normalisation, EOS rules — resolved: Whisper's at 5 beams, Σ log p / len, F-026 | 6.2     | transcript parity                 |
-| U9  | Keyword bias weight and revocation                                                          | 6.3     | keyword fixture parity            |
+| U9  | Keyword bias weight and revocation — best fit: 2 nats per token, full revocation, F-029     | 6.3     | keyword fixture parity            |
 | U10 | Silence gate measure and threshold                                                          | 6.6     | threshold sweep                   |
 | U11 | Timestamp algorithm (heads/layers, DTW), word probability                                   | 7.2–7.3 | timestamp parity                  |
 | U12 | Streaming commit rule details, behaviour beyond 30 s                                        | 8.3–8.4 | stream parity                     |
