@@ -958,3 +958,217 @@ picture: the worst value is again `gate` at 0.40, and the worst of the new tenso
 **Not covered.** The decoder's cross-attention and the full decoder stack (Phase 4). The KV cache, the rolling
 `v_raw` history for the engram taps, and RoPE offsets (Phase 5). The encoder's Conformer block that `MHC` will wrap.
 Parallelism and speed.
+
+## F-014 — Encoder probe harness and the first search (2026-10-10)
+
+**Question.** The encoder runs inside the closed engine, and only its final output (`needle_embed`) is observable.
+Which reading of each open choice (front end, stem, block, positions, output) reproduces it, and how is a wrong early
+guess kept from hiding a right later one?
+
+**Instrument.** `internal/encoder` builds the encoder for one `Hypothesis` from a `weights.Source` by the F-006 names:
+the `frontend.Options` (864 variants, F-012) plus 19 typed encoder axes, each value a named constant starting at 1.
+That is 8 stem axes (stride placement, padding, kernel axis order, flatten order, three activations, input scale), the
+`pe_gate` use, RoPE, and 9 block axes (FFN scale, GLU form, conv activation, `conv_out_norm` position, depthwise
+padding, module order, mHC, Hadamard permutations, output tap). `Load` rejects with `ErrRuledOut` what the tensor
+shapes exclude. The harness `internal/encoder/probe_test.go` (build tag `oracle`, `just encoder-probe`) scores a
+hypothesis by the mean over clips of the mean per-frame cosine against `testdata/oracle/<clip>.embed.safetensors`. It
+caches the log-mel per front end and the stem output per stem key, runs (hypothesis, clip) pairs on all cores, and
+rules out without a score any hypothesis whose frame count differs from the engine's on a clip. One hypothesis on all
+32 clips takes about 0.3 s (Apple M5 Pro); the whole search from the prior takes about 3 min.
+
+**Is the score meaningful?** `TestProbeBaselines` over the 32 clips: each engine frame against the mean engine frame of
+the other 31 clips gives **0.2349** (0.157–0.284); a fixed random projection of 8 stacked NeMo log-mel frames gives
+**−0.0048** (−0.019 to +0.009). So about 0.23 is what a constant direction (mostly `enc.final_norm`'s gain) earns, and
+anything below it carries no signal. The starting hypothesis (`prior()`, below) scores 0.2485 on the inner clips and
+0.18 on all 32: no signal yet.
+
+**Search order and beam.** Six inner-loop clips, the shortest from both LibriSpeech splits and FLEURS nl/es (28–71
+frames). Stages, each the full product of its axes around every kept hypothesis, with a beam of 4:
+
+1. stem geometry (`stride`, `stempad`, `kernel`, `flatten`), because every later score depends on the stem;
+2. stem activations and input scale (`convact`, `dwact`, `pwact`, `scale`, 1000 combinations per beam entry);
+3. front end: `log`, `norm`, `spec`;
+4. conv module: `glu`, `blockact`, `convnorm`, `dwpad`;
+5. block structure: `ffn`, `order`, `mhc`, `perms`;
+6. positions and output: `rope`, `pe`, `out`;
+7. front end: `win`, `pad`, `band`, `pre`.
+
+Then coordinate descent with escalating moves around the 4 kept hypotheses. First every axis on its own. If that
+leaves the leader unchanged, every pair of axes jointly (351 pairs). If that does too, every stage's joint product
+again. Any move that changes the leader restarts from single axes, and the search stops when no level moves it.
+Results are cached per hypothesis, so a re-scored hypothesis costs nothing. Finally, the leader's sensitivity table
+(each value of each axis, all else at the leader). It certifies that no single-axis change improves, and gives the
+cost of every rejected value.
+
+**Masking.** Only the final embedding is observable, so a wrong early choice could hide a right later one. Three
+things guard against it. The beam keeps 4 hypotheses per stage. The descent re-opens every axis once all others are
+in place: in the run below it changed `log` and `pre` after stage 7. The pair and stage moves escape coupled axes.
+The test is a search started from a hypothesis wrong on all 26 axes (`WHISTLE_PROBE_KEY`, reference score 0.017903,
+below the mean-frame baseline). With single-axis descent alone it stalled at 0.753162 in a coupled optimum:
+`scale=sqrt-dim` with `ffn=1`, `convnorm=after-act` and ReLU in the stem compensate for each other. Pairs lifted it
+to 0.866608 (`ffn=half`, `convnorm=before-act`) and stalled again on the stem cluster `scale`/`convact`/`dwact`/
+`pwact`. The stage move (the stem-activation product) then reached **0.999819**, the same leader as from the prior,
+32-clip mean 0.9995, min 0.9929. That took 7.5 min against about 1–2 min from the prior. Without the escalation
+the search is not robust to an adversarial start, so the escalation is part of the harness.
+
+**Starting hypothesis** (`prior()`): NeMo front end; stride (2, 2) on all convs, SAME, kernel [time, mel], NHWC
+flatten (channel fastest), SiLU after the conv and the pointwise convs; RoPE off, `pe_gate` unused; FFN ½, GLU
+a·σ(b), SiLU, `conv_out_norm` before the activation, centred depthwise, macaron order, mHC lanes, shared
+permutations, `final_norm` output.
+
+**Run** (`just encoder-probe`, `.cact` weights, beam 4, 6 inner clips). Stage leaders (mean / min over the inner
+clips):
+
+| stage                            | leader's change from the prior | mean     | min      |
+| -------------------------------- | ------------------------------ | -------- | -------- |
+| reference (prior)                | —                              | 0.248542 | 0.204152 |
+| 1 stem geometry                  | `stempad=sym flatten=ch-mel`   | 0.774874 | 0.645987 |
+| 2 stem activations               | (unchanged)                    | 0.774874 | 0.645987 |
+| 3 front end log/norm/spec        | `log=log10` (`ln` ties)        | 0.778428 | 0.673380 |
+| 4 conv module                    | (unchanged)                    | 0.778428 | 0.673380 |
+| 5 block structure                | (unchanged)                    | 0.778428 | 0.673380 |
+| 6 positions and output           | `rope=1e5` (`pe` ties)         | 0.999164 | 0.997439 |
+| 7 front end win/pad/band/pre     | `pre=none`                     | 0.999193 | 0.997534 |
+| descent 1, single axes           | `log=whisper`                  | 0.999819 | 0.999710 |
+| descent 2–4, single/pairs/stages | (unchanged: converged)         | 0.999819 | 0.999710 |
+
+The leader with `pe=none` is `encoder.Best()`:
+`win=hann-symmetric pad=zero spec=power log=whisper norm=channel band=full pre=none stride=all stempad=sym
+kernel=time-mel flatten=ch-mel convact=silu dwact=none pwact=silu scale=1 pe=none rope=1e5 ffn=half glu=a*sig(b)
+blockact=silu convnorm=before-act dwpad=centred order=macaron mhc=lanes perms=shared out=final-norm`.
+
+**All 32 clips** (`.cact` weights): mean per-frame cosine **0.999539**, every clip ≥ **0.992932**
+(fleurs-fr_fr-10174413140250646001); the next worst is 0.9981 (ls-clean-5639-40744-0014), all others ≥ 0.9992. The
+worst frames are near-silent (F-018).
+
+**Weight sources.** The same hypothesis on the float checkpoint (`whistle.safetensors`) gives mean **0.921019**, min
+0.881934, max 0.938908 over the 32 clips. The dequantised `.cact` is closer to the engine by 0.0785 in mean cosine:
+the engine computes with the CQ2/CQ4 weights. Whatever its 8-bit activations cost fits in the remaining gap of 4.6e-4
+in mean cosine. Around the
+leader, the sensitivity table on the 8 inner clips picks the same value on every axis with either source, and only the
+ties of F-017/F-018 change sign.
+
+The full search run on the float weights (`WHISTLE_PROBE_SRC=safetensors just encoder-probe`, 5 min) finds the
+same stem, block, positions, output, spectrum, normalisation and band. It differs from `Best()` only on three
+front-end axes: `pad=reflect`, `log=log10` and `pre=0.97`, mean 0.923691 on its inner clips. That leader overfits
+the 6 inner clips. On all 32 it scores 0.920582 with the float weights, below `Best()`'s 0.921019. With the `.cact`
+weights it scores 0.998560, and one clip falls to 0.987513, below the Accept. The float checkpoint is too far from
+the engine to decide axes worth less than about 2e-3. The `.cact` search's choices hold on all 32 clips, and it
+converges to the same leader from the prior (3 min) and from the adversarial start (7.5 min).
+
+**Fast regression.** `TestBestMatchesEngine` (no tag, skips without `models/`) runs `Best()` on the three shortest
+clips and pins the mean per-frame cosine: `.cact` 0.999709 / 0.999842 / 0.999833 (floors 0.9996 / 0.9997 / 0.9997),
+safetensors 0.9132 / 0.9389 / 0.9366 (floors 0.912 / 0.938 / 0.935).
+
+## F-015 — `needle_embed` returns `enc.final_norm` of the lane mean (2026-10-10)
+
+**Question.** Is the engine's embedding before or after `encoder/final_norm`, and before or after the lane mean
+(PLAN.md Phase 4)? F-001 left open whether 512 is the encoder width.
+
+**Direct test.** ZCRMSNorm makes `y / (1 + scale)` have RMS exactly 1 in every row, whatever x is. For all 2205 engine
+rows of the 32 clips, `rms(row / (1 + enc.final_norm))` with the `.cact` (FP16) gain is 1 within **1.8e-7**, float32
+rounding (`TestEmbedIsFinalNormOutput`, model-gated). With the safetensors (FP32) gain it is 0.9974–1.0000, so the
+engine applies the FP16 gain the `.cact` stores. With the decoder's `final_norm` it is 6.0–98.7. The raw row RMS
+spans 0.31–1.18, so this is not a property of any embedding.
+
+**By score.** Around the leader, the lane mean before `final_norm` (`out=lane-mean`) costs −0.396920 (F-014). The
+final norm is applied to the lane mean as in upstream's `Stack` (`jnp.mean(x, axis=2)`, then `final_norm`). mHC
+itself (`mhc=lanes` against a plain stack) is worth 0.678340.
+
+**Winner.** `needle_embed` is `enc.final_norm(mean over the 4 mHC lanes)`, `[frames, 512]`, 512 being the model width.
+The direct test fixes "after `final_norm`"; the lane mean rests on the score and on upstream's `Stack`, since a single
+lane is not among the hypotheses.
+
+## F-016 — The conv stem: strides, padding, layout and activations (U2) (2026-10-10)
+
+**Question.** U2: how do `stem/w [3,3,1,128]`, `stem/dw_{1,2}`, `stem/pw_{1,2}` and `stem/out [1280,512]` turn
+`[frames, 80]` log-mel into `[frames/8, 512]`?
+
+**Ruled out by shapes and frame count.** `stem/out` takes 1280 = 10 mel positions × 128 channels, so the mel axis
+must halve three times: stride only on the depthwise stages leaves 20 positions (2560 features), VALID padding 9 (1152).
+Both fail at `Load` (`TestRuledOutByShapes`), 16 of stage 1's 24 hypotheses. SAME and symmetric padding both give
+ceil(n/2) per stage, so 3000 mel frames → **375** and the engine's frame rule `ceil(floor(n/160)/8)` (F-012) on every
+corpus clip and on F-001's lengths (`TestStemFrames`, `TestEmbed30s`).
+
+**Decided by score** (Δ against the leader's 0.999819, inner clips, `.cact`):
+
+| axis              | winner                                  | alternatives                                                       |
+| ----------------- | --------------------------------------- | ------------------------------------------------------------------ |
+| padding           | **symmetric (1, 1)**, torch `padding=1` | lax SAME (0 before, 1 after on even lengths) −0.243827             |
+| kernel axes       | **[time, mel]** (H = time)              | [mel, time] −0.509124                                              |
+| flatten           | **channel-major (NCHW): `c·10 + mel`**  | NHWC `mel·128 + c` −0.713620                                       |
+| after `stem/w`    | **SiLU**                                | GELU (tanh or erf) −0.000569, ReLU −0.039795, none −0.063222       |
+| after each `dw_k` | **none**                                | GELU −0.092201, SiLU −0.092369, ReLU −0.317228                     |
+| after each `pw_k` | **SiLU**                                | GELU tanh −0.027121, erf −0.027152, ReLU −0.121726, none −0.815920 |
+| input scale       | **1**                                   | ×√512 −0.837042                                                    |
+
+So the stem is `conv3×3/2 → SiLU → [dw3×3/2 → pw → SiLU] × 2 → NCHW flatten → stem/out`, zero padding 1 on every side,
+no biases (the checkpoint has none). The symmetric padding and the NCHW flatten suggest the engine, and maybe the
+trainer, uses PyTorch-style convolutions. The closest runner-up is GELU after the first conv, at 5.7e-4.
+
+## F-017 — The encoder block (U3, U5) (2026-10-10)
+
+**Question.** U3 (conv module, macaron scale, `pe_gate`, positions) and U5 (do the encoder's Hadamard MLPs share the
+decoder's permutations?).
+
+**Ruled out by shapes.** `pw1` is (1024, 512) and `dw` (9, 512), so pw1's output must be halved before the depthwise
+conv: "no GLU" cannot run (`ErrRuledOut`).
+
+**Decided by score** (Δ against 0.999819, inner clips, `.cact`):
+
+| axis                  | winner                                                  | alternatives                                                       |
+| --------------------- | ------------------------------------------------------- | ------------------------------------------------------------------ |
+| FFN residual scale    | **½ (macaron)** on both Hadamard MLPs                   | 1 −0.622692                                                        |
+| GLU                   | **a·σ(b)**, a = first 512 channels                      | a·silu(b) −0.403596, σ(a)·b −0.978467, silu(a)·b −0.992501         |
+| activation after `dw` | **SiLU**                                                | GELU tanh −0.005362, erf −0.005372, ReLU −0.110529, none −0.820849 |
+| `conv_out_norm`       | **between `dw` and the activation** (BatchNorm's place) | after the activation −0.185564, after `pw2` −0.896173              |
+| depthwise padding     | **centred**, 4 + 4 frames                               | causal −0.907688                                                   |
+| module order          | **macaron**: FFN½, attention, conv, FFN½                | conv before attention −0.415660                                    |
+| encoder RoPE          | **θ = 1e5**, half split, as the decoder                 | θ = 1e4 −0.029625, none −0.221335                                  |
+| residual stream       | **mHC, 4 lanes, lane = layer % 4**, as the decoder      | plain stack −0.678340                                              |
+| permutations (U5)     | **shared `hada_p1/p2`** (RandomState 11/13)             | `split=True` halves −0.980344, identity −0.977999                  |
+
+The block is therefore
+`x += ½·hada_0(pre_hada_0(x)); x += σ(attn_gate)·post_norm(attn(norm_in(x), no mask, RoPE 1e5));
+x += pw2(silu(conv_out_norm(dw(glu(pw1(conv_norm(x))))))); x += ½·hada(pre_hada(x))`, inside the same mHC
+advance as the decoder (`needle.MHC` with `enc.mhc_*`). The attention is `needle.Attention` without taps.
+
+**`pe_gate` stays open.** σ(−6.1094) = 0.00222, so a sinusoid gated by it has RMS 0.0016 against a stem output RMS of
+4.6–5.1, about −70 dB. Adding it to the stem output, as `[sin | cos]` or interleaved, moves the score by ≤ 1e-6
+(−0.000000 and −0.000001). As a RoPE mix, `(1 − g)·x + g·RoPE(x)` replaces the RoPE that wins and costs −0.221535,
+as much as no RoPE. `Best()` leaves `pe_gate` unused. The embeddings cannot tell whether the engine uses it; a
+probe with a far larger signal (or the decoder side, Phase 5) could.
+
+## F-018 — The front end against the encoder oracle (U1, partial) (2026-10-10)
+
+**Question.** U1: which of F-012's 864 front-end hypotheses does the engine run?
+
+**Decided by score** (Δ against 0.999819, inner clips, `.cact`):
+
+| axis          | winner                                                              | alternatives                                                             |
+| ------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| normalisation | **per mel channel** over time                                       | global −0.015016, none −0.045222                                         |
+| band          | **full** (the shipped bank)                                         | FFT bins outside 250–3500 Hz zeroed −0.030047, channels zeroed −0.038980 |
+| spectrum      | **power**                                                           | magnitude −0.001683                                                      |
+| pre-emphasis  | **none**                                                            | 0.97 −0.001250                                                           |
+| log           | **Whisper clamp**: `log10`, then `max(y, max(y) − 8)` over the clip | `ln(x + 2⁻²⁴)` −0.000324, `ln`/`log10` with floor 1e-10 −0.000625        |
+| centring      | zero or reflect (tie)                                               | `none` (snip edges) −0.027794                                            |
+| window        | symmetric or periodic Hann (tie)                                    | —                                                                        |
+
+The "250–3500 Hz band-limited" sentence of cactuscompute.com/whistle does not describe a mask on the mel input in
+either reading. Per-channel normalisation removes any affine map of the log, which is why `ln` and `log10` tie and
+why Whisper's `(y + 4)/4` drops out. The Whisper winner differs from `ln` only by its clamp at 80 dB below the clip's
+peak.
+
+**Weight-source dependence.** `pre` and `log` (margins 1.3e-3 and 3e-4) are decided with the `.cact` weights. The
+float-weight search prefers 0.97, `log10` and reflect padding on its inner clips, which loses on all 32 clips with
+either source (F-014). The `log` choice is the weakest decision of this table.
+
+**Ties.** The window (Δ −0.000001) and reflect against zero padding (−0.000040 with `.cact`, +0.000014 with
+safetensors) are below what the embeddings resolve; `Best()` keeps the search's choice (symmetric, zero).
+
+**Open: quiet frames.** The frames below 0.995 are all near-silent: peak |x| < 3e-3 within the frame's 80 ms, and a
+log10-mel maximum ≤ −3.7. The three worst are fleurs-fr_fr-10174413140250646001 frames 13–14 (0.756, 0.675, peak 3e-4)
+and ls-clean-5639-40744-0014 frame 69 (0.883). Elsewhere frames reach 0.9999. The floor that the clamp approximates,
+dither or the engine's 8-bit activations on low-energy frames remain candidates for the next session. They cost
+0.007 on the worst clip and do not threaten the 0.99 target.
