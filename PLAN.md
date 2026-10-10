@@ -654,8 +654,9 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       sigmoid gate, `post_cross_norm`, σ(`cross_gate`) residual. Decide where it sits in the block (after
       self-attention is the most likely) by fixture accuracy.
       (2026-10-10) — between the self-attention and the MLP, inside the mHC block function
-      (`needle.Block.Extend` with `Hooks.AfterAttn`): `x += σ(cross_gate)·post_cross_norm(out_proj(softmax(q̂k̂ᵀ/√48)v
-    · σ(gate_proj(cross_norm(x)))))`, 8 heads of 48/64, per-head q/k ZCRMSNorm, no RoPE, over `needle_embed`
+      (`needle.Block.Extend` with `Hooks.AfterAttn`):
+      `x += σ(cross_gate)·post_cross_norm(out_proj(softmax(q̂k̂ᵀ/√48)v · σ(gate_proj(cross_norm(x)))))`, 8 heads of
+      48/64, per-head q/k ZCRMSNorm, no RoPE, over `needle_embed`
       (`enc.final_norm` of the lane mean). Decided by teacher-forced mean log-probability of the engine transcripts,
       32 clips, `.cact` (leader −0.1302, top-1 0.977): after the MLP −0.1484 (language 20/32), before the
       self-attention −1.0900, outside mHC −1.5188; q/k norm none −0.2098, without gain −0.7983, gain = scale −2.7037;
