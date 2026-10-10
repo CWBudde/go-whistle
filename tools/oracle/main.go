@@ -11,6 +11,7 @@
 //	go run -tags oracle ./tools/oracle limits             # length limits into testdata/oracle/limits
 //	go run -tags oracle ./tools/oracle librispeech-audio  # the LibriSpeech subset into models/corpus/librispeech
 //	go run -tags oracle ./tools/oracle librispeech        # its transcripts into testdata/oracle/librispeech
+//	go run -tags oracle ./tools/oracle stream             # stream API calls into testdata/oracle/stream
 //
 // It loads the closed-source Needle 3 engine (the needle CLI and libneedle3 through purego), so it lives behind the
 // oracle build tag and never ships with the library or the whistle CLI.
@@ -39,9 +40,10 @@ const (
 	cmdNameLimits      = "limits"
 	cmdNameLSAudio     = "librispeech-audio"
 	cmdNameLibriSpeech = "librispeech"
+	cmdNameStream      = "stream"
 )
 
-const usage = "usage: oracle clips [-audio dir] | oracle run|probes|depth|keywords|silence|limits|librispeech " +
+const usage = "usage: oracle clips [-audio dir] | oracle run|probes|depth|keywords|silence|limits|librispeech|stream " +
 	"[-audio dir] [-out dir] [-oracle dir] [-corpus dir] [-models dir] [-engine dir] | " +
 	"oracle librispeech-audio [-corpus dir] [-out dir]"
 
@@ -57,6 +59,7 @@ var engineCmds = map[string]struct {
 	cmdNameSilence:     {"silence", cmdSilence},
 	cmdNameLimits:      {"limits", cmdLimits},
 	cmdNameLibriSpeech: {"librispeech", cmdLibriSpeech},
+	cmdNameStream:      {"stream", cmdStream},
 }
 
 func main() {

@@ -20,6 +20,8 @@ type engine struct {
 	lastError func() string
 	embed     func(input *byte, pcm *float32, samples int32, out *float32, capacity int32) int32
 	transcr   func(pcm *float32, samples int32, language, keywords *byte, words int32, out *byte, capacity int32) int32
+	stream    func(pcm *float32, samples int32, language, keywords *byte, out *byte, capacity int32) int32
+	stop      func(out *byte, capacity int32) int32
 }
 
 // platformDir names the engine/<platform> directory that scripts/fetch-engine.sh writes for this machine.
@@ -67,6 +69,8 @@ func openEngine(dir string, cact []byte) (*engine, error) {
 	purego.RegisterLibFunc(&e.lastError, lib, "needle_last_error")
 	purego.RegisterLibFunc(&e.embed, lib, "needle_embed")
 	purego.RegisterLibFunc(&e.transcr, lib, "needle_transcribe")
+	purego.RegisterLibFunc(&e.stream, lib, "needle_stream_transcribe_process")
+	purego.RegisterLibFunc(&e.stop, lib, "needle_stream_transcribe_stop")
 
 	rc := e.load(&cact[0], uint64(len(cact)))
 	runtime.KeepAlive(cact)
@@ -116,7 +120,10 @@ type libResult struct {
 
 // transcribePCM runs needle_transcribe on 16 kHz mono pcm with language detection, no keywords and word times on.
 // An empty pcm is passed as a valid pointer with zero samples.
-func (e *engine) transcribePCM(pcm []float32) libResult {
+func (e *engine) transcribePCM(pcm []float32) libResult { return e.transcribeIn(pcm, "") }
+
+// transcribeIn is transcribePCM with a forced language; an empty one detects it.
+func (e *engine) transcribeIn(pcm []float32, language string) libResult {
 	buf := make([]byte, transcribeOutCap)
 	ptr := new(float32)
 
@@ -124,9 +131,52 @@ func (e *engine) transcribePCM(pcm []float32) libResult {
 		ptr = &pcm[0]
 	}
 
-	rc := e.transcr(ptr, int32(len(pcm)), nil, nil, 1, &buf[0], int32(len(buf))) // #nosec G115 -- at most 30 s.
-	runtime.KeepAlive(pcm)
+	lang := cString(language)
 
+	rc := e.transcr(ptr, int32(len(pcm)), lang, nil, 1, &buf[0], int32(len(buf))) // #nosec G115 -- at most 30 s.
+	runtime.KeepAlive(pcm)
+	runtime.KeepAlive(lang)
+
+	return e.result(rc, buf)
+}
+
+// cString is s as a NUL-terminated C string, or nil when s is empty.
+func cString(s string) *byte {
+	if s == "" {
+		return nil
+	}
+
+	return &append([]byte(s), 0)[0]
+}
+
+// streamProcess runs needle_stream_transcribe_process on one chunk of 16 kHz mono pcm with no keywords; an empty
+// language detects it. An empty pcm is passed as a valid pointer with zero samples.
+func (e *engine) streamProcess(pcm []float32, language string) libResult {
+	buf := make([]byte, transcribeOutCap)
+	ptr := new(float32)
+
+	if len(pcm) > 0 {
+		ptr = &pcm[0]
+	}
+
+	lang := cString(language)
+
+	rc := e.stream(ptr, int32(len(pcm)), lang, nil, &buf[0], int32(len(buf))) // #nosec G115 -- chunks are short.
+	runtime.KeepAlive(pcm)
+	runtime.KeepAlive(lang)
+
+	return e.result(rc, buf)
+}
+
+// streamStop runs needle_stream_transcribe_stop.
+func (e *engine) streamStop() libResult {
+	buf := make([]byte, transcribeOutCap)
+
+	return e.result(e.stop(&buf[0], int32(len(buf))), buf) // #nosec G115 -- a constant.
+}
+
+// result is a call's libResult: needle_last_error on a negative rc, else the NUL-terminated JSON in buf.
+func (e *engine) result(rc int32, buf []byte) libResult {
 	if rc < 0 {
 		return libResult{RC: rc, Error: e.lastError()}
 	}

@@ -25,7 +25,7 @@ func newTranscribeCmd() *cobra.Command {
 		Long: "Transcribe a RIFF WAV file (8/16/24/32-bit PCM or float, any channels and rate) of at most 30 s and\n" +
 			"print the text, or with --json the engine's JSON object:\n" +
 			`  {"text":"...","language":"en","ttft_ms":0.0,"decode_tps":0.0}` + "\n\n" +
-			"Decoding is greedy for now; the engine decodes with beam search.",
+			"Decoding is the engine's beam search (5 beams); silence gives the empty text.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			m, err := whistle.Load(model)

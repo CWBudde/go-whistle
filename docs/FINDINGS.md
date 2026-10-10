@@ -2073,3 +2073,301 @@ nats per token. The ladder itself is settled by the variant table; the remaining
 **Fast regression.** `TestDepthMatchesEngine` (no tag, skips without `models/`): three short clips at depths 2 and 4
 whose engine text differs from the full depth's, each reproduced exactly with a ranking score above floors just below
 the measured values. `TestLadderOrder` pins the port against upstream's output for 1, 2, 3, 5, 8 and 12 layers.
+
+## F-031 — The silence gate, beam search in `Transcribe`, and the LibriSpeech check (U10) (2026-10-10)
+
+**Question.** U10: by which measure and threshold does the engine decide that a clip is silence and return the empty
+JSON without decoding? F-025's sweep says that it compares levels within the clip. Steady noise at any level is
+empty. A middle second 2.70 dB louder opens the gate at every base level. A 10 dB louder section opens it only while
+it covers between 560 samples and 90 % of the clip. Then: does the pipeline with the gate and F-026's beam search
+reproduce the engine (PLAN.md 6.6 **Accept**)?
+
+### The gate
+
+**Evidence.** The 320 sweep signals and the 22 limit signals, regenerated from their manifests by `tools/oracle/probe`
+and checked against `pcm_sha256` (on darwin/arm64, and on linux/amd64 in a container, so the digests also hold on the
+CI's architecture). Two of the 342 are over 30 s, which is an error before the gate (F-025). That leaves 340 verdicts,
+170 empty and 170 transcribed. A limit signal takes `needle_transcribe`'s verdict, because the CLI refuses an empty
+WAV that the library treats as silence.
+
+**Harness.** `internal/silence/fit_test.go` (tag `oracle`;
+`go test -tags oracle -count=1 -v -run TestFitGate ./internal/silence/`, 5 s) scores 340 measures. Each measure is a
+band × a percentile pair × a percentile definition, and every one turns a clip into a spread in dB.
+
+- Bands: the time-domain mean square of 400 samples every 160; the power spectrogram's flat FFT bins (all, or 8–112 =
+  250–3500 Hz); its mel energy summed over channels 0–79, 2–79 and every range from 5, 6 or 7 to 56, 57, 58 or 59.
+- Pairs: p99−p10, p99−p9, p99−p11, p98−p10, p99.5−p10, p95−p10, p99−p5, p99−p20, max−min and p90−p10.
+- Definitions: nearest rank, or numpy's linear interpolation.
+
+For each measure the harness finds the threshold with the fewest misclassified signals. When none is wrong, it
+reports the interval of thresholds that separate the two classes. An earlier, wider exploration had also tried
+non-overlapping frames of 160–1280 samples, frame peaks instead of energies, absolute floors of 10⁻²⁰ to 10⁻¹⁰, the
+geometric mean of the mel channels, and per-channel log-mel spreads averaged (or taken as the median, max or min) over
+the channels. All of them stayed at 8 or more errors.
+
+**Leaderboard** (excerpt; errors at the best threshold, and the separating interval of the spread in dB):
+
+| measure                                   | wrong | interval / misclassified                                       |
+| ----------------------------------------- | ----- | -------------------------------------------------------------- |
+| **mel 6–57, p99−p10, nearest rank**       | **0** | **(4.985, 5.011], contains 5 dB**                              |
+| mel 6–56, p99−p9 rank                     | 0     | (5.039, 5.089]                                                 |
+| mel 5–58, p99−p9 rank                     | 0     | (4.980, 5.030]                                                 |
+| mel 6–57, p99−p9 rank                     | 0     | (5.006, 5.056]                                                 |
+| mel 6–56, p99−p10 rank                    | 0     | (5.024, 5.069]                                                 |
+| mel 5–57 / 5–58 / 5–59, p99−p10 rank      | 0     | (4.945, 4.979] / (4.949, 4.990] / (4.907, 4.942]               |
+| mel 6–58 (centre in 250–3500 Hz), p99−p10 | 1     | step-m40-2.65                                                  |
+| mel 7–57 / 7–58 / 7–59, p99−p10           | 2–3   | en-snr-m9.5, en-snr-m9.75 (and width-57600 for 7–57)           |
+| any band, p99−p11                         | ≥ 1   | width-57600: the 10 % quiet share falls below p11              |
+| mel 2–79, p99−p10                         | 8     | the step and SNR transitions, speech-1279                      |
+| bins 8–112 (flat 250–3500 Hz), p99−p9     | 12    | the step transitions                                           |
+| mel 0–79, p99−p10                         | 15    | all 7 pink noise levels, the steps                             |
+| bins 0–256 (flat full band), p99−p10      | 27    | pink noise: its low frequencies make the frame level fluctuate |
+| time domain 400/160, p99−p9               | 29    | pink noise, the steps                                          |
+
+**Winner** (`internal/silence`, `whistle.Load` builds it). The measure starts from the front end's power spectrogram:
+400-sample symmetric Hann windows centred every 160 samples, zero padded, `len(pcm) / 160` frames (F-012, F-020).
+Per frame it sums the mel energy over channels 6 to 57 (centres 261–3307 Hz, Slaney bank = `audio.mel_filters`,
+F-006) and takes 10·log10 of the sum. A frame without energy is −∞. The spread is the nearest-rank 99th percentile of
+these levels minus the 10th. It is 0 without frames or when the 99th is −∞, and +∞ when only the 10th is. A clip
+whose spread is at most **5 dB** is silence.
+
+The mel-weighted band, not the flat FFT band, is what passes the steps. Flat bins weight 2–3.5 kHz far more than the
+mel channels do.
+
+Per family, at the winner (largest spread of an empty signal, smallest of a transcribed one):
+
+| family                          | empty: largest spread | transcribed: smallest spread |
+| ------------------------------- | --------------------- | ---------------------------- |
+| digital silence (7 lengths)     | 0                     | —                            |
+| white noise −120 … 0 dBFS       | 2.331 (white-m110)    | —                            |
+| pink noise −120 … 0 dBFS        | 3.461 (pink-m60)      | —                            |
+| step at −40 dBFS (+Δ and −Δ)    | 4.985 (+2.65 dB)      | 5.035 (+2.70 dB)             |
+| step at −80 and −10 dBFS        | 4.935 (+2.6 dB)       | 5.035 (+2.7 dB)              |
+| +10 dB section, width w         | 3.624 (w = 58,240)    | 5.051 (w = 57,600)           |
+| speech + noise, en              | 4.893 (SNR −10 dB)    | 5.011 (SNR −9.75 dB)         |
+| speech + noise, de              | 4.943 (SNR −15.25 dB) | 5.071 (SNR −15 dB)           |
+| speech × gain (float), padded   | —                     | 43.9; +∞ with padding        |
+| speech on the 16-bit grid       | 0 (en −87.5, de −83)  | +∞ (en −87, de −82.5)        |
+| limits: 1–161 samples / 1279 on | 0                     | 9.455 (speech-1279)          |
+
+Some rows are decided by rank alone, not by level:
+
+- On the 16-bit grid, speech at −87.5 dB (en) keeps 3 non-zero samples of 100,560, and at −87 dB 13. Below about
+  1 % of frames with any energy, the 99th percentile is −∞ and the clip is silence; above it, the 10th percentile is
+  −∞ and the spread infinite. The de clip turns at 1 sample against 11.
+- 160 and 161 samples are one frame, a spread of 0. The engine returns the empty JSON for them too; before the gate,
+  `Transcribe` decoded that one encoder frame.
+- With 1279 samples there are 7 frames, and the spread is their max − min, 9.455 dB.
+
+**What the sweep does not decide.**
+
+- The band edges, to a channel: 5 or 6 to 56 or 57 all separate the classes with p99−p9 or p99−p10. Channel 58
+  (centre 3437 Hz, inside the band) costs one step signal.
+- p9 or p10.
+- The threshold beyond the separating interval.
+- The window (periodic Hann: (4.989, 5.007]) and reflect against zero padding (reflect: (4.973, 4.999], 0 wrong).
+  Frames that stay inside the clip lose 4 signals, pre-emphasis 36.
+
+The winner is the natural pair, p99−p10 with nearest rank, on the band whose interval holds a round 5 dB. Real speech
+is far from the threshold: the 32 corpus clips have spreads of at least 41.7 dB, the 200 LibriSpeech utterances at
+least 36.4 dB.
+
+**Reading.** cactuscompute.com/whistle says the front end is "band-limited to 250-3500 Hz". F-018 found no such limit
+on the encoder's input. The gate is where a 250–3500 Hz band fits the engine: without it, 8 or more of the 340 verdicts
+are wrong (mel 2–79), pink noise opens the gate (full band), and so do the steps (flat bins).
+
+**Tests.**
+
+- `TestGateMatchesEngine` (no tag, committed fixtures only, under 1 s): 340 of 340 verdicts equal to the engine, plus
+  the 2 rejected by length.
+- Unit tests for `Percentile`, `Spread` and `Levels`, and synthetic signals for `Silent`.
+- `TestFramingIsTheEncoders`: the gate's framing is `encoder.Best()`'s.
+
+### The pipeline
+
+- `Transcribe` checks the length (`ErrTooLong` over 480,000 samples), then runs the gate. A silent clip returns
+  `Result{}` without decoding: the engine's JSON without word timestamps,
+  `{"text":"","language":"","ttft_ms":0.0,"decode_tps":0.0}`. With timestamps (Phase 7) it will return `Silence()`.
+  Fewer than 160 samples are always silence.
+- Decoding is `search.Beam(d, mem, search.Default())` (F-026) behind the `strategy` seam. Greedy decoding stays as a
+  strategy for tests (`TestGreedyStrategy`).
+- The clock keeps F-027's semantics. The search runs as a whole, so it is read through `Options.Adjust`. The search
+  calls the hook for every live hypothesis of a step after the decoder ran it, and all of them hold the same number of
+  text tokens. So the first call stops the TTFT clock at the first step after the language token, and the first call
+  of every later step counts one token. `decode_tps` is thus a rate over the search's steps, which continue after the
+  winner's EOS until 5 hypotheses have finished. An `Adjust` already in the options (keywords, 6.3) runs after the
+  clock (`TestBeamClock`).
+- Keywords and depths 2–7 still return `ErrNotSupported`; they follow 6.3 and 6.4.
+
+**32 fixture clips through `Transcribe`** (`TestTranscribeMatchesEngine`, all 32 without `-short`):
+
+- 31 of 32 (96.9 %) equal the engine's `text` and `language` exactly. Each transcript also equals `search.Beam` on the
+  same encoder output.
+- The one miss, `fleurs-pl_pl-10047713455444904767`, is F-026's search miss. Under our model the engine's text scores
+  higher, but its prefix falls out of the beam at text token 43, 0.135 nats behind the fifth live hypothesis.
+- Median TTFT 91.8 ms, median 478 tok/s (Apple M5 Pro, the beams on all cores, machine shared).
+
+**Sweep and limits through `Transcribe`** (`TestTranscribeSilenceSweep`, `TestTranscribeLimits`):
+
+- All 159 empty sweep signals give exactly the empty JSON.
+- The transcribed signals nearest the threshold in every family give text, mostly the engine's "Thank you.". The
+  exception is en-snr-m9.75, where both texts are hallucinations.
+- All 22 limit signals behave like the engine: 2 errors, 12 empty, 8 transcribed. The text equals the engine's on 6 of
+  the 8. speech-4000 gives "Nerdy." against "I don't know.". speech-480000 (the en clip padded to 30 s) gives "and the
+  manner" against "in the manner".
+
+### LibriSpeech test-clean subset
+
+`just eval-librispeech` (`TestEvalLibriSpeech`, run only with `WHISTLE_EVAL_LIBRISPEECH` set; it needs the model and
+`just oracle-librispeech-audio`) transcribes the 200 utterances of F-025's subset with `TranscribeWAV` and checks each
+WAV's SHA-256 against `subset.json`. It applies the manifest's `wer_rule` to both sides through `internal/eval`: word
+edit distance over the reference's words, split at every rune other than a letter, digit or apostrophe, case folded.
+`eval.Words` lower-cases where the rule upper-cases, which is the same on this ASCII text. On the engine's transcripts
+the rule reproduces `manifest.json` exactly (221 errors in 4167 words, and every utterance's count).
+
+| quantity                                 | value                                                                        |
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
+| WER, Go pipeline                         | 223/4167 = **5.35 %**                                                        |
+| WER, engine                              | 221/4167 = **5.30 %**                                                        |
+| difference                               | **+0.05 percentage points** (bound ±0.3)                                     |
+| text equal to the engine's               | 181/200 (90.5 %); words after the rule 189/200 (94.5 %)                      |
+| language equal                           | 200/200                                                                      |
+| utterances with fewer / more errors      | 3 / 4                                                                        |
+| speed (M5 Pro, shared machine, two runs) | 42.5–66.0 s for 1549.4 s of audio, RTF 0.027–0.043, 212–330 ms per utterance |
+
+**The 19 differing texts.**
+
+- 8 differ only in punctuation or case: a comma, "?" after "girls" instead of after "roof", "who, as a gentlewoman".
+- 11 differ in words, mostly names and rare words: "Margalot"/"Margulot", "cendiaries"/"Sunday Aries",
+  "Mokdomots"/"Mukdonnuts", "hit"/"hid".
+- To classify them, the eval teacher-forces both texts under our model. Ours uses the search's own tokens. The
+  engine's uses the tokenizer's spelling, a lower bound on its best spelling (F-026). The score is Σ log p of the text
+  and EOS over the text tokens.
+- Our model prefers our text on 17 of the 19, by 0.0003 to 0.0251 nats per token (median 0.0034). On the other 2 the
+  engine's text scores higher, by 0.0005 and 0.0007 per token: search misses, as on the Polish clip.
+- Every margin is far below the W2A8 noise that keeps teacher forcing at 97.7 % top-1 agreement with the engine
+  (F-024). The differences are near-ties that the two numerics resolve differently, not a missing rule.
+
+### Result (PLAN.md 6.6 **Accept**)
+
+- Fixtures: 31 of 32 transcripts (96.9 %) equal the engine's, at least 95 %, and the miss is explained in F-026.
+- LibriSpeech test-clean subset: our WER is 5.35 % against the engine's 5.30 %. That is +0.05 percentage points, within
+  0.3.
+- Both parts hold for beam search without keywords at full depth. Keywords (6.3) and the depth ladder (6.4) are not
+  merged yet, and `Transcribe` rejects them.
+
+## F-032 — The stream oracle: LocalAgreement-2 with a 15 s sentence trim (U12, part 1) (2026-10-10)
+
+**Purpose.** 8.3 (the commit rule) and 8.4 (buffers beyond 30 s) are fitted against the engine's live API. `oracle
+stream` (`just oracle-stream`) records every `needle_stream_transcribe_process` and `needle_stream_transcribe_stop`
+call into `testdata/oracle/stream/`. Both symbols are now bound in `tools/oracle/engine.go` (purego), so the chunks
+are exact. Keywords are always off. `NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1` are set as in every recipe.
+
+**Sets.** One stream per run; the stop of each run ends it, so the next run starts a new one.
+
+| set        | runs | content                                                                                                   | calls |
+| ---------- | ---- | --------------------------------------------------------------------------------------------------------- | ----- |
+| `clips`    | 32   | every corpus clip in 1 s chunks, language detected                                                        | 192   |
+| `chunks`   | 64   | every clip in 0.5 s and in 2 s chunks                                                                     | 471   |
+| `language` | 4    | 1 s chunks, forced: the de and fr clips whose first pass detects English, an en clip, the de clip as en   | 28    |
+| `long`     | 3    | `long-clean`: 9 test-clean clips back to back, 44.91 s                                                    | 125   |
+|            |      | `long-other-gaps`: 9 test-other clips with 0.5 s of zeros between them, 42.16 s                           |       |
+|            |      | `long-silence-lead`: 32.5 s of zeros, then `ls-clean-6930-75918-0000`, 36.01 s                            |       |
+| `edge`     | 5    | a stop without a call, a 0-sample call, 0-sample calls after 3 s of speech, one call of 30 s, of 30 s + 1 | 6     |
+
+The manifest names each run's clips, `lead_samples`, `gap_samples`, `chunk_samples` (or `call_samples`) and language,
+plus `pcm_sha256` of the float32 samples, so the Go side rebuilds every stream from `testdata/audio` and checks it.
+`calls.json` holds, per run, every call's index, sample range `[start, end)`, return code, error and normalised JSON,
+then the stop's. Normalised: `pass_ms` dropped (a timing), keys sorted, values verbatim. Together 541,815 + 86,158
+bytes, 620 KB on disk.
+
+**Checks in the recipe.** Outside the edge set a run fails unless every call returns rc ≥ 0, rc equals the number of
+`words`, `text` is the words joined by spaces, `received` is the samples fed so far / 16000 to a hundredth, `pass_ms`
+is > 0 on every process call and 0.0 on every stop, and the CLI agrees (below).
+
+**What a call does.** Each rule below is checked against every call of the fixtures.
+
+1. **One pass per call.** Every process call re-transcribes the buffer, whatever the chunk length: 0.25 s, 0.5 s, 1 s
+   and 2 s chunks and 0-sample calls all report `pass_ms` > 0. The header's "about one second at a time" is advice,
+   not a gate.
+2. **A pass is `needle_transcribe` of the buffer.** For each call that commits words, the tool searches the buffer
+   start t0 such that `needle_transcribe` on `[t0, end)`, in the stream's language, ends with the call's committed
+   words followed by `pending`. The committed words must match in text, in `start` and `end` (shifted by t0) and in
+   `probability`. Candidates: the previous t0, then the ends of the committed words. Such a t0 exists for 470 of 470
+   calls (`buffer_start`). There is no prompt from the committed text, unlike whisper_streaming's 200-character
+   `init_prompt`. `language` is the pass's own: without a forced language, 10 of 32 clips at 1 s change language
+   between calls (the de clip's first second gives `[en] "Eden."`), and 0 of 32 at 2 s. Forcing the clip's language
+   changes only the first call (de: "Hier dann...", fr: "Merci.").
+3. **Words already committed are dropped** (`dropped`: how many leading words of the pass precede the call's words).
+   The pass keeps the words starting after the end of the last committed word minus 0.1 s. If the first kept word
+   starts within 1 s of that end, it also drops the longest n-gram (n ≤ 5) that repeats the committed tail. This
+   predicts `dropped` on 470 of 470 calls. Without the n-gram step: 438. With a margin of 0, 0.05 or 0.2 s instead of
+   0.1 s: 148, 459, 469.
+4. **Commit rule: LocalAgreement-2.** A call commits the longest common prefix of the previous call's `pending` words
+   and this pass's remaining words, compared as exact strings. Case and punctuation count: "Transportsysteme." does
+   not agree with "Transportsysteme,". This holds on 816 of 816 process calls. rc is the number of committed words,
+   `text` the committed words joined by spaces, `pending` the rest of the pass.
+5. **Trim: completed sentences at 15 s.** After a call that committed words, if `received` − t0 > 15 s, t0 moves to
+   the end of the second-to-last sentence of all committed words. A sentence ends at a word ending in `.`, `?` or `!`
+   (closing quotes allowed) when the next word starts with a capital letter or a digit. So "broke up. and all" is one
+   sentence, as in a Moses splitter. This reproduces all 470 inferred buffer starts, with 6 trims, all in the long
+   runs: 12.72, 23.12 and 34.32 s in `long-clean`, 8.32 and 21.52 s in `long-other-gaps`. A threshold of 14.5 s gives
+   458 of 470, 15.5 s 469 of 470. Items 2 to 5 are ufal whisper_streaming's `OnlineASRProcessor` (LocalAgreement-2,
+   `buffer_trimming="sentence"`, 15 s) with `needle_transcribe` as the ASR and no prompt.
+6. **Stop.** No pass (`pass_ms` 0.0). It commits the last call's `pending` verbatim, with the times and probabilities
+   of that pass: 103 of 103 runs, 42 of them non-empty. Then the stream is gone. A stop without a stream returns
+   `{"text":"","words":[],"pending":"","language":"","received":0.00,"pass_ms":0.0}`, rc 0.
+7. **`received`** is the audio fed so far, in seconds. Until the first trim it is n · (1/16000) printed to two
+   decimals: 50,160 samples print as "3.14", where n / 16000 prints "3.13" (`receivedText`). After a trim it can be one
+   hundredth lower: in 2 calls of `long-other-gaps`, 674,480 samples (42.155 s) print as "42.15". The engine therefore
+   adds a buffer offset and the buffer length, not a sample count. The exact form is open; t0 + (n − t0) / 16000 in
+   float64 gives "42.16".
+8. **Beyond 30 s.** `received` keeps counting (stops at 44.91, 42.16 and 36.01). While sentences get committed, the
+   trim keeps every pass under 30 s. In `long-silence-lead`, 32 s of zeros give empty passes (language "", `pass_ms`
+   about 1 ms, no error). Once the speech arrives, the passes at 33 to 36 s are not `needle_transcribe` of any single
+   window `[t0, received)` on a 0.04 s grid. A brute-force search finds windows that reproduce each call's text, but
+   no t0 and no window length serves 33, 34, 35 and 36 s together. The stop commits "Current Court returned to its
+   place amidst the tents." (offline: "Concord …"). How the engine bounds a buffer that has nothing to trim at is
+   open for 8.4.
+9. **Edges.** A 0-sample first call returns the stop's empty JSON. 0-sample calls after 3 s of speech run a pass on
+   the unchanged buffer. It agrees with the previous one and commits all of `pending` (9 words), which flushes without
+   ending the stream. A 480,000-sample call is accepted. A 480,001-sample call returns rc −1 with `needle_last_error`
+   `audio limit is 30 s` and is not counted: the following stop reports `received` 0.00.
+
+`needle.h` describes only the commit ("the words two consecutive passes agree on"), `pending`, the 30 s per call and
+the stop. Items 1 to 3, 5, 7, 8 and 9, the exact-string agreement and the "no pass at stop" are not in the header.
+
+**CLI cross-check.** `needle --audio-stream --audio-chunk S [--audio-language L] --audio-word-timestamps --threads 4`
+on each run's samples (a float WAV) prints one line per call with rc > 0, then the stop's line. Nothing is printed for
+the other calls. After dropping `pass_ms`, these lines equal the library's outputs on all 103 non-edge runs; the
+recipe fails otherwise. In stream mode the words are printed with or without `--audio-word-timestamps`.
+`--audio-chunk` refuses 31 ("takes seconds between 0 and 30").
+
+**Final text against offline (the Phase 8 Accept).** Text: all committed words of a run joined by spaces. Offline:
+`testdata/oracle/<clip>.json`, or for the long runs the clips' texts joined by spaces. Word errors are the edit
+distance over space-split words. Normalised: lower case, punctuation removed.
+
+| chunks             | runs equal | word errors / offline words | runs equal normalised | median commit delay |
+| ------------------ | ---------- | --------------------------- | --------------------- | ------------------- |
+| 0.5 s              | 14 / 32    | 31 / 459 (6.8 %)            | 21 / 32               | 0.76 s              |
+| 1 s                | 18 / 32    | 19 / 459 (4.1 %)            | 24 / 32               | 1.48 s              |
+| 2 s                | 27 / 32    | 9 / 459 (2.0 %)             | 27 / 32               | 2.64 s              |
+| 1 s, forced (4)    | 2 / 4      | 10 / 59                     |                       |                     |
+| long runs, 1 s (3) | 0 / 3      | 23 / 254 (9.1 %)            |                       |                     |
+
+The commit delay is `received` at the committing call minus the word's `end`. At 1 s the engine's own stream misses
+the offline text on 14 of 32 clips, for four reasons:
+
+- case and punctuation at commit boundaries: "broke up. and all", where offline has "broke up, and all";
+  "Free State" for "free state";
+- a lost opening quote: `You` for `"You`;
+- a word committed from a pass over less audio: "transfer" for "chance", "Billy" for "belly", "Bahre" for "Bare";
+- a word dropped between two agreements: "Vanke bij zich" for "Vanke strafreziekte bij zich".
+
+So the Accept as worded ("the final committed text equals the offline transcript") does not hold for the engine at
+1 s chunks. 8.3 should compare its stream with these fixtures call by call, and with the offline text only on the 18
+clips where the engine's own stream equals it.
+
+**Determinism.** The library has no thread setting. It runs on its default, the fast cores (at most 4, here 4), and
+F-025 found the transcripts identical at 1 to 8 threads. Every run also checks the library against the CLI at
+`--threads 4`. `just oracle-stream` was run twice, and the second run left `git status` clean.

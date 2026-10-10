@@ -85,6 +85,10 @@ oracle-librispeech-audio:
 oracle-librispeech:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle librispeech
 
+# Record the Needle 3 engine's stream API calls (1 s, 0.5 s, 2 s chunks, forced language, > 30 s) into testdata/oracle/stream
+oracle-stream:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle stream
+
 # Regenerate the sentencepiece fixture for internal/tokenizer (testdata/tokenizer); --needle3 <tokenizer.model> cross-checks
 tokenizer-fixture *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/tokenizer_fixture.py {{args}}
@@ -120,6 +124,10 @@ depth-probe *args:
 # Score the keyword biasing variants against the committed engine keyword transcripts and report the leader (WHISTLE_PROBE_TOP/KEY)
 keywords-probe *args:
     go test -tags oracle -count=1 -v -timeout 120m -run 'TestProbeKeywords$' ./internal/search/ {{args}}
+
+# WER of the Go pipeline and of the engine on the LibriSpeech test-clean subset, and how often the transcripts are equal (audio: oracle-librispeech-audio)
+eval-librispeech:
+    WHISTLE_EVAL_LIBRISPEECH=1 go test -count=1 -v -timeout 60m -run 'TestEvalLibriSpeech$' ./whistle/
 
 # Clean build artifacts
 clean:
