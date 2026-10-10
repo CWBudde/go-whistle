@@ -1,0 +1,2282 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "model": {
+    "repo": "Cactus-Compute/whistle",
+    "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    "file": "whistle.cact",
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "command": "needle_stream_transcribe_process, needle_stream_transcribe_stop (libneedle3)",
+  "threads": "the library's default (the device's fast cores, at most 4); the CLI check runs --threads 4",
+  "calls": "calls.json: \u003crun\u003e → {calls: [{index, start, end, rc, error, buffer_start, dropped, out}], stop: {rc, error, out}}; start and end delimit the samples fed (from the stream start), rc is the return code",
+  "audio": "lead_samples zeros, then the clips (testdata/audio, int16 / 32768) with gap_samples zeros between consecutive clips; pcm_sha256 is the SHA-256 of those float32 samples, little-endian. The calls cut them into chunk_samples (the last call shorter) or into call_samples. Every run is one stream that ends with a stop, so the next run starts a new one",
+  "output": "out is the engine's JSON with pass_ms dropped (a timing), keys sorted, values verbatim. text is the committed text of all calls and the stop joined by spaces, stop_language the stop's language",
+  "checks": "outside the edge set the run fails unless every call returns rc ≥ 0, rc equals the number of words, text is the words joined by spaces, received is the samples fed so far / 16000 rounded to two decimals either way, and pass_ms is \u003e 0 on every process call and 0.0 on every stop",
+  "buffer_start": "buffer_start (samples from the stream start), on calls that committed words: the start t0 of the audio [t0, end) whose needle_transcribe JSON (in the run's language) ends with this call's words (the same text, start and end once shifted by t0, and probability) followed by the words of pending, in the same language. Candidates in order: the previous call's t0 (0 at first), then the ends of earlier committed words after it, newest first, as long as [t0, end) is at most 30 s. dropped is the number of words of that JSON before the call's words, which the engine left out as already committed. Both absent when the call committed nothing or no candidate matched",
+  "cli_check": "\"same\": needle --audio-stream --audio-chunk \u003cchunk_samples / 16000\u003e [--audio-language] --audio-word-timestamps --threads 4 on the run's samples as a float WAV prints, after dropping pass_ms, exactly the outputs of the calls with rc \u003e 0 followed by the stop's; the run fails otherwise. Not run on the edge set",
+  "offline": "offline is testdata/oracle/\u003cclip\u003e.json's text, for the long runs the clips' texts joined by spaces; offline_word_errors is the word-level edit distance from it to text (words split at spaces)",
+  "clip_sha256": {
+    "fleurs-de_de-10229344228128634115": "73d3dabd54b15922e298a2f4c1c275c0f4c7e94d5b7973874a0f54d50b62f945",
+    "fleurs-de_de-10308608197319017935": "544cab4432eb05943f0457107e0858124b53ca35bde5c4447143506fc936abc2",
+    "fleurs-es_419-10149016836336603986": "1653e02ceebdf31d89edbaab37d7380d1f652911080c421a1f55535444fdf6de",
+    "fleurs-es_419-10236991702517253859": "dac59b598f0bc34550d717803f0e4f0e749c01fddb312708bcf487224213f38d",
+    "fleurs-fr_fr-10174413140250646001": "7bd61aa01aff463594eb51a0344f8c03db402c30b489bce8725578f1edfb61fa",
+    "fleurs-fr_fr-10385751433252343757": "069ed5a13f80eced39addb18b1b4a5ec90c3997a8f7de2910eaa1534e4adfae8",
+    "fleurs-it_it-1006729518827641482": "092a2c7d04af088c098720a1a31de164c9b0350f01d3d668ba1071b8d06991d5",
+    "fleurs-it_it-10210638754804006465": "ae6cfe7a312ad1d94dccb7c39a4c96ebaa34dd772f0c2fd7a85134703663c63a",
+    "fleurs-nl_nl-10042455874761876908": "6e4fc1718ac727e04ab8fe21034bfc4964ea436eedbec040747239ba59ab9f23",
+    "fleurs-nl_nl-1004717084892689357": "224949db6a6c16d78a3bb3ef0eb120e1a798fbd86f8998196cb6d78f106d85d5",
+    "fleurs-pl_pl-10013271501230525766": "a34ac72ade2e265e8a5dc5c6e63a4fc1251908fccd038b4a1a7136cb153c082d",
+    "fleurs-pl_pl-10047713455444904767": "c64a0cada0cfc872b7f69d12bb17e03953c3874889fa1e15c44502bcd0df49f9",
+    "ls-clean-1320-122617-0003": "b3441360742f4a1b3ae938fe7dc666aa0b9ff6214f766edb4c23d916f691e3b9",
+    "ls-clean-1320-122617-0012": "74b45a2b8d480a5b4a5eaf3ce32229d23cd5c2f76853b63956299ae270f3d712",
+    "ls-clean-260-123440-0007": "eb8c81460fda39080c2c9accaf0ab8231053cdbbec3cf4f862eae67df9f5893e",
+    "ls-clean-260-123440-0018": "c2eebac5698e1190c4ac52f530ddc0f4e653ae139aee61dbae5b7686f7342ef0",
+    "ls-clean-5639-40744-0011": "90d9efe9e9a46498a41ae16318a65c488f18808b88cc97dc06d2be90218db044",
+    "ls-clean-5639-40744-0014": "568ef7e94f3d42ee6af618bfc3a7ba7ecb00bfe5051d3f0ffae488004efd5e01",
+    "ls-clean-6930-75918-0000": "103c3f15eb3715ebc6243d142244128a3ac39b6bfae315baa6b8dc4a8be14aa8",
+    "ls-clean-6930-75918-0007": "c6c28e12656aff6cec3484ed10cfc625d17d62f63a065b91ad3c510716e2c7e0",
+    "ls-clean-7729-102255-0012": "8ed730d628c4d4e9ce8b28a4162a0237edd675904a006681d4fb79f114e084c7",
+    "ls-clean-7729-102255-0045": "8c720b6537f8b9264bd4aebf79e4bef205671aff094502a576ebe418bb27afd2",
+    "ls-other-3080-5040-0011": "7733bc0cf3c3ef4e53eecc5e6eddc9cbe9d3f61731dd6ab038ba7ef6c8748c42",
+    "ls-other-3080-5040-0018": "bb2a3d9563373f3b07c4342035e009e1d146b2712ee51884610f18678d4f67a4",
+    "ls-other-4198-12281-0004": "b281e2d28bb8c61045a7caa70ce773795422f816537d519b65febca8c575ca23",
+    "ls-other-4198-12281-0014": "885c10d10aef1adfeb762c08ca61fecd6c300995a247cd08b7f09bb1e1769367",
+    "ls-other-7018-75788-0016": "8ab142dd9b03b1fb4a1ed00718c9758743167207b899909597ee97eab1e244de",
+    "ls-other-7018-75788-0019": "8519b602bdb0d5f40e24ed82943c610f86447b87281237852eb4ec6109012e29",
+    "ls-other-7902-96591-0005": "854224e6c0f84c52d1201eeba8bec5b8bd4c6245f2d137c17e3ae057c112a97e",
+    "ls-other-7902-96591-0023": "b0fe5f5830b372632de62e17fe39a8b244d376866bef46ba42c99eb2e04df8e8",
+    "ls-other-8280-266249-0029": "b7d41e2071ccc0ff01804d9b9b81d0b220a77ec10070e2f9ed4230aff2e48051",
+    "ls-other-8280-266249-0032": "bd73e8745382cb1e8ed8a7b5e888cdf0eda724d92f0918ef29a5ba2a22b9d5b0"
+  },
+  "sets": [
+    {
+      "set": "clips",
+      "runs": 32,
+      "compared": 32,
+      "same_as_offline": 18,
+      "offline_word_errors": 19,
+      "offline_words": 459,
+      "calls_with_words": 125,
+      "buffer_starts": 125,
+      "received_not_n_over_16000": 0
+    },
+    {
+      "set": "chunks",
+      "runs": 64,
+      "compared": 64,
+      "same_as_offline": 41,
+      "offline_word_errors": 40,
+      "offline_words": 918,
+      "calls_with_words": 267,
+      "buffer_starts": 267,
+      "received_not_n_over_16000": 0
+    },
+    {
+      "set": "language",
+      "runs": 4,
+      "compared": 4,
+      "same_as_offline": 2,
+      "offline_word_errors": 10,
+      "offline_words": 59,
+      "calls_with_words": 15,
+      "buffer_starts": 15,
+      "received_not_n_over_16000": 0
+    },
+    {
+      "set": "long",
+      "runs": 3,
+      "compared": 3,
+      "same_as_offline": 0,
+      "offline_word_errors": 23,
+      "offline_words": 254,
+      "calls_with_words": 63,
+      "buffer_starts": 63,
+      "received_not_n_over_16000": 2
+    },
+    {
+      "set": "edge",
+      "runs": 5,
+      "compared": 0,
+      "same_as_offline": 0,
+      "offline_word_errors": 0,
+      "offline_words": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "received_not_n_over_16000": 0
+    }
+  ],
+  "runs": [
+    {
+      "name": "ls-clean-6930-75918-0000.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-6930-75918-0000"
+      ],
+      "chunk_samples": 16000,
+      "samples": 56080,
+      "pcm_sha256": "51efadc8c74ac6aed3972c75006d034908a6d73d99bd0af64705693bf1b89909",
+      "calls": 4,
+      "committed_words": 8,
+      "text": "Concord returned to its place amidst the tents.",
+      "stop_language": "en",
+      "offline": "Concord returned to its place amidst the tents.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-6930-75918-0007.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-6930-75918-0007"
+      ],
+      "chunk_samples": 16000,
+      "samples": 53040,
+      "pcm_sha256": "b60614ba02d40c689de879dd805f0fe06d221c3231aedb244ea1333ad1b532d5",
+      "calls": 4,
+      "committed_words": 9,
+      "text": "You will be frank with me? I always am.\"",
+      "stop_language": "en",
+      "offline": "\"You will be frank with me? I always am.\"",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-1320-122617-0003.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-1320-122617-0003"
+      ],
+      "chunk_samples": 16000,
+      "samples": 100560,
+      "pcm_sha256": "e360bc3fa12b256978617a28c60278d1dcc7fc7070245afec6dc4cc2c918a72b",
+      "calls": 7,
+      "committed_words": 22,
+      "text": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "stop_language": "en",
+      "offline": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-1320-122617-0012.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-1320-122617-0012"
+      ],
+      "chunk_samples": 16000,
+      "samples": 121440,
+      "pcm_sha256": "5617277c5dd765949d48a1551647c09fd8a44a48cf0fbc1c788ab51d91379b56",
+      "calls": 8,
+      "committed_words": 26,
+      "text": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+      "stop_language": "en",
+      "offline": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-5639-40744-0011.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-5639-40744-0011"
+      ],
+      "chunk_samples": 16000,
+      "samples": 42640,
+      "pcm_sha256": "52161aeafdb6763704fc082867590a7d1d76d51fb8af36ebf094b3a80adc2b8b",
+      "calls": 3,
+      "committed_words": 9,
+      "text": "She found a door, but it was locked outside.",
+      "stop_language": "en",
+      "offline": "She found a door, but it was locked outside.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-5639-40744-0014.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-5639-40744-0014"
+      ],
+      "chunk_samples": 16000,
+      "samples": 123520,
+      "pcm_sha256": "c25fa4c18aae3f7c7091c686f35bbfd5ccf6d3f463b1851ba25934cb227b7f53",
+      "calls": 8,
+      "committed_words": 23,
+      "text": "Among other things on which she cast her eyes was a small crucifix of solid silver, standing on a cabinet near the window.",
+      "stop_language": "en",
+      "offline": "Among other things on which she cast her eyes was a small crucifix of solid silver, standing on a cabinet near the window.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 7,
+      "buffer_starts": 7,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-260-123440-0018.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-260-123440-0018"
+      ],
+      "chunk_samples": 16000,
+      "samples": 58240,
+      "pcm_sha256": "5bfed9dd4de24cf5cd6dd6dffbd547334e49ba377d816981dbeb60331817ce82",
+      "calls": 4,
+      "committed_words": 10,
+      "text": "I am very tired of swimming about here. Oh, mouse!\"",
+      "stop_language": "en",
+      "offline": "I am very tired of swimming about here. Oh, mouse!\"",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-260-123440-0007.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-260-123440-0007"
+      ],
+      "chunk_samples": 16000,
+      "samples": 54160,
+      "pcm_sha256": "2c45ea6f9533cd682ee719e23724ec7c45939b8a564cb89367869ab06d7950f8",
+      "calls": 4,
+      "committed_words": 10,
+      "text": "I almost think I can remember feeling a little different.",
+      "stop_language": "en",
+      "offline": "I almost think I can remember feeling a little different.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-7729-102255-0045.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-7729-102255-0045"
+      ],
+      "chunk_samples": 16000,
+      "samples": 108880,
+      "pcm_sha256": "22f30623d7d2b79beac776c610ea10e0883a27d8d5acf6066801ec5b6d1738ab",
+      "calls": 7,
+      "committed_words": 18,
+      "text": "Captain Martin said, \"I shall give you a pistol to help protect yourself if worse comes to worst.\"",
+      "stop_language": "en",
+      "offline": "Captain Martin said, \"I shall give you a pistol to help protect yourself if worse comes to worst.\"",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-7729-102255-0012.c1",
+      "set": "clips",
+      "clips": [
+        "ls-clean-7729-102255-0012"
+      ],
+      "chunk_samples": 16000,
+      "samples": 65200,
+      "pcm_sha256": "84985b34b5fbaa1418a8924c23df1654bfeac47623dbc5a02660b1b5484931bd",
+      "calls": 5,
+      "committed_words": 10,
+      "text": "Several hundred Free State men promptly responded to the summons.",
+      "stop_language": "en",
+      "offline": "Several hundred free state men promptly responded to the summons.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7902-96591-0023.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-7902-96591-0023"
+      ],
+      "chunk_samples": 16000,
+      "samples": 53840,
+      "pcm_sha256": "21d86d27945b666143caff39b5e6265877e72de18ddd947d472bd56832b360ed",
+      "calls": 4,
+      "committed_words": 16,
+      "text": "But there was no transfer for his body there, and the head would not go first.",
+      "stop_language": "en",
+      "offline": "But there was no chance for his body there, and the head would not go first.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7902-96591-0005.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-7902-96591-0005"
+      ],
+      "chunk_samples": 16000,
+      "samples": 54800,
+      "pcm_sha256": "35b0ddb5ba7b808933791e21a73e9d52d9cdba486f6a567624c60cf9afdfc67f",
+      "calls": 4,
+      "committed_words": 13,
+      "text": "He could not help it. He hates the smugglers. You shall not tell.",
+      "stop_language": "en",
+      "offline": "He could not help it. He hates the smugglers. You shall not tell.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7018-75788-0016.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-7018-75788-0016"
+      ],
+      "chunk_samples": 16000,
+      "samples": 120640,
+      "pcm_sha256": "643fa0141140eab88325a4068777900bed26a25c765f1cf96ca05fdc8d4c4bc2",
+      "calls": 8,
+      "committed_words": 22,
+      "text": "Presently the ship struck the mountain and broke up. and all and everything on board of her were plunged into the sea.",
+      "stop_language": "en",
+      "offline": "Presently the ship struck the mountain and broke up, and all and everything on board of her were plunged into the sea.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7018-75788-0019.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-7018-75788-0019"
+      ],
+      "chunk_samples": 16000,
+      "samples": 96880,
+      "pcm_sha256": "aebab239084cc16fa463ef5b2f7051c79fc3008e1c7739f52970de244cf139d4",
+      "calls": 7,
+      "committed_words": 16,
+      "text": "But there is majesty, and there is no might save in Allah. the glorious, the great.",
+      "stop_language": "en",
+      "offline": "But there is majesty, and there is no might save in Allah, the glorious, the great.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-4198-12281-0004.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-4198-12281-0004"
+      ],
+      "chunk_samples": 16000,
+      "samples": 84960,
+      "pcm_sha256": "70b27c030d987072bd1f5ad03aa3a9965d2c2cd424b20d0a3f3feb5c2983ac7c",
+      "calls": 6,
+      "committed_words": 14,
+      "text": "By the Billy of St. James, what shall we poor devils drink the while?",
+      "stop_language": "en",
+      "offline": "By the belly of St. James, what shall we poor devils drink the while?",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-4198-12281-0014.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-4198-12281-0014"
+      ],
+      "chunk_samples": 16000,
+      "samples": 58560,
+      "pcm_sha256": "68ad02cac7181d555831e878293ccfc9d2a91ccabf38cc3127bb0e578782ddba",
+      "calls": 4,
+      "committed_words": 8,
+      "text": "Can you tell with what instruments they did?\"",
+      "stop_language": "en",
+      "offline": "\"Can you tell with what instruments they did?\"",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-3080-5040-0018.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-3080-5040-0018"
+      ],
+      "chunk_samples": 16000,
+      "samples": 42240,
+      "pcm_sha256": "c276e1472e63dc93d73fce551437677a386c88c38d52e9771f56cba166e0256f",
+      "calls": 3,
+      "committed_words": 4,
+      "text": "Directed for your master.",
+      "stop_language": "en",
+      "offline": "Directed for your master.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-3080-5040-0011.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-3080-5040-0011"
+      ],
+      "chunk_samples": 16000,
+      "samples": 62640,
+      "pcm_sha256": "349d964df3f5a3cb9728f05c5c7e1979946ed36d8f0f4ab23da5e6014e5caf13",
+      "calls": 4,
+      "committed_words": 12,
+      "text": "Here are some verses of colonies. Tell me how you like them.",
+      "stop_language": "en",
+      "offline": "Here are some verses of colonies. Tell me how you like them.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-8280-266249-0032.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-8280-266249-0032"
+      ],
+      "chunk_samples": 16000,
+      "samples": 35920,
+      "pcm_sha256": "8ca8b72e6c3a26d16fb76efe065e788bc07a09f0d507e000064f46569396d0b8",
+      "calls": 3,
+      "committed_words": 6,
+      "text": "No, sir, he is not here.",
+      "stop_language": "en",
+      "offline": "\"No, sir, he is not here.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-8280-266249-0029.c1",
+      "set": "clips",
+      "clips": [
+        "ls-other-8280-266249-0029"
+      ],
+      "chunk_samples": 16000,
+      "samples": 120000,
+      "pcm_sha256": "a7ea921c6da3a5c568ec25ece40dcb63617e2d50f3e1f5b9e1110b4532223c33",
+      "calls": 8,
+      "committed_words": 27,
+      "text": "There was a pause, broken by young Horace, who had been watching a group of men gathered about a table at the further end of the room.",
+      "stop_language": "en",
+      "offline": "There was a pause, broken by young Horace, who had been watching a group of men gathered about a table at the further end of the room.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 7,
+      "buffer_starts": 7,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-de_de-10229344228128634115.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-de_de-10229344228128634115"
+      ],
+      "chunk_samples": 16000,
+      "samples": 114240,
+      "pcm_sha256": "23c89546106d28494fbc463d76f7dfd4521eae021e19897973c8961069307956",
+      "calls": 8,
+      "committed_words": 16,
+      "text": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "stop_language": "de",
+      "offline": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-de_de-10308608197319017935.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-de_de-10308608197319017935"
+      ],
+      "chunk_samples": 16000,
+      "samples": 110400,
+      "pcm_sha256": "b3bbab1469af7953a41c84e8315fff8e9f15aab77d5b9bc931a872d8b3da13ca",
+      "calls": 7,
+      "committed_words": 11,
+      "text": "Diese Bahre können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "stop_language": "de",
+      "offline": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-fr_fr-10174413140250646001.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-fr_fr-10174413140250646001"
+      ],
+      "chunk_samples": 16000,
+      "samples": 115200,
+      "pcm_sha256": "095c551c5214d9da384398f3bcf08c690a9bf776ab1d991cf78783310a423f2a",
+      "calls": 8,
+      "committed_words": 19,
+      "text": "Jan Carlo Fittiella a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "stop_language": "fr",
+      "offline": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-fr_fr-10385751433252343757.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-fr_fr-10385751433252343757"
+      ],
+      "chunk_samples": 16000,
+      "samples": 122880,
+      "pcm_sha256": "a4c5ff2cb6ffbdd71852dfa8ed07fa2c779d81adf907021a48cdb8e50f93385e",
+      "calls": 8,
+      "committed_words": 24,
+      "text": "Il est deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "stop_language": "fr",
+      "offline": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 7,
+      "buffer_starts": 7,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-es_419-10149016836336603986.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-es_419-10149016836336603986"
+      ],
+      "chunk_samples": 16000,
+      "samples": 90240,
+      "pcm_sha256": "ff7cf264412f50e0f82ec9b875c001b78ad0215d4cdafc6966896d8214300fc5",
+      "calls": 6,
+      "committed_words": 9,
+      "text": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "stop_language": "es",
+      "offline": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-es_419-10236991702517253859.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-es_419-10236991702517253859"
+      ],
+      "chunk_samples": 16000,
+      "samples": 122880,
+      "pcm_sha256": "c96b2382a1993671afd360c2694384021d4616ba317ba93ddbe50b68dc3ea571",
+      "calls": 8,
+      "committed_words": 17,
+      "text": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "stop_language": "es",
+      "offline": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-it_it-1006729518827641482.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-it_it-1006729518827641482"
+      ],
+      "chunk_samples": 16000,
+      "samples": 113280,
+      "pcm_sha256": "76f64452d2a74d4ae8b9ed1c1e9f5058db3ece549a27305877614c2ba46d19d0",
+      "calls": 8,
+      "committed_words": 15,
+      "text": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "stop_language": "it",
+      "offline": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-it_it-10210638754804006465.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-it_it-10210638754804006465"
+      ],
+      "chunk_samples": 16000,
+      "samples": 104640,
+      "pcm_sha256": "87e9e880924635ff3fe5368870a5bca2182b666864b0a4851ae1a02d4c880336",
+      "calls": 7,
+      "committed_words": 11,
+      "text": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "stop_language": "it",
+      "offline": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-nl_nl-10042455874761876908.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-nl_nl-10042455874761876908"
+      ],
+      "chunk_samples": 16000,
+      "samples": 103680,
+      "pcm_sha256": "1ca71e0a7c3415626afab1fd804c883239f4ad3c98e1aeae03dabd037cfa2a83",
+      "calls": 7,
+      "committed_words": 15,
+      "text": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "stop_language": "nl",
+      "offline": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-nl_nl-1004717084892689357.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-nl_nl-1004717084892689357"
+      ],
+      "chunk_samples": 16000,
+      "samples": 70080,
+      "pcm_sha256": "23d52a4ff27a28d229c6d34e353ccd21b03e7db2d5be265251e42064e0d777b0",
+      "calls": 5,
+      "committed_words": 10,
+      "text": "Vanke bij zich en dragen het via mugen overal mensen.",
+      "stop_language": "nl",
+      "offline": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-pl_pl-10013271501230525766.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-pl_pl-10013271501230525766"
+      ],
+      "chunk_samples": 16000,
+      "samples": 122880,
+      "pcm_sha256": "61e797fa3f3e0dbeb07eb5d76ab5b6faa1ff29b67f70ac916ca13423fa5b5c5c",
+      "calls": 8,
+      "committed_words": 16,
+      "text": "Większość mniejszych wysp to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "stop_language": "pl",
+      "offline": "W większość mniejszych wyzptów to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "same_as_offline": false,
+      "offline_word_errors": 3,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-pl_pl-10047713455444904767.c1",
+      "set": "clips",
+      "clips": [
+        "fleurs-pl_pl-10047713455444904767"
+      ],
+      "chunk_samples": 16000,
+      "samples": 105600,
+      "pcm_sha256": "4d848d2e2c35deb52e0e4aebb9592844fa092e31ba156acaa684cfc07b9f9f28",
+      "calls": 7,
+      "committed_words": 13,
+      "text": "Zgodnie z oświadczeniem wyreguber na to raw śródranych płodzi w ją nas obolicjantów.",
+      "stop_language": "pl",
+      "offline": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-6930-75918-0000.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-6930-75918-0000"
+      ],
+      "chunk_samples": 8000,
+      "samples": 56080,
+      "pcm_sha256": "51efadc8c74ac6aed3972c75006d034908a6d73d99bd0af64705693bf1b89909",
+      "calls": 8,
+      "committed_words": 8,
+      "text": "Concord returned to its place amidst the tents.",
+      "stop_language": "en",
+      "offline": "Concord returned to its place amidst the tents.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-6930-75918-0007.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-6930-75918-0007"
+      ],
+      "chunk_samples": 8000,
+      "samples": 53040,
+      "pcm_sha256": "b60614ba02d40c689de879dd805f0fe06d221c3231aedb244ea1333ad1b532d5",
+      "calls": 7,
+      "committed_words": 9,
+      "text": "you will be frank with me. I always am.\"",
+      "stop_language": "en",
+      "offline": "\"You will be frank with me? I always am.\"",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-1320-122617-0003.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-1320-122617-0003"
+      ],
+      "chunk_samples": 8000,
+      "samples": 100560,
+      "pcm_sha256": "e360bc3fa12b256978617a28c60278d1dcc7fc7070245afec6dc4cc2c918a72b",
+      "calls": 13,
+      "committed_words": 22,
+      "text": "There was something in his heir and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "stop_language": "en",
+      "offline": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 9,
+      "buffer_starts": 9,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-1320-122617-0012.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-1320-122617-0012"
+      ],
+      "chunk_samples": 8000,
+      "samples": 121440,
+      "pcm_sha256": "5617277c5dd765949d48a1551647c09fd8a44a48cf0fbc1c788ab51d91379b56",
+      "calls": 16,
+      "committed_words": 26,
+      "text": "4 or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+      "stop_language": "en",
+      "offline": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 9,
+      "buffer_starts": 9,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-5639-40744-0011.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-5639-40744-0011"
+      ],
+      "chunk_samples": 8000,
+      "samples": 42640,
+      "pcm_sha256": "52161aeafdb6763704fc082867590a7d1d76d51fb8af36ebf094b3a80adc2b8b",
+      "calls": 6,
+      "committed_words": 9,
+      "text": "She found a door, but it was locked outside.",
+      "stop_language": "en",
+      "offline": "She found a door, but it was locked outside.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-5639-40744-0014.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-5639-40744-0014"
+      ],
+      "chunk_samples": 8000,
+      "samples": 123520,
+      "pcm_sha256": "c25fa4c18aae3f7c7091c686f35bbfd5ccf6d3f463b1851ba25934cb227b7f53",
+      "calls": 16,
+      "committed_words": 23,
+      "text": "Among other things on which she cast her eyes was a small crucifix of solid silver, standing on a cabinet near the window.",
+      "stop_language": "en",
+      "offline": "Among other things on which she cast her eyes was a small crucifix of solid silver, standing on a cabinet near the window.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 10,
+      "buffer_starts": 10,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-260-123440-0018.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-260-123440-0018"
+      ],
+      "chunk_samples": 8000,
+      "samples": 58240,
+      "pcm_sha256": "5bfed9dd4de24cf5cd6dd6dffbd547334e49ba377d816981dbeb60331817ce82",
+      "calls": 8,
+      "committed_words": 10,
+      "text": "I am very tired of swimming about here. Oh, mouse!\"",
+      "stop_language": "en",
+      "offline": "I am very tired of swimming about here. Oh, mouse!\"",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-260-123440-0007.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-260-123440-0007"
+      ],
+      "chunk_samples": 8000,
+      "samples": 54160,
+      "pcm_sha256": "2c45ea6f9533cd682ee719e23724ec7c45939b8a564cb89367869ab06d7950f8",
+      "calls": 7,
+      "committed_words": 10,
+      "text": "I almost think I can remember feeling a little different.",
+      "stop_language": "en",
+      "offline": "I almost think I can remember feeling a little different.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-7729-102255-0045.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-7729-102255-0045"
+      ],
+      "chunk_samples": 8000,
+      "samples": 108880,
+      "pcm_sha256": "22f30623d7d2b79beac776c610ea10e0883a27d8d5acf6066801ec5b6d1738ab",
+      "calls": 14,
+      "committed_words": 18,
+      "text": "Captain Martin said. \"I shall give you a pistol to help protect yourself if worse comes to worst.\"",
+      "stop_language": "en",
+      "offline": "Captain Martin said, \"I shall give you a pistol to help protect yourself if worse comes to worst.\"",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 10,
+      "buffer_starts": 10,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-7729-102255-0012.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-7729-102255-0012"
+      ],
+      "chunk_samples": 8000,
+      "samples": 65200,
+      "pcm_sha256": "84985b34b5fbaa1418a8924c23df1654bfeac47623dbc5a02660b1b5484931bd",
+      "calls": 9,
+      "committed_words": 10,
+      "text": "Several hundred Free State men promptly responded to the summons.",
+      "stop_language": "en",
+      "offline": "Several hundred free state men promptly responded to the summons.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7902-96591-0023.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-7902-96591-0023"
+      ],
+      "chunk_samples": 8000,
+      "samples": 53840,
+      "pcm_sha256": "21d86d27945b666143caff39b5e6265877e72de18ddd947d472bd56832b360ed",
+      "calls": 7,
+      "committed_words": 16,
+      "text": "But there was no chance for his body there, and the head would not go first.",
+      "stop_language": "en",
+      "offline": "But there was no chance for his body there, and the head would not go first.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7902-96591-0005.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-7902-96591-0005"
+      ],
+      "chunk_samples": 8000,
+      "samples": 54800,
+      "pcm_sha256": "35b0ddb5ba7b808933791e21a73e9d52d9cdba486f6a567624c60cf9afdfc67f",
+      "calls": 7,
+      "committed_words": 13,
+      "text": "He could not help it. He hates the smugglers. You shall not tell.",
+      "stop_language": "en",
+      "offline": "He could not help it. He hates the smugglers. You shall not tell.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7018-75788-0016.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-7018-75788-0016"
+      ],
+      "chunk_samples": 8000,
+      "samples": 120640,
+      "pcm_sha256": "643fa0141140eab88325a4068777900bed26a25c765f1cf96ca05fdc8d4c4bc2",
+      "calls": 16,
+      "committed_words": 22,
+      "text": "Presently the ship struck the mountain and broke up. and all in everything on board of her were plunged into the sea.",
+      "stop_language": "en",
+      "offline": "Presently the ship struck the mountain and broke up, and all and everything on board of her were plunged into the sea.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 10,
+      "buffer_starts": 10,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7018-75788-0019.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-7018-75788-0019"
+      ],
+      "chunk_samples": 8000,
+      "samples": 96880,
+      "pcm_sha256": "aebab239084cc16fa463ef5b2f7051c79fc3008e1c7739f52970de244cf139d4",
+      "calls": 13,
+      "committed_words": 16,
+      "text": "But there is majesty. and there is no might save in Allah. the glorious, the great.",
+      "stop_language": "en",
+      "offline": "But there is majesty, and there is no might save in Allah, the glorious, the great.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 8,
+      "buffer_starts": 8,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-4198-12281-0004.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-4198-12281-0004"
+      ],
+      "chunk_samples": 8000,
+      "samples": 84960,
+      "pcm_sha256": "70b27c030d987072bd1f5ad03aa3a9965d2c2cd424b20d0a3f3feb5c2983ac7c",
+      "calls": 11,
+      "committed_words": 14,
+      "text": "By the Billy of St. James. what shall we poor devils drink the while?",
+      "stop_language": "en",
+      "offline": "By the belly of St. James, what shall we poor devils drink the while?",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-4198-12281-0014.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-4198-12281-0014"
+      ],
+      "chunk_samples": 8000,
+      "samples": 58560,
+      "pcm_sha256": "68ad02cac7181d555831e878293ccfc9d2a91ccabf38cc3127bb0e578782ddba",
+      "calls": 8,
+      "committed_words": 8,
+      "text": "Can you tell with what instruments they did?\"",
+      "stop_language": "en",
+      "offline": "\"Can you tell with what instruments they did?\"",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-3080-5040-0018.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-3080-5040-0018"
+      ],
+      "chunk_samples": 8000,
+      "samples": 42240,
+      "pcm_sha256": "c276e1472e63dc93d73fce551437677a386c88c38d52e9771f56cba166e0256f",
+      "calls": 6,
+      "committed_words": 4,
+      "text": "Directed for your master.",
+      "stop_language": "en",
+      "offline": "Directed for your master.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-3080-5040-0011.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-3080-5040-0011"
+      ],
+      "chunk_samples": 8000,
+      "samples": 62640,
+      "pcm_sha256": "349d964df3f5a3cb9728f05c5c7e1979946ed36d8f0f4ab23da5e6014e5caf13",
+      "calls": 8,
+      "committed_words": 12,
+      "text": "Here are some verses of colonies. Tell me how you like them.",
+      "stop_language": "en",
+      "offline": "Here are some verses of colonies. Tell me how you like them.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-8280-266249-0032.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-8280-266249-0032"
+      ],
+      "chunk_samples": 8000,
+      "samples": 35920,
+      "pcm_sha256": "8ca8b72e6c3a26d16fb76efe065e788bc07a09f0d507e000064f46569396d0b8",
+      "calls": 5,
+      "committed_words": 6,
+      "text": "No, sir, he is not here.",
+      "stop_language": "en",
+      "offline": "\"No, sir, he is not here.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-8280-266249-0029.c0.5",
+      "set": "chunks",
+      "clips": [
+        "ls-other-8280-266249-0029"
+      ],
+      "chunk_samples": 8000,
+      "samples": 120000,
+      "pcm_sha256": "a7ea921c6da3a5c568ec25ece40dcb63617e2d50f3e1f5b9e1110b4532223c33",
+      "calls": 15,
+      "committed_words": 27,
+      "text": "There was a pause, broken by young Horace, who had been watching a group of men gathered about a table at the further end of the room.",
+      "stop_language": "en",
+      "offline": "There was a pause, broken by young Horace, who had been watching a group of men gathered about a table at the further end of the room.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 12,
+      "buffer_starts": 12,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-de_de-10229344228128634115.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-de_de-10229344228128634115"
+      ],
+      "chunk_samples": 8000,
+      "samples": 114240,
+      "pcm_sha256": "23c89546106d28494fbc463d76f7dfd4521eae021e19897973c8961069307956",
+      "calls": 15,
+      "committed_words": 16,
+      "text": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme. was jeder beklagt sich über die Transportsysteme.",
+      "stop_language": "de",
+      "offline": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 7,
+      "buffer_starts": 7,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-de_de-10308608197319017935.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-de_de-10308608197319017935"
+      ],
+      "chunk_samples": 8000,
+      "samples": 110400,
+      "pcm_sha256": "b3bbab1469af7953a41c84e8315fff8e9f15aab77d5b9bc931a872d8b3da13ca",
+      "calls": 14,
+      "committed_words": 11,
+      "text": "Diese Bahre können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "stop_language": "de",
+      "offline": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-fr_fr-10174413140250646001.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-fr_fr-10174413140250646001"
+      ],
+      "chunk_samples": 8000,
+      "samples": 115200,
+      "pcm_sha256": "095c551c5214d9da384398f3bcf08c690a9bf776ab1d991cf78783310a423f2a",
+      "calls": 15,
+      "committed_words": 19,
+      "text": "Jan Carlo Fittiella a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "stop_language": "fr",
+      "offline": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 7,
+      "buffer_starts": 7,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-fr_fr-10385751433252343757.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-fr_fr-10385751433252343757"
+      ],
+      "chunk_samples": 8000,
+      "samples": 122880,
+      "pcm_sha256": "a4c5ff2cb6ffbdd71852dfa8ed07fa2c779d81adf907021a48cdb8e50f93385e",
+      "calls": 16,
+      "committed_words": 24,
+      "text": "Il est deux composés réagissant là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "stop_language": "fr",
+      "offline": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "same_as_offline": false,
+      "offline_word_errors": 3,
+      "calls_with_words": 13,
+      "buffer_starts": 13,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-es_419-10149016836336603986.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-es_419-10149016836336603986"
+      ],
+      "chunk_samples": 8000,
+      "samples": 90240,
+      "pcm_sha256": "ff7cf264412f50e0f82ec9b875c001b78ad0215d4cdafc6966896d8214300fc5",
+      "calls": 12,
+      "committed_words": 9,
+      "text": "Los luchadores compañeros de Luna también les rindieron homenaje.",
+      "stop_language": "es",
+      "offline": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-es_419-10236991702517253859.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-es_419-10236991702517253859"
+      ],
+      "chunk_samples": 8000,
+      "samples": 122880,
+      "pcm_sha256": "c96b2382a1993671afd360c2694384021d4616ba317ba93ddbe50b68dc3ea571",
+      "calls": 16,
+      "committed_words": 17,
+      "text": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "stop_language": "es",
+      "offline": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 9,
+      "buffer_starts": 9,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-it_it-1006729518827641482.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-it_it-1006729518827641482"
+      ],
+      "chunk_samples": 8000,
+      "samples": 113280,
+      "pcm_sha256": "76f64452d2a74d4ae8b9ed1c1e9f5058db3ece549a27305877614c2ba46d19d0",
+      "calls": 15,
+      "committed_words": 15,
+      "text": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "stop_language": "it",
+      "offline": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 7,
+      "buffer_starts": 7,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-it_it-10210638754804006465.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-it_it-10210638754804006465"
+      ],
+      "chunk_samples": 8000,
+      "samples": 104640,
+      "pcm_sha256": "87e9e880924635ff3fe5368870a5bca2182b666864b0a4851ae1a02d4c880336",
+      "calls": 14,
+      "committed_words": 11,
+      "text": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "stop_language": "it",
+      "offline": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 7,
+      "buffer_starts": 7,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-nl_nl-10042455874761876908.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-nl_nl-10042455874761876908"
+      ],
+      "chunk_samples": 8000,
+      "samples": 103680,
+      "pcm_sha256": "1ca71e0a7c3415626afab1fd804c883239f4ad3c98e1aeae03dabd037cfa2a83",
+      "calls": 13,
+      "committed_words": 15,
+      "text": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "stop_language": "nl",
+      "offline": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-nl_nl-1004717084892689357.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-nl_nl-1004717084892689357"
+      ],
+      "chunk_samples": 8000,
+      "samples": 70080,
+      "pcm_sha256": "23d52a4ff27a28d229c6d34e353ccd21b03e7db2d5be265251e42064e0d777b0",
+      "calls": 9,
+      "committed_words": 10,
+      "text": "Vanke strafreziekten bij, zich aandragen het via mugen overal mensen.",
+      "stop_language": "nl",
+      "offline": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+      "same_as_offline": false,
+      "offline_word_errors": 4,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-pl_pl-10013271501230525766.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-pl_pl-10013271501230525766"
+      ],
+      "chunk_samples": 8000,
+      "samples": 122880,
+      "pcm_sha256": "61e797fa3f3e0dbeb07eb5d76ab5b6faa1ff29b67f70ac916ca13423fa5b5c5c",
+      "calls": 16,
+      "committed_words": 17,
+      "text": "W większości mniejszych wysp to narody niezależne lub wspomnieżone z Francją i złynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "stop_language": "pl",
+      "offline": "W większość mniejszych wyzptów to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "same_as_offline": false,
+      "offline_word_errors": 3,
+      "calls_with_words": 6,
+      "buffer_starts": 6,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-pl_pl-10047713455444904767.c0.5",
+      "set": "chunks",
+      "clips": [
+        "fleurs-pl_pl-10047713455444904767"
+      ],
+      "chunk_samples": 8000,
+      "samples": 105600,
+      "pcm_sha256": "4d848d2e2c35deb52e0e4aebb9592844fa092e31ba156acaa684cfc07b9f9f28",
+      "calls": 14,
+      "committed_words": 13,
+      "text": "Zgodnie z oświadczeniem wyreguber na to raw śródranych płodzi w ją nas obolicjantów.",
+      "stop_language": "pl",
+      "offline": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-6930-75918-0000.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-6930-75918-0000"
+      ],
+      "chunk_samples": 32000,
+      "samples": 56080,
+      "pcm_sha256": "51efadc8c74ac6aed3972c75006d034908a6d73d99bd0af64705693bf1b89909",
+      "calls": 2,
+      "committed_words": 8,
+      "text": "Concord returned to its place amidst the tents.",
+      "stop_language": "en",
+      "offline": "Concord returned to its place amidst the tents.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-6930-75918-0007.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-6930-75918-0007"
+      ],
+      "chunk_samples": 32000,
+      "samples": 53040,
+      "pcm_sha256": "b60614ba02d40c689de879dd805f0fe06d221c3231aedb244ea1333ad1b532d5",
+      "calls": 2,
+      "committed_words": 9,
+      "text": "\"You will be frank with me? I always am.\"",
+      "stop_language": "en",
+      "offline": "\"You will be frank with me? I always am.\"",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 0,
+      "buffer_starts": 0,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-1320-122617-0003.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-1320-122617-0003"
+      ],
+      "chunk_samples": 32000,
+      "samples": 100560,
+      "pcm_sha256": "e360bc3fa12b256978617a28c60278d1dcc7fc7070245afec6dc4cc2c918a72b",
+      "calls": 4,
+      "committed_words": 22,
+      "text": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "stop_language": "en",
+      "offline": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-1320-122617-0012.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-1320-122617-0012"
+      ],
+      "chunk_samples": 32000,
+      "samples": 121440,
+      "pcm_sha256": "5617277c5dd765949d48a1551647c09fd8a44a48cf0fbc1c788ab51d91379b56",
+      "calls": 4,
+      "committed_words": 26,
+      "text": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+      "stop_language": "en",
+      "offline": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-5639-40744-0011.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-5639-40744-0011"
+      ],
+      "chunk_samples": 32000,
+      "samples": 42640,
+      "pcm_sha256": "52161aeafdb6763704fc082867590a7d1d76d51fb8af36ebf094b3a80adc2b8b",
+      "calls": 2,
+      "committed_words": 9,
+      "text": "She found a door, but it was locked outside.",
+      "stop_language": "en",
+      "offline": "She found a door, but it was locked outside.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-5639-40744-0014.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-5639-40744-0014"
+      ],
+      "chunk_samples": 32000,
+      "samples": 123520,
+      "pcm_sha256": "c25fa4c18aae3f7c7091c686f35bbfd5ccf6d3f463b1851ba25934cb227b7f53",
+      "calls": 4,
+      "committed_words": 23,
+      "text": "Among other things on which she cast her eyes was a small crucifix of solid silver, standing on a cabinet near the window.",
+      "stop_language": "en",
+      "offline": "Among other things on which she cast her eyes was a small crucifix of solid silver, standing on a cabinet near the window.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-260-123440-0018.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-260-123440-0018"
+      ],
+      "chunk_samples": 32000,
+      "samples": 58240,
+      "pcm_sha256": "5bfed9dd4de24cf5cd6dd6dffbd547334e49ba377d816981dbeb60331817ce82",
+      "calls": 2,
+      "committed_words": 10,
+      "text": "I am very tired of swimming about here. Oh, mouse!\"",
+      "stop_language": "en",
+      "offline": "I am very tired of swimming about here. Oh, mouse!\"",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-260-123440-0007.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-260-123440-0007"
+      ],
+      "chunk_samples": 32000,
+      "samples": 54160,
+      "pcm_sha256": "2c45ea6f9533cd682ee719e23724ec7c45939b8a564cb89367869ab06d7950f8",
+      "calls": 2,
+      "committed_words": 10,
+      "text": "I almost think I can remember feeling a little different.",
+      "stop_language": "en",
+      "offline": "I almost think I can remember feeling a little different.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-7729-102255-0045.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-7729-102255-0045"
+      ],
+      "chunk_samples": 32000,
+      "samples": 108880,
+      "pcm_sha256": "22f30623d7d2b79beac776c610ea10e0883a27d8d5acf6066801ec5b6d1738ab",
+      "calls": 4,
+      "committed_words": 18,
+      "text": "Captain Martin said, \"I shall give you a pistol to help protect yourself if worse comes to worst.\"",
+      "stop_language": "en",
+      "offline": "Captain Martin said, \"I shall give you a pistol to help protect yourself if worse comes to worst.\"",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-7729-102255-0012.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-clean-7729-102255-0012"
+      ],
+      "chunk_samples": 32000,
+      "samples": 65200,
+      "pcm_sha256": "84985b34b5fbaa1418a8924c23df1654bfeac47623dbc5a02660b1b5484931bd",
+      "calls": 3,
+      "committed_words": 10,
+      "text": "Several hundred free state men promptly responded to the summons.",
+      "stop_language": "en",
+      "offline": "Several hundred free state men promptly responded to the summons.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7902-96591-0023.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-7902-96591-0023"
+      ],
+      "chunk_samples": 32000,
+      "samples": 53840,
+      "pcm_sha256": "21d86d27945b666143caff39b5e6265877e72de18ddd947d472bd56832b360ed",
+      "calls": 2,
+      "committed_words": 16,
+      "text": "But there was no chance for his body there, and the head would not go first.",
+      "stop_language": "en",
+      "offline": "But there was no chance for his body there, and the head would not go first.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7902-96591-0005.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-7902-96591-0005"
+      ],
+      "chunk_samples": 32000,
+      "samples": 54800,
+      "pcm_sha256": "35b0ddb5ba7b808933791e21a73e9d52d9cdba486f6a567624c60cf9afdfc67f",
+      "calls": 2,
+      "committed_words": 13,
+      "text": "He could not help it. He hates the smugglers. You shall not tell.",
+      "stop_language": "en",
+      "offline": "He could not help it. He hates the smugglers. You shall not tell.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7018-75788-0016.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-7018-75788-0016"
+      ],
+      "chunk_samples": 32000,
+      "samples": 120640,
+      "pcm_sha256": "643fa0141140eab88325a4068777900bed26a25c765f1cf96ca05fdc8d4c4bc2",
+      "calls": 4,
+      "committed_words": 22,
+      "text": "Presently the ship struck the mountain and broke up, and all and everything on board of her were plunged into the sea.",
+      "stop_language": "en",
+      "offline": "Presently the ship struck the mountain and broke up, and all and everything on board of her were plunged into the sea.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-7018-75788-0019.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-7018-75788-0019"
+      ],
+      "chunk_samples": 32000,
+      "samples": 96880,
+      "pcm_sha256": "aebab239084cc16fa463ef5b2f7051c79fc3008e1c7739f52970de244cf139d4",
+      "calls": 4,
+      "committed_words": 16,
+      "text": "But there is majesty, and there is no might save in Allah, the glorious, the great.",
+      "stop_language": "en",
+      "offline": "But there is majesty, and there is no might save in Allah, the glorious, the great.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-4198-12281-0004.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-4198-12281-0004"
+      ],
+      "chunk_samples": 32000,
+      "samples": 84960,
+      "pcm_sha256": "70b27c030d987072bd1f5ad03aa3a9965d2c2cd424b20d0a3f3feb5c2983ac7c",
+      "calls": 3,
+      "committed_words": 14,
+      "text": "By the belly of St. James, what shall we poor devils drink the while?",
+      "stop_language": "en",
+      "offline": "By the belly of St. James, what shall we poor devils drink the while?",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-4198-12281-0014.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-4198-12281-0014"
+      ],
+      "chunk_samples": 32000,
+      "samples": 58560,
+      "pcm_sha256": "68ad02cac7181d555831e878293ccfc9d2a91ccabf38cc3127bb0e578782ddba",
+      "calls": 2,
+      "committed_words": 8,
+      "text": "\"Can you tell with what instruments they did?\"",
+      "stop_language": "en",
+      "offline": "\"Can you tell with what instruments they did?\"",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 0,
+      "buffer_starts": 0,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-3080-5040-0018.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-3080-5040-0018"
+      ],
+      "chunk_samples": 32000,
+      "samples": 42240,
+      "pcm_sha256": "c276e1472e63dc93d73fce551437677a386c88c38d52e9771f56cba166e0256f",
+      "calls": 2,
+      "committed_words": 4,
+      "text": "Directed for your master.",
+      "stop_language": "en",
+      "offline": "Directed for your master.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-3080-5040-0011.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-3080-5040-0011"
+      ],
+      "chunk_samples": 32000,
+      "samples": 62640,
+      "pcm_sha256": "349d964df3f5a3cb9728f05c5c7e1979946ed36d8f0f4ab23da5e6014e5caf13",
+      "calls": 2,
+      "committed_words": 12,
+      "text": "Here are some verses of colonies. Tell me how you like them.",
+      "stop_language": "en",
+      "offline": "Here are some verses of colonies. Tell me how you like them.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 1,
+      "buffer_starts": 1,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-8280-266249-0032.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-8280-266249-0032"
+      ],
+      "chunk_samples": 32000,
+      "samples": 35920,
+      "pcm_sha256": "8ca8b72e6c3a26d16fb76efe065e788bc07a09f0d507e000064f46569396d0b8",
+      "calls": 2,
+      "committed_words": 6,
+      "text": "\"No, sir, he is not here.",
+      "stop_language": "en",
+      "offline": "\"No, sir, he is not here.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 0,
+      "buffer_starts": 0,
+      "cli": "same"
+    },
+    {
+      "name": "ls-other-8280-266249-0029.c2",
+      "set": "chunks",
+      "clips": [
+        "ls-other-8280-266249-0029"
+      ],
+      "chunk_samples": 32000,
+      "samples": 120000,
+      "pcm_sha256": "a7ea921c6da3a5c568ec25ece40dcb63617e2d50f3e1f5b9e1110b4532223c33",
+      "calls": 4,
+      "committed_words": 27,
+      "text": "There was a pause, broken by young Horace, who had been watching a group of men gathered about a table at the further end of the room.",
+      "stop_language": "en",
+      "offline": "There was a pause, broken by young Horace, who had been watching a group of men gathered about a table at the further end of the room.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-de_de-10229344228128634115.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-de_de-10229344228128634115"
+      ],
+      "chunk_samples": 32000,
+      "samples": 114240,
+      "pcm_sha256": "23c89546106d28494fbc463d76f7dfd4521eae021e19897973c8961069307956",
+      "calls": 4,
+      "committed_words": 16,
+      "text": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "stop_language": "de",
+      "offline": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-de_de-10308608197319017935.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-de_de-10308608197319017935"
+      ],
+      "chunk_samples": 32000,
+      "samples": 110400,
+      "pcm_sha256": "b3bbab1469af7953a41c84e8315fff8e9f15aab77d5b9bc931a872d8b3da13ca",
+      "calls": 4,
+      "committed_words": 11,
+      "text": "Diese Bahre können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "stop_language": "de",
+      "offline": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-fr_fr-10174413140250646001.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-fr_fr-10174413140250646001"
+      ],
+      "chunk_samples": 32000,
+      "samples": 115200,
+      "pcm_sha256": "095c551c5214d9da384398f3bcf08c690a9bf776ab1d991cf78783310a423f2a",
+      "calls": 4,
+      "committed_words": 19,
+      "text": "Jan Carlo Fittiella a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "stop_language": "fr",
+      "offline": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-fr_fr-10385751433252343757.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-fr_fr-10385751433252343757"
+      ],
+      "chunk_samples": 32000,
+      "samples": 122880,
+      "pcm_sha256": "a4c5ff2cb6ffbdd71852dfa8ed07fa2c779d81adf907021a48cdb8e50f93385e",
+      "calls": 4,
+      "committed_words": 24,
+      "text": "Il est deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "stop_language": "fr",
+      "offline": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-es_419-10149016836336603986.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-es_419-10149016836336603986"
+      ],
+      "chunk_samples": 32000,
+      "samples": 90240,
+      "pcm_sha256": "ff7cf264412f50e0f82ec9b875c001b78ad0215d4cdafc6966896d8214300fc5",
+      "calls": 3,
+      "committed_words": 9,
+      "text": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "stop_language": "es",
+      "offline": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-es_419-10236991702517253859.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-es_419-10236991702517253859"
+      ],
+      "chunk_samples": 32000,
+      "samples": 122880,
+      "pcm_sha256": "c96b2382a1993671afd360c2694384021d4616ba317ba93ddbe50b68dc3ea571",
+      "calls": 4,
+      "committed_words": 17,
+      "text": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "stop_language": "es",
+      "offline": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-it_it-1006729518827641482.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-it_it-1006729518827641482"
+      ],
+      "chunk_samples": 32000,
+      "samples": 113280,
+      "pcm_sha256": "76f64452d2a74d4ae8b9ed1c1e9f5058db3ece549a27305877614c2ba46d19d0",
+      "calls": 4,
+      "committed_words": 15,
+      "text": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "stop_language": "it",
+      "offline": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-it_it-10210638754804006465.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-it_it-10210638754804006465"
+      ],
+      "chunk_samples": 32000,
+      "samples": 104640,
+      "pcm_sha256": "87e9e880924635ff3fe5368870a5bca2182b666864b0a4851ae1a02d4c880336",
+      "calls": 4,
+      "committed_words": 11,
+      "text": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "stop_language": "it",
+      "offline": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-nl_nl-10042455874761876908.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-nl_nl-10042455874761876908"
+      ],
+      "chunk_samples": 32000,
+      "samples": 103680,
+      "pcm_sha256": "1ca71e0a7c3415626afab1fd804c883239f4ad3c98e1aeae03dabd037cfa2a83",
+      "calls": 4,
+      "committed_words": 15,
+      "text": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "stop_language": "nl",
+      "offline": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-nl_nl-1004717084892689357.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-nl_nl-1004717084892689357"
+      ],
+      "chunk_samples": 32000,
+      "samples": 70080,
+      "pcm_sha256": "23d52a4ff27a28d229c6d34e353ccd21b03e7db2d5be265251e42064e0d777b0",
+      "calls": 3,
+      "committed_words": 11,
+      "text": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+      "stop_language": "nl",
+      "offline": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-pl_pl-10013271501230525766.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-pl_pl-10013271501230525766"
+      ],
+      "chunk_samples": 32000,
+      "samples": 122880,
+      "pcm_sha256": "61e797fa3f3e0dbeb07eb5d76ab5b6faa1ff29b67f70ac916ca13423fa5b5c5c",
+      "calls": 4,
+      "committed_words": 16,
+      "text": "Większość mniejszych wysp to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "stop_language": "pl",
+      "offline": "W większość mniejszych wyzptów to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "same_as_offline": false,
+      "offline_word_errors": 3,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-pl_pl-10047713455444904767.c2",
+      "set": "chunks",
+      "clips": [
+        "fleurs-pl_pl-10047713455444904767"
+      ],
+      "chunk_samples": 32000,
+      "samples": 105600,
+      "pcm_sha256": "4d848d2e2c35deb52e0e4aebb9592844fa092e31ba156acaa684cfc07b9f9f28",
+      "calls": 4,
+      "committed_words": 13,
+      "text": "Zgodnie z oświadczeniem wyreguber na to raw śródranych płodzi w ją nas obolicjantów.",
+      "stop_language": "pl",
+      "offline": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 3,
+      "buffer_starts": 3,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-de_de-10229344228128634115.c1.de",
+      "set": "language",
+      "clips": [
+        "fleurs-de_de-10229344228128634115"
+      ],
+      "chunk_samples": 16000,
+      "language": "de",
+      "samples": 114240,
+      "pcm_sha256": "23c89546106d28494fbc463d76f7dfd4521eae021e19897973c8961069307956",
+      "calls": 8,
+      "committed_words": 16,
+      "text": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "stop_language": "de",
+      "offline": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-de_de-10229344228128634115.c1.en",
+      "set": "language",
+      "clips": [
+        "fleurs-de_de-10229344228128634115"
+      ],
+      "chunk_samples": 16000,
+      "language": "en",
+      "samples": 114240,
+      "pcm_sha256": "23c89546106d28494fbc463d76f7dfd4521eae021e19897973c8961069307956",
+      "calls": 8,
+      "committed_words": 18,
+      "text": "Jeder nimmt an der Gesellschaft teil and benutzt Transport Systeme, fast jeda beclarked sich über die Transport Systeme.",
+      "stop_language": "en",
+      "offline": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "same_as_offline": false,
+      "offline_word_errors": 9,
+      "calls_with_words": 4,
+      "buffer_starts": 4,
+      "cli": "same"
+    },
+    {
+      "name": "fleurs-fr_fr-10174413140250646001.c1.fr",
+      "set": "language",
+      "clips": [
+        "fleurs-fr_fr-10174413140250646001"
+      ],
+      "chunk_samples": 16000,
+      "language": "fr",
+      "samples": 115200,
+      "pcm_sha256": "095c551c5214d9da384398f3bcf08c690a9bf776ab1d991cf78783310a423f2a",
+      "calls": 8,
+      "committed_words": 19,
+      "text": "Jan Carlo Fittiella a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "stop_language": "fr",
+      "offline": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "same_as_offline": false,
+      "offline_word_errors": 1,
+      "calls_with_words": 5,
+      "buffer_starts": 5,
+      "cli": "same"
+    },
+    {
+      "name": "ls-clean-6930-75918-0000.c1.en",
+      "set": "language",
+      "clips": [
+        "ls-clean-6930-75918-0000"
+      ],
+      "chunk_samples": 16000,
+      "language": "en",
+      "samples": 56080,
+      "pcm_sha256": "51efadc8c74ac6aed3972c75006d034908a6d73d99bd0af64705693bf1b89909",
+      "calls": 4,
+      "committed_words": 8,
+      "text": "Concord returned to its place amidst the tents.",
+      "stop_language": "en",
+      "offline": "Concord returned to its place amidst the tents.",
+      "same_as_offline": true,
+      "offline_word_errors": 0,
+      "calls_with_words": 2,
+      "buffer_starts": 2,
+      "cli": "same"
+    },
+    {
+      "name": "long-clean",
+      "set": "long",
+      "clips": [
+        "ls-clean-6930-75918-0000",
+        "ls-clean-6930-75918-0007",
+        "ls-clean-1320-122617-0003",
+        "ls-clean-1320-122617-0012",
+        "ls-clean-5639-40744-0011",
+        "ls-clean-5639-40744-0014",
+        "ls-clean-260-123440-0018",
+        "ls-clean-260-123440-0007",
+        "ls-clean-7729-102255-0045"
+      ],
+      "chunk_samples": 16000,
+      "samples": 718560,
+      "pcm_sha256": "d6ca1b3dcbfe50dcf21f86696510493507f4fd9e69d8601972163c3685c42039",
+      "calls": 45,
+      "committed_words": 134,
+      "text": "Concord returned to its place amidst the tents. \"You will be frank with me?\" \"I always am.\" There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind. Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive. She found the door, but it was locked outside. Among other things on which she cast her eyes was a small crucifix of solid silver, standing on a cabinet near the window. \"I am very tired of swimming about here. Oh, Mouse!\" \"I almost think I can remember feeling little different,\" Captain Martin said. \"I shall give you a pistol to help protect yourself if worse comes to worst.",
+      "stop_language": "en",
+      "offline": "Concord returned to its place amidst the tents. \"You will be frank with me? I always am.\" There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind. Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive. She found a door, but it was locked outside. Among other things on which she cast her eyes was a small crucifix of solid silver, standing on a cabinet near the window. I am very tired of swimming about here. Oh, mouse!\" I almost think I can remember feeling a little different. Captain Martin said, \"I shall give you a pistol to help protect yourself if worse comes to worst.\"",
+      "same_as_offline": false,
+      "offline_word_errors": 10,
+      "calls_with_words": 36,
+      "buffer_starts": 36,
+      "cli": "same"
+    },
+    {
+      "name": "long-other-gaps",
+      "set": "long",
+      "clips": [
+        "ls-other-7902-96591-0023",
+        "ls-other-7902-96591-0005",
+        "ls-other-7018-75788-0016",
+        "ls-other-7018-75788-0019",
+        "ls-other-4198-12281-0004",
+        "ls-other-4198-12281-0014",
+        "ls-other-3080-5040-0018",
+        "ls-other-3080-5040-0011",
+        "ls-other-8280-266249-0032"
+      ],
+      "gap_samples": 8000,
+      "chunk_samples": 16000,
+      "samples": 674480,
+      "pcm_sha256": "a6743ffef15d91f066d0b82be01ef01ce000f989826069842356b4a3c52ff6d2",
+      "calls": 43,
+      "committed_words": 112,
+      "text": "But there was no transfer for his body there, and the head would not go first. He could not help it. He hate the smugglers. You shall not tell.\" Presently the ship struck the mountain and broke up. and all in everything on board of her were plunged into the sea. But there is majesty, and there is no might save in Allah, the glorious, the great. By the belly of St. James, what shall we poor devils drink the while? Can you tell with what instruments they did it? \"Directed for your master. Here are some verses of Cowley's. Tell me how you like them.\" \"No, sir, he is not here.",
+      "stop_language": "en",
+      "offline": "But there was no chance for his body there, and the head would not go first. He could not help it. He hates the smugglers. You shall not tell. Presently the ship struck the mountain and broke up, and all and everything on board of her were plunged into the sea. But there is majesty, and there is no might save in Allah, the glorious, the great. By the belly of St. James, what shall we poor devils drink the while? \"Can you tell with what instruments they did?\" Directed for your master. Here are some verses of colonies. Tell me how you like them. \"No, sir, he is not here.",
+      "same_as_offline": false,
+      "offline_word_errors": 11,
+      "calls_with_words": 27,
+      "buffer_starts": 27,
+      "received_not_n_over_16000": 2,
+      "cli": "same"
+    },
+    {
+      "name": "long-silence-lead",
+      "set": "long",
+      "clips": [
+        "ls-clean-6930-75918-0000"
+      ],
+      "lead_samples": 520000,
+      "chunk_samples": 16000,
+      "samples": 576080,
+      "pcm_sha256": "7e8986f912a7dc73a3194734c98b0a7d68eae8d9a0df5d4eeea08c683eab6fe2",
+      "calls": 37,
+      "committed_words": 9,
+      "text": "Current Court returned to its place amidst the tents.",
+      "stop_language": "en",
+      "offline": "Concord returned to its place amidst the tents.",
+      "same_as_offline": false,
+      "offline_word_errors": 2,
+      "calls_with_words": 0,
+      "buffer_starts": 0,
+      "cli": "same"
+    },
+    {
+      "name": "edge-stop-only",
+      "set": "edge",
+      "clips": null,
+      "samples": 0,
+      "pcm_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "calls": 0,
+      "committed_words": 0,
+      "text": "",
+      "stop_language": "",
+      "calls_with_words": 0,
+      "buffer_starts": 0
+    },
+    {
+      "name": "edge-empty-call",
+      "set": "edge",
+      "clips": null,
+      "call_samples": [
+        0
+      ],
+      "samples": 0,
+      "pcm_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "calls": 1,
+      "committed_words": 0,
+      "text": "",
+      "stop_language": "",
+      "calls_with_words": 0,
+      "buffer_starts": 0
+    },
+    {
+      "name": "edge-empty-calls-after-speech",
+      "set": "edge",
+      "clips": [
+        "fleurs-de_de-10229344228128634115"
+      ],
+      "call_samples": [
+        48000,
+        0,
+        0
+      ],
+      "samples": 114240,
+      "pcm_sha256": "23c89546106d28494fbc463d76f7dfd4521eae021e19897973c8961069307956",
+      "calls": 3,
+      "committed_words": 9,
+      "text": "Jeder nimmt an der Gesellschaft Teil und benutzt Transport.",
+      "stop_language": "de",
+      "calls_with_words": 1,
+      "buffer_starts": 1
+    },
+    {
+      "name": "edge-30s-call",
+      "set": "edge",
+      "clips": null,
+      "lead_samples": 480000,
+      "call_samples": [
+        480000
+      ],
+      "samples": 480000,
+      "pcm_sha256": "124617c1f65e92d3bc895fbd869e4bb16a30754b198f59e6e973949b9aaa1b01",
+      "calls": 1,
+      "committed_words": 0,
+      "text": "",
+      "stop_language": "",
+      "calls_with_words": 0,
+      "buffer_starts": 0
+    },
+    {
+      "name": "edge-30s-plus-1-call",
+      "set": "edge",
+      "clips": null,
+      "lead_samples": 480001,
+      "call_samples": [
+        480001
+      ],
+      "samples": 480001,
+      "pcm_sha256": "bac06b80a55f7b83c2d7a83ba183d897cd621b462b5f118ea6f6f120f4ed2add",
+      "calls": 1,
+      "committed_words": 0,
+      "text": "",
+      "stop_language": "",
+      "calls_with_words": 0,
+      "buffer_starts": 0
+    }
+  ]
+}
