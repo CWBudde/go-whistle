@@ -11,6 +11,7 @@ import (
 	"github.com/cwbudde/go-whistle/internal/frontend"
 	"github.com/cwbudde/go-whistle/internal/safetensors"
 	"github.com/cwbudde/go-whistle/internal/weights"
+	"github.com/cwbudde/go-whistle/tools/oracle/probe"
 )
 
 // Pinned inputs as laid out by `whistle download` and `just oracle-run`.
@@ -19,6 +20,7 @@ const (
 	whistleCactPath        = "../../models/whistle/whistle.cact"
 	clipDir                = "../../testdata/audio"
 	oracleDir              = "../../testdata/oracle"
+	probeDir               = "../../testdata/oracle/probes"
 )
 
 // openModel opens a weight file or skips the test when it is missing.
@@ -83,20 +85,99 @@ func loadClips(t testing.TB, ids ...string) []clip {
 			t.Fatalf("%s: %v", id, err)
 		}
 
-		store, err := safetensors.OpenStore(filepath.Join(oracleDir, id+".embed.safetensors"), safetensors.StoreOptions{})
-		if err != nil {
-			t.Fatalf("%s: %v", id, err)
+		emb := readEmbed(t, filepath.Join(oracleDir, id+".embed.safetensors"))
+		out = append(out, clip{ID: id, Samples: samples, Embed: emb, Frames: len(emb) / 512})
+	}
+
+	return out
+}
+
+// readEmbed reads the [frames, 512] needle_embed rows of a fixture.
+func readEmbed(t testing.TB, path string) []float32 {
+	t.Helper()
+
+	store, err := safetensors.OpenStore(path, safetensors.StoreOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer store.Close()
+
+	ts, err := store.Tensor("embed")
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+
+	if len(ts.Shape) != 2 || ts.Shape[1] != 512 {
+		t.Fatalf("%s: embed shape %v", path, ts.Shape)
+	}
+
+	return ts.Data
+}
+
+// probeRecord is one entry of testdata/oracle/probes/manifest.json.
+type probeRecord struct {
+	probe.Spec
+
+	Frames    int    `json:"frames"`
+	PCMSHA256 string `json:"pcm_sha256"`
+}
+
+// loadProbes regenerates the named probes (all when names is empty) from
+// the manifest's parameters, checks each signal against the digest of the
+// one the engine embedded, and pairs it with the engine's rows
+// (docs/FINDINGS.md F-019, F-020).
+func loadProbes(t testing.TB, names ...string) []clip {
+	t.Helper()
+
+	raw, err := os.ReadFile(filepath.Join(probeDir, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var manifest struct {
+		Probes []probeRecord `json:"probes"`
+	}
+
+	err = json.Unmarshal(raw, &manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	byName := map[string]probeRecord{}
+	all := len(names) == 0
+
+	for _, p := range manifest.Probes {
+		byName[p.Name] = p
+
+		if all {
+			names = append(names, p.Name)
+		}
+	}
+
+	out := make([]clip, 0, len(names))
+
+	for _, name := range names {
+		p, ok := byName[name]
+		if !ok {
+			t.Fatalf("probe %s is not in the manifest", name)
 		}
 
-		ts, err := store.Tensor("embed")
-
-		store.Close()
-
+		x, err := p.Signal()
 		if err != nil {
-			t.Fatalf("%s: %v", id, err)
+			t.Fatal(err)
 		}
 
-		out = append(out, clip{ID: id, Samples: samples, Embed: ts.Data, Frames: int(ts.Shape[0])})
+		if got := probe.SHA256(x); got != p.PCMSHA256 {
+			t.Fatalf("%s: regenerated samples have sha256 %s, the engine embedded %s", name, got, p.PCMSHA256)
+		}
+
+		emb := readEmbed(t, filepath.Join(probeDir, name+".embed.safetensors"))
+		if len(emb) != p.Frames*512 {
+			t.Fatalf("%s: %d values, manifest %d frames", name, len(emb), p.Frames)
+		}
+
+		out = append(out, clip{ID: name, Samples: x, Embed: emb, Frames: p.Frames})
 	}
 
 	return out
