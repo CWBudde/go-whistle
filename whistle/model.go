@@ -32,6 +32,7 @@ type Model struct {
 	src      weights.Source
 	enc      *encoder.Encoder
 	dec      *decoder.Decoder
+	ladder   []*decoder.Decoder // ladder[n] runs depth n (docs/FINDINGS.md F-030); nil below 2
 	gate     *silence.Gate
 	strategy strategy
 	dim      int // encoder width, Embedding.Dim
@@ -112,8 +113,20 @@ func build(src weights.Source, path string, o loadOptions) (*Model, error) {
 
 	cfg := src.Config()
 
+	// Every ladder rung shares the weights; building them up front keeps
+	// Transcribe free of locks.
+	ladder := make([]*decoder.Decoder, cfg.DecLayers+1)
+	ladder[cfg.DecLayers] = dec
+
+	for n := 2; n < cfg.DecLayers; n++ {
+		ladder[n], err = dec.WithDepth(n)
+		if err != nil {
+			return nil, wrap(err)
+		}
+	}
+
 	return &Model{
-		src: src, enc: enc, dec: dec, gate: gate, strategy: beam{opt: search.Default()},
+		src: src, enc: enc, dec: dec, ladder: ladder, gate: gate, strategy: beam{opt: search.Default()},
 		dim: cfg.Dim, layers: cfg.DecLayers,
 	}, nil
 }

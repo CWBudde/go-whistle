@@ -273,7 +273,7 @@ func TestBeamClock(t *testing.T) {
 
 	clk := newClock(func() time.Time { ms += time.Millisecond; return time.Unix(0, 0).Add(ms) })
 
-	out, err := beam{opt: opt}.decode(m.dec, mem, "", clk)
+	out, err := beam{opt: opt}.decode(m.dec, mem, request{}, clk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,9 +415,7 @@ func TestTranscribeOptionsRejected(t *testing.T) {
 		unsupp  bool
 		message string
 	}{
-		{"keywords", TranscribeOptions{Keywords: []string{"Siobhan"}}, true, "keywords"},
 		{"timestamps", TranscribeOptions{WordTimestamps: true}, true, "word timestamps"},
-		{"depth 4", TranscribeOptions{Depth: 4}, true, "depth 4"},
 		{"depth 1", TranscribeOptions{Depth: 1}, false, "outside 2..8"},
 		{"depth 9", TranscribeOptions{Depth: 9}, false, "outside 2..8"},
 		{"language", TranscribeOptions{Language: "xx"}, false, `unknown language "xx"`},
@@ -428,9 +426,11 @@ func TestTranscribeOptionsRejected(t *testing.T) {
 		}
 	}
 
-	_, err := m.Transcribe(pcm, TranscribeOptions{Depth: 8})
-	if err != nil {
-		t.Errorf("depth 8 (full): %v", err)
+	for _, opts := range []TranscribeOptions{{Depth: 8}, {Depth: 2}, {Depth: 7}, {Keywords: []string{"Siobhan"}}} {
+		_, err := m.Transcribe(pcm, opts)
+		if err != nil {
+			t.Errorf("%+v: %v", opts, err)
+		}
 	}
 }
 

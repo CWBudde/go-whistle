@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cwbudde/go-whistle/internal/decoder"
 	"github.com/cwbudde/go-whistle/internal/frontend"
+	"github.com/cwbudde/go-whistle/internal/search"
 )
 
 var (
@@ -28,14 +30,18 @@ type TranscribeOptions struct {
 	// Language forces the language ("en", "de", "fr", "es", "it", "nl",
 	// "pl"); empty detects it.
 	Language string
-	// Keywords are words or phrases to favour (keyword biasing). Not yet
-	// supported (PLAN.md 6.3).
+	// Keywords are words or phrases to favour, the engine's keyword
+	// biasing (docs/FINDINGS.md F-029). Each entry is trimmed and its inner
+	// white space collapsed; empty entries are dropped. An entry holding
+	// newlines is split like the engine's --audio-keywords file.
 	Keywords []string
 	// WordTimestamps adds Result.Words. Not yet supported (PLAN.md
 	// Phase 7).
 	WordTimestamps bool
 	// Depth is the number of decoder layers to run, 2 up to the full 8; 0
-	// is full. Only the full depth is supported yet (PLAN.md 6.4).
+	// is full. It is the engine's endpoint-preserving ladder
+	// (--audio-depth, docs/FINDINGS.md F-030): fewer layers decode faster
+	// and less accurately.
 	Depth int
 }
 
@@ -70,6 +76,11 @@ func (m *Model) transcribe(pcm []float32, opts TranscribeOptions, now func() tim
 		return Result{}, err
 	}
 
+	req, err := m.request(opts)
+	if err != nil {
+		return Result{}, err
+	}
+
 	err = checkLength(len(pcm))
 	if err != nil {
 		return Result{}, err
@@ -92,12 +103,13 @@ func (m *Model) transcribe(pcm []float32, opts TranscribeOptions, now func() tim
 		return Result{}, wrap(err)
 	}
 
+	// One Memory serves every ladder depth (F-030).
 	mem, err := m.dec.Memory(enc, frames)
 	if err != nil {
 		return Result{}, wrap(err)
 	}
 
-	out, err := m.strategy.decode(m.dec, mem, opts.Language, clk)
+	out, err := m.strategy.decode(m.decoder(opts.Depth), mem, req, clk)
 	if err != nil {
 		return Result{}, wrap(err)
 	}
@@ -126,23 +138,45 @@ func (m *Model) check(opts TranscribeOptions) error {
 		return fmt.Errorf("whistle: unknown language %q, want one of %s", opts.Language, strings.Join(m.Languages(), ", "))
 	}
 
-	if len(opts.Keywords) > 0 {
-		return fmt.Errorf("whistle: keywords: %w", ErrNotSupported)
-	}
-
 	if opts.WordTimestamps {
 		return fmt.Errorf("whistle: word timestamps: %w", ErrNotSupported)
 	}
 
-	switch {
-	case opts.Depth == 0 || opts.Depth == m.layers:
-	case opts.Depth < 2 || opts.Depth > m.layers:
+	if opts.Depth != 0 && (opts.Depth < 2 || opts.Depth > m.layers) {
 		return fmt.Errorf("whistle: depth %d outside 2..%d", opts.Depth, m.layers)
-	default:
-		return fmt.Errorf("whistle: depth %d: %w", opts.Depth, ErrNotSupported)
 	}
 
 	return nil
+}
+
+// request builds the decoding settings of one call: the forced language
+// and the keyword automaton (docs/FINDINGS.md F-029), nil without keywords.
+func (m *Model) request(opts TranscribeOptions) (request, error) {
+	req := request{lang: opts.Language}
+
+	keywords := search.ParseKeywords(strings.Join(opts.Keywords, "\n"))
+	if len(keywords) == 0 {
+		return req, nil
+	}
+
+	kw, err := search.NewKeywords(m.dec.Tokenizer(), keywords, search.DefaultBias())
+	if err != nil {
+		return request{}, fmt.Errorf("whistle: keywords: %w", err)
+	}
+
+	req.adjust = kw.Adjust
+
+	return req, nil
+}
+
+// decoder is the decoder at ladder depth n, 0 for the full depth; check has
+// validated n.
+func (m *Model) decoder(n int) *decoder.Decoder {
+	if n == 0 {
+		return m.dec
+	}
+
+	return m.ladder[n]
 }
 
 // checkLength enforces the 30 s limit of one pass.

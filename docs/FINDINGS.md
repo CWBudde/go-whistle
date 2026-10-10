@@ -2197,7 +2197,8 @@ are wrong (mel 2–79), pink noise opens the gate (full band), and so do the ste
   of every later step counts one token. `decode_tps` is thus a rate over the search's steps, which continue after the
   winner's EOS until 5 hypotheses have finished. An `Adjust` already in the options (keywords, 6.3) runs after the
   clock (`TestBeamClock`).
-- Keywords and depths 2–7 still return `ErrNotSupported`; they follow 6.3 and 6.4.
+- Keywords and depths 2–7 were wired in after 6.3 and 6.4 merged: `TranscribeOptions.Keywords` runs F-029's bias
+  after the clock, `Depth` runs F-030's ladder rung on the same `Memory`.
 
 **32 fixture clips through `Transcribe`** (`TestTranscribeMatchesEngine`, all 32 without `-short`):
 
