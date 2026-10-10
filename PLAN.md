@@ -590,21 +590,63 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       re-derived over 250–3500 Hz (the shipped bank is full band) and a time-domain band-pass (no stated shape)
       (`docs/FINDINGS.md` F-012).
 
-## Phase 4 — Encoder (reverse engineering)
+## Phase 4 — Encoder (reverse engineering) — ✅ DONE (2026-10-10)
 
-- [ ] Stem: a 2-D conv with candidate strides (2,2) on all three convs vs. stride only on the depthwise stages; padding
+- [x] Stem: a 2-D conv with candidate strides (2,2) on all three convs vs. stride only on the depthwise stages; padding
       SAME or VALID; activation (SiLU, GELU or none) after each stage. Pin the frame count: 3000 → 375.
+      (2026-10-10) — `internal/encoder` stem on the new `ops.Conv2D` (NHWC/HWIO, strides, per-side padding, groups;
+      float64-reference and hand-computed tests, `ops.SamePadding` = lax SAME). Stride-2 on all three convs: stride
+      only on the depthwise stages (20 mel positions) and VALID (9) do not fit `stem/out`'s 1280 = 10 × 128 and are
+      rejected at load (`ErrRuledOut`); 3000 mel frames → 375 and the engine's frame rule hold (`TestStemFrames`,
+      `TestEmbed30s`). Chosen by score (inner clips, `.cact`, leader 0.999819): zero padding 1 on every side, torch
+      style (lax SAME −0.243827); kernel [time, mel] (swapped −0.509124); channel-major NCHW flatten, mel fastest
+      (NHWC −0.713620); SiLU after `stem/w` (GELU −0.000569, none −0.063222), nothing after the depthwise convs (SiLU
+      −0.092369), SiLU after the pointwise convs (GELU −0.027121, none −0.815920); no input scale (×√512 −0.837042)
+      (`docs/FINDINGS.md` F-016).
 - [ ] Encoder block candidates:
   - FFN residual scale 1 or ½ (macaron)
   - conv module: GLU over pw1's 1024 channels or not; SiLU after dw; any normalisation between dw and pw2
   - attention: full non-causal; RoPE in the encoder or not
   - where `pe_gate` applies: a sinusoidal or RoPE mix-in gated by σ(pe_gate), or on the stem output
   - how mHC wraps the block (same as the decoder, `enc_lanes` 4)
-- [ ] Hypothesis harness `internal/encoder/probe_test.go` (build tag `oracle`): enumerate the combinations, run the
+
+  (2026-10-10) — partial: everything but `pe_gate` is resolved by score (F-017). FFN ½ (1: −0.622692); GLU a·σ(b)
+  over pw1's halves ("no GLU" ruled out by the 512-wide `dw`; a·silu(b) −0.403596, σ(a)·b −0.978467); SiLU after
+  `dw` (GELU −0.005362, none −0.820849); `conv_out_norm` between `dw` and the SiLU (after it −0.185564, after `pw2`
+  −0.896173); centred kernel-9 `dw` (causal −0.907688); macaron order (conv first −0.415660); full non-causal
+  attention with half-split RoPE θ = 1e5 (θ 1e4 −0.029625, none −0.221335); mHC exactly as the decoder, 4 lanes
+  (plain stack −0.678340); shared `hada_p1/p2`, so U5 is settled (split −0.980344, identity −0.977999). Open:
+  `pe_gate`. σ(pe_gate) = 0.0022 makes a sinusoid −70 dB below the stem output (RMS 0.0016 against 4.6–5.1), so
+  adding it to the stem output either way changes the score by ≤ 1e-6. A RoPE mix replaces the winning RoPE
+  (−0.221535). `Best()` leaves it unused; the embeddings cannot decide it.
+
+- [x] Hypothesis harness `internal/encoder/probe_test.go` (build tag `oracle`): enumerate the combinations, run the
       encoder on the fixture clips and score each by the mean per-frame cosine against `needle_embed`. Prune greedily by stage.
-- [ ] Confirm what `needle_embed` actually returns: the shape, and whether it is before or after `final_norm` and the lane mean.
-- [ ] **Accept:** mean per-frame cosine ≥ 0.99 against the engine on all fixture clips. Every resolved unknown is
+      (2026-10-10) — `just encoder-probe`. `encoder.Hypothesis` = `frontend.Options` + 19 typed encoder axes with
+      named values (the PLAN candidates plus kernel axis order, flatten order, input scale, GLU forms, depthwise
+      padding, module order, mHC on/off, permutation sets, output tap). The harness rules out by shapes and by frame
+      count, caches the mel and the stem output, and runs pairs on all cores (32 clips in about 0.3 s). Baselines:
+      the mean engine frame of the other clips scores 0.2349 and a random mel projection −0.0048, so about 0.23 means
+      no signal. Search: 7 stages (stem geometry, stem activations, front end log/norm/spec, conv module, block
+      structure, positions/output, front end window/padding/band/pre), each the full product around a beam of 4.
+      Then coordinate descent with escalating moves (single axes, then axis pairs, then whole stages; any change
+      restarts from single axes) until no level moves the leader, then a per-axis sensitivity table. On `.cact`
+      weights it goes 0.2485 → 0.7749 (stem geometry) → 0.9992 (RoPE) → 0.9998 (descent, `log`) in about 3 min.
+      Started from a hypothesis wrong on all 26 axes (0.0179), it reaches the same leader in 7.5 min; without the
+      pair and stage moves it stalled at 0.753. Fast regression without the tag: `TestBestMatchesEngine` (F-014).
+- [x] Confirm what `needle_embed` actually returns: the shape, and whether it is before or after `final_norm` and the lane mean.
+      (2026-10-10) — `[frames, 512]`, `enc.final_norm` of the lane mean. Every one of the 2205 engine rows divided by
+      (1 + the `.cact` FP16 `enc.final_norm` gain) has RMS 1 within 1.8e-7, which only a ZCRMSNorm output has
+      (`TestEmbedIsFinalNormOutput`). Before `final_norm`, the lane mean scores −0.396920 (F-015).
+- [x] **Accept:** mean per-frame cosine ≥ 0.99 against the engine on all fixture clips. Every resolved unknown is
       written to `docs/FINDINGS.md` with its metrics.
+      (2026-10-10) — `encoder.Best()` with the dequantised `.cact` weights: mean per-frame cosine 0.999539 over the 32
+      clips, every clip ≥ 0.992932 (fleurs-fr_fr-10174413140250646001; next 0.9981, all others ≥ 0.9992). The float
+      safetensors weights give 0.921019 (min 0.881934), so the engine runs the quantised weights. The frames below
+      0.995 are near-silent (peak |x| < 3e-3): the log floor for quiet frames is the remaining gap. Front end (U1)
+      decided as far as the embeddings allow: power spectrum, Whisper log clamp, per-channel norm, full band (the
+      "250–3500 Hz" mask is ruled out), no pre-emphasis; window and reflect vs zero padding tie (F-018). Findings
+      F-014 to F-018.
 
 ## Phase 5 — Decoder + greedy decoding
 
