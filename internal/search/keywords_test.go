@@ -212,3 +212,35 @@ func TestKeywordPerCharBytes(t *testing.T) {
 		t.Errorf("Bonus(%q) = %g, want 2 characters", kw, got)
 	}
 }
+
+// TestKeywordLong: a spelling longer than 64 tokens works like a short one:
+// it completes, a failure takes back only the tokens no completed keyword
+// covers, and a keyword completed inside it past token 64 keeps its tokens.
+func TestKeywordLong(t *testing.T) {
+	const n = 100
+
+	long := make([]int, n)
+	for i := range long {
+		long[i] = 10 + i
+	}
+
+	inner := long[70:75] // also a keyword, completed at position 75
+	k := build([][]int{long, inner}, unit, Bias{Weight: 1, Revoke: 1, Complete: 0.5, Forms: FormSpace})
+
+	if got := k.Bonus(long, -1); got != n+2*0.5 {
+		t.Errorf("Bonus(long) = %g, want %g", got, n+2*0.5)
+	}
+
+	// The first 80 tokens, then a token outside the automaton: all but the
+	// five of the inner keyword are taken back.
+	if got := k.Bonus(append(slices.Clone(long[:80]), 99), -1); got != 5+0.5 {
+		t.Errorf("Bonus(long[:80] + miss) = %g, want 5.5", got)
+	}
+
+	row := make([]float64, 200)
+	k.Adjust(long[:n-1], row)
+
+	if want := 1 + 0.5; row[long[n-1]] != want {
+		t.Errorf("Adjust before the last token: %g, want %g", row[long[n-1]], want)
+	}
+}

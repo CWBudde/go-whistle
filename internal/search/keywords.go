@@ -133,7 +133,7 @@ type Keywords struct {
 // belong to a completed keyword (bit i for the path's token i).
 type kwState struct {
 	n   int
-	cov uint64
+	cov bitset
 }
 
 // textStart is the token in front of every text that anchors the bare
@@ -143,9 +143,51 @@ const (
 	noToken   = -1
 )
 
-// maxKeywordTokens is the longest spelling, in tokens, that the coverage
-// bits of kwState hold.
-const maxKeywordTokens = 63
+// bitset is a set of path positions, bit i of word i/64 for position i.
+// It is never written in place: a state shares it with the states it was
+// derived from.
+type bitset []uint64
+
+// has reports whether position i is in b.
+func (b bitset) has(i int) bool {
+	w := i / 64
+
+	return w < len(b) && b[w]>>(i%64)&1 != 0
+}
+
+// shift is b without its first n positions, the rest moved down by n.
+func (b bitset) shift(n int) bitset {
+	if n == 0 {
+		return b
+	}
+
+	skip, off := n/64, n%64
+	if skip >= len(b) {
+		return nil
+	}
+
+	out := make(bitset, len(b)-skip)
+	for i := range out {
+		out[i] = b[skip+i] >> off
+		if off > 0 && skip+i+1 < len(b) {
+			out[i] |= b[skip+i+1] << (64 - off)
+		}
+	}
+
+	return out
+}
+
+// with is b plus the positions [lo, hi).
+func (b bitset) with(lo, hi int) bitset {
+	out := make(bitset, max(len(b), (hi+63)/64))
+	copy(out, b)
+
+	for i := lo; i < hi; i++ {
+		out[i/64] |= 1 << (i % 64)
+	}
+
+	return out
+}
 
 // NewKeywords tokenises the keywords in the forms of b with tok and builds
 // the automaton.
@@ -159,10 +201,7 @@ func NewKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) (*Keywords
 		return nil, fmt.Errorf("%w: forms %b match neither after a space nor bare", ErrKeywords, b.Forms)
 	}
 
-	ids, err := encodeKeywords(tok, keywords, b)
-	if err != nil {
-		return nil, err
-	}
+	ids := encodeKeywords(tok, keywords, b)
 
 	weight := func(int) float64 { return b.Weight }
 	if b.PerChar {
@@ -174,7 +213,7 @@ func NewKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) (*Keywords
 
 // encodeKeywords tokenises the spellings of the keywords under b, a bare
 // one behind textStart.
-func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) ([][]int, error) {
+func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) [][]int {
 	var ids [][]int
 
 	for _, kw := range keywords {
@@ -186,10 +225,6 @@ func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) ([][]in
 		for _, w := range words {
 			for _, s := range spellings(w, b.Forms) {
 				e := tok.Encode(s)
-				if len(e) > maxKeywordTokens {
-					return nil, fmt.Errorf("%w: %q is %d tokens, more than %d", ErrKeywords, s, len(e), maxKeywordTokens)
-				}
-
 				if len(e) > 0 && !strings.HasPrefix(s, " ") {
 					e = append([]int{textStart}, e...)
 				}
@@ -199,7 +234,7 @@ func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) ([][]in
 		}
 	}
 
-	return ids, nil
+	return ids
 }
 
 // pieceChars is the number of characters token id spells: the runes of its
@@ -413,12 +448,12 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 	}
 
 	depth := len(k.ws[c])
-	cov := st.cov >> drop
+	cov := st.cov.shift(drop)
 	d += k.ws[c][depth-1]
 
 	for _, l := range k.out[c] {
 		d += k.bias.Complete
-		cov |= (uint64(1)<<l - 1) << (depth - l)
+		cov = cov.with(depth-l, depth)
 	}
 
 	return kwState{n: c, cov: cov}, d
@@ -426,11 +461,11 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 
 // revoke is the bonus taken back for the dropped tokens ws, those not in a
 // completed keyword by cov.
-func (k *Keywords) revoke(ws []float64, cov uint64) float64 {
+func (k *Keywords) revoke(ws []float64, cov bitset) float64 {
 	lost := 0.0
 
 	for i, w := range ws {
-		if cov&(1<<i) == 0 {
+		if !cov.has(i) {
 			lost += w
 		}
 	}
