@@ -3169,3 +3169,174 @@ regressions, model-gated and skipped without `models/`, with bounds just outside
   pages it duplicates (F-034's in-register transpose), so that the GC does not double it.
 - **TTFT.** Sharing one FWHT of an activation between the matrices that read it (q/k/v, the three φ, k/v of the memory),
   and 9.5's parallelism over row blocks for the batched products.
+
+## F-038 — Parallelism: the encoder over time blocks and heads, shared rotations, the stem in chunks (9.5) (2026-10-10)
+
+**Question.** Since 9.2 every linear layer runs `internal/cq`'s single-threaded lut kernel. `tensor.Workers()` defaulted
+to 1 and nothing called `SetWorkers`, and `tensor.MatMulTransB`, which `internal/needle` uses for every float product,
+ignored it anyway. So the whole encoder ran on one core; only `search`'s beams used more (one goroutine each, F-026).
+Where does parallelism pay, can every output stay the same bit for bit, and do F-037's two open levers (one rotation per
+activation for all matrices that read it, the stem in time chunks) hold?
+
+**Starting point.** A CPU profile of `Embed` on the 30 s clip (the first corpus clip tiled, M5 Pro, packed): 279 ms,
+the stem 25 % (its SiLUs, a float64 `math.Exp` per value, 56 % of that; the convs 32 %), the 8 layers 75 %.
+`TestSpeedProbe` before: median TTFT 58.8 ms packed, 56.1 ms float; the 30 s clip 309 / 288 ms (load average 2.0–3.2).
+
+### Design
+
+**One worker pool for all kernels** (`internal/tensor`). `tensor.Parallel(n, grain, fn)` runs `fn` on pieces of
+`[0, n)` on the calling goroutine and helpers. Three rules make it safe to nest and to call from many goroutines:
+
+- **One helper budget for the process.** A helper starts only while fewer than `Workers() − 1` run, counted over all
+  calls at once; a caller that finds the budget used runs its pieces itself. So a GEMM inside a loop over heads, or the
+  five beams each running their own GEMVs, never add more than `Workers() − 1` goroutines to their callers.
+  `TestParallelBoundsHelpers` runs Parallel inside Parallel from five goroutines on 4 workers: never more than 5 + 3
+  run `fn` at once, and the budget is back at 0 after.
+- **Pieces fixed by n, grain and Workers() only**, not by how many helpers are free. Each starts at a multiple of grain.
+  Up to 4 · `Workers()` pieces whose sizes differ by at most one grain, taken in turn by whoever is free: a core that
+  another process holds up takes fewer. The first version cut `ceil(units / w)`-sized pieces, which left the stem's 47
+  chunks in 12 pieces on 15 workers.
+- **The default is GOMAXPROCS, read once at start-up.** `runtime.GOMAXPROCS(0)` takes the scheduler's lock; called on
+  every `Parallel`, it showed up as 2.5 s of lock contention in a 8 s profile. `SetWorkers(1)` restores single-threaded
+  kernels.
+
+`MatMulTransB` splits a product of at least 2²⁰ multiply-adds: over the rows of a from 8 rows on, else over the rows
+of b (the decoder's GEMVs), in pieces that start at multiples of 4. The NEON kernel computes 4×4 blocks of rows and
+1×4 blocks for the leftover rows, and a 4×4 block sums in another order than a 1×4 one, so a split that moved the block
+boundaries would change the last bits. With pieces aligned to 4, every block stays as it is in one call
+(`TestMatMulTransBWorkers`, nine shapes with row and column splits, k tails and leftover rows: equal bit for bit on 1,
+2, 3, 7 and 16 workers).
+
+**cq** (`internal/cq`). The lut kernel splits a product over its activations when there are at least `Workers()` of
+them, or when one activation's work is below 2 · 2¹⁸ index bytes; else, for a single large product (the tied head,
+8199 rows), it builds the tables once and splits the lookup over the blocks of 32 rows. Both splits leave every output
+the same sum in the same order: an activation's tables do not depend on the split, and `lutLookup` computes every row of
+a block on its own. The scalar kernels split over activations in multiples of four, so `nibble4` (purego, amd64 without
+AVX2) sees the same groups of four. `TestGEMMWorkers`: every kernel on 1, 2, 5 and 16 workers, through `Rows` views that
+start and end inside a block, equal bit for bit, and the lut kernel also equal to its unsplit Go reference.
+
+**One rotation and one table build per activation** (`cq.GEMMs`, `needle.ApplyShared`). `.cact` stores one codebook
+per width, so every CQ2 matrix of input width 512 builds the same tables from the same activation. `GEMMs` rotates and
+tabulates each activation once and looks it up in every matrix: q, k, v and the gate's projection in `needle.Attention`
+(the encoder's, and the decoder's per step), the three mHC φ (CQ4, 2048 wide, the costliest tables per output, F-037),
+and the engram's key and value projections. The result is the same bits as a GEMM per matrix (`TestGEMMsMatchesGEMM`,
+`TestApplySharedMatchesApply`), so this is exact. `BenchmarkGEMMs` (`-cpu 1`, median of three): q, k, v and
+gate 6.47 against 8.20 µs per decode step and 2.43 against 3.04 ms over 375 frames (1.25×); the φ 7.43 against 13.2 µs
+and 2.80 against 4.96 ms (1.77×). On 15 cores over 375 frames: 0.35 against 0.70 ms and 0.34 against 1.02 ms.
+
+**needle** (`internal/needle`). The attention runs its (head, query row) pairs on `Parallel`, in blocks of rows that
+start at multiples of 4 within a head, so that its Q·Kᵀ and P·V GEMMs keep their 4-row blocks. The norms, the sigmoid
+gate, `HadamardMLP`'s rows and the mHC's per-row heads and mix run over row ranges; each row is computed on its own.
+In a decoder step (t = 1) the row loops are one piece and stay on the calling goroutine; of
+its products only the tied head (8199 rows, packed or float) is large enough to split.
+
+**encoder** (`internal/encoder`). The conv module's GLU, depthwise conv and activation run over row ranges. The stem
+runs in chunks of 8 output frames (`stemChunk`), on `Parallel`. For its output frames [o0, o1), a chunk works back
+through the three stride-2 convs to the rows each needs, and pads its slice of rows only where the whole axis is padded,
+so each conv pixel reads the same taps in the same order as in one call. The activations work value by value; the
+pointwise products (`stem.pw_*`, `stem.out`) sum some rows in blocks of 4 (the NEON float GEMM, `nibble4`), so a chunk
+must start on such a block: true for Best's mel widths of 20 and 10, not for VALID padding's 19 and 9, which the
+weights rule out anyway (F-016). A chunk recomputes one shared row per stride-2 stage: 35 rows of the first conv's 1500
+for 8 frames (32 without the overlap), 9 % more for that conv. Instead of 1500 × 40 × 128 floats (29.3 MiB, F-037) at
+once, each worker holds one chunk's 35 × 40 × 128 (0.7 MiB).
+
+**The decoder over beams** stays as it was: `search` runs each hypothesis' `Extend` on its own goroutine (F-026). With
+the kernels now parallel too, the five beams and their kernels share the one helper budget. Nothing in
+`internal/decoder` or `internal/search` changed.
+
+### Bit for bit
+
+Every split keeps each output's sums in the same order, so outputs do not depend on the worker count, and with one
+worker they equal the code before. The tests, all on random data without `models/` unless marked, pass on arm64, under
+`purego` and on linux/amd64 (AVX2, Docker emulation), also under `-race`:
+
+| test                                                         | compares                                                          |
+| ------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `TestParallelPieces`, `TestParallelBoundsHelpers` (`tensor`) | pieces cover once, aligned, even; nested callers stay in budget   |
+| `TestMatMulTransBWorkers` (`tensor`)                         | 1 vs 2, 3, 7, 16 workers, row and column splits                   |
+| `TestGEMMWorkers`, `TestGEMMsMatchesGEMM` (`cq`)             | every kernel 1 vs N; lut vs its unsplit reference; shared vs not  |
+| `TestApplySharedMatchesApply`, `Test*Workers` (`needle`)     | packed and float attention (encoder, causal with cache), MLP, mHC |
+| `TestStemChunks` (`encoder`)                                 | chunks vs `whole` for 9 clip lengths, 6 stem geometries, 1 vs 16  |
+| `TestWhistleStemChunks`, `TestWhistleEmbedWorkers` (model)   | real weights, packed and float, a short clip and 30 s             |
+
+Against `origin/main` (62a4458), with a throwaway test in both trees: the `Embed` rows of all 32 corpus clips (one tiled
+to 30 s) hash the same, packed and float, and so do the text, language, word times and word probabilities (float64
+bits) of `Transcribe` on the 32 clips and the 30 s clip with word timestamps, with `Depth` 4 and with two keywords.
+
+### Speed
+
+`TestSpeedProbe` (packed and float in one process, alternating, F-037) on the M5 Pro (5 + 10 cores). Other sessions kept
+the load average at 4–7, so the old (`origin/main`) and the new test binaries ran alternately, two rounds each, in the
+same minutes; the ranges are the two rounds. `WHISTLE_SPEED_WORKERS=1` (new) runs the kernels on one worker,
+`GOMAXPROCS=1` runs everything, the beams too, on one core.
+
+| median                 | old           | new           | new, 1 worker  | old, 1 core   | new, 1 core   |
+| ---------------------- | ------------- | ------------- | -------------- | ------------- | ------------- |
+| TTFT, 32 clips, packed | 65.3–67.1 ms  | 21.2–21.3 ms  | 59.0–59.9 ms   | 59.4–62.4 ms  | 54.9–61.2 ms  |
+| TTFT, 32 clips, float  | 60.7–62.9 ms  | 23.4–24.0 ms  | 60.7–60.9 ms   | 56.0–59.6 ms  | 55.9–62.4 ms  |
+| TTFT, 30 s, packed     | 332–337 ms    | 66–67 ms      | 300–327 ms     | 307–314 ms    | 290–324 ms    |
+| TTFT, 30 s, float      | 311–314 ms    | 72–75 ms      | 303–333 ms     | 284–291 ms    | 292–312 ms    |
+| decode, packed         | 819–947 tok/s | 960–961 tok/s | 991–1012 tok/s | 243–252 tok/s | 233–270 tok/s |
+| decode, float          | 539–570 tok/s | 543–545 tok/s | 564–566 tok/s  | 143–149 tok/s | 128–149 tok/s |
+
+So TTFT is 3.1× (32 clips) and 5.0× (30 s) shorter packed, 2.6× and 4.2× float; packed is now faster than float on
+both. A first run at a load average of 2–3 gave 58.8 → 19.8 ms and 309 → 67 ms packed, 56.1 → 22.3 ms and
+288 → 73 ms float. On one core the new code is within the noise of the old: the shared rotations and the chunked stem
+save some 5–10 % there, and the split costs nothing.
+
+`just eval-librispeech` (200 utterances, sequential, load 4): RTF 0.0086, 67 ms per utterance; F-037 had 0.0188.
+
+**The decoder over beams.** One core decodes 233–270 tok/s packed, all cores 960–1060: the beams' goroutines give the
+4×, as before. The only decode product big enough to split is the tied head (lut 97 → 39 µs on 15 cores, float 193 →
+75 µs, `BenchmarkGEMM`). Three more alternating rounds (load 3–5) compared the new build with a build that does not
+split single activations: 1028–1060 against 1000–1044 tok/s packed, so the head split stays. With one kernel worker the
+decode rate is 1070–1081 tok/s, and the no-split build gives 1055–1078 on one worker against 1000–1044 on all, with the
+same decode work: the 3–5 % that the parallel encoder costs the following decode steps is not in the steps' own
+kernels (whose splits are the head only). It may be the cores' clocks or the GC after the burst; it is not resolved.
+
+**Nested parallelism.** Beams × kernel workers stays bounded by the helper budget: 5 beams plus at most 14 helpers
+(`TestParallelBoundsHelpers`). Below the piece sizes (2²⁰ multiply-adds for the float GEMM, 2 · 2¹⁸ index bytes for the
+lut kernel, 16 to 128 rows for the row loops) nothing splits, so a decode step's projections, norms and MLP run on its
+beam's goroutine.
+
+**Where the 30 s TTFT goes now** (a throwaway phase timer, packed, load 6): log-mel 6 ms (single-threaded,
+`internal/frontend`), stem 11 ms, the 8 blocks 39 ms (attention 17, conv module 12, the two MLPs 10), the mHC around them
+9 ms, then the cross-attention memory and the first decode step. The attention at t = 375 takes 4.4 ms on one worker and 1.2 ms on 8 or 15
+(load 6). In a CPU profile of 40 `Embed` calls, about half of the samples are the scheduler (idle cores waking and
+looking for work) and 8.5 % are `madvise`: the GC hands freed pages back, and the next large `make` asks for them
+again (about 17 collections per `Embed`).
+
+### Memory
+
+`just mem-probe` (F-037), alternating the old and new binaries, two rounds, load 3.5–4:
+
+| MiB                                   | old           | new           | old, 1 core   | new, 1 core   |
+| ------------------------------------- | ------------- | ------------- | ------------- | ------------- |
+| packed: process after `Load`          | 41.5 / 41.4   | 41.5 / 41.7   |               |               |
+| packed: peak over a 30 s `Transcribe` | 127.6 / 126.8 | 108.1 / 106.4 | 126.4 / 123.0 | 97.5 / 97.7   |
+| packed: model (live heap + `.cact`)   | 34.3 / 34.2   | 34.9 / 34.7   | 32.9 / 32.9   | 32.9 / 32.9   |
+| float: peak                           | 489.3 / 489.0 | 494.1 / 495.2 | 488.8 / 489.1 | 489.6 / 489.5 |
+
+On one core the chunked stem alone takes 26–29 MiB off the packed peak (the 29.3 MiB of F-037). On 15 cores the workers'
+buffers live at the same time and give some 10 MiB back, and the scratch pools keep about 0.6 MiB more. What is left
+of the 106–108 MiB is the GC's headroom: during the decode the live heap is 29–40 MiB (20 MiB weights, 10 MiB
+cross-attention memory, the beams), and `GOGC=100` lets the heap grow to twice that before a collection
+(`GODEBUG=gctrace=1`: 70–84 MiB heaps).
+
+### Parity
+
+All outputs are the same bits as before, so every parity number is unchanged, packed and float:
+`TestTranscribeMatchesEngine` 31/32 (the same 32 transcripts), `TestEmbedMatchesEngine` 0.999827 (floor 0.9998), the
+depth and keyword regressions pass, `just eval-librispeech` WER 223/4167 = 5.35 % (engine 5.30 %), `just stream-parity`
+797/930 calls with an equal decision.
+
+### Open
+
+- **The decoder's cross-attention memory** (`internal/decoder/cross.go`, k and v of 375 frames) still rotates the
+  encoder output twice. `needle.ApplyShared` takes both projections as they are; it is a two-line change in a package
+  outside 9.5's scope.
+- **Allocation.** Each block allocates its intermediates afresh, 0.8–3 MB each for 30 s, so the GC runs about 17 times
+  per `Embed` and `madvise` shows in the profile; reusing buffers per layer would cut both the time and the GC headroom
+  of the peak.
+- **The log-mel front end** (6 ms of the 30 s TTFT) is single-threaded.
+- **The 3–5 % decode cost after a parallel encoder** (above).
