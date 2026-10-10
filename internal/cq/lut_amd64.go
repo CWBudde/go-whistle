@@ -47,6 +47,10 @@ func lutLookup(y []float32, idx, tab []byte, norm, steps []float32, blocks, grou
 		return
 	}
 
+	if blocks == 0 {
+		return
+	}
+
 	_ = y[blocks*lutRows-1]
 	_ = idx[blocks*groups*gb*lutRows-1]
 	_ = tab[64*groups*gb-1]

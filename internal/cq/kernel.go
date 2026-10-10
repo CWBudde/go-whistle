@@ -99,6 +99,10 @@ func (m *Matrix) gemm(k kernel, dst, x []float32, rows int) {
 		panic(fmt.Sprintf("cq: GEMM(len %d, len %d, %d rows) on [%d, %d]", len(dst), len(x), rows, m.out, m.in))
 	}
 
+	if rows == 0 || m.out == 0 {
+		return // no block to look up: the assembly lut kernels index y[blocks*32-1]
+	}
+
 	s, _ := m.scratch.Get().(*scratch)
 	defer m.scratch.Put(s)
 
