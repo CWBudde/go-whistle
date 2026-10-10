@@ -32,7 +32,7 @@ func TestKronApplyMatchesDense(t *testing.T) {
 		}
 
 		got := make([]float32, n)
-		kronApply(got, z, a, na, b, nb, make([]float32, n))
+		kronApply(got, z, transposed(a, na), na, transposed(b, nb), nb, make([]float32, n))
 
 		var refMax float64
 		for _, w := range want {
