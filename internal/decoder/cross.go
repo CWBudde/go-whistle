@@ -183,8 +183,9 @@ func (c *cross) project(enc []float32, frames int, rope *needle.Rope) memory {
 }
 
 // branch returns the term the residual adds for h, t rows of dim values at
-// the token positions off … off+t−1, against the memory m.
-func (c *cross) branch(h []float32, t, off int, m memory, rope *needle.Rope) []float32 {
+// the token positions off … off+t−1, against the memory m. A non-nil keep
+// receives the attention probabilities and the output gate (Attention).
+func (c *cross) branch(h []float32, t, off int, m memory, rope *needle.Rope, keep *Attention) []float32 {
 	qW, oW := c.heads*c.qk, c.heads*c.v
 	x := make([]float32, len(h))
 	c.norm.Apply(x, h)
@@ -204,7 +205,7 @@ func (c *cross) branch(h []float32, t, off int, m memory, rope *needle.Rope) []f
 		}
 	}
 
-	out := c.attend(q, t, m)
+	out := c.attend(q, t, m, keep)
 
 	if c.h.Gate != GateNone {
 		gin := x
@@ -217,10 +218,16 @@ func (c *cross) branch(h []float32, t, off int, m memory, rope *needle.Rope) []f
 
 		for i, g := range gate {
 			if c.h.Gate == GateSiLU {
-				out[i] *= g * sigmoid(g)
+				gate[i] = g * sigmoid(g)
 			} else {
-				out[i] *= sigmoid(g)
+				gate[i] = sigmoid(g)
 			}
+
+			out[i] *= gate[i]
+		}
+
+		if keep != nil {
+			keep.Gate = gate
 		}
 	}
 
@@ -238,12 +245,17 @@ func (c *cross) branch(h []float32, t, off int, m memory, rope *needle.Rope) []f
 	return y
 }
 
-// attend is softmax(q kᵀ / √qk) v per head over every memory frame.
-func (c *cross) attend(q []float32, t int, m memory) []float32 {
+// attend is softmax(q kᵀ / √qk) v per head over every memory frame. A
+// non-nil keep receives the probabilities, [t, heads, frames].
+func (c *cross) attend(q []float32, t int, m memory, keep *Attention) []float32 {
 	qW, vW := c.heads*c.qk, c.heads*c.v
 	out := make([]float32, t*vW)
 	scores := make([]float32, m.frames)
 	scale := float32(math.Sqrt(float64(c.qk)))
+
+	if keep != nil {
+		keep.Probs = make([]float32, t*c.heads*m.frames)
+	}
 
 	for hd := range c.heads {
 		for i := range t {
@@ -253,6 +265,10 @@ func (c *cross) attend(q []float32, t int, m memory) []float32 {
 			}
 
 			softmax(scores)
+
+			if keep != nil {
+				copy(keep.Probs[(i*c.heads+hd)*m.frames:], scores)
+			}
 
 			o := out[i*vW+hd*c.v : i*vW+(hd+1)*c.v]
 			for f, p := range scores {
