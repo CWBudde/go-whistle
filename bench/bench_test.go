@@ -260,6 +260,31 @@ func TestSameMachine(t *testing.T) {
 	}
 }
 
+// TestRenderUnknownRSS shows a peak RSS of 0, a platform without
+// ru_maxrss, as missing rather than as 0.0 MiB.
+func TestRenderUnknownRSS(t *testing.T) {
+	g := &GoResults{Modes: []GoMode{{Mode: "packed"}, {Mode: "float", MaxRSSLoadMiB: 238.875, MaxRSSPeakMiB: 489.328125}}}
+	e := &EngineResults{}
+
+	var b bytes.Buffer
+
+	err := Render(&b, g, e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := b.String()
+
+	for _, want := range []string{
+		"| after the model load                         |         — |    238.9 |          — |",
+		"| one 30 s transcription, load included        |         — |    489.3 |          — |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("report lacks %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestRenderWithoutResults(t *testing.T) {
 	var b bytes.Buffer
 

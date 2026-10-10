@@ -286,7 +286,7 @@ func renderMemory(b *strings.Builder, g *GoResults, e *EngineResults) {
 			return missing
 		}
 
-		return mib(v)
+		return rssMiB(v)
 	}
 
 	rss := func(m *GoMode, load bool) string {
@@ -294,9 +294,9 @@ func renderMemory(b *strings.Builder, g *GoResults, e *EngineResults) {
 		case m == nil:
 			return missing
 		case load:
-			return mib(m.MaxRSSLoadMiB)
+			return rssMiB(m.MaxRSSLoadMiB)
 		default:
-			return mib(m.MaxRSSPeakMiB)
+			return rssMiB(m.MaxRSSPeakMiB)
 		}
 	}
 
@@ -313,6 +313,16 @@ func renderMemory(b *strings.Builder, g *GoResults, e *EngineResults) {
 	fmt.Fprintf(b, "## Memory\n\n%s\nThe Go figures come from a fresh `whistle-bench` child per mode (`Load`, then "+
 		"one `Transcribe` of the 30 s clip, as `just mem-probe`); the engine's from the CLI processes of the speed "+
 		"runs.\n\n", t)
+}
+
+// rssMiB is a peak RSS cell: 0 is the measuring side's "unknown" (no
+// ru_maxrss outside unix), not a measurement, and shows as missing.
+func rssMiB(v float64) string {
+	if v <= 0 {
+		return missing
+	}
+
+	return mib(v)
 }
 
 func renderMethod(b *strings.Builder) {
