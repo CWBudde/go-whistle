@@ -2020,6 +2020,11 @@ change their text but still differ. Result: **46/53** (86.8 %) with keywords, Ac
 in `DefaultBias`, so its fix changes no default result. The grids above were run before these fixes; their ranking was
 not re-run. `TestKeywordOverlaps` and `TestKeywordPerCharBytes` pin the fixes.
 
+**Accept settled (2026-10-10).** By the user's decision the 6.3 Accept now reads "at least 85 % of the keyword cases
+equal, every mismatch explained by its margin, a miss shared without keywords, or a documented search miss". 46/53
+meets it: 3 Polish cases share the miss without keywords, 3 are near-ties, `de-paare-missed` is the documented search
+miss (a PLAN.md Phase 10 follow-up). The verdicts above are the original wording's.
+
 **Speed.** 72 ms per case with keywords against 61 ms without (F-026), M5 Pro; the automaton is rerun over the text of
 every live hypothesis at every step.
 
@@ -2096,6 +2101,10 @@ the one mismatch has Δ 0.0093.
 27, 29, 29, 28 and 24 of 32 (75 %–90.6 %, 161 of 192 = 83.9 % overall). Every mismatch is a near-tie of at most 0.029
 nats per token. The ladder itself is settled by the variant table; the remaining gap is numeric, so the W2A8 path
 (Phase 9) is the place to close it.
+
+**Accept settled (2026-10-10).** By the user's decision the 6.4 Accept now reads "every mismatch at depths 2–7 is a
+near-tie of at most 0.03 nats per text token". The 31 mismatches (at most 0.0288) meet it; "not met" above is the
+original wording's verdict.
 
 **Fast regression.** `TestDepthMatchesEngine` (no tag, skips without `models/`): three short clips at depths 2 and 4
 whose engine text differs from the full depth's, each reproduced exactly with a ranking score above floors just below
@@ -2952,6 +2961,10 @@ the offline pass, F-032's four reasons. Each stream misses 14 clips; 13 are the 
 for ours (the "gli" / "vi" tie above) and one for the engine's. The
 embedding half holds since 8.2 (F-027: mean per-frame cosine 0.999828, every clip ≥ 0.999033).
 
+**Accept settled (2026-10-10).** By the user's decision the Phase 8 Accept now asks for the offline text at least as
+often as the engine's own stream reaches it, with the call parity reported. 18/32 against the engine's 18/32 meets
+it, with 797 of 930 calls (85.7 %) equal to the engine's.
+
 ### Buffers over 30 s with nothing to trim (8.4)
 
 `long-silence-lead` is 32.5 s of zeros, then `ls-clean-6930-75918-0000`, fed in 1 s chunks. Nothing is committed in
@@ -3163,7 +3176,8 @@ regressions, model-gated and skipped without `models/`, with bounds just outside
 
 ### Open
 
-- **The 64 MB target for a whole 30 s `Transcribe`.** The weights fit (34 MiB), the process does not (127.6 MiB peak).
+- **The 30 s `Transcribe` peak.** By the user's decision (2026-10-10) PLAN.md 9.2's 64 MB target counts the weights
+  (live Go heap plus resident `.cact` pages, 34 MiB, met); the process peak (127.6 MiB) is a separate goal.
   The levers are outside 9.2's wiring: run the stem in time chunks (removes the 29 MiB spike), keep the cross-attention
   memory in int8 (9.3), let the application set `GOMEMLIMIT`, and move the lut copy out of the Go heap or into the file
   pages it duplicates (F-034's in-register transpose), so that the GC does not double it.
