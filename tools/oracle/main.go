@@ -53,7 +53,7 @@ var engineCmds = map[string]struct {
 	run    func(context.Context, runConfig, io.Writer) error
 }{
 	cmdNameRun:         {"", cmdRun},
-	cmdNameProbes:      {"probes", func(_ context.Context, c runConfig, w io.Writer) error { return cmdProbes(c, w) }},
+	cmdNameProbes:      {"probes", cmdProbes},
 	cmdNameDepth:       {"depth", cmdDepth},
 	cmdNameKeywords:    {"keywords", cmdKeywords},
 	cmdNameSilence:     {"silence", cmdSilence},
