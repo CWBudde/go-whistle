@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -145,8 +147,9 @@ func TestTranscribeCmdLimit(t *testing.T) {
 	writeSilentWAV(t, path, whistle.MaxSamples+1)
 
 	out, err := runCmd(t, "transcribe", "--model", cactPath, path)
-	if err == nil || !strings.Contains(err.Error(), "30 s") {
-		t.Errorf("err = %v, want an error naming 30 s", err)
+	if !errors.Is(err, whistle.ErrTooLong) || !strings.Contains(err.Error(), "30 s") ||
+		!strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), "whistle stream") {
+		t.Errorf("err = %v, want an error naming the file, 30 s and whistle stream", err)
 	}
 
 	if out != "" {
@@ -218,5 +221,81 @@ func writeSilentWAV(t *testing.T, path string, n int) {
 	err := os.WriteFile(path, b, 0o600)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Several files load the model once: each text after its path, or a JSON
+// line each, and a file that fails is reported and skipped.
+func TestTranscribeCmdFiles(t *testing.T) {
+	requireModel(t)
+
+	other := "../../testdata/audio/ls-other-3080-5040-0011.wav"
+	missing := filepath.Join(t.TempDir(), "missing.wav")
+
+	out, errOut, err := runCmdIO(t, nil, "transcribe", "--model", cactPath, clipPath, missing,
+		other)
+	if exitCode(err) != exitFailure || err.Error() != "1 of 3 files failed" {
+		t.Errorf("err = %v, want 1 of 3 files failed", err)
+	}
+
+	want := clipPath + ": " + clipText + "\n" + other + ": Here are some verses of colonies. Tell me how you like them.\n"
+	if out != want {
+		t.Errorf("stdout = %q, want %q", out, want)
+	}
+
+	if errOut != "whistle: "+missing+": no such file or directory\n" {
+		t.Errorf("stderr = %q, want one line naming %s", errOut, missing)
+	}
+
+	out, _, err = runCmdIO(t, nil, "transcribe", "--model", cactPath, "--json", clipPath, clipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+	if len(lines) != 2 || !strings.HasPrefix(lines[0], `{"text":"`+clipText+`","language":"en",`) ||
+		!strings.HasPrefix(lines[1], `{"text":"`+clipText+`",`) {
+		t.Errorf("--json with two files: %q", out)
+	}
+}
+
+func TestFileError(t *testing.T) {
+	err := fileError("a.wav", fmt.Errorf("whistle: %w: 480001 samples, at most 480000", whistle.ErrTooLong))
+	if !errors.Is(err, whistle.ErrTooLong) ||
+		err.Error() != "a.wav: audio limit is 30 s: 480001 samples, at most 480000 "+
+			"(transcribe takes one pass of at most 30 s; whistle stream takes longer audio)" {
+		t.Errorf("too long: %v", err)
+	}
+
+	err = fileError("a.wav", fmt.Errorf("whistle: a.wav %w", whistle.ErrNoAudio))
+	if !errors.Is(err, whistle.ErrNoAudio) || err.Error() != "a.wav holds no audio" {
+		t.Errorf("no audio: %v", err)
+	}
+
+	err = fileError("a.wav", fmt.Errorf("frontend: %w", &fs.PathError{Op: "open", Path: "a.wav", Err: fs.ErrNotExist}))
+	if !errors.Is(err, fs.ErrNotExist) || err.Error() != "a.wav: file does not exist" {
+		t.Errorf("missing: %v", err)
+	}
+}
+
+func TestExitCodes(t *testing.T) {
+	for _, c := range []struct {
+		args []string
+		want int
+	}{
+		{[]string{"nonsense"}, exitUsage},
+		{[]string{"transcribe", "--bogus", clipPath}, exitUsage},
+		{[]string{"transcribe"}, exitUsage},
+		{[]string{"embed", "a.wav", "b.wav"}, exitUsage},
+		{[]string{"doctor", "extra"}, exitUsage},
+		{[]string{"download", "extra"}, exitUsage},
+		{[]string{"transcribe", "--model", filepath.Join(t.TempDir(), "none.cact"), clipPath}, exitFailure},
+		{[]string{"--help"}, exitOK},
+		{nil, exitOK},
+	} {
+		_, err := runCmd(t, c.args...)
+		if got := exitCode(err); got != c.want {
+			t.Errorf("whistle %v: exit %d (%v), want %d", c.args, got, err, c.want)
+		}
 	}
 }
