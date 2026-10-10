@@ -1074,9 +1074,34 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 
 ## Phase 10 — Distribution & extras
 
-- [ ] CLI polish on top of 6.5: `whistle transcribe [--language] [--keywords] [--word-timestamps] [--depth] [--json]`,
+- [x] CLI polish on top of 6.5: `whistle transcribe [--language] [--keywords] [--word-timestamps] [--depth] [--json]`,
       `whistle stream` (stdin PCM or a WAV played in chunks), `whistle embed`, `whistle doctor`
-- [ ] README quickstart, examples and Go API docs
+      (2026-10-10) — `transcribe` takes several files on one model load: the text after each path, or a JSON line
+      each (the engine's JSON unchanged); a failing file goes to stderr, the rest go on. A file over 30 s fails with
+      `ErrTooLong`, its path and a pointer to `stream`. Exit codes: 0, 1 on failure, 2 for a wrong command line
+      (flags, arguments, unknown commands). `stream [wav]` feeds a WAV file in `--chunk` seconds (default 1, (0, 30]
+      as the engine's `--audio-chunk`), or without a file raw 16 kHz mono PCM from stdin (`--format s16le|f32le`),
+      one `Process` per chunk and `Stop` at EOF or Ctrl-C; `--realtime` paces a file, `--json` prints each call's
+      stream JSON, `--commits-only` the committing calls and the stop as the engine's `--audio-stream`. The CLI's
+      calls equal the library's `Stream` fed the same chunks, byte for byte without `pass_ms`, on three manifest runs
+      at 1 s (WAV, s16le and f32le; `long-clean`, 44.91 s, from the WAV), and so their final text, which is also the
+      engine's stream text (`TestStreamCmdMatchesLibrary`). `embed <wav>` writes JSON with `frames`, `dim`,
+      `frame_ms` and `embedding` (shortest float32 decimals) or `.npy` (`-o`); equal to `Embed` in both formats,
+      cosine ≥ 0.99 per frame against `needle_embed`, 30 s and empty files rejected (`TestEmbedCmd`). `doctor`
+      prints the model's path, size, format, SHA-256 against the pinned manifest, the other pinned files next to it,
+      the weights mode, the Go version and platform, the assembly kernels (NEON; AVX2/FMA by CPU on amd64; none under
+      `purego`) and GOMAXPROCS, then loads the model, runs a 2 s tone burst through `Embed` and `Transcribe` and
+      transcribes `testdata/audio/ls-other-3080-5040-0018.wav` when present; it exits 1 on any failed check
+      (`TestDoctorPasses`, `TestDoctorWrongFile`, `TestDoctorMissingModel`). Model-free tests cover the PCM readers,
+      chunking, the view, Ctrl-C, pacing, the `.npy` and JSON writers and the exit codes.
+- [x] README quickstart, examples and Go API docs
+      (2026-10-10) — README: status, quickstart (install, `download`, `doctor`, `transcribe`, `stream`, `embed`),
+      a Go API program, the parity table with links to FINDINGS and the limits; every command and the program were
+      run and their output pasted. The repository is not public yet, so the README points `go get` at a clone via
+      `replace`. `whistle/doc.go` is a package overview (loading, transcribing, streaming, embeddings, parity), and
+      `whistle/example_test.go` has 10 examples: 4 model-free with `// Output:` (the result and stream JSON, reading
+      engine JSON, embedding rows), 6 that need the model and only compile under `go test` (each was run against
+      the model with its output checked once).
 - [ ] Optional: an HTTP server (`/transcribe`, `/stream` over WebSocket)
 - [ ] Optional: a js/wasm build (as in go-pocket-tts) with a small web demo
 - [ ] Optional: the Needle 3 text model (tool calling) on top of `internal/needle` and `.cact`, which reuses most of the work
