@@ -968,6 +968,14 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       behind a flag.
 - [ ] 9.4 Plan 9 assembly (NEON/AVX2) for the LUT GEMV, the FWHT, the Monarch Kronecker products and the
       softmax/Sinkhorn hot loops, with pure-Go fallbacks and equivalence tests (see `go-plan9-assembly`).
+      (2026-10-10) — partial: the `internal/needle` half. Profiled `Transcribe` over the 32 clips first. The Monarch
+      `kronApply` now runs as two `tensor.MatMulTransB` calls on transposed factors (4.8 → 0.68 µs per mix). `attend`
+      batches each head into Q·Kᵀ and P·V GEMMs from 8 query rows. Sinkhorn runs in the exp domain in float64, with a
+      log-domain fallback (4.46 → 0.52 µs). `meanSquare` uses four partial sums. The softmax gets a NEON/AVX2 Cephes
+      expf kernel (`exp_arm64.s`, `exp_amd64.s`, float64 `purego` fallback, ≤ 0.99 ulp). `TestTranscribeMatchesEngine`,
+      one run each: median TTFT 82.5 → 57.8 ms, decode 561 → 609 tok/s, still 31/32, all 32 transcripts unchanged; a
+      30 s clip's TTFT 513 → 281 ms. The remaining time is `tensor`'s GEMM and `search`'s goroutines.
+      `docs/FINDINGS.md` F-035.
 - [ ] 9.5 Parallelism: the encoder over time blocks and heads; the decoder over beams.
 - [ ] 9.6 Benchmarks (`bench/`): TTFT and decode tok/s against the engine on the same machine. The engine publishes
       11.1 ms TTFT and 1319 tok/s on an M4 Pro with 5 beams. Also the real-time factor for 30 s clips.
