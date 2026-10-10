@@ -10,9 +10,11 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cwbudde/go-whistle/internal/frontend"
 	"github.com/cwbudde/go-whistle/internal/safetensors"
+	"github.com/cwbudde/go-whistle/internal/search"
 )
 
 // Pinned inputs as laid out by `whistle download` and `just oracle-run`.
@@ -140,13 +142,87 @@ func corpus(t testing.TB) []clip {
 	return loadClips(t)
 }
 
-// Accept (PLAN.md 6.5): Transcribe equals decoder.Greedy on the corpus.
-func TestTranscribeMatchesGreedy(t *testing.T) {
+// engineMisses are the corpus clips on which the beam search's transcript
+// differs from the engine's: a search miss on a non-Polish text, where the
+// engine's prefix falls out of our beam 0.135 nats behind the fifth live
+// hypothesis (docs/FINDINGS.md F-026).
+var engineMisses = map[string]bool{"fleurs-pl_pl-10047713455444904767": true}
+
+// Accept (PLAN.md 6.6): Transcribe gives the engine's text and language on
+// at least 95 % of the corpus, every miss explained in FINDINGS, and equals
+// search.Beam under search.Default on the same encoder output.
+func TestTranscribeMatchesEngine(t *testing.T) {
 	m := loadModel(t)
 	clips := corpus(t)
-	engineText := 0
+	equal := 0
 
 	for _, c := range clips {
+		res, err := m.Transcribe(c.Samples, TranscribeOptions{})
+		if err != nil {
+			t.Fatalf("%s: %v", c.ID, err)
+		}
+
+		want := beamDecode(t, m, c.Samples, "")
+		if res.Text != want.Text || res.Language != want.Language {
+			t.Errorf("%s: Transcribe [%s] %q, search.Beam [%s] %q", c.ID, res.Language, res.Text, want.Language, want.Text)
+		}
+
+		if res.TTFT <= 0 || res.DecodeTPS <= 0 {
+			t.Errorf("%s: ttft %v, decode_tps %v; want both > 0", c.ID, res.TTFT, res.DecodeTPS)
+		}
+
+		same := res.Text == c.Text && res.Language == c.Language
+		if same {
+			equal++
+		} else if !engineMisses[c.ID] {
+			t.Errorf("%s: [%s] %q, the engine [%s] %q", c.ID, res.Language, res.Text, c.Language, c.Text)
+		}
+
+		t.Logf("%s: [%s] ttft %.1f ms, %.1f tok/s, equal to the engine %v", c.ID, res.Language,
+			float64(res.TTFT.Microseconds())/1000, res.DecodeTPS, same)
+	}
+
+	if 100*equal < 95*len(clips) {
+		t.Errorf("%d of %d clips equal to the engine, want at least 95 %%", equal, len(clips))
+	}
+
+	t.Logf("%d clips: text and language equal to the engine on %d (%.1f %%)", len(clips), equal,
+		100*float64(equal)/float64(len(clips)))
+}
+
+// beamDecode runs search.Beam under search.Default on the model's encoder
+// output, outside the strategy seam.
+func beamDecode(t *testing.T, m *Model, pcm []float32, lang string) search.Result {
+	t.Helper()
+
+	emb, err := m.Embed(pcm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mem, err := m.dec.Memory(emb.Values, emb.Frames)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opt := search.Default()
+	opt.Language = lang
+
+	r, err := search.Beam(m.dec, mem, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return r
+}
+
+// The greedy strategy stays reachable for tests: through Transcribe it
+// equals decoder.Greedy (PLAN.md 6.5).
+func TestGreedyStrategy(t *testing.T) {
+	m := loadModel(t)
+	m.strategy = greedy{}
+
+	for _, c := range loadClips(t, shortClips...) {
 		res, err := m.Transcribe(c.Samples, TranscribeOptions{})
 		if err != nil {
 			t.Fatalf("%s: %v", c.ID, err)
@@ -169,16 +245,49 @@ func TestTranscribeMatchesGreedy(t *testing.T) {
 		if res.TTFT <= 0 || res.DecodeTPS <= 0 {
 			t.Errorf("%s: ttft %v, decode_tps %v; want both > 0", c.ID, res.TTFT, res.DecodeTPS)
 		}
+	}
+}
 
-		if res.Text == c.Text {
-			engineText++
-		}
+// The beam strategy's clock: one tick per search step after the language
+// token, so at least one per text token plus EOS, and a keyword hook in the
+// options still sees every live hypothesis.
+func TestBeamClock(t *testing.T) {
+	m := loadModel(t)
+	c := loadClips(t, shortClips[1])[0]
 
-		t.Logf("%s: [%s] ttft %.1f ms, %.1f tok/s, engine text equal %v", c.ID, res.Language,
-			float64(res.TTFT.Microseconds())/1000, res.DecodeTPS, res.Text == c.Text)
+	emb, err := m.Embed(c.Samples)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	t.Logf("%d clips: Transcribe = decoder.Greedy on all; text equal to the engine's on %d", len(clips), engineText)
+	mem, err := m.dec.Memory(emb.Values, emb.Frames)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opt := search.Default()
+	calls := 0
+	opt.Adjust = func([]int, []float64) { calls++ }
+
+	var ms time.Duration
+
+	clk := newClock(func() time.Time { ms += time.Millisecond; return time.Unix(0, 0).Add(ms) })
+
+	out, err := beam{opt: opt}.decode(m.dec, mem, "", clk)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	steps := clk.after + 1
+	if steps < len(out.tokens)+1 || calls < steps || calls > opt.Beams*steps {
+		t.Errorf("%d text tokens: %d clock ticks, %d hook calls; want ≥ %d ticks and 1–%d calls per tick",
+			len(out.tokens), steps, calls, len(out.tokens)+1, opt.Beams)
+	}
+
+	// The clock started before the search and ticks once per step.
+	if clk.ttft() != time.Millisecond || clk.tps() != 1000 {
+		t.Errorf("ttft %v, tps %v; want 1ms and 1000/s with one fake millisecond per reading", clk.ttft(), clk.tps())
+	}
 }
 
 func TestTranscribeForcedLanguage(t *testing.T) {
@@ -190,18 +299,9 @@ func TestTranscribeForcedLanguage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	emb, err := m.Embed(c.Samples)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	want, err := m.dec.Greedy(emb.Values, emb.Frames, "en")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	want := beamDecode(t, m, c.Samples, "en")
 	if res.Language != "en" || res.Text != want.Text {
-		t.Errorf("forced en: [%s] %q, decoder.Greedy %q", res.Language, res.Text, want.Text)
+		t.Errorf("forced en: [%s] %q, search.Beam %q", res.Language, res.Text, want.Text)
 	}
 }
 

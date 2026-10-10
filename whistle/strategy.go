@@ -5,11 +5,12 @@ import (
 	"time"
 
 	"github.com/cwbudde/go-whistle/internal/decoder"
+	"github.com/cwbudde/go-whistle/internal/search"
 )
 
 // strategy turns a clip's projected encoder memory into a token sequence.
-// Transcribe sees only this seam, so beam search (PLAN.md 6.6) can replace
-// greedy decoding without changing the public API.
+// Transcribe sees only this seam: the engine's beam search, or greedy
+// decoding for tests.
 type strategy interface {
 	decode(d *decoder.Decoder, mem *decoder.Memory, lang string, clk *clock) (decoded, error)
 }
@@ -63,6 +64,45 @@ func (c *clock) tps() float64 {
 	}
 
 	return float64(c.after) / d
+}
+
+// beam is the engine's search (docs/FINDINGS.md F-026, F-031):
+// search.Beam under opt, search.Default() in Load, with the language forced
+// or by argmax. The search runs as a whole; the clock reads its steps
+// through Options.Adjust, which the search calls for every live hypothesis
+// of a step once the decoder has run it, and all live hypotheses of a step
+// hold the same number of text tokens. So the first call stops the TTFT
+// clock at the first step after the language token, as greedy's does, and
+// the first call of every later step counts one more token: decode_tps is a
+// rate over the search's steps. An Adjust already in opt (keywords) still
+// runs after the clock.
+type beam struct {
+	opt search.Options
+}
+
+func (b beam) decode(d *decoder.Decoder, mem *decoder.Memory, lang string, clk *clock) (decoded, error) {
+	opt := b.opt
+	opt.Language = lang
+
+	step, next := -1, opt.Adjust
+	opt.Adjust = func(tokens []int, logp []float64) {
+		if len(tokens) != step {
+			step = len(tokens)
+
+			clk.token()
+		}
+
+		if next != nil {
+			next(tokens, logp)
+		}
+	}
+
+	r, err := search.Beam(d, mem, opt)
+	if err != nil {
+		return decoded{}, fmt.Errorf("beam: %w", err)
+	}
+
+	return decoded{tokens: r.Tokens, lang: r.Language}, nil
 }
 
 // greedy is decoder.GreedyMemory step for step through the decoder's

@@ -10,6 +10,8 @@ import (
 	"github.com/cwbudde/go-whistle/internal/decoder"
 	"github.com/cwbudde/go-whistle/internal/encoder"
 	"github.com/cwbudde/go-whistle/internal/frontend"
+	"github.com/cwbudde/go-whistle/internal/search"
+	"github.com/cwbudde/go-whistle/internal/silence"
 	"github.com/cwbudde/go-whistle/internal/tokenizer"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
@@ -30,6 +32,7 @@ type Model struct {
 	src      weights.Source
 	enc      *encoder.Encoder
 	dec      *decoder.Decoder
+	gate     *silence.Gate
 	strategy strategy
 	dim      int // encoder width, Embedding.Dim
 	layers   int // decoder blocks, the full Depth
@@ -60,7 +63,8 @@ const vocabularyFile = "whistle.cact"
 
 // Load opens a Whistle weight file, the deployed whistle.cact or the float32
 // whistle.safetensors checkpoint, and builds the model on it with the
-// encoder and decoder the oracle settled (docs/FINDINGS.md F-014 to F-024).
+// encoder and decoder the oracle settled (docs/FINDINGS.md F-014 to F-024),
+// the engine's beam search (F-026) and its silence gate (F-031).
 // The .cact weights are the ones the engine runs; they match it best.
 func Load(path string, opts ...Option) (*Model, error) {
 	var o loadOptions
@@ -83,7 +87,8 @@ func Load(path string, opts ...Option) (*Model, error) {
 	return m, nil
 }
 
-// build loads the vocabulary, the encoder and the decoder from src.
+// build loads the vocabulary, the encoder and the decoder from src and sets
+// up the silence gate and the beam search.
 func build(src weights.Source, path string, o loadOptions) (*Model, error) {
 	tok, err := vocabulary(src, path, o)
 	if err != nil {
@@ -100,9 +105,17 @@ func build(src weights.Source, path string, o loadOptions) (*Model, error) {
 		return nil, wrap(err)
 	}
 
+	gate, err := silence.New()
+	if err != nil {
+		return nil, wrap(err)
+	}
+
 	cfg := src.Config()
 
-	return &Model{src: src, enc: enc, dec: dec, strategy: greedy{}, dim: cfg.Dim, layers: cfg.DecLayers}, nil
+	return &Model{
+		src: src, enc: enc, dec: dec, gate: gate, strategy: beam{opt: search.Default()},
+		dim: cfg.Dim, layers: cfg.DecLayers,
+	}, nil
 }
 
 // vocabulary reads the tokenizer from src, or from the WithVocabulary file
