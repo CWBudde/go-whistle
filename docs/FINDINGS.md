@@ -2553,3 +2553,259 @@ and the word objects collapsed too. F-027's marshaller needed no change.
 
 **Not covered.** The first word's start (the onset rule is a fit). The probabilities' last decimal (W2A8). Depth runs
 end to end through `Transcribe` (teacher forced only). Streaming passes (F-032) reuse the same words, untested here.
+
+## F-034 — CQ LUT kernel in NEON and AVX2: byte-plane tables and a 32-row index (9.4, `internal/cq`) (2026-10-10)
+
+**Question.** F-028's pure-Go `nibble`/`nibble4` kernels are 2.2–5.7× slower than the NEON float GEMM, because every
+table lookup is scalar. Can assembly make the packed path at least as fast as the float path, single-threaded, while
+the 9.1 Accept (cosine ≥ 0.99999 against `cact.CQ` + float GEMM on the real tensors) still holds?
+
+**Design** (`internal/cq/lut.go`, the `lut` kernel). A byte shuffle (NEON `TBL`, AVX2 `VPSHUFB`) looks up 16 bytes in a
+16-entry byte table with one instruction. The F-028 nibble tables are float32 and differ per index position, so three
+changes make them fit:
+
+- **Integer tables in two byte planes.** Per activation group, each nibble table entry e (2 bits: cb[lo]·x̂[2q] +
+  cb[hi]·x̂[2q+1]; 4 bits: cb[c]·x̂[q]) is rounded to v = round(e · lutQ/M) with lutQ = 8191. M = max |cb| times the
+  group's largest |x̂[2q]| + |x̂[2q+1]| (2 bits) or |x̂[q]| (4 bits), so |v| ≤ 8191 (14 bits). v is stored as lo = v &
+  127 and hi = v>>7 + 64, both in [0, 127]: a shuffle reads each plane, and two lookups add in one byte without
+  overflow.
+- **A repacked index.** `cq.New` copies the index once into blocks of 32 rows. Per block and index byte j, the 32 rows'
+  bytes are adjacent (`lutLayout`), so one vector load holds byte j of 16 (NEON) or 32 (AVX2) rows, and one shuffle
+  looks up a table for all of them. The norms are blocked the same way. Rows past `Out` are zero; a `Rows` view computes
+  the blocks it overlaps and copies its rows out, so the mHC φ views need no repack of their own.
+- **Exact integer sums.** Per row and group, each plane's lookups are summed in uint16: at most 2·groupBytes · 127, so
+  groupBytes ≤ 256 (`lutMaxGroupBytes`; Whistle has 32 and 64). At the end of a group, 128·Σhi + Σlo − 16384·groupBytes
+  (the hi offset) is an exact int32. It is converted to float32 and added to y times norm · step_g, with step_g =
+  M/(lutQ·√G).
+
+The rotation is the plain FWHT; its 1/√G is folded into step_g. The assembly does exactly the float32 operations of the
+Go reference (`lutTables2Generic`, `lutTables4Generic`, `lutLookupGeneric`, `fwht`), in the same order. There is no FMA
+(the Go side writes `float32(a*b)` to prevent fusion), round-to-nearest-even both in `FCVTNS`/`VCVTPS2DQ` and in
+`math.RoundToEven`, and the FWHT stages run in `fwht`'s order. So assembly and Go reference agree bit for bit.
+`asm_test.go` checks each routine and the whole GEMM, including views that start and end inside a block.
+
+**Kernels.** Per block of 32 rows and index byte j:
+
+| step        | NEON (`lut_arm64.s`)                                         | AVX2 (`lut_amd64.s`)                                          |
+| ----------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
+| loads       | 2 × 16 index bytes, 64 table bytes (`LD1` ×4)                | 32 index bytes, 4 × 16 table bytes (`VBROADCASTI128`)         |
+| nibbles     | `AND`, `USHR` per vector: 4                                  | `VPAND`, `VPSRLW`, `VPAND`: 3                                 |
+| lookups     | 8 `TBL` (2 planes × 2 nibbles × 2 vectors)                   | 4 `VPSHUFB`                                                   |
+| sums        | 4 byte `ADD`, 8 `UADDW`/`UADDW2` into 8 uint16 accumulators  | 2 `VPADDB`, 4 `VPUNPCK*BW` with zero, 4 `VPADDW`              |
+| group end   | `USHLL #7`, `UADDW`, `SUB`, `SCVTF`, `FMUL`, `FADD`          | the same; in-lane unpacks permute rows, `VPERM2I128` restores |
+| table build | `FMUL` by element, `FCVTNS`, `UZP1`, `SHRN #7`               | `VMULPS`, `VCVTPS2DQ`, `VPACKSSDW`, `VPSRAW`, `VPACKUSWB`     |
+| FWHT        | h = 1, 2, 4 in registers (`UZP1`/`UZP2`), then 8 floats/pass | h = 1, 2, 4 in registers (`VPERMILPS`, `VPERM2F128`, blends)  |
+
+On NEON that is 24 vector instructions per 32 rows and index byte, i.e. per 128 weights of CQ2 or 64 of CQ4; on AVX2,
+17 and 5 loads. Go 1.25 (`go.mod`) lacks the NEON float instructions and `SHRN`, so they are `WORD`-encoded, as in
+`internal/tensor`. Every word was checked against Go 1.27's mnemonics with `go tool objdump`. On amd64 the kernel
+needs AVX2 only (`cpu.X86.HasAVX2` at run time); without it `lutAsm` is false, and the Go reference runs.
+
+**Accuracy** (`TestWhistleGEMM`, the 11 real tensors of F-028, five activation rows, worst row). In each build `lut`
+equals its Go reference bit for bit; the float reference (`tensor.MatMulTransB`) is NEON, purego Go or AVX2+FMA, which
+moves the last digit in two places:
+
+| tensor          | CQ  | shape        | 1 − cos arm64 / purego / amd64 | max \|Δ\| / max \|y\| |
+| --------------- | --- | ------------ | ------------------------------ | --------------------- |
+| layer00.q_proj  | 2   | (384, 512)   | 2.05e-8 / 2.05e-8 / 2.05e-8    | 1.3e-4                |
+| layer03.k_proj  | 2   | (96, 512)    | 2.28e-8 / 2.28e-8 / 2.28e-8    | 2.2e-4                |
+| cross05.v_proj  | 2   | (512, 512)   | 1.98e-8 / 1.98e-8 / 1.98e-8    | 8.9e-5                |
+| enc00.pw1       | 2   | (1024, 512)  | 1.48e-8 / 1.48e-8 / 1.48e-8    | 1.5e-4                |
+| enc07.out_proj  | 2   | (512, 512)   | 1.24e-8 / 1.24e-8 / 1.24e-8    | 1.7e-4                |
+| stem.pw_1       | 2   | (128, 128)   | 1.90e-8 / 1.90e-8 / 1.90e-8    | 1.9e-4                |
+| stem.out        | 2   | (512, 1280)  | 1.51e-8 / 1.51e-8 / 1.51e-8    | 1.3e-4                |
+| engram0.tables  | 2   | (73728, 128) | 1.44e-8 / 1.44e-8 / 1.44e-8    | 1.4e-4                |
+| embedding       | 4   | (8199, 512)  | 7.83e-8 / 7.83e-8 / 7.83e-8    | 4.3e-4                |
+| mhc_phi_pre     | 4   | (32, 2048)   | 5.89e-8 / 5.89e-8 / 5.90e-8    | 3.5e-4                |
+| enc.mhc_phi_res | 4   | (128, 2048)  | 3.63e-8 / 3.63e-8 / 3.64e-8    | 1.1e-4                |
+
+The worst 1 − cos, 7.8e-8, is 128× inside the Accept's 1e-5. That is the table rounding: the F-028 kernels stay near
+1e-13. The table width was measured with the Go reference on the same tensors. With int8 tables (lutQ = 127, one plane)
+the worst 1 − cos is 5.2e-4, 52× outside the Accept. With 12 bits (lutQ = 2047, which would let a byte hold four
+lookups) it is 2.0e-6, a margin of 5×. 14 bits is the widest that adds two lookups per byte. `TestKernels` bounds every
+element on random matrices by the float32 bound of F-028 plus the rounding bound 2·groupBytes · n · M/(2·lutQ·√G) per
+group.
+
+**Speed** (`BenchmarkGEMM`, Apple M5 Pro, `-cpu 1`, mean of 3 × 0.5 s, random packed matrices; float is
+`tensor.MatMulTransB` on the dequantised matrix). The default build runs the NEON `lut`; "purego" is the same benchmark
+under `-tags purego`, where `lut` is the Go reference. amd64 ran under emulation only, so it has no timings here.
+
+| shape                    | rows | float NEON | `lut` NEON | `nibble4` (9.1) | `lut` vs float   | `lut` vs `nibble4` | MB float32 | MB `lut` |
+| ------------------------ | ---- | ---------- | ---------- | --------------- | ---------------- | ------------------ | ---------- | -------- |
+| k_proj (96, 512) CQ2     | 1    | 1.79 µs    | 1.15 µs    | 6.50 µs         | 1.56× faster     | 5.7×               | 0.197      | 0.0277   |
+| q_proj (384, 512) CQ2    | 1    | 7.52 µs    | 2.91 µs    | 18.5 µs         | 2.58× faster     | 6.4×               | 0.786      | 0.111    |
+| out (512, 512) CQ2       | 1    | 10.1 µs    | 3.68 µs    | 24.0 µs         | 2.75× faster     | 6.5×               | 1.049      | 0.148    |
+| pw1 (1024, 512) CQ2      | 1    | 22.0 µs    | 6.84 µs    | 45.8 µs         | 3.21× faster     | 6.7×               | 2.097      | 0.295    |
+| stem.out (512, 1280) CQ2 | 1    | 25.3 µs    | 9.18 µs    | 59.6 µs         | 2.76× faster     | 6.5×               | 2.621      | 0.369    |
+| phi_res (128, 2048) CQ4  | 1    | 9.37 µs    | 8.89 µs    | 52.2 µs         | 1.05× faster     | 5.9×               | 1.049      | 0.279    |
+| head (8199, 512) CQ4     | 1    | 192 µs     | 97.2 µs    | 652 µs          | 1.98× faster     | 6.7×               | 16.79      | 4.467    |
+| q_proj (384, 512) CQ2    | 5    | 20.3 µs    | 14.5 µs    | 74.7 µs         | 1.40× faster     | 5.2×               | 0.786      | 0.111    |
+| head (8199, 512) CQ4     | 5    | 461 µs     | 487 µs     | 2.34 ms         | **1.06× slower** | 4.8×               | 16.79      | 4.467    |
+| q_proj (384, 512) CQ2    | 375  | 1.21 ms    | 1.09 ms    | 5.24 ms         | 1.11× faster     | 4.8×               | 0.786      | 0.111    |
+
+Under purego the Go reference of `lut` is 2.2–4.9× slower than `nibble4` (q_proj 57.4 vs 19.5 µs, head 2.29 vs
+0.654 ms), so `best()` is `lut` only where `lutAsm` is true, and `nibble4` elsewhere.
+
+**Where the time goes** (one GEMV, NEON). q_proj: FWHT 0.16 µs, tables 0.36 µs, lookup 2.33 µs. k_proj: 0.16, 0.37 and
+0.59 µs. phi_res: 0.62, 2.1 and 6.0 µs. head: 0.16, 0.53 and 96 µs. The lookup takes 1.5 ns per block and index
+byte; at an assumed 4.5 GHz that is about 3.5 of its 24 vector instructions per cycle, close to four vector pipes. The
+rest is table building, which costs O(In · 16) per activation whatever Out is. That is why the small k_proj gains least
+among the CQ2 shapes, and the 2048-wide φ_res least of all.
+
+**Batches.** The kernel runs one activation at a time (five GEMVs cost 487 µs on the head, the same as one 5-row
+GEMM). Only the index load and the nibble split (4 of 24 instructions) could be shared between activations, while the
+float GEMM's 4×4 blocking reuses every weight four times. So the float GEMM catches up with batches: `lut` is still
+1.40× faster at 5 rows of q_proj and 1.11× at 375 rows, but 1.06× slower on the 5-beam head.
+
+**Tried and rejected.** Unrolling the NEON loop over two index bytes in separate registers: within 1 % (head 97.1 vs
+97.2 µs). The loop is limited by instruction throughput, not latency.
+
+**Counted, not built.**
+
+- Pairing two index bytes of one row in adjacent lanes, with a 2-register `TBL` (index + 16 for the odd lanes) and
+  `UADALP` as the widening add: also 24 instructions per 32 rows and byte, because the + 16 costs an `ORR` per vector.
+- 6+6-bit planes, so that a byte holds four lookups: 22 instead of 24 instructions, for 12-bit tables (5× margin,
+  above).
+- Not tried: a 2-activation lookup would save the shared 4 of 24 instructions per extra activation (about 7 % at 5
+  rows); it needs 31 of the 32 NEON registers.
+
+**Memory.** The blocked copy of index and norms comes on top of the packed form: 33.27 MB for all 152 CQ matrices with
+the assembly against 16.63 MB in the purego build (`TestWhistleAllMatrices`), still 6.6× less than float32
+(218.77 MB). `cact.Open` reads the whole 16.9 MB `.cact` into memory, so today the copy is extra heap. With an mmap-ed
+file the `lut` kernel never touches the original index pages (`Row` does, for gathers), so they would not count toward
+RSS. If 9.2 needs the memory back, the kernel could run on the original layout and transpose 16 rows × 16 bytes in
+registers: 64 `TRN1`/`TRN2`, about 8 more instructions per 32 rows and byte (+⅓).
+
+**Consequences for 9.2.**
+
+- Use `Matrix.GEMV`/`GEMM` as they are. `best()` picks `lut` on arm64 and on amd64 with AVX2. The packed path is now
+  faster than the float path on all seven benchmarked GEMV shapes and on the batches of q_proj. The exception is the
+  5-beam head, which is 6 % slower; for it, 9.5's parallelism over row blocks applies directly, since blocks are
+  independent.
+- Outputs differ from the float path by up to 4.3e-4 of max |y| (1 − cos ≤ 7.8e-8), much more than F-028's 5.7e-7. Tests
+  pinned to float fixtures need cosine checks, as AGENTS.md asks.
+- The 64 MB RSS target: about 35 MB of CQ weights with the file read into memory, about 18 MB new heap with an mmap.
+
+## F-035 — `internal/needle` hot loops: GEMMs, a float64 Sinkhorn and a vector exp (2026-10-10)
+
+**Question.** Where does `whistle.Transcribe` spend its time in `internal/needle`, and which of its loops are worth
+vectorising (PLAN.md 9.4, the `internal/needle` half; the CQ GEMV and the FWHT are `internal/cq`'s)?
+
+**Profile.** An untracked driver loads `whistle.cact` and runs `Transcribe` with default options over the 32 corpus
+clips, three passes under one CPU profile (Apple M5 Pro, Go 1.27.1, default GOMAXPROCS). Before: 24.3 s of samples in
+12.4 s. Of these, 13.6 s are OS wait and wake-up (`pthread_cond_signal`/`_wait`, `usleep`), the goroutine hand-offs of
+`search`'s parallel beam expansion (`sync.WaitGroup.Go` in `(*stepper).expand`). That is not `needle`'s code, and it
+stays at 14.0 s after. The `internal/needle` rows, in seconds over the three passes:
+
+| function                  | flat before | cum before | flat after | cum after | change                                     |
+| ------------------------- | ----------- | ---------- | ---------- | --------- | ------------------------------------------ |
+| `(*HadamardMLP).forward`  | 0.22        | 2.33       | 0.27       | 0.78      | through `mix`                              |
+| `kronApply`               | 0.40        | 1.78       | 0          | 0.21      | 1.37 s were `tensor.Axpy`; now two GEMMs   |
+| `linear`                  | 0           | 1.69       | 0          | 1.36      | `tensor.MatMulTransB`, not changed         |
+| `(*Attention).output`     | 0.03        | 1.11       | 0.02       | 0.78      | gate and out projections (GEMM)            |
+| `(*Attention).attend`     | 0.13        | 0.65       | 0          | 0.14      | per-key dot/axpy; now GEMMs from 8 rows    |
+| `ZCRMSNorm.Apply`         | 0.16        | 0.39       | 0.07       | 0.12      | `meanSquare`                               |
+| `sinkhorn`                | 0.02        | 0.36       | 0          | 0.04      | 0.34 s were `logSumExp`; now `sinkhornExp` |
+| `meanSquare`              | 0.34        | 0.34       | 0.06       | 0.06      | four partial sums                          |
+| `sigmoid`                 | 0           | 0.17       | 0          | 0.20      | not changed                                |
+| `softmaxInPlace`          | 0.05        | 0.15       | 0          | 0.04      | `expSubSum` kernel                         |
+| `RMSUnit`                 | 0.04        | 0.15       | 0.03       | 0.05      | `meanSquare`                               |
+| `applyTaps`, `(*MHC).mix` | 0.09        | 0.16       | 0.07       | 0.13      | not changed                                |
+
+`(*MHC).forward` (8.09 → 4.57 s cum) and `(*Block).run` (3.13 → 1.80 s) contain everything above, the decoder's
+cross-attention hook (`runHook`, `internal/decoder`, 1.30 → 0.81 s) and the encoder's own parts. A 30 s clip (the first
+clip tiled) ranks the same, except that `softmaxInPlace` grows with the square of the frames. After the first two
+changes below, it was 40 ms of the encoder's 312 ms there, a third of the attention at t = 375.
+
+**What changed, in profile order.** The order of preference was (1) `internal/tensor`'s NEON/AVX2 kernels, (2) plain Go,
+(3) new assembly with a measured reason. Micro-benchmarks (`internal/needle/bench_test.go`, random weights at Whistle's
+shapes, single thread, median of three):
+
+| benchmark                         | before               | after                |          |
+| --------------------------------- | -------------------- | -------------------- | -------- |
+| `KronApply` (one 16×32 mix)       | 5.07 µs              | 0.68 µs              | 7.5×     |
+| `HadamardMLP`, t = 1              | 19.0 µs              | 5.75 µs              | 3.3×     |
+| `HadamardMLP`, t = 128            | 2.37 ms              | 0.66 ms              | 3.6×     |
+| `AttentionEncoder`, t = 128       | 4.32 ms              | 2.48 ms              | 1.7×     |
+| `AttentionEncoder`, t = 375       | 27.0 ms              | 10.2 ms              | 2.6×     |
+| `AttentionDecodeStep` (64 cached) | 57.3 µs              | 54.4 µs              | —        |
+| `Sinkhorn` (4×4, 20 iterations)   | 4.46 µs              | 0.52 µs              | 8.6×     |
+| `Softmax`, n = 8 / 64 / 375       | 29.9 / 258 / 1466 ns | 11.3 / 73.1 / 435 ns | 2.6–3.5× |
+| `Norms/ZCRMSNorm` (128 × 512)     | 69.8 µs              | 33.2 µs              | 2.1×     |
+| `Norms/RMSUnit` (128 × 2048)      | 271 µs               | 121 µs               | 2.2×     |
+
+1. **Kronecker products: the existing GEMM.** `kronApply` computed Y = Z · b and aᵀ · Y with one `tensor.Axpy` of 32
+   per entry, 768 calls per mix. It now makes two `tensor.MatMulTransB` calls on factors transposed once at load:
+   Yᵀ = bᵀ · Zᵀ (m 32, n 16, k 32), then out = aᵀ · Y (m 16, n 32, k 16). Both contract over contiguous rows, so no
+   transpose is needed per row, and both fill the NEON 4×4 blocks exactly. Batching all rows of the first stage into
+   one GEMM would leave the second stage contracting over a strided axis, so it would need a transpose per row
+   anyway. With the GEMM, a dedicated Kronecker kernel has no target left: `kronApply` is 1 % of the samples after.
+2. **Attention: the existing GEMM.** From `attendGEMMRows` = 8 query rows on, `attend` gathers each KV head's keys
+   (keys × 48) and transposed values (64 × keys) once, and computes each query head's logits as Q · Kᵀ and its output
+   as P · V. The output is written straight into the head's columns, with `ldc` = heads · v. A masked key's weight is
+   set to 0, so it adds an exact zero, and a causal row stays independent of later rows bit for bit
+   (`TestAttentionCausalBatched`). Decoder steps (t = 1) keep the per-key loop: there the gather would copy the whole
+   cache every step, as much work as the attention itself. `TestAttendGEMMMatchesRows` compares both paths at
+   Whistle's geometry for 1–130 rows, unmasked and causal with offsets: outputs within 1e-5 and weights within 1e-6,
+   with the same zeros.
+3. **Sinkhorn: plain Go.** Subtracting a row's logsumexp equals dividing the row of exp(logits) by its sum.
+   `sinkhornExp` therefore runs upstream's 20 iterations on exp(logits − max) in float64. That is 16 exps instead of 640
+   exps and 160 logs, and more accurate than the float32 log domain. Range guard: every entry starts in [e^−spread, 1],
+   never exceeds 1, and a normalisation divides it by at most n. So if spread + 2 · iters · ln n ≤ 700, no entry leaves
+   float64's normal range and no sum is 0. Outside that bound (spread above about 644 for n = 4) and for non-finite
+   logits, `sinkhornLog`, the previous code, runs instead. `TestSinkhornExpMatchesLog`: within 1e-6 of the log domain
+   and 2e-7 of the float64 transcription for n = 1–5 and 8, also at a spread of 640. The fixture's h_res is reproduced
+   as before, 1.19e-7 max abs.
+4. **Norms: plain Go.** `meanSquare`'s float64 sum was a single chain of dependent adds. Four partial sums give the
+   same float32 result on all 600 rows of `TestMeanSquareOrder` (widths 1 … 2048).
+5. **Softmax: new assembly.** The measured reason: after 1 and 2, the float64 `math.Exp` in `softmaxInPlace` was a
+   third of the encoder attention at t = 375 and 40 ms of a 30 s clip's TTFT. `expSubSum(s, m)` sets s[i] =
+   exp(s[i] − m) and returns the sum. `exp_arm64.s` (NEON, 4 lanes) and `exp_amd64.s` (AVX2 + FMA, 8 lanes, chosen at
+   run time via `golang.org/x/sys/cpu`) compute Cephes' expf:
+   - range reduction k = round(x · log2e), r = x − k · ln2hi − k · ln2lo;
+   - the degree-6 polynomial for e^r;
+   - 2^k added to the exponent bits.
+
+   Inputs below −87.33 are clamped, and their results flushed to 0. There, `math.Exp` gives at most 1.2e-38, and
+   the integer exponent add would leave the normal range. NaN propagates. The float64 loop is the `purego` fallback
+   and handles the tails. `TestExpSubSumMatchesGeneric` (lengths 0–69, 127–129, 375, 1000, 4099 at offsets 0–3,
+   logits spread up to 100, ±Inf, NaN) and a 65,536-point sweep of [−90, 0] give at most 0.99 ulp from
+   `math.Exp`. The kernel takes 150 ns for 375 values against 1186 ns for the fallback.
+
+**Not changed, and why.**
+
+- `linear` (`tensor.MatMulTransB`) is the largest remaining item at 1.36 s. It is `internal/tensor`'s kernel, and a
+  faster one would replace it rather than add to it. At t = 1 the decoder's projections also stream float32 weights, so
+  9.2 (packed CQ weights) is the lever there.
+- `sigmoid` (0.20 s, float64 `math.Exp` per value in HadamardMLP and the attention gate) is 1 % of the samples. A
+  vector sigmoid could reuse the expf core, but the gain is too small for another kernel now. The encoder's own
+  sigmoid (0.35 s) is `internal/encoder`'s.
+- The softmax's max and division loops (about 0.3 ns per value) and `applyTaps`/`(*MHC).mix` (0.13 s together) were
+  left as is.
+- The OS wait time from `search`'s goroutines, which is half of all samples, belongs to 9.5.
+
+**Parity.** Every `internal/needle` fixture stays inside the F-009 contract. The largest share of a bound moves from
+0.21 to 0.20 (`attention_decoder.out`); others move by up to 0.02 in either direction (`block.h` 0.18 → 0.20,
+`hadamard_mlp.out` 0.13 → 0.15, `mhc` layer 0 0.14 → 0.11), and `probs` stays at 1.3e-6. The encoder corpus cosines
+(F-020) change in the sixth decimal (worst frame 0.992554 → 0.992552). The decoder's incremental-vs-full test stays at
+5.3e-5 worst. `TestTranscribeMatchesEngine` gives 31 / 32, and all 32 transcripts are byte-identical to the old code's
+in six alternating driver runs. No tolerance moved.
+
+**End to end.** The same machine, alternating old and new driver binaries (three corpus passes each) while the
+process list showed no other test binary:
+
+| `Transcribe`, 32 clips                | before              | after               |
+| ------------------------------------- | ------------------- | ------------------- |
+| median TTFT                           | 81.3–82.4 ms        | 55.5–57.1 ms        |
+| median decode                         | 554–570 tok/s       | 556–621 tok/s       |
+| wall time, 32 clips                   | 4.05–4.12 s         | 3.19–3.49 s         |
+| 30 s tiled clip, TTFT (6 runs)        | 511–524 ms          | 279–283 ms          |
+| `TestTranscribeMatchesEngine` (1 run) | 82.5 ms / 561 tok/s | 57.8 ms / 609 tok/s |
+
+The engine does 7.5 ms and about 1400 tok/s on this machine (F-027). Decode barely moves because a step is one row:
+its time is in the float32 GEMVs and in `search`'s goroutine hand-offs, not in `needle`'s loops.
+
+**amd64.** This Mac has no Rosetta. The linux/amd64 test binaries ran under Docker Desktop's emulation, which reports
+`avx2` and `fma`, with the checkout mounted at its own path so the fixtures and models resolve. All 53 `internal/needle`
+tests pass there, the model-gated ones included, so the AVX2 kernel ran (worst 0.99 ulp in the sweep). `internal/tensor`
+passes too, and `GOARCH=amd64 go vet` (asmdecl) is clean. Emulated timings mean nothing and are not reported.

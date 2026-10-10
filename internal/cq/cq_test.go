@@ -6,12 +6,13 @@ import (
 	"math/rand/v2"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/cwbudde/go-whistle/internal/cact"
 )
 
-var kernels = []kernel{kernelGather, kernelNibble, kernelNibble4}
+var kernels = []kernel{kernelGather, kernelNibble, kernelNibble4, kernelLUT}
 
 // randomPacked is a [out, in] CQ tensor with uniform random indices, FP16
 // norms between 2^-4 and 2^4 and a sorted random codebook, laid out as
@@ -133,6 +134,49 @@ func rotatedBound(p cact.Packed, x []float32) []float64 {
 	return bound
 }
 
+// lutBound bounds the lut kernel's rounding of its tables (lut.go): every
+// entry of group g is off by at most M_g/(2·lutQ), M_g the table bound on
+// the unscaled rotation H · x_g, and a row sums 2·groupBytes entries per
+// group, scaled by n[r, g]/√G. The 1.01 covers M_g's own rounding.
+func lutBound(p cact.Packed, x []float32) []float64 {
+	h := sylvester(p.Group)
+	cbMax := 0.0
+
+	for _, c := range p.Codebook {
+		cbMax = math.Max(cbMax, math.Abs(float64(c)))
+	}
+
+	bound := make([]float64, p.Out)
+	per := float64(p.Group * p.Bits / 4) // entries per row and group: G/2 pairs (2 bits) or G (4 bits)
+
+	for g := range p.Groups() {
+		xt := make([]float64, p.Group)
+
+		for j := range p.Group {
+			for k := g * p.Group; k < min((g+1)*p.Group, p.In); k++ {
+				xt[j] += h[j][k-g*p.Group] * float64(x[k])
+			}
+		}
+
+		var mx float64
+
+		for q := 0; q < p.Group; q += 4 / p.Bits {
+			v := math.Abs(xt[q])
+			if p.Bits == 2 {
+				v += math.Abs(xt[q+1])
+			}
+
+			mx = math.Max(mx, v)
+		}
+
+		for r := range p.Out {
+			bound[r] += 1.01 * float64(p.Norm(r, g)) * per * cbMax * mx / (2 * lutQ * math.Sqrt(float64(p.Group)))
+		}
+	}
+
+	return bound
+}
+
 // testShapes cover one and several groups, padding (In not a multiple of
 // the group, down to one real column in the last group) and groups 8 to
 // 128, for both widths.
@@ -148,7 +192,7 @@ var testShapes = []struct{ out, in, group int }{
 
 // TestKernels compares every kernel's GEMM with the float64 product of the
 // explicit dequantisation, on random packed matrices: per element within
-// a float32 bound, and by cosine.
+// a float32 bound, plus the table rounding for lut, and by cosine.
 func TestKernels(t *testing.T) {
 	rng := rand.New(rand.NewPCG(1, 2))
 
@@ -177,6 +221,16 @@ func TestKernels(t *testing.T) {
 				for i := range rows {
 					xi := x[i*s.in : (i+1)*s.in]
 					bound := rotatedBound(p, xi)
+					minCos := 0.999999
+
+					if k == kernelLUT {
+						for r, b := range lutBound(p, xi) {
+							bound[r] += b
+						}
+
+						minCos = 0.99999 // the 9.1 Accept; real tensors stay near 1e-7 (F-034)
+					}
+
 					want := make([]float64, s.out)
 
 					for r := range s.out {
@@ -190,7 +244,7 @@ func TestKernels(t *testing.T) {
 						}
 					}
 
-					if c := cosine(got[i*s.out:(i+1)*s.out], want); c < 0.999999 {
+					if c := cosine(got[i*s.out:(i+1)*s.out], want); c < minCos {
 						t.Errorf("%v bits %d %s: row %d cosine %.9f", s, bits, k, i, c)
 					}
 				}
@@ -298,6 +352,64 @@ func TestRow(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestGEMMConcurrent runs the best kernel and the lut kernel from several
+// goroutines on a fresh matrix and its Rows views, which share the lut
+// kernel's blocks (built lazily unless lut is the best kernel) and,
+// through the pool, their scratch; every result must equal the serial one
+// bit for bit (run with -race).
+func TestGEMMConcurrent(t *testing.T) {
+	rng := rand.New(rand.NewPCG(15, 16))
+	p := randomPacked(rng, 70, 384, 128, 4)
+
+	serial, err := New(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	shared, err := New(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	views := []struct{ lo, hi int }{{0, 70}, {5, 40}, {33, 70}, {64, 66}}
+	ks := []kernel{serial.best(), kernelLUT}
+	x := make([]float32, 3*384)
+
+	for i := range x {
+		x[i] = float32(rng.NormFloat64())
+	}
+
+	want := make([][]float32, len(views)*len(ks))
+
+	for i, v := range views {
+		for j, k := range ks {
+			w := make([]float32, 3*(v.hi-v.lo))
+			serial.Rows(v.lo, v.hi).gemm(k, w, x, 3)
+			want[i*len(ks)+j] = w
+		}
+	}
+
+	var wg sync.WaitGroup
+
+	for g := range 8 {
+		wg.Go(func() {
+			for n := range 20 {
+				i, j := (g+n)%len(views), n%len(ks)
+				w := want[i*len(ks)+j]
+				got := make([]float32, len(w))
+				shared.Rows(views[i].lo, views[i].hi).gemm(ks[j], got, x, 3)
+
+				if !slices.Equal(got, w) {
+					t.Errorf("goroutine %d: %s on rows [%d, %d) differs from the serial product", g, ks[j], views[i].lo, views[i].hi)
+					return
+				}
+			}
+		})
+	}
+
+	wg.Wait()
 }
 
 func TestNewErrors(t *testing.T) {

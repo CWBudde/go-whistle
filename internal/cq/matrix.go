@@ -32,6 +32,10 @@ type Matrix struct {
 	index      []byte    // out rows of rowBytes; aliases cact.Packed.Index
 	norms      []float32 // [out][groups], widened from FP16
 	cb         []float32
+	cbMax      float32    // max |cb|, for the lut kernel's table bound
+	lutStep    float32    // lutStepOf(group)
+	lut        *lutLayout // the lut kernel's blocked rows, shared with Rows views
+	row0       int        // first row in lut: non-zero for a Rows view
 	scratch    *sync.Pool // *scratch, shared by every Matrix of the same row layout
 }
 
@@ -64,6 +68,17 @@ func New(p cact.Packed) (*Matrix, error) {
 		}
 	}
 
+	for _, c := range m.cb {
+		m.cbMax = max(m.cbMax, abs32(c))
+	}
+
+	m.lutStep = lutStepOf(m.group)
+	m.lut = &lutLayout{index: m.index, norms: m.norms, out: m.out, rowBytes: m.rowBytes, groups: m.groups}
+
+	if m.best() == kernelLUT {
+		m.lut.blocks()
+	}
+
 	m.scratch = scratchPool(m.groups*m.group, m.rowBytes)
 
 	return m, nil
@@ -79,9 +94,18 @@ func (m *Matrix) In() int { return m.in }
 func (m *Matrix) Bits() int { return m.width }
 
 // Bytes is the memory the matrix holds: the packed indices, the float32
-// norms and the codebook. Index bytes shared with a file or another view
-// count in full.
-func (m *Matrix) Bytes() int { return len(m.index) + 4*len(m.norms) + 4*len(m.cb) }
+// norms and the codebook, and for the lut kernel the blocked copy of its
+// rows' indices and norms (F-034). Index bytes shared with a file or
+// another view count in full.
+func (m *Matrix) Bytes() int {
+	n := len(m.index) + 4*len(m.norms) + 4*len(m.cb)
+	if m.best() == kernelLUT {
+		b0, b1 := m.lutSpan()
+		n += (b1 - b0) * lutRows * (m.rowBytes + 4*m.groups)
+	}
+
+	return n
+}
 
 // Rows returns rows [lo, hi) as a Matrix that shares m's storage, for a
 // tensor that stacks several matrices (the mHC φ of every layer, F-028).
@@ -92,6 +116,7 @@ func (m *Matrix) Rows(lo, hi int) *Matrix {
 
 	v := *m
 	v.out = hi - lo
+	v.row0 = m.row0 + lo
 	v.index = m.index[lo*m.rowBytes : hi*m.rowBytes : hi*m.rowBytes]
 	v.norms = m.norms[lo*m.groups : hi*m.groups : hi*m.groups]
 
