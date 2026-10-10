@@ -69,6 +69,35 @@ func loadClips(audioDir, oracleDir string) ([]clip, error) {
 	return clips, nil
 }
 
+// longClip is the 30 s clip: the first corpus clip tiled. It reads that
+// clip alone (checked against its digest), not the whole corpus.
+func longClip(audio string) ([]float32, error) {
+	var manifest struct {
+		Clips []struct {
+			ID     string `json:"id"`
+			SHA256 string `json:"sha256"`
+		} `json:"clips"`
+	}
+
+	err := readJSON(filepath.Join(audio, "manifest.json"), &manifest)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(manifest.Clips) == 0 {
+		return nil, fmt.Errorf("%s: no clips", audio)
+	}
+
+	first := manifest.Clips[0]
+
+	pcm, err := readWAV(filepath.Join(audio, first.ID+".wav"), first.SHA256)
+	if err != nil {
+		return nil, err
+	}
+
+	return tile30s(pcm), nil
+}
+
 // tile30s is pcm repeated to exactly 30 s, the 30 s clip of F-027, F-035
 // and F-037 when pcm is the first corpus clip.
 func tile30s(pcm []float32) []float32 {

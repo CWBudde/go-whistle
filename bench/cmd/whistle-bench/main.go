@@ -83,7 +83,7 @@ func dispatch(ctx context.Context, args []string, stdout, log io.Writer) error {
 			return fmt.Errorf("child: %w", err)
 		}
 
-		return memChild(stdout, *model, *audio, *oracle, *mode)
+		return memChild(stdout, *model, *audio, *mode)
 	case "run":
 		cfg := config{log: log}
 
@@ -240,15 +240,11 @@ func spawnChild(ctx context.Context, log io.Writer, cfg config, mode string) (me
 }
 
 // memChild is the memory child: Load, one Transcribe of the 30 s clip,
-// and ru_maxrss after each, printed as one memLine.
-func memChild(stdout io.Writer, model, audio, oracle, mode string) error {
-	pcm, err := longClip(audio, oracle)
-	if err != nil {
-		return err
-	}
-
-	runtime.GC()
-
+// and ru_maxrss after each, printed as one memLine. ru_maxrss is a
+// high-water mark, so the model loads before any audio is read: the
+// sample after Load sees the model alone, and the 30 s clip is built from
+// the first clip only.
+func memChild(stdout io.Writer, model, audio, mode string) error {
 	m, err := whistle.Load(model, options(mode)...)
 	if err != nil {
 		return fmt.Errorf("load: %w", err)
@@ -257,6 +253,11 @@ func memChild(stdout io.Writer, model, audio, oracle, mode string) error {
 	defer func() { _ = m.Close() }()
 
 	r := memReport{Mode: mode, MaxRSSLoad: maxRSS()}
+
+	pcm, err := longClip(audio)
+	if err != nil {
+		return err
+	}
 
 	res, err := m.Transcribe(pcm, whistle.TranscribeOptions{})
 	if err != nil {
@@ -276,14 +277,4 @@ func memChild(stdout io.Writer, model, audio, oracle, mode string) error {
 	}
 
 	return nil
-}
-
-// longClip is the 30 s clip: the first corpus clip tiled.
-func longClip(audio, oracle string) ([]float32, error) {
-	clips, err := loadClips(audio, oracle)
-	if err != nil {
-		return nil, err
-	}
-
-	return tile30s(clips[0].Samples), nil
 }

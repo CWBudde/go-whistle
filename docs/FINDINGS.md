@@ -3188,7 +3188,10 @@ with like?
   - The 30 s clip, the first corpus clip tiled to 480,000 samples (F-027, F-035, F-037): one warm-up and ten timed runs
     per mode, alternating.
   - Peak RSS: a fresh child process per mode (`whistle-bench child`) runs `Load` and one 30 s `Transcribe` and reports
-    `ru_maxrss` after each, as `just mem-probe` does.
+    `ru_maxrss` after each, as `just mem-probe` does. `ru_maxrss` is a high-water mark, so the child loads the model
+    before it reads any audio and builds the 30 s clip from the first clip alone (PR #33 review: decoding all 32 clips
+    first had put 40.6 MiB after `Load`; the committed values are now three fresh children's median, 37.9 packed and
+    238.9 float, with the 30 s peaks unchanged at 124.9–126.0 MiB packed).
   - WER: the 200 LibriSpeech utterances of F-025, digests checked, both modes per utterance in alternating order. The
     manifest's `wer_rule` goes through `internal/eval` as in `TestEvalLibriSpeech`. The run fails unless the rule
     reproduces `manifest.json`'s count for every engine transcript and its totals.
@@ -3266,7 +3269,7 @@ run and 5.2–5.5 during the engine's (`bench/RESULTS.md` has every row).
 - **Real-time factor**: 0.016–0.017, about 60× faster than real time, against the engine's 0.005 (2.8–3.4×).
 - **Load**: 7.0 ms packed against `needle_load`'s 2.7 ms, which gets the bytes already in memory; float takes 139 ms.
 - **Memory**: a 30 s run peaks at 125.3 MiB packed against the engine CLI's 70.0 MiB (model load included in both;
-  ours includes the Go runtime), and 40.6 MiB after `Load`. F-037's open levers (the stem's activation spike, `GOGC`
+  ours includes the Go runtime), and 37.9 MiB after `Load`. F-037's open levers (the stem's activation spike, `GOGC`
   headroom) are the difference.
 - **Against the published figures**: the engine here gives 7.5 ms and 1383 tok/s, the published M4 Pro figures 11.1 ms
   and 1319 tok/s on another clip set. This machine is faster in TTFT and about equal in decode, so the engine on the

@@ -49,6 +49,54 @@ func TestTile30s(t *testing.T) {
 	}
 }
 
+// TestLongClip builds the 30 s clip from the first clip alone: the other
+// clips of the manifest are missing, and the result equals the corpus
+// path's.
+func TestLongClip(t *testing.T) {
+	clips, err := loadClips(testAudio, testOracle)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(testAudio, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+
+	err = os.WriteFile(filepath.Join(dir, "manifest.json"), raw, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wav, err := os.ReadFile(filepath.Join(testAudio, clips[0].ID+".wav"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.WriteFile(filepath.Join(dir, clips[0].ID+".wav"), wav, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pcm, err := longClip(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := tile30s(clips[0].Samples)
+	if len(pcm) != len(want) {
+		t.Fatalf("%d samples, want %d", len(pcm), len(want))
+	}
+
+	for i := range want {
+		if pcm[i] != want[i] {
+			t.Fatalf("sample %d is %v, want %v", i, pcm[i], want[i])
+		}
+	}
+}
+
 // TestLoadLibriSpeech reads the committed subset fixtures; the audio is
 // not needed.
 func TestLoadLibriSpeech(t *testing.T) {

@@ -92,7 +92,7 @@ The published figures come from another machine and clip set; the engine on the 
 
 | peak RSS (MiB, ru_maxrss of a fresh process) | Go packed | Go float | engine CLI |
 | -------------------------------------------- | --------: | -------: | ---------: |
-| after the model load                         |      40.6 |    241.1 |          — |
+| after the model load                         |      37.9 |    238.9 |          — |
 | one 30 s transcription, load included        |     125.3 |    489.4 |       70.0 |
 | largest over the 32 clips, load included     |         — |        — |       54.5 |
 

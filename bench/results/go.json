@@ -98,7 +98,7 @@
         }
       },
       "equal_engine": 31,
-      "max_rss_load_mib": 40.578125,
+      "max_rss_load_mib": 37.859375,
       "max_rss_peak_mib": 125.3125
     },
     {
@@ -177,7 +177,7 @@
         }
       },
       "equal_engine": 31,
-      "max_rss_load_mib": 241.140625,
+      "max_rss_load_mib": 238.875,
       "max_rss_peak_mib": 489.390625
     }
   ],
