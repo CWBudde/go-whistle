@@ -1,6 +1,8 @@
 package whistle
 
 import (
+	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -57,9 +59,9 @@ type Stream struct {
 
 	open     bool          // Process has fed audio since the last Stop
 	buf      []float32     // the samples from offset on: the next pass' audio
-	offset   int           // samples dropped from the front, the buffer start t0
+	offset   int64         // samples dropped from the front, the buffer start t0
 	at       float64       // offset in seconds as the engine holds it (F-036)
-	received int           // samples fed since the stream started
+	received int64         // samples fed since the stream started
 	inBuffer []streamWord  // committed words that end after offset
 	pending  []streamWord  // the last pass' words after its commit
 	last     time.Duration // the end of the last committed word
@@ -94,6 +96,15 @@ type StreamResult struct {
 
 // MarshalJSON writes r in the engine's form.
 func (r StreamResult) MarshalJSON() ([]byte, error) {
+	if math.IsNaN(r.Received) || math.IsInf(r.Received, 0) {
+		return nil, fmt.Errorf("whistle: received %v is not a JSON number", r.Received)
+	}
+
+	err := validWords(r.Words)
+	if err != nil {
+		return nil, err
+	}
+
 	b := make([]byte, 0, 96+len(r.Text)+len(r.Pending)+64*len(r.Words))
 
 	b = append(b, `{"text":`...)
@@ -154,7 +165,7 @@ func (s *Stream) Process(pcm []float32) (StreamResult, error) {
 
 	s.open = true
 	s.buf = append(s.buf, pcm...)
-	s.received += len(pcm)
+	s.received += int64(len(pcm))
 	s.limit()
 
 	words, lang, err := s.pass()
@@ -242,7 +253,7 @@ func (s *Stream) limit() {
 	}
 
 	drop := (over + frameSamples - 1) / frameSamples * frameSamples
-	s.chunkAt(s.offset+drop, s.at+float64(drop)*(1.0/SampleRate))
+	s.chunkAt(s.offset+int64(drop), s.at+float64(drop)*(1.0/SampleRate))
 }
 
 // fresh drops the words of a pass that the stream has committed already
@@ -308,8 +319,8 @@ func (s *Stream) trimSentence() {
 // chunkAt drops the buffer before sample cut, at seconds as the engine
 // holds it, and the committed words that end there or earlier
 // (whisper_streaming's chunk_at).
-func (s *Stream) chunkAt(cut int, at float64) {
-	s.buf = s.buf[min(cut-s.offset, len(s.buf)):]
+func (s *Stream) chunkAt(cut int64, at float64) {
+	s.buf = s.buf[min(int(cut-s.offset), len(s.buf)):]
 	s.offset, s.at = cut, at
 
 	k := 0
@@ -380,9 +391,9 @@ func frameSeconds(n int) float64 {
 const sampleDuration = time.Second / SampleRate
 
 // samplesDuration is the time of n samples.
-func samplesDuration(n int) time.Duration { return time.Duration(n) * sampleDuration }
+func samplesDuration(n int64) time.Duration { return time.Duration(n) * sampleDuration }
 
 // durationSamples is the sample at time d, rounded.
-func durationSamples(d time.Duration) int {
-	return int((d + sampleDuration/2) / sampleDuration)
+func durationSamples(d time.Duration) int64 {
+	return int64((d + sampleDuration/2) / sampleDuration)
 }

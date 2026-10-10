@@ -139,6 +139,23 @@ func TestResultMarshalRejectsNaN(t *testing.T) {
 		if err == nil {
 			t.Errorf("DecodeTPS %v: no error", v)
 		}
+
+		words := []Word{{Text: "a", Probability: 0.5}, {Text: "b", Probability: v}}
+
+		_, err = Result{Words: words}.MarshalJSON()
+		if err == nil {
+			t.Errorf("word probability %v: no error", v)
+		}
+
+		_, err = StreamResult{Words: words}.MarshalJSON()
+		if err == nil {
+			t.Errorf("stream word probability %v: no error", v)
+		}
+
+		_, err = StreamResult{Received: v}.MarshalJSON()
+		if err == nil {
+			t.Errorf("stream received %v: no error", v)
+		}
 	}
 }
 
