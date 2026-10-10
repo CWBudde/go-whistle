@@ -2,8 +2,11 @@ package cq
 
 import (
 	"math"
+	"slices"
 	"sync"
 	"sync/atomic"
+
+	"github.com/cwbudde/go-whistle/internal/tensor"
 )
 
 // The lut kernel (docs/FINDINGS.md F-034) is the nibble kernel recast for
@@ -82,52 +85,127 @@ func (m *Matrix) lutSpan() (b0, b1 int) {
 	return m.row0 / lutRows, (m.row0 + m.out + lutRows - 1) / lutRows
 }
 
-// gemmLUT runs the lut kernel for each activation: rotate, build the
-// tables group by group, look up every block of the matrix's rows.
-func (m *Matrix) gemmLUT(s *scratch, dst, x []float32, rows int) {
-	idx, norm := m.lut.blocks()
-	b0, b1 := m.lutSpan()
-	nb := b1 - b0
-	idx = idx[b0*m.rowBytes*lutRows : b1*m.rowBytes*lutRows]
-	norm = norm[b0*m.groups*lutRows : b1*m.groups*lutRows]
+// lutPieceBytes is the least work of one Parallel piece of the lut
+// kernel, in index bytes looked up (matrix rows times row bytes, per
+// activation): 2^18 take about 12 µs on one NEON core at F-034's 1.5 ns
+// per block of 32 rows and index byte, several times the cost of waking a
+// helper (docs/FINDINGS.md F-038).
+const lutPieceBytes = 1 << 18
+
+// gemmLUT sets dsts[k] = x · ms[k]ᵀ for rows activations with the lut
+// kernel. The matrices share their tables (sharesTables), so each
+// activation is rotated and tabulated once for all of them. The work is
+// split on tensor.Parallel over the activations, or for a single large
+// product over the matrix's blocks of rows. Each output is the same sum in
+// the same order either way: an activation's tables do not depend on the
+// split, and lutLookup computes each row of a block on its own.
+func gemmLUT(ms []*Matrix, dsts [][]float32, x []float32, rows int) {
+	m0, per := ms[0], 0
+
+	for _, m := range ms {
+		per += m.out * m.rowBytes
+	}
+
+	if rows > 1 && (rows >= tensor.Workers() || per < 2*lutPieceBytes) {
+		tensor.Parallel(rows, (lutPieceBytes+per-1)/per, func(lo, hi int) {
+			s, _ := m0.scratch.Get().(*scratch)
+			defer m0.scratch.Put(s)
+
+			lutRun(s, ms, dsts, x, lo, hi, false)
+		})
+
+		return
+	}
+
+	s, _ := m0.scratch.Get().(*scratch)
+	defer m0.scratch.Put(s)
+
+	lutRun(s, ms, dsts, x, 0, rows, per >= 2*lutPieceBytes)
+}
+
+// lutRun runs activations [lo, hi) through every matrix of ms: rotate,
+// build the tables group by group, look up the blocks of each matrix's
+// rows, on Parallel over the blocks if split.
+func lutRun(s *scratch, ms []*Matrix, dsts [][]float32, x []float32, lo, hi int, split bool) {
+	m0, nb := ms[0], 0
+
+	for _, m := range ms {
+		b0, b1 := m.lutSpan()
+		nb = max(nb, b1-b0)
+	}
 
 	if cap(s.y) < nb*lutRows {
 		s.y = make([]float32, nb*lutRows)
 	}
 
 	if s.tab == nil {
-		s.tab = make([]byte, 64*m.rowBytes)
+		s.tab = make([]byte, 64*m0.rowBytes)
 	}
 
-	if len(s.steps) < m.groups { // matrices of one row layout can differ in group size
-		s.steps = make([]float32, m.groups)
+	if len(s.steps) < m0.groups { // matrices of one row layout can differ in group size
+		s.steps = make([]float32, m0.groups)
 	}
 
-	y := s.y[:nb*lutRows]
-	off := m.row0 - b0*lutRows
-	tabBytes := 64 * m.groupBytes
-	pad := m.groups * m.group
+	for i := lo; i < hi; i++ {
+		m0.lutTables(s, x[i*m0.in:(i+1)*m0.in])
 
-	for i := range rows {
-		xh := s.xh[:pad]
-		copy(xh, x[i*m.in:(i+1)*m.in])
-		clear(xh[m.in:])
-
-		for g := range m.groups {
-			xg := xh[g*m.group : (g+1)*m.group]
-			fwhtF32(xg)
-
-			tg := s.tab[g*tabBytes : (g+1)*tabBytes]
-			if m.width == 2 {
-				s.steps[g] = lutTables2(tg, xg, m.cb, m.cbMax) * m.lutStep
-			} else {
-				s.steps[g] = lutTables4(tg, xg, m.cb, m.cbMax) * m.lutStep
-			}
+		for k, m := range ms {
+			m.lutApply(s, dsts[k][i*m.out:(i+1)*m.out], split)
 		}
-
-		lutLookup(y, idx, s.tab, norm, s.steps, nb, m.groups, m.groupBytes)
-		copy(dst[i*m.out:(i+1)*m.out], y[off:off+m.out])
 	}
+}
+
+// lutTables rotates one activation x into s.xh and builds its tables and
+// group steps in s.tab and s.steps.
+func (m *Matrix) lutTables(s *scratch, x []float32) {
+	tabBytes := 64 * m.groupBytes
+
+	xh := s.xh[:m.groups*m.group]
+	copy(xh, x)
+	clear(xh[m.in:])
+
+	for g := range m.groups {
+		xg := xh[g*m.group : (g+1)*m.group]
+		fwhtF32(xg)
+
+		tg := s.tab[g*tabBytes : (g+1)*tabBytes]
+		if m.width == 2 {
+			s.steps[g] = lutTables2(tg, xg, m.cb, m.cbMax) * m.lutStep
+		} else {
+			s.steps[g] = lutTables4(tg, xg, m.cb, m.cbMax) * m.lutStep
+		}
+	}
+}
+
+// lutApply looks up s's tables for every block of m's rows and writes the
+// matrix's rows to y (len Out).
+func (m *Matrix) lutApply(s *scratch, y []float32, split bool) {
+	idx, norm := m.lut.blocks()
+	b0, b1 := m.lutSpan()
+	nb := b1 - b0
+	ib, nbk := m.rowBytes*lutRows, m.groups*lutRows // index bytes and norms per block
+	idx, norm = idx[b0*ib:b1*ib], norm[b0*nbk:b1*nbk]
+	yb := s.y[:nb*lutRows]
+
+	if split {
+		tensor.Parallel(nb, (lutPieceBytes+ib-1)/ib, func(lo, hi int) {
+			lutLookup(yb[lo*lutRows:hi*lutRows], idx[lo*ib:hi*ib], s.tab, norm[lo*nbk:hi*nbk], s.steps, hi-lo,
+				m.groups, m.groupBytes)
+		})
+	} else {
+		lutLookup(yb, idx, s.tab, norm, s.steps, nb, m.groups, m.groupBytes)
+	}
+
+	off := m.row0 - b0*lutRows
+	copy(y, yb[off:off+m.out])
+}
+
+// sharesTables reports whether an activation's lut tables for m serve o
+// too: the same input width, group, index width and codebook. In Whistle
+// every matrix of one width and input width does (one codebook per width).
+func (m *Matrix) sharesTables(o *Matrix) bool {
+	return m.in == o.in && m.group == o.group && m.width == o.width && m.cbMax == o.cbMax &&
+		slices.Equal(m.cb, o.cb)
 }
 
 // lutStepOf is the factor from a group's bound M to its integer step in y:
