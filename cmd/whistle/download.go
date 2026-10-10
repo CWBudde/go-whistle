@@ -29,7 +29,7 @@ func newDownloadCmd() *cobra.Command {
 			"  HF_TOKEN        Hugging Face token, sent as a Bearer token\n" +
 			"  HF_HUB_OFFLINE  1/true/yes/on: no network, only verify the files on disk (same as --offline)\n" +
 			"  HF_ENDPOINT     Hub base URL (default " + hub.DefaultEndpoint + ")",
-		Args: cobra.NoArgs,
+		Args: usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			m, err := hub.Pinned()
 			if err != nil {
