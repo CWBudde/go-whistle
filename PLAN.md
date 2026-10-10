@@ -236,7 +236,10 @@ go-whistle/
 │   ├── needle/              shared blocks: ZCRMSNorm, Attention (taps, q/k norm, gate), HadamardMLP, MHC + Sinkhorn, Engram
 │   ├── encoder/             stem + conformer blocks + final_norm
 │   ├── decoder/             Needle Block + cross-attention, KV cache, tied head, depth ladder
-│   ├── search/              beam search, Aho-Corasick keyword bias, timestamps, silence gate, streaming commit
+│   ├── search/              beam search (copy-on-write KV per beam), Aho-Corasick keyword bias
+│   ├── align/               word grouping, word probability, cross-attention DTW timestamps
+│   ├── cq/                  CQ LUT GEMV in the rotated (Hadamard) domain, straight from the packed .cact
+│   ├── eval/                WER/CER and edit distance shared by the parity tests and the LibriSpeech harness
 │   └── testutil/            fixture loading, cosine/top-1 helpers, "skip if models missing"
 ├── tools/oracle/            //go:build oracle — runs the needle binary / dlopens libneedle3 via purego, dumps fixtures
 ├── scripts/                 uv-managed Python: JAX block fixtures, safetensors↔cact comparison, WER evaluation
@@ -713,53 +716,114 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 
 ## Phase 6 — Engine-parity decoding
 
-- [ ] Beam search: 5 beams, with candidate length normalisations (`logp / len`, `logp / len^α`, GNMT); EOS handling;
-      max 320 tokens; encoder K/V and cross-attention keys shared across beams; copy-on-write KV per beam.
-- [ ] Keyword biasing: tokenise the keywords, build an Aho-Corasick automaton over token ids, add a bonus as a match
-      advances and revoke it on failure. Tune the weight against the engine using fixture clips with and without keywords.
-- [ ] Silence gate: a loudness-range measure (e.g. a percentile spread of frame RMS in dB). Pick the threshold from
-      oracle sweeps (silence, very quiet speech, noise). Return the exact empty JSON for silence.
-- [ ] The 30 s limit: an error whose message contains "30 s" for more than 480,000 samples.
+Split into sub-phases with disjoint package scopes so that independent work can run in parallel. 6.1, 6.2 and 6.5 have
+no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything and carries the phase **Accept**.
+
+### 6.1 Decoding oracle corpus (`tools/oracle`, `testdata/oracle/`, `justfile`)
+
+- [ ] Depth runs: engine transcripts at `--audio-depth 2..7` for the 32 fixture clips (`testdata/oracle/depth/`).
+- [ ] Keyword runs (`testdata/oracle/keywords/`): per case a keyword file and the transcript with and without it. Cases:
+      a word the engine already gets right, a word it misses against the reference transcript, a wrong but plausible
+      word, a multi-word phrase.
+- [ ] Silence sweep (`testdata/oracle/silence/`), signals from `tools/oracle/probe`: digital silence of several
+      lengths, white/pink noise at several levels, a speech clip attenuated in steps down to −90 dBFS, speech padded
+      with long silence. Record whether the engine returns the empty JSON.
+- [ ] Limits (`testdata/oracle/limits/`): 480,000 vs 480,001 samples (the exact error text), 0 and a handful of samples.
+- [ ] LibriSpeech test-clean subset (`testdata/oracle/librispeech/`): about 200 utterances, seeded and spread over the
+      speakers, with ids, SHA-256, reference text and the engine JSON. The audio stays git-ignored under
+      `models/corpus/` and a `just` recipe fetches it.
+- [ ] **Accept:** every `just oracle-*` recipe regenerates its fixtures deterministically (a re-run leaves no diff), and
+      the repo grows by less than 2 MB.
+
+### 6.2 Beam search (`internal/search`, `internal/decoder`, `internal/needle`)
+
+- [ ] `decoder.State.Fork`: copy-on-write KV per beam; the encoder memory (cross K/V) is shared by all beams.
+- [ ] Beam search: 5 beams, max 320 tokens. Candidates for the length normalisation (`logp / len`, `logp / len^α`,
+      GNMT), the EOS rule (all beams finished, best finished beats best alive, K finished) and whether the language
+      step is beamed or argmax (U8).
+- [ ] Move `editDistance`/`wer`/`cer` from the decoder tests into `internal/eval` for reuse.
+- [ ] **Accept:** the variant is picked by evidence on the 32 clips (`.cact` weights); target ≥ 31/32 transcripts equal
+      to the engine's, every remaining mismatch explained by its log-probability margin.
+
+### 6.3 Keyword biasing (`internal/search`, `internal/tokenizer`; needs 6.1)
+
+- [ ] Tokenise the keywords, build an Aho-Corasick automaton over token ids, add a bonus as a match advances and revoke
+      it on failure. Tune the weight and the revocation against the 6.1 keyword fixtures (U9).
+- [ ] **Accept:** transcripts with keywords equal the engine's on the keyword fixtures at the same rate as without.
+
+### 6.4 Depth ladder (`internal/decoder`; needs 6.1)
+
 - [ ] `Depth` option: run the decoder layers given by the bisection order 0, 7, 3, 5, 1, 2, 4, 6, truncated to N.
-      Port `_ladder_layer_order` and test that it matches the engine's `--audio-depth`.
+      Port `_ladder_layer_order` (`architecture.py`).
+- [ ] **Accept:** transcripts at depths 2–7 equal the 6.1 depth fixtures at the same rate as the full depth does.
+
+### 6.5 Public pipeline & limits (`whistle/`, `cmd/whistle`)
+
+- [ ] `whistle.Load(path, opts)` over `.cact` or safetensors; `(*Model).Transcribe(pcm, opts)`, `TranscribeWAV`,
+      `Embed`; built only from the exported `frontend`, `encoder` and `decoder` APIs. Greedy decoding until 6.6.
+- [ ] The 30 s limit: an error whose message contains "30 s" for more than 480,000 samples.
+- [ ] Result JSON byte-compatible with the engine in field names, order and number formatting; silence returns exactly
+      `{"text":"","language":"","words":[],"ttft_ms":0.0,"decode_tps":0.0}`.
+- [ ] `ttft_ms` and `decode_tps` measured the same way as the engine (TTFT includes the front end and the encoder).
+- [ ] Minimal `whistle transcribe <wav> [--language] [--json]`.
+- [ ] **Accept:** the transcripts and `language` of `Transcribe` equal `decoder.Greedy` on the 32 clips, and the JSON
+      round-trips byte-identical against recorded engine output.
+
+### 6.6 Silence gate & integration (`whistle/`; needs 6.1, 6.2, 6.5)
+
+- [ ] Silence gate: a loudness-range measure (e.g. a percentile spread of frame RMS in dB). Pick the measure and the
+      threshold from the 6.1 silence sweep (U10); return the exact empty JSON for silence.
+- [ ] Beam search wired into `Transcribe` (with keywords and depth once 6.3/6.4 are merged).
+- [ ] `just eval-librispeech`: WER of the Go pipeline and of the engine on the 6.1 subset.
 - [ ] **Accept:** transcripts equal the engine's on ≥ 95% of fixtures (with the rest explained in FINDINGS), and
       LibriSpeech test-clean WER is within 0.3 absolute of the engine on the same subset.
 
 ## Phase 7 — Word timestamps & output JSON
 
-- [ ] Word grouping: tokens starting with `▁` begin words; byte pieces are merged.
-- [ ] Timestamps from cross-attention: per token, aggregate the attention over heads and layers (candidates: all
-      layers, the last layer, the best-aligned heads) and run a monotonic DTW alignment over the 80 ms frames.
-- [ ] `probability` per word: candidates are the mean or the product of the token probabilities. Match the engine.
-- [ ] `ttft_ms` and `decode_tps` measured the same way as the engine (TTFT includes the front end and the encoder).
+One session: `internal/decoder` (capture hook), `internal/align` (new) and `whistle/`. The 32 fixture JSONs already hold
+the engine's word times and probabilities, so this phase needs no new oracle runs; teacher-force the engine's text.
+
+- [ ] 7.1 Cross-attention capture: per decoded token, the attention probabilities per layer and head over the 80 ms
+      frames, through a decoder hook that costs nothing when off.
+- [ ] 7.2 Word grouping: tokens starting with `▁` begin words; byte pieces are merged. `probability` per word:
+      candidates are the mean or the product of the token probabilities (U11). Match the engine.
+- [ ] 7.3 Timestamps: aggregate the attention over heads and layers (candidates: all layers, the last layer, the
+      best-aligned heads) and run a monotonic DTW alignment over the 80 ms frames (U11).
+- [ ] 7.4 `words` in `whistle.Result` and `--word-timestamps` in the CLI.
 - [ ] **Accept:** timestamps are monotone and within [0, duration], start/end are within 80 ms of the engine on ≥ 90% of
       words, and the JSON is byte-compatible in field names and order.
 
 ## Phase 8 — Streaming & embeddings
 
-- [ ] `Stream`: buffer the incoming chunks; every ~1 s re-transcribe the buffer; commit the longest word prefix on
-      which two consecutive passes agree; report `pending`, `received` and `pass_ms`; `Stop()` flushes. Support
-      buffers longer than 30 s by trimming committed audio (match the engine's behaviour).
-- [ ] `Embed`: the encoder output per 80 ms frame, the same layout as `needle_embed`.
+- [ ] 8.1 Stream oracle (`tools/oracle`, `testdata/oracle/stream/`): `needle_stream_transcribe_process`/`_stop` with
+      1 s chunks over the 32 clips, recording every call's output, plus two concatenated streams longer than 30 s.
+- [ ] 8.2 `Embed`: the encoder output per 80 ms frame, the same layout as `needle_embed` (delivered with 6.5).
+- [ ] 8.3 `Stream`: buffer the incoming chunks; every ~1 s re-transcribe the buffer; commit the longest word prefix on
+      which two consecutive passes agree; report `pending`, `received` and `pass_ms`; `Stop()` flushes (U12).
+- [ ] 8.4 Buffers longer than 30 s: trim committed audio the way the engine does (U12).
 - [ ] **Accept:** on fixture clips fed in 1 s chunks, the final committed text equals the offline transcript, and
       the embeddings match the engine at cosine ≥ 0.99.
 
 ## Phase 9 — Native quantised path & performance
 
-- [ ] Run straight from the packed `.cact`: a 2/4-bit LUT GEMV in the rotated (Hadamard) domain. Apply FWHT-128 to the
-      activation groups once and multiply by the codebook values, instead of dequantising the weights. Memory target:
-      under 64 MB RSS for the model.
-- [ ] Optional int8 activations and an int8 KV cache (`act_bits 8`, `kv_bits 8`) to mirror the engine's numerics, behind a flag.
-- [ ] Plan 9 assembly (NEON/AVX2) for the LUT GEMV, the FWHT, the Monarch Kronecker products and the softmax/Sinkhorn
-      hot loops, with pure-Go fallbacks and equivalence tests (see `go-plan9-assembly`).
-- [ ] Parallelism: the encoder over time blocks and heads; the decoder over beams.
-- [ ] Benchmarks (`bench/`): TTFT and decode tok/s against the engine on the same machine. The engine publishes
+- [ ] 9.1 CQ LUT GEMV kernel (`internal/cq`, plus an additive raw-blob accessor in `internal/cact`): a 2/4-bit LUT GEMV
+      in the rotated (Hadamard) domain. Apply FWHT-128 to the activation groups once and multiply by the codebook
+      values, instead of dequantising the weights. Pure Go. **Accept:** equal to dequantise + GEMV at cosine
+      ≥ 0.99999 on real `.cact` tensors, with a benchmark against the float GEMV.
+- [ ] 9.2 Run straight from the packed `.cact`: wire the 9.1 kernel into `needle`, `encoder` and `decoder` behind
+      `weights.Source`. Memory target: under 64 MB RSS for the model.
+- [ ] 9.3 Optional int8 activations and an int8 KV cache (`act_bits 8`, `kv_bits 8`) to mirror the engine's numerics,
+      behind a flag.
+- [ ] 9.4 Plan 9 assembly (NEON/AVX2) for the LUT GEMV, the FWHT, the Monarch Kronecker products and the
+      softmax/Sinkhorn hot loops, with pure-Go fallbacks and equivalence tests (see `go-plan9-assembly`).
+- [ ] 9.5 Parallelism: the encoder over time blocks and heads; the decoder over beams.
+- [ ] 9.6 Benchmarks (`bench/`): TTFT and decode tok/s against the engine on the same machine. The engine publishes
       11.1 ms TTFT and 1319 tok/s on an M4 Pro with 5 beams. Also the real-time factor for 30 s clips.
 - [ ] **Accept:** WER unchanged within 0.1 against the float path, with numbers recorded in `bench/RESULTS.md`.
 
 ## Phase 10 — Distribution & extras
 
-- [ ] CLI polish: `whistle transcribe [--language] [--keywords] [--word-timestamps] [--depth] [--json]`,
+- [ ] CLI polish on top of 6.5: `whistle transcribe [--language] [--keywords] [--word-timestamps] [--depth] [--json]`,
       `whistle stream` (stdin PCM or a WAV played in chunks), `whistle embed`, `whistle doctor`
 - [ ] README quickstart, examples and Go API docs
 - [ ] Optional: an HTTP server (`/transcribe`, `/stream` over WebSocket)
@@ -771,20 +835,20 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
 
 ## Unknowns to resolve against the oracle
 
-| #   | Unknown                                                                                     | Phase | Resolved by                       |
-| --- | ------------------------------------------------------------------------------------------- | ----- | --------------------------------- |
-| U1  | Mel log flavour, floor, normalisation; the "250–3500 Hz" claim vs. the full-band filterbank | 3/4   | encoder cosine vs. `needle_embed` |
-| U2  | Stem strides, padding, activations                                                          | 4     | frame count + encoder cosine      |
-| U3  | Encoder conv module (GLU?), macaron scale, `pe_gate` usage, positions                       | 4     | encoder cosine                    |
-| U4  | Meaning of the audio manifest values `3246, 1`                                              | 4/5   | inspection + experiments          |
-| U5  | Whether the encoder and decoder share the Hadamard permutations                             | 2/4   | block parity / encoder cosine     |
-| U6  | Cross-attention position in the block — resolved: after the self-attention, F-021           | 5     | teacher-forced transcript score   |
-| U7  | Decoder prompt format, language detection — resolved: `[<s>]`, argmax language, F-023/F-024 | 5     | language + teacher-forced score   |
-| U8  | Beam length normalisation, EOS rules                                                        | 6     | transcript parity                 |
-| U9  | Keyword bias weight and revocation                                                          | 6     | keyword fixture parity            |
-| U10 | Silence gate measure and threshold                                                          | 6     | threshold sweep                   |
-| U11 | Timestamp algorithm (heads/layers, DTW), word probability                                   | 7     | timestamp parity                  |
-| U12 | Streaming commit rule details, behaviour beyond 30 s                                        | 8     | stream parity                     |
+| #   | Unknown                                                                                     | Phase   | Resolved by                       |
+| --- | ------------------------------------------------------------------------------------------- | ------- | --------------------------------- |
+| U1  | Mel log flavour, floor, normalisation; the "250–3500 Hz" claim vs. the full-band filterbank | 3/4     | encoder cosine vs. `needle_embed` |
+| U2  | Stem strides, padding, activations                                                          | 4       | frame count + encoder cosine      |
+| U3  | Encoder conv module (GLU?), macaron scale, `pe_gate` usage, positions                       | 4       | encoder cosine                    |
+| U4  | Meaning of the audio manifest values `3246, 1`                                              | 4/5     | inspection + experiments          |
+| U5  | Whether the encoder and decoder share the Hadamard permutations                             | 2/4     | block parity / encoder cosine     |
+| U6  | Cross-attention position in the block — resolved: after the self-attention, F-021           | 5       | teacher-forced transcript score   |
+| U7  | Decoder prompt format, language detection — resolved: `[<s>]`, argmax language, F-023/F-024 | 5       | language + teacher-forced score   |
+| U8  | Beam length normalisation, EOS rules                                                        | 6.2     | transcript parity                 |
+| U9  | Keyword bias weight and revocation                                                          | 6.3     | keyword fixture parity            |
+| U10 | Silence gate measure and threshold                                                          | 6.6     | threshold sweep                   |
+| U11 | Timestamp algorithm (heads/layers, DTW), word probability                                   | 7.2–7.3 | timestamp parity                  |
+| U12 | Streaming commit rule details, behaviour beyond 30 s                                        | 8.3–8.4 | stream parity                     |
 
 ## Non-goals
 
