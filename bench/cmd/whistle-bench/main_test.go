@@ -1,0 +1,161 @@
+package main
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/cwbudde/go-whistle/bench"
+	"github.com/cwbudde/go-whistle/whistle"
+)
+
+const (
+	testAudio  = "../../../testdata/audio"
+	testOracle = "../../../testdata/oracle"
+	testModel  = "../../../models/whistle/whistle.cact"
+)
+
+// TestLoadClips reads the committed corpus: 32 clips, digests checked,
+// each with the engine's transcript.
+func TestLoadClips(t *testing.T) {
+	clips, err := loadClips(testAudio, testOracle)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(clips) != 32 {
+		t.Fatalf("%d clips, want 32", len(clips))
+	}
+
+	for _, c := range clips {
+		if len(c.Samples) == 0 || c.Text == "" || c.Language == "" {
+			t.Errorf("%s: %d samples, text %q, language %q", c.ID, len(c.Samples), c.Text, c.Language)
+		}
+	}
+}
+
+func TestTile30s(t *testing.T) {
+	pcm := tile30s([]float32{1, 2, 3})
+	if len(pcm) != whistle.MaxSamples {
+		t.Fatalf("%d samples", len(pcm))
+	}
+
+	for i, v := range pcm {
+		if v != float32(i%3+1) {
+			t.Fatalf("sample %d is %v", i, v)
+		}
+	}
+}
+
+// TestLoadLibriSpeech reads the committed subset fixtures; the audio is
+// not needed.
+func TestLoadLibriSpeech(t *testing.T) {
+	ls, err := loadLibriSpeech("../../../testdata/oracle/librispeech", "unused")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(ls.utterances) != 200 || ls.words != 4167 || ls.engineErrors != 221 {
+		t.Fatalf("%d utterances, %d words, %d engine errors", len(ls.utterances), ls.words, ls.engineErrors)
+	}
+
+	var sum int
+
+	for _, u := range ls.utterances {
+		e, _ := wordErrors(u.Transcript, u.engine)
+		if e != u.engineErrors {
+			t.Errorf("%s: %d errors under the rule, manifest.json says %d", u.ID, e, u.engineErrors)
+		}
+
+		sum += e
+	}
+
+	if sum != ls.engineErrors {
+		t.Errorf("%d errors under the rule, manifest.json says %d", sum, ls.engineErrors)
+	}
+}
+
+func TestDispatchErrors(t *testing.T) {
+	var log bytes.Buffer
+
+	for _, args := range [][]string{nil, {"nope"}} {
+		err := dispatch(t.Context(), args, &log, &log)
+		if err == nil || !strings.Contains(err.Error(), "usage") {
+			t.Errorf("%q: %v", args, err)
+		}
+	}
+
+	err := dispatch(t.Context(), []string{"run", "-model", filepath.Join(t.TempDir(), "none.cact")}, &log, &log)
+	if err == nil || !strings.Contains(err.Error(), "whistle download") {
+		t.Errorf("run without a model: %v", err)
+	}
+}
+
+// TestReport renders a report without any results.
+func TestReport(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "RESULTS.md")
+
+	var log bytes.Buffer
+
+	err := dispatch(t.Context(), []string{
+		"report", "-go", filepath.Join(dir, "go.json"), "-engine", filepath.Join(dir, "e.json"),
+		"-report", out,
+	}, &log, &log)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.HasPrefix(string(raw), "# Benchmarks") {
+		t.Errorf("report:\n%s", raw)
+	}
+}
+
+// BenchmarkTranscribe is the 32 fixture clips through Transcribe per
+// iteration, packed and float, with the median TTFT and decode rate as
+// metrics: `go test -run '^$' -bench . ./bench/cmd/whistle-bench/`. It
+// skips without the model.
+func BenchmarkTranscribe(b *testing.B) {
+	if !exists(testModel) {
+		b.Skipf("%s missing; run `whistle download`", testModel)
+	}
+
+	clips, err := loadClips(testAudio, testOracle)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for _, mode := range modes {
+		b.Run(mode, func(b *testing.B) {
+			m, err := whistle.Load(testModel, options(mode)...)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			defer func() { _ = m.Close() }()
+
+			var ttft, tps []float64
+
+			for b.Loop() {
+				for _, c := range clips {
+					r, _, err := transcribe(m, c.Samples)
+					if err != nil {
+						b.Fatal(err)
+					}
+
+					ttft, tps = append(ttft, ms(r.TTFT)), append(tps, r.DecodeTPS)
+				}
+			}
+
+			b.ReportMetric(bench.Summarise(ttft).Median, "ttft-ms")
+			b.ReportMetric(bench.Summarise(tps).Median, "tok/s")
+		})
+	}
+}
