@@ -1491,3 +1491,94 @@ safetensors). The rest is the 5-beam search and the engine's W2A8 arithmetic, wh
 **Fast regression.** `TestGreedyMatchesEngine` (no tag, skips without `models/`) decodes three short clips
 (LibriSpeech test-other and test-clean, FLEURS de). It requires the engine's language and text exactly, and the
 teacher-forced mean log-probability above floors just below the measured −0.0880 / −0.0548 / −0.0652.
+
+## F-027 — The public pipeline: the engine's JSON, the 30 s limit and its timing (2026-10-10)
+
+**Question.** What exactly does the engine print for a transcript, so that `whistle.Result` can match it byte for
+byte? What does it do at the limits? And how does it measure `ttft_ms` and `decode_tps`? `testdata/oracle/*.json` cannot
+answer this, because `tools/oracle` normalises them and drops the timing (F-002).
+
+**Raw output.** `needle --model whistle.cact --audio <wav> [--audio-word-timestamps]` (engine 3.2.0, `NEEDLE_TELEMETRY=0
+DO_NOT_TRACK=1`) on two speech clips, a clip whose text has quotes, a Polish clip, 2 s of digital silence and the
+first clip tiled to exactly 30 s. Ten outputs are kept verbatim in `whistle/testdata/needle-cli/`. They are named
+`.stdout` rather than `.json`, so prettier (`treefmt.toml` formats `*.json`) leaves the bytes alone.
+
+- One JSON object on one line, then `\n`, on stdout. No spaces.
+- Field order: `text`, `language`, then `words` if present, then `ttft_ms`, `decode_tps`.
+- `words` is printed **only with `--audio-word-timestamps`**, and then it is printed **for silence too**:
+
+  | input       | without timestamps                                         | with timestamps                                                       |
+  | ----------- | ---------------------------------------------------------- | --------------------------------------------------------------------- |
+  | 2 s silence | `{"text":"","language":"","ttft_ms":0.0,"decode_tps":0.0}` | `{"text":"","language":"","words":[],"ttft_ms":0.0,"decode_tps":0.0}` |
+
+  So the "exact silence JSON" in PLAN.md and `tests/test_whistle.py` is the timestamps-on form. The upstream test
+  calls `transcribe(..., word_timestamps=True)`.
+
+- Numbers are fixed-point: `ttft_ms` and `decode_tps` with one decimal (`7.4`, `1433.6`, `0.0`), `start` and `end`
+  with two (`0.40`, `29.92`), `probability` with three (`0.225`, `1.000`).
+- Strings: `"` is written as `\"`. Non-ASCII is raw UTF-8 (`ü`, `ł`, `é`), not `\u` escapes. The engine never
+  printed a backslash or a control character, so their form is not observed. `Result` writes `\\`, `\n`, `\r`,
+  `\t`, `\b`, `\f` and `\u00XX`, and does not escape `<`, `>`, `&` or `/`.
+
+**Limits.**
+
+- 480,001 samples: exit 1, nothing on stdout, and `needle: audio limit is 30 s` on stderr (kept as
+  `limit-480001.stderr`). 480,000 samples transcribe normally.
+- A WAV without samples: exit 1, `needle: <path> holds no audio`.
+- 10 samples: the silence JSON.
+
+**In Go.**
+
+- `Result.MarshalJSON` writes that form by hand: fixed field order, `strconv.AppendFloat(v, 'f', 1|2|3, 64)`, the
+  string escaper above. `UnmarshalJSON` reads it. `words` is written iff `Words != nil`. So `Result{}` is the silence
+  JSON without timestamps, and `whistle.Silence()` (`Words: []Word{}`) is the exact
+  `{"text":"","language":"","words":[],"ttft_ms":0.0,"decode_tps":0.0}`.
+- `TestResultRoundTripsEngineOutput`: all ten recorded outputs unmarshal and marshal back byte-identical. That
+  includes the quote, Polish, word times up to 29.92 s and probabilities of 1.000. `TestSilenceJSON` checks both
+  silence forms against the recorded ones.
+- `json.Marshal` on a `Result` re-escapes `<>&` in the marshaller's output. The CLI therefore calls `MarshalJSON`
+  directly, and the type's doc says so.
+- `ErrTooLong` is the engine's text, `audio limit is 30 s` (`TestTooLongIsTheEngineText`). `Transcribe` and `Embed`
+  wrap it as `whistle: audio limit is 30 s: 480001 samples, at most 480000`.
+- `TranscribeWAV` on an empty file returns `ErrNoAudio` (`whistle: <path> holds no audio`).
+- A clip under 160 samples has no encoder frame (F-012). It returns `Result{}`, which matches the engine on 10
+  samples.
+- Until the 6.6 silence gate, real silence goes through the decoder: 2 s of zeros give `[en] "Thank you."`.
+
+**Timing.** The C API takes PCM, so the clock starts in `Transcribe`, once the samples are in hand. WAV decoding and
+resampling are not counted. Two quantities:
+
+- `ttft_ms` runs until the decoder has chosen the first token after the language token, text or EOS. It covers the
+  front end, the encoder, the cross-attention K/V projection, the prompt step that yields the language and the first
+  text step.
+- `decode_tps` is the number of tokens chosen after that one, EOS included, divided by the time from that token to
+  the last one.
+
+Both are measured through the `whistle` strategy seam (`clock` in `strategy.go`, unit-tested with a fake clock). The
+engine's numbers, median of 3 runs per clip, all 32 clips, Apple M5 Pro, default threads (at most 4):
+
+| fit over the 32 clips           | engine (5 beams, W2A8)       | Go (greedy, float32, 1 thread) |
+| ------------------------------- | ---------------------------- | ------------------------------ |
+| `ttft_ms` against clip duration | 0.66 + 1.084 ms/s, r = 0.980 | 3.30 + 13.04 ms/s, r = 0.991   |
+| median `ttft_ms` / `decode_tps` | 7.5 / 1401.3                 | 85.5 / 676.9                   |
+| 30 s (the tiled clip)           | 41.2 / 1175.5                | —                              |
+
+The engine's TTFT grows linearly with the clip's length and correlates with the duration (r 0.980) more than with
+the length of the text (r 0.889, which is itself correlated with duration). So the engine's TTFT includes the front
+end and the encoder, as ours does. Its `decode_tps` does not depend on the text length (r −0.147), so it is a rate
+over the decode steps, not total time. That matches ours.
+
+The fits do not settle whether the engine stops the TTFT clock at the language token or at the first text token.
+Its intercept, 0.66 ms, is about one decode step at its rate (0.71 ms at 1400 tok/s). Ours, 3.3 ms, is about two
+steps (1.48 ms each), but each fit's intercept is only good to about ±1 ms. We keep the first text token, as PLAN.md
+asks. The Go numbers are the same order of magnitude in tokens per second and 11× slower in TTFT. The float32
+encoder (13 ms per second of audio against 1.1) is that gap; Phase 9 addresses it.
+
+**Pipeline equality** (`TestTranscribeMatchesGreedy`, all 32 clips, `.cact`): `Transcribe`'s text and `language`
+equal `decoder.Greedy` on the same encoder output on 32 of 32 clips. Its text equals the engine's on 22 of 32, the
+Phase 5 count on the F-020 encoder. `Embed` (PLAN.md 8.2) is `encoder.Embed` behind the 30 s check. Against
+`needle_embed` (`TestEmbedMatchesEngine`) its mean per-frame cosine is 0.999828, and the worst clip is 0.999033
+(ls-clean-260-123440-0018), exactly F-020's numbers.
+
+**Safetensors.** The checkpoint has no tokenizer (F-007). `Load` takes it from `whistle.cact` next to the file, or
+from `WithVocabulary(path)`. If neither exists, it fails with a message that names `WithVocabulary`.
