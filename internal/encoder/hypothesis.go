@@ -275,16 +275,17 @@ type Hypothesis struct {
 	Output    Output
 }
 
-// Best is the leading hypothesis of the first probe search, mean per-frame
-// cosine 0.9995 against needle_embed over the 32 corpus clips with the
-// .cact weights, every clip ≥ 0.9929 (docs/FINDINGS.md F-014 to F-017).
-// Where values tie to 1e-5 it takes the simpler one: pe_gate unused
-// (PENone), and the window and centre padding the search kept.
+// Best is the leading hypothesis, mean per-frame cosine 0.9998 against
+// needle_embed over the 32 corpus clips with the .cact weights, every clip
+// ≥ 0.9990 (docs/FINDINGS.md F-014 to F-020). pe_gate is unused: the
+// silence probes match without any position term beyond RoPE (F-019). The
+// log is the soft knee 76 dB below the clip's peak, zero centring is
+// decided by the DC probes, and the window still ties (F-020).
 func Best() Hypothesis {
 	return Hypothesis{
 		Frontend: frontend.Options{
 			Window: frontend.HannSymmetric, Padding: frontend.PadZero, Spectrum: frontend.Power,
-			Log: frontend.LogWhisper, Norm: frontend.NormChannel, Band: frontend.BandFull,
+			Log: frontend.LogSoft76, Norm: frontend.NormChannel, Band: frontend.BandFull,
 			Preemphasis: frontend.PreemphNone, Dither: frontend.DitherNone,
 		},
 		StemStride: StrideAll, StemPad: PadSymmetric, StemKernel: KernelTimeMel, StemFlatten: FlattenChannelMel,
