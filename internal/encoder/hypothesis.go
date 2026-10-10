@@ -92,6 +92,10 @@ const (
 )
 
 // PE is where the global pe_gate (σ ≈ 0.0022) applies a position signal.
+// Each sinusoid placement adds g times the transformer sinusoid of its row
+// width w (frequency 10000^(−2i/w) for pair i), laid out [sin | cos] or
+// interleaved, with g = σ(pe_gate). The probes rule every placement out
+// (docs/FINDINGS.md F-019).
 type PE int
 
 const (
@@ -106,7 +110,32 @@ const (
 	// PERopeMix rotates q and k by (1 − g)·x + g·RoPE(x), g = σ(pe_gate),
 	// with the Rope axis' θ (1e5 when Rope is RopeNone).
 	PERopeMix
+	// PEMelConcat adds the [sin | cos] sinusoid to the stem input, the
+	// normalised log-mel (width 80).
+	PEMelConcat
+	// PEMelInterleaved adds the interleaved sinusoid to the stem input.
+	PEMelInterleaved
+	// PEFlatConcat adds the [sin | cos] sinusoid before stem/out, to the
+	// flattened 1280-wide stem features.
+	PEFlatConcat
+	// PEFlatInterleaved adds the interleaved sinusoid before stem/out.
+	PEFlatInterleaved
+	// PEBlockConcat adds the [sin | cos] sinusoid to every block's input u
+	// (inside mHC, the residual taken around u + PE).
+	PEBlockConcat
+	// PEBlockInterleaved adds the interleaved sinusoid to every block's
+	// input.
+	PEBlockInterleaved
+	// PEStemUngated adds the [sin | cos] sinusoid to the stem output with
+	// gain 1 instead of σ(pe_gate): a control for the probes' sensitivity.
+	PEStemUngated
 )
+
+// interleaved reports whether a sinusoid placement uses the interleaved
+// layout.
+func (p PE) interleaved() bool {
+	return p == PEStemInterleaved || p == PEMelInterleaved || p == PEFlatInterleaved || p == PEBlockInterleaved
+}
 
 // Rope is the encoder attention's rotary embedding.
 type Rope int
@@ -297,7 +326,10 @@ var axes = []Axis{
 	{"dwact", actNames, func(h *Hypothesis) *int { return (*int)(&h.StemDWAct) }},
 	{"pwact", actNames, func(h *Hypothesis) *int { return (*int)(&h.StemPWAct) }},
 	{"scale", []string{"1", "sqrt-dim"}, func(h *Hypothesis) *int { return (*int)(&h.InputScale) }},
-	{"pe", []string{noneName, "stem-concat", "stem-interleaved", "rope-mix"}, func(h *Hypothesis) *int { return (*int)(&h.PE) }},
+	{"pe", []string{
+		noneName, "stem-concat", "stem-interleaved", "rope-mix", "mel-concat", "mel-interleaved",
+		"flat-concat", "flat-interleaved", "block-concat", "block-interleaved", "stem-ungated",
+	}, func(h *Hypothesis) *int { return (*int)(&h.PE) }},
 	{"rope", []string{noneName, "1e5", "1e4"}, func(h *Hypothesis) *int { return (*int)(&h.Rope) }},
 	{"ffn", []string{"1", "half"}, func(h *Hypothesis) *int { return (*int)(&h.FFNScale) }},
 	{"glu", []string{"a*sig(b)", "sig(a)*b", "silu(a)*b", "a*silu(b)", noneName}, func(h *Hypothesis) *int { return (*int)(&h.GLU) }},

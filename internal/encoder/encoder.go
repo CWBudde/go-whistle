@@ -72,6 +72,7 @@ func Load(src weights.Source, h Hypothesis) (*Encoder, error) {
 	}
 
 	e.peGate = sigmoid(gate[0])
+	e.stem.peGate = e.peGate
 
 	e.final, err = needle.LoadZCRMSNorm(src, "enc.final_norm")
 	if err != nil {
@@ -118,7 +119,13 @@ func (e *Encoder) Stem(mel frontend.Features) ([]float32, int, error) {
 		return nil, 0, fmt.Errorf("encoder: %d mel values for %d frames", len(mel.Data), mel.Frames)
 	}
 
-	x, t, err := e.stem.forward(mel.Data, mel.Frames, frontend.Mels)
+	in := mel.Data
+	if e.h.PE == PEMelConcat || e.h.PE == PEMelInterleaved {
+		in = append([]float32(nil), in...)
+		addSinusoid(in, mel.Frames, frontend.Mels, e.peGate, e.h.PE.interleaved())
+	}
+
+	x, t, err := e.stem.forward(in, mel.Frames, frontend.Mels)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -130,8 +137,11 @@ func (e *Encoder) Stem(mel frontend.Features) ([]float32, int, error) {
 		}
 	}
 
-	if e.h.PE == PEStemConcat || e.h.PE == PEStemInterleaved {
-		addSinusoid(x, t, e.dim, e.peGate, e.h.PE == PEStemInterleaved)
+	switch e.h.PE {
+	case PEStemConcat, PEStemInterleaved:
+		addSinusoid(x, t, e.dim, e.peGate, e.h.PE.interleaved())
+	case PEStemUngated:
+		addSinusoid(x, t, e.dim, 1, false)
 	}
 
 	return x, t, nil
@@ -146,11 +156,39 @@ func (e *Encoder) Stack(x []float32, t int) ([]float32, error) {
 
 	rope := e.rope(t)
 
+	// forward runs block b on u; a block-input pe_gate signal is added to
+	// u first and taken out of the output again, so that the residual is
+	// the block's change of u + PE.
+	forward := func(b *block, u []float32) ([]float32, error) {
+		if e.h.PE != PEBlockConcat && e.h.PE != PEBlockInterleaved {
+			return b.forward(u, t, rope)
+		}
+
+		pe := make([]float32, len(u))
+		addSinusoid(pe, t, e.dim, e.peGate, e.h.PE.interleaved())
+
+		in := make([]float32, len(u))
+		for i, v := range u {
+			in[i] = v + pe[i]
+		}
+
+		out, err := b.forward(in, t, rope)
+		if err != nil {
+			return nil, err
+		}
+
+		for i, v := range pe {
+			out[i] -= v
+		}
+
+		return out, nil
+	}
+
 	if e.h.MHC == MHCNone {
 		var err error
 
 		for _, b := range e.blocks {
-			x, err = b.forward(x, t, rope)
+			x, err = forward(b, x)
 			if err != nil {
 				return nil, err
 			}
@@ -162,7 +200,7 @@ func (e *Encoder) Stack(x []float32, t int) ([]float32, error) {
 			var err error
 
 			stream, err = e.mhc[l].Forward(stream, t, func(u []float32) ([]float32, error) {
-				return b.forward(u, t, rope)
+				return forward(b, u)
 			})
 			if err != nil {
 				return nil, err

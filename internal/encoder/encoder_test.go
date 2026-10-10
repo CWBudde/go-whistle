@@ -202,6 +202,61 @@ func TestAddSinusoid(t *testing.T) {
 	}
 }
 
+// TestPEPlacements checks where each pe_gate placement acts on 1 s of
+// silence, whose stem output is exactly 0 without one (docs/FINDINGS.md
+// F-019): the mel, flat and stem placements change Stem's output, the
+// block placements and the RoPE mix leave it at 0 and change only Stack's.
+func TestPEPlacements(t *testing.T) {
+	src := openModel(t, whistleCactPath)
+	x := make([]float32, 16000)
+
+	run := func(pe PE) (stemOut, out []float32) {
+		h := Best()
+		h.PE = pe
+
+		e, err := Load(src, h)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mel, err := e.fe.LogMel(x)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		stemOut, n, err := e.Stem(mel)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		out, err = e.Stack(stemOut, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return stemOut, out
+	}
+
+	zeroStem, base := run(PENone)
+	if slices.ContainsFunc(zeroStem, func(v float32) bool { return v != 0 }) {
+		t.Fatal("pe=none: the stem output of silence is not 0")
+	}
+
+	for v := PENone + 1; int(v) <= len(axes[8].Names); v++ {
+		stemOut, out := run(v)
+		stemSide := slices.ContainsFunc(stemOut, func(v float32) bool { return v != 0 })
+		wantStem := v != PERopeMix && v != PEBlockConcat && v != PEBlockInterleaved
+
+		if stemSide != wantStem {
+			t.Errorf("pe=%s: stem output changed = %v, want %v", axes[8].Names[v-1], stemSide, wantStem)
+		}
+
+		if slices.Equal(out, base) {
+			t.Errorf("pe=%s: the encoder output equals pe=none's", axes[8].Names[v-1])
+		}
+	}
+}
+
 // fakePermSource answers only the permutations' shape.
 type fakePermSource struct{ permSource }
 
