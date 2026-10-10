@@ -39,11 +39,11 @@ func (m Mask) String() string {
 type Attention struct {
 	dim, heads, kvHeads, qk, v, taps int
 
-	qProj, kProj, vProj []float32 // [heads·qk | kvHeads·qk | kvHeads·v, dim]
+	qProj, kProj, vProj Linear    // [heads·qk | kvHeads·qk | kvHeads·v, dim]
 	qTaps, kTaps, vTaps []float32 // [taps, width], nil without taps
 	qNorm, kNorm        ZCRMSNorm // (qk)
-	gateProj            []float32 // [heads·v, dim]
-	outProj             []float32 // [dim, heads·v]
+	gateProj            Linear    // [heads·v, dim]
+	outProj             Linear    // [dim, heads·v]
 }
 
 // LoadAttention loads the attention with the names prefix+"q_proj", …
@@ -58,9 +58,11 @@ func LoadAttention(src weights.Source, prefix string) (*Attention, error) {
 	var qW, kW, vW int
 
 	qNorm := l.vector("q_norm", 0)
-	a.qProj, qW, a.dim = l.matrix("q_proj", 0, 0)
-	a.kProj, kW, _ = l.matrix("k_proj", 0, a.dim)
-	a.vProj, vW, _ = l.matrix("v_proj", 0, a.dim)
+	a.qProj = l.linear("q_proj", 0, 0)
+	qW, a.dim = a.qProj.Out(), a.qProj.In()
+	a.kProj = l.linear("k_proj", 0, a.dim)
+	a.vProj = l.linear("v_proj", 0, a.dim)
+	kW, vW = a.kProj.Out(), a.vProj.Out()
 	a.qk = len(qNorm)
 
 	if l.err == nil {
@@ -69,8 +71,8 @@ func LoadAttention(src weights.Source, prefix string) (*Attention, error) {
 
 	a.qNorm = NewZCRMSNorm(qNorm)
 	a.kNorm = NewZCRMSNorm(l.vector("k_norm", a.qk))
-	a.gateProj, _, _ = l.matrix("gate_proj", a.heads*a.v, a.dim)
-	a.outProj, _, _ = l.matrix("out_proj", a.dim, a.heads*a.v)
+	a.gateProj = l.linear("gate_proj", a.heads*a.v, a.dim)
+	a.outProj = l.linear("out_proj", a.dim, a.heads*a.v)
 
 	if src.Has(prefix + "q_taps") {
 		a.qTaps, a.taps, _ = l.matrix("q_taps", 0, qW)
@@ -180,7 +182,7 @@ func (a *Attention) forward(x []float32, t int, mask Mask, rope *Rope, tr *attnT
 func (a *Attention) output(x []float32, t int, out []float32, tr *attnTrace) []float32 {
 	oW := a.heads * a.v
 	gate := make([]float32, t*oW)
-	linear(gate, x, t, a.gateProj, oW, a.dim)
+	a.gateProj.Apply(gate, x, t)
 
 	for i, g := range gate {
 		gate[i] = sigmoid(g)
@@ -192,7 +194,7 @@ func (a *Attention) output(x []float32, t int, out []float32, tr *attnTrace) []f
 	}
 
 	y := make([]float32, t*a.dim)
-	linear(y, out, t, a.outProj, a.dim, oW)
+	a.outProj.Apply(y, out, t)
 
 	return y
 }
@@ -202,9 +204,9 @@ func (a *Attention) output(x []float32, t int, out []float32, tr *attnTrace) []f
 func (a *Attention) project(x []float32, t int, tr *attnTrace) (q, k, v []float32) {
 	qW, kW, vW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v
 	q, k, v = make([]float32, t*qW), make([]float32, t*kW), make([]float32, t*vW)
-	linear(q, x, t, a.qProj, qW, a.dim)
-	linear(k, x, t, a.kProj, kW, a.dim)
-	linear(v, x, t, a.vProj, vW, a.dim)
+	a.qProj.Apply(q, x, t)
+	a.kProj.Apply(k, x, t)
+	a.vProj.Apply(v, x, t)
 
 	if tr != nil {
 		tr.qProj, tr.kProj, tr.vProj = slices.Clone(q), slices.Clone(k), slices.Clone(v)

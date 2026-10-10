@@ -38,8 +38,8 @@ type Engram struct {
 	dim, sub, slots, taps, dilation, maxOrder int
 
 	orders           []int     // order of table c
-	tables           []float32 // (len(orders)·slots, sub): table c's slot s is row c·slots + s
-	keyProj, valProj []float32 // [dim, len(orders)·sub]
+	tables           Linear    // (len(orders)·slots, sub): table c's slot s is row c·slots + s
+	keyProj, valProj Linear    // [dim, len(orders)·sub]
 	tapW             []float32 // (taps, dim)
 }
 
@@ -56,16 +56,18 @@ func LoadEngram(src weights.Source, prefix string, orders []int, tables int) (*E
 	l := &loader{src: src, prefix: prefix}
 	e := &Engram{dilation: slices.Max(orders), maxOrder: slices.Max(orders)}
 
-	var rows int
+	e.tables = l.table("tables", 0, 0)
+	rows := e.tables.Out()
+	e.sub = e.tables.In()
 
-	e.tables, rows, e.sub = l.matrix("tables", 0, 0)
 	if l.err == nil && (rows == 0 || rows%tables != 0) {
 		l.failf("%stables has %d rows, not a multiple of %d tables", prefix, rows, tables)
 	}
 
 	e.slots = rows / tables
-	e.keyProj, e.dim, _ = l.matrix("key_proj", 0, tables*e.sub)
-	e.valProj, _, _ = l.matrix("value_proj", e.dim, tables*e.sub)
+	e.keyProj = l.linear("key_proj", 0, tables*e.sub)
+	e.dim = e.keyProj.Out()
+	e.valProj = l.linear("value_proj", e.dim, tables*e.sub)
 	e.tapW, e.taps, _ = l.matrix("taps", 0, e.dim)
 
 	if l.err != nil {
@@ -177,14 +179,14 @@ func (e *Engram) forward(tokens []int, tr *engramTrace) (*EngramKV, error) {
 			}
 
 			row := c*e.slots + idx[i*n+c]
-			copy(emb[i*w+c*e.sub:i*w+(c+1)*e.sub], e.tables[row*e.sub:(row+1)*e.sub])
+			e.tables.Row(emb[i*w+c*e.sub:i*w+(c+1)*e.sub], row)
 			ok[i*n+c] = 1
 		}
 	}
 
 	k, vRaw := make([]float32, t*e.dim), make([]float32, t*e.dim)
-	linear(k, emb, t, e.keyProj, e.dim, w)
-	linear(vRaw, emb, t, e.valProj, e.dim, w)
+	e.keyProj.Apply(k, emb, t)
+	e.valProj.Apply(vRaw, emb, t)
 
 	if tr != nil {
 		tr.indices, tr.ngramOK, tr.e, tr.vRaw = idx, ok, emb, slices.Clone(vRaw)

@@ -34,8 +34,8 @@ type MHC struct {
 	aPre, aPost, aRes float32
 	bPre, bPost       []float32 // (lanes)
 	bRes              []float32 // (lanes, lanes)
-	phiPre, phiPost   []float32 // [lanes, lanes·dim]
-	phiRes            []float32 // [lanes², lanes·dim], row n·i + j is h_res[i, j]
+	phiPre, phiPost   Linear    // [lanes, lanes·dim]
+	phiRes            Linear    // [lanes², lanes·dim], row n·i + j is h_res[i, j]
 	preOff, postOff   []float32 // (lanes)
 }
 
@@ -59,14 +59,15 @@ func LoadMHC(src weights.Source, prefix string, layer int) (*MHC, error) {
 	bPre, _, n := l.matrix("mhc_b_pre", layers, 0)
 	bPost, _, _ := l.matrix("mhc_b_post", layers, n)
 	bRes := l.cube("mhc_b_res", layers, n, n)
-	phiPre, _, nC := l.matrix("mhc_phi_pre", layers*n, 0)
+	phiPre := l.linear("mhc_phi_pre", layers*n, 0)
+	nC := phiPre.In()
 
 	if l.err == nil && (n == 0 || nC%n != 0) {
 		l.failf("%smhc_phi_pre width %d is not a multiple of %d lanes", prefix, nC, n)
 	}
 
-	phiPost, _, _ := l.matrix("mhc_phi_post", layers*n, nC)
-	phiRes, _, _ := l.matrix("mhc_phi_res", layers*n*n, nC)
+	phiPost := l.linear("mhc_phi_post", layers*n, nC)
+	phiRes := l.linear("mhc_phi_res", layers*n*n, nC)
 
 	if l.err != nil {
 		return nil, l.err
@@ -76,9 +77,9 @@ func LoadMHC(src weights.Source, prefix string, layer int) (*MHC, error) {
 	m.aPre, m.aPost, m.aRes = aPre[layer], aPost[layer], aRes[layer]
 	m.bPre, m.bPost = bPre[layer*n:(layer+1)*n], bPost[layer*n:(layer+1)*n]
 	m.bRes = bRes[layer*n*n : (layer+1)*n*n]
-	m.phiPre = phiPre[layer*n*nC : (layer+1)*n*nC]
-	m.phiPost = phiPost[layer*n*nC : (layer+1)*n*nC]
-	m.phiRes = phiRes[layer*n*n*nC : (layer+1)*n*n*nC]
+	m.phiPre = phiPre.Rows(layer*n, (layer+1)*n)
+	m.phiPost = phiPost.Rows(layer*n, (layer+1)*n)
+	m.phiRes = phiRes.Rows(layer*n*n, (layer+1)*n*n)
 	m.preOff, m.postOff = laneOffsets(n, layer)
 
 	return m, nil
@@ -230,11 +231,11 @@ func (m *MHC) forward(stream []float32, t int, block func([]float32) ([]float32,
 // h_post (t, n), h_res (t, n, n). The products are rounded before the adds
 // (the conversions rule out FMA), as upstream's elementwise jnp ops are.
 func (m *MHC) logits(nx []float32, t int) (pre, post, res []float32) {
-	n, nC := m.lanes, m.lanes*m.dim
+	n := m.lanes
 	pre, post, res = make([]float32, t*n), make([]float32, t*n), make([]float32, t*n*n)
-	linear(pre, nx, t, m.phiPre, n, nC)
-	linear(post, nx, t, m.phiPost, n, nC)
-	linear(res, nx, t, m.phiRes, n*n, nC)
+	m.phiPre.Apply(pre, nx, t)
+	m.phiPost.Apply(post, nx, t)
+	m.phiRes.Apply(res, nx, t)
 
 	for i := range t {
 		for k := range n {
