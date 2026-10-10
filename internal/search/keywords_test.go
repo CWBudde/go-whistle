@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"math/rand/v2"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -242,5 +243,33 @@ func TestKeywordLong(t *testing.T) {
 
 	if want := 1 + 0.5; row[long[n-1]] != want {
 		t.Errorf("Adjust before the last token: %g, want %g", row[long[n-1]], want)
+	}
+}
+
+// TestKeywordLongMemory: the automaton of one long spelling stays linear in
+// its length (a full path per node would hold n(n+1)/2 weights, 1.6 GB here).
+func TestKeywordLongMemory(t *testing.T) {
+	const n = 20000
+
+	long := make([]int, n)
+	for i := range long {
+		long[i] = i
+	}
+
+	var before, after runtime.MemStats
+
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+
+	k := build([][]int{long}, unit, Bias{Weight: 1, Revoke: 1, Forms: FormSpace})
+
+	runtime.ReadMemStats(&after)
+
+	if grown := after.TotalAlloc - before.TotalAlloc; grown > 64<<20 {
+		t.Errorf("building a %d-token spelling allocated %d MB", n, grown>>20)
+	}
+
+	if got := k.Bonus(long, -1); got != n {
+		t.Errorf("Bonus = %g, want %d", got, n)
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -121,7 +120,9 @@ func ParseKeywords(s string) []string {
 type Keywords struct {
 	next  []map[int]int // goto, per node; node 0 is the root
 	fail  []int         // the longest proper suffix that is a node
-	ws    [][]float64   // the bonus of each token on the path to the node
+	up    []int         // the parent node
+	w     []float64     // the bonus of the token into the node
+	depth []int         // the node's path length in tokens
 	out   [][]int       // the token lengths of the keywords that end at the node, suffixes included
 	end   []bool        // a keyword ends here
 	start kwState       // the state at the start of the text
@@ -259,7 +260,7 @@ func pieceChars(tok *tokenizer.Tokenizer, id int) int {
 // given by weight; a sequence that starts with textStart is anchored at
 // the start of the text.
 func build(ids [][]int, weight func(id int) float64, b Bias) *Keywords {
-	k := &Keywords{next: []map[int]int{{}}, fail: []int{0}, ws: [][]float64{nil}, end: []bool{false}, bias: b}
+	k := &Keywords{next: []map[int]int{{}}, fail: []int{0}, up: []int{0}, w: []float64{0}, depth: []int{0}, end: []bool{false}, bias: b}
 
 	for _, s := range ids {
 		k.add(s, weight)
@@ -372,7 +373,9 @@ func (k *Keywords) add(ids []int, weight func(int) float64) {
 			c = len(k.next)
 			k.next = append(k.next, map[int]int{})
 			k.fail = append(k.fail, 0)
-			k.ws = append(k.ws, append(slices.Clone(k.ws[n]), w))
+			k.up = append(k.up, n)
+			k.w = append(k.w, w)
+			k.depth = append(k.depth, k.depth[n]+1)
 			k.end = append(k.end, false)
 			k.next[n][id] = c
 		}
@@ -398,7 +401,7 @@ func (k *Keywords) link() {
 		queue = queue[1:]
 
 		if k.end[n] {
-			k.out[n] = append(k.out[n], len(k.ws[n]))
+			k.out[n] = append(k.out[n], k.depth[n])
 		}
 
 		k.out[n] = append(k.out[n], k.out[k.fail[n]]...)
@@ -440,16 +443,16 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 		c, ok = k.next[f][id]
 	}
 
-	drop := len(k.ws[n]) - len(k.ws[f])
-	d := k.revoke(k.ws[n][:drop], st.cov)
+	drop := k.depth[n] - k.depth[f]
+	d := k.revoke(n, drop, st.cov)
 
 	if !ok {
 		return kwState{}, d
 	}
 
-	depth := len(k.ws[c])
+	depth := k.depth[c]
 	cov := st.cov.shift(drop)
-	d += k.ws[c][depth-1]
+	d += k.w[c]
 
 	for _, l := range k.out[c] {
 		d += k.bias.Complete
@@ -459,14 +462,15 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 	return kwState{n: c, cov: cov}, d
 }
 
-// revoke is the bonus taken back for the dropped tokens ws, those not in a
-// completed keyword by cov.
-func (k *Keywords) revoke(ws []float64, cov bitset) float64 {
+// revoke is the bonus taken back when the match at node n drops its
+// first drop tokens: theirs, except for those cov marks as in a completed
+// keyword.
+func (k *Keywords) revoke(n, drop int, cov bitset) float64 {
 	lost := 0.0
 
-	for i, w := range ws {
-		if !cov.has(i) {
-			lost += w
+	for a := n; k.depth[a] > 0; a = k.up[a] {
+		if i := k.depth[a] - 1; i < drop && !cov.has(i) {
+			lost += k.w[a]
 		}
 	}
 
