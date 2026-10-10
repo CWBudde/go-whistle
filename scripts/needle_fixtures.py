@@ -113,6 +113,8 @@ def provenance(upstream, safetensors, allow_unpinned):
     problems = []
     if rev is None or not rev.startswith(UPSTREAM_PIN):
         problems.append(f"{upstream} is at {rev or 'no git revision'}, not {UPSTREAM_PIN}")
+    if rev is not None and changes is None:
+        problems.append(f"{upstream}: git status failed, so its worktree is unverified")
     if changes:
         problems.append(f"{upstream} has local changes under needle/: " + "; ".join(changes[:5]))
     if digest != pinned_digest():
@@ -123,7 +125,9 @@ def provenance(upstream, safetensors, allow_unpinned):
         sys.exit("unpinned inputs (pass --allow-unpinned to record them as such):\n  " + "\n  ".join(problems))
     for p in problems:
         print("warning:", p, file=sys.stderr)
-    return (rev[:10] + ("-dirty" if changes else "") if rev else "unverified"), "sha256:" + digest
+    if rev is None or changes is None:
+        return "unverified", "sha256:" + digest
+    return rev[:10] + ("-dirty" if changes else ""), "sha256:" + digest
 
 
 def load_upstream(root):
