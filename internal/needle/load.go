@@ -105,20 +105,15 @@ func sigmoid(x float32) float32 {
 	return float32(1 / (1 + math.Exp(-float64(x))))
 }
 
-// softmaxInPlace is jax.nn.softmax over s: exp(s − max) / Σ.
+// softmaxInPlace is jax.nn.softmax over s: exp(s − max) / Σ, the
+// exponents and their sum from expSubSum (docs/FINDINGS.md F-035).
 func softmaxInPlace(s []float32) {
 	m := float32(math.Inf(-1))
 	for _, v := range s {
 		m = max(m, v)
 	}
 
-	var sum float32
-
-	for i, v := range s {
-		e := float32(math.Exp(float64(v - m)))
-		s[i] = e
-		sum += e
-	}
+	sum := expSubSum(s, m)
 
 	for i := range s {
 		s[i] /= sum

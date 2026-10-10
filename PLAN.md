@@ -966,9 +966,17 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       `weights.Source`. Memory target: under 64 MB RSS for the model.
 - [ ] 9.3 Optional int8 activations and an int8 KV cache (`act_bits 8`, `kv_bits 8`) to mirror the engine's numerics,
       behind a flag.
-- [ ] 9.4 Plan 9 assembly (NEON/AVX2) for the LUT GEMV, the FWHT, the Monarch Kronecker products and the
+- [x] 9.4 Plan 9 assembly (NEON/AVX2) for the LUT GEMV, the FWHT, the Monarch Kronecker products and the
       softmax/Sinkhorn hot loops, with pure-Go fallbacks and equivalence tests (see `go-plan9-assembly`).
-      (2026-10-10) — partial, the `internal/cq` half: a new `lut` kernel with NEON (`lut_arm64.s`) and AVX2
+      (2026-10-10) — the `internal/needle` half. Profiled `Transcribe` over the 32 clips first. The Monarch
+      `kronApply` now runs as two `tensor.MatMulTransB` calls on transposed factors (4.8 → 0.68 µs per mix). `attend`
+      batches each head into Q·Kᵀ and P·V GEMMs from 8 query rows. Sinkhorn runs in the exp domain in float64, with a
+      log-domain fallback (4.46 → 0.52 µs). `meanSquare` uses four partial sums. The softmax gets a NEON/AVX2 Cephes
+      expf kernel (`exp_arm64.s`, `exp_amd64.s`, float64 `purego` fallback, ≤ 0.99 ulp). `TestTranscribeMatchesEngine`,
+      one run each: median TTFT 82.5 → 57.8 ms, decode 561 → 609 tok/s, still 31/32, all 32 transcripts unchanged; a
+      30 s clip's TTFT 513 → 281 ms. The remaining time is `tensor`'s GEMM and `search`'s goroutines.
+      `docs/FINDINGS.md` F-035.
+      (2026-10-10) — the `internal/cq` half: a new `lut` kernel with NEON (`lut_arm64.s`) and AVX2
       (`lut_amd64.s`, chosen at run time) assembly for the FWHT, the table build and the lookup, each with a Go
       reference that it equals bit for bit (`asm_test.go`); `purego` and other architectures keep `nibble4`. Nibble
       tables are rounded to 14-bit integers in two byte planes, and `cq.New` repacks the index into blocks of 32 rows,
@@ -977,7 +985,10 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       on all seven F-028 shapes: 1.05× (φ_res) to 3.2× (pw1), q_proj 2.91 vs 7.52 µs, head 97 vs 192 µs; 4.8–6.7×
       faster than `nibble4`. Batched: 1.40× at 5 rows of q_proj, 1.11× at 375, but 1.06× slower on the 5-beam head.
       The blocked copy doubles the CQ memory to 33.27 MB (still 6.6× below float32). Details: `docs/FINDINGS.md`
-      F-034. The Monarch and softmax/Sinkhorn half is in `internal/needle`.
+      F-034. Both halves merged: the LUT GEMV, the FWHT and the softmax exp have NEON/AVX2 assembly; the Monarch
+      Kronecker products run on `internal/tensor`'s existing NEON/AVX2 GEMM; Sinkhorn stayed in Go (8.6× faster in the
+      exp domain, under 1 % of the profile, F-035). Every kernel has a pure-Go fallback and an equivalence test, and the
+      amd64 builds pass in linux/amd64 Docker with AVX2.
 - [ ] 9.5 Parallelism: the encoder over time blocks and heads; the decoder over beams.
 - [ ] 9.6 Benchmarks (`bench/`): TTFT and decode tok/s against the engine on the same machine. The engine publishes
       11.1 ms TTFT and 1319 tok/s on an M4 Pro with 5 beams. Also the real-time factor for 30 s clips.

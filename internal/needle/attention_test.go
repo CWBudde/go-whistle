@@ -1,6 +1,7 @@
 package needle
 
 import (
+	"fmt"
 	"math"
 	"math/rand/v2"
 	"slices"
@@ -507,4 +508,94 @@ func TestAttentionEncoderFixture(t *testing.T) {
 	withRope := attentionFixture(t, fx, a, MaskNone, NewRope(a.QKDim(), shape[1], 1e5))
 	wantRope, _ := fx.get("out_rope")
 	checkContract(t, "out_rope", withRope["out"], wantRope)
+}
+
+// TestAttendGEMMMatchesRows compares attend's two paths at Whistle's head
+// geometry: the GEMM-batched one against one dot product and axpy per key,
+// unmasked and causal with a cache offset, for query blocks around
+// attendGEMMRows and key counts off the GEMM's 4-wide blocks. The sums
+// run in a different order, so they agree to float32 rounding; the
+// weights must agree as well, including the exact zeros of masked keys
+// (docs/FINDINGS.md F-035).
+func TestAttendGEMMMatchesRows(t *testing.T) {
+	a := &Attention{dim: 512, heads: 8, kvHeads: 2, qk: 48, v: 64}
+	qW, kW, vW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v
+
+	for _, c := range []struct {
+		rows, off int
+		mask      Mask
+	}{
+		{1, 0, MaskNone},
+		{7, 0, MaskNone},
+		{8, 0, MaskNone},
+		{13, 0, MaskNone},
+		{130, 0, MaskNone},
+		{1, 9, MaskCausal},
+		{8, 0, MaskCausal},
+		{9, 5, MaskCausal},
+		{33, 2, MaskCausal},
+	} {
+		r := rand.New(rand.NewPCG(uint64(c.rows), uint64(c.off)))
+		keys := c.off + c.rows
+		q := randVec(r, c.rows*qW, 1)
+		k := randVec(r, keys*kW, 1)
+		v := randVec(r, keys*vW, 1)
+
+		rowTr := &attnTrace{probs: make([]float32, a.heads*c.rows*keys)}
+		gemmTr := &attnTrace{probs: make([]float32, a.heads*c.rows*keys)}
+		want := a.attendRows(q, k, v, c.rows, c.off, c.mask, rowTr)
+		got := a.attendGEMM(q, k, v, c.rows, c.off, c.mask, gemmTr)
+
+		name := fmt.Sprintf("%d rows at %d, %v", c.rows, c.off, c.mask)
+		if d := maxAbsDiff64(got, toFloat64(want)); d > 1e-5 {
+			t.Errorf("%s: outputs differ by %.3g", name, d)
+		}
+
+		if d := maxAbsDiff64(gemmTr.probs, toFloat64(rowTr.probs)); d > 1e-6 {
+			t.Errorf("%s: weights differ by %.3g", name, d)
+		}
+
+		for i, p := range rowTr.probs {
+			if (p == 0) != (gemmTr.probs[i] == 0) {
+				t.Fatalf("%s: weight %d is %v per row, %v batched", name, i, p, gemmTr.probs[i])
+			}
+		}
+	}
+}
+
+// TestAttentionCausalBatched: on the GEMM path, too, a causal row does not
+// depend on later rows at all, not even through rounding, because masked
+// keys add exact zeros.
+func TestAttentionCausalBatched(t *testing.T) {
+	r := rand.New(rand.NewPCG(4, 4))
+	ta := newTinyAttention(r, "", 2)
+
+	a, err := LoadAttention(ta.src, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const steps, keep = 2 * attendGEMMRows, attendGEMMRows + 3
+
+	x := randVec(r, steps*ta.dim, 1)
+	rope := NewRope(ta.qk, steps, 1e5)
+
+	full, err := a.Forward(x, steps, MaskCausal, rope)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changed := slices.Clone(x)
+	for i := keep * ta.dim; i < len(changed); i++ {
+		changed[i] = -3 * changed[i]
+	}
+
+	other, err := a.Forward(changed, steps, MaskCausal, rope)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Equal(other[:keep*ta.dim], full[:keep*ta.dim]) {
+		t.Errorf("causal rows 0–%d depend on later rows", keep-1)
+	}
 }

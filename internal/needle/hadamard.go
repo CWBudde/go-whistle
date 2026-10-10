@@ -25,6 +25,7 @@ type HadamardMLP struct {
 
 	d1, d2, b2, d3, d4 []float32       // (n)
 	w                  [3][2][]float32 // stage s: a (na, na), b (nb, nb)
+	wT                 [3][2][]float32 // the factors transposed, for kronApply
 	condVT             []float32       // cond_v transposed to (rank, n) for linear
 	condU              []float32       // (rank, n)
 	perm               [2][]int        // hada_p1, hada_p2
@@ -104,6 +105,27 @@ func (h *HadamardMLP) loadFactors(l *loader) {
 		h.w[s][0], _, _ = l.matrix(fmt.Sprintf("w%da", s+1), h.na, h.na)
 		h.w[s][1], _, _ = l.matrix(fmt.Sprintf("w%db", s+1), h.nb, h.nb)
 	}
+
+	if l.err != nil {
+		return
+	}
+
+	for s := range h.w {
+		h.wT[s][0], h.wT[s][1] = transposed(h.w[s][0], h.na), transposed(h.w[s][1], h.nb)
+	}
+}
+
+// transposed returns the transpose of the n × n matrix m.
+func transposed(m []float32, n int) []float32 {
+	t := make([]float32, n*n)
+
+	for i := range n {
+		for j := range n {
+			t[j*n+i] = m[i*n+j]
+		}
+	}
+
+	return t
 }
 
 // perm reads a permutation of n stored as float32 and checks it.
@@ -219,14 +241,14 @@ func (h *HadamardMLP) forward(x []float32, t int, tr *hadaTrace) ([]float32, err
 // stage's permutation for the first two stages (dst[i] = kron(z)[p[i]]).
 // y and k are n-value scratch buffers distinct from dst and z.
 func (h *HadamardMLP) mix(dst, z []float32, s int, y, k []float32) {
-	a, b := h.w[s][0], h.w[s][1]
+	aT, bT := h.wT[s][0], h.wT[s][1]
 	if s == 2 {
-		kronApply(dst, z, a, h.na, b, h.nb, y)
+		kronApply(dst, z, aT, h.na, bT, h.nb, y)
 
 		return
 	}
 
-	kronApply(k, z, a, h.na, b, h.nb, y)
+	kronApply(k, z, aT, h.na, bT, h.nb, y)
 
 	for i, p := range h.perm[s] {
 		dst[i] = k[p]
@@ -236,24 +258,12 @@ func (h *HadamardMLP) mix(dst, z []float32, s int, y, k []float32) {
 // kronApply is architecture.py _kron_apply for one vector: with
 // Z = z.reshape(na, nb), out[k, l] = Σ_ij Z[i, j] · a[i, k] · b[j, l]
 // (einsum "ij,ik,jl->kl"), i.e. out = aᵀ · Z · b. That is z · (a ⊗ b),
-// computed as Y = Z · b and then aᵀ · Y in na·nb² + na²·nb multiply-adds
-// instead of (na·nb)². y is scratch for Y; dst, z and y must not overlap.
-func kronApply(dst, z, a []float32, na int, b []float32, nb int, y []float32) {
-	clear(y[:na*nb])
-
-	for i := range na {
-		yi := y[i*nb : (i+1)*nb]
-		for j, zij := range z[i*nb : (i+1)*nb] {
-			tensor.Axpy(yi, zij, b[j*nb:(j+1)*nb])
-		}
-	}
-
-	clear(dst[:na*nb])
-
-	for k := range na {
-		dk := dst[k*nb : (k+1)*nb]
-		for i := range na {
-			tensor.Axpy(dk, a[i*na+k], y[i*nb:(i+1)*nb])
-		}
-	}
+// computed in na·nb² + na²·nb multiply-adds instead of (na·nb)², as two
+// GEMMs on the transposed factors aT and bT, so that both contract over
+// contiguous rows: Yᵀ = bᵀ · Zᵀ, then out = aᵀ · Y. yT is scratch for Yᵀ
+// (nb × na); dst, z and yT must not overlap. The GEMM sums each output in
+// its own order, not the einsum's (docs/FINDINGS.md F-035).
+func kronApply(dst, z, aT []float32, na int, bT []float32, nb int, yT []float32) {
+	tensor.MatMulTransB(yT, na, bT, z, nb, na, nb)
+	tensor.MatMulTransB(dst, nb, aT, yT, na, nb, na)
 }
