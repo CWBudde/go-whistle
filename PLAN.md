@@ -972,11 +972,38 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       30 s, no frame under 160 samples. Against `testdata/oracle/<clip>.embed.safetensors` (`TestEmbedMatchesEngine`):
       mean per-frame cosine 0.999828, every clip ≥ 0.999033, so the phase's "embeddings match at cosine ≥ 0.99"
       holds (F-027).
-- [ ] 8.3 `Stream`: buffer the incoming chunks; every ~1 s re-transcribe the buffer; commit the longest word prefix on
+- [x] 8.3 `Stream`: buffer the incoming chunks; every ~1 s re-transcribe the buffer; commit the longest word prefix on
       which two consecutive passes agree; report `pending`, `received` and `pass_ms`; `Stop()` flushes (U12).
-- [ ] 8.4 Buffers longer than 30 s: trim committed audio the way the engine does (U12).
+      (2026-10-10) — `(*Model).NewStream(StreamOptions{Language, Keywords})`, `Process(pcm) (StreamResult, error)`,
+      `Stop() StreamResult`; `StreamResult` marshals to the engine's stream JSON (field order, `received` to two
+      decimals, `pass_ms` to one, the words through F-027's marshaller). One pass per call over the buffer with
+      `Transcribe`'s decoding and word timestamps, F-032's dropping (end − 0.1 s, shortest repeated n-gram; longest
+      gives the same on all 108 runs), LocalAgreement-2 on exact strings, the 15 s second-to-last-sentence trim, `Stop`
+      without a pass, F-032 item 9's edges. `received` is the engine's float arithmetic (word times
+      `float32(frames) · 0.08f` plus a float64 offset), the one variant of 64 that prints all 929 values. A `Stream`
+      belongs to one goroutine; the `Model` stays safe for concurrent use. `just stream-parity` replays all 108 runs
+      against `calls.json`: the decision (rc, text, pending, language, received) equals the engine's on 794 of 930
+      calls (clips 193/224, chunks 454/535, language 21/32, long 115/128, edge 11/11), every decision of 69 of 108
+      runs, `received` and `language` on 930/930; committed words both times within 80 ms 98.8 %, probability within
+      0.01 93.4 %; the final text equals the engine's stream on 98 of 108 runs. Every run's first differing call
+      follows a pass that spells other words than the engine's (38 runs, 32 within ±0.07 nats per token) or another
+      word time (1), none the bookkeeping (`docs/FINDINGS.md` F-036). After 9.2 made the packed
+      path the default, the same replay gives 797/930 calls (clips 194, chunks 456, others unchanged), the Accept
+      numbers unchanged.
+- [x] 8.4 Buffers longer than 30 s: trim committed audio the way the engine does (U12).
+      (2026-10-10) — The sentence trim keeps the long runs under 30 s as in the engine: all of F-032's inferred
+      buffer starts are reproduced up to each run's first divergence (466/471; the five others follow it in
+      `long-clean`), `received` included ("42.15"). With nothing to trim (`long-silence-lead`), the evidence (word
+      times on the 80 ms grid from 0, `received` 36.01, no ≤ 30 s window fits on the engine) says the engine passes
+      the whole buffer. The port never feeds more than 30 s: it drops the oldest audio in whole frames and passes the
+      last 30 s on the grid. Under our model both give the same 3 of 5 passes after the silence; the engine's 34 s and
+      36 s passes are reached from neither (`TestStreamWindowScan`), so that run's last calls still differ (F-036).
 - [ ] **Accept:** on fixture clips fed in 1 s chunks, the final committed text equals the offline transcript, and
       the embeddings match the engine at cosine ≥ 0.99.
+      partial: (2026-10-10) — at 1 s chunks our final committed text equals the offline transcript on 18 of 32 clips
+      (normalised 24 of 32, 25 word errors in 459), against the engine's offline text and against our own
+      `Transcribe` alike; the engine's own stream also gives 18 of 32 (24 normalised, 19 word errors), 13 of the 14
+      misses shared (`TestStreamAccept`, F-036). The embedding half holds since 8.2 (F-027: every clip ≥ 0.999033).
 
 ## Phase 9 — Native quantised path & performance
 
@@ -1069,7 +1096,7 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 | U9  | Keyword bias weight and revocation — best fit: 2 nats per token, full revocation, F-029     | 6.3     | keyword fixture parity            |
 | U10 | Silence gate — resolved: p99 − p10 of 250–3500 Hz mel frame energy ≤ 5 dB, F-031            | 6.6     | threshold sweep                   |
 | U11 | Timestamps — Whisper's alignment, last half of the layers; first start fitted, F-033        | 7.2–7.3 | timestamp parity                  |
-| U12 | Stream commit rule — resolved: LocalAgreement-2, 15 s sentence trim, F-032; > 30 s open     | 8.3–8.4 | stream parity                     |
+| U12 | Stream commit rule — resolved: LocalAgreement-2, 15 s trim, F-032; > 30 s: last 30 s, F-036 | 8.3–8.4 | stream parity                     |
 
 ## Non-goals
 
