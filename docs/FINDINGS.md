@@ -2809,3 +2809,160 @@ its time is in the float32 GEMVs and in `search`'s goroutine hand-offs, not in `
 `avx2` and `fma`, with the checkout mounted at its own path so the fixtures and models resolve. All 53 `internal/needle`
 tests pass there, the model-gated ones included, so the AVX2 kernel ran (worst 0.99 ulp in the sweep). `internal/tensor`
 passes too, and `GOARCH=amd64 go vet` (asmdecl) is clean. Emulated timings mean nothing and are not reported.
+
+## F-036 — `Stream`: the engine's stream in Go, call by call (U12, part 2; PLAN.md 8.3, 8.4) (2026-10-10)
+
+**Question.** F-032 read the engine's stream off `testdata/oracle/stream/`: whisper_streaming's `OnlineASRProcessor`
+with `needle_transcribe` as the ASR. Does a Go port of exactly that, on our `Transcribe`, reproduce the 930 recorded
+calls? What is left open in F-032 (the arithmetic behind `received`, the repeat rule's n-gram order, buffers over
+30 s with nothing to trim), and does the Phase 8 Accept hold as written?
+
+**API.** `(*Model).NewStream(StreamOptions{Language, Keywords}) (*Stream, error)`, `(*Stream).Process(pcm)
+(StreamResult, error)`, `(*Stream).Stop() StreamResult`. `StreamResult` holds `Text`, `Words` (never nil), `Pending`,
+`Language`, `Received` (seconds, float64) and `Pass`; its `MarshalJSON` writes the engine's object in the engine's
+order, `{"text","words","pending","language","received","pass_ms"}`, with `received` to two decimals, `pass_ms` to one
+and the words through `Result`'s marshaller (now `appendWords`, F-027). A `Stream` belongs to one goroutine; the `Model`
+stays safe for concurrent use, so several streams and `Transcribe` calls can share it.
+
+### What a call does (`whistle/stream.go`)
+
+Each rule is F-032's item, implemented as whisper_streaming writes it:
+
+1. **One pass per call** over the whole buffer `[t0, received)`: `transcribe` with word timestamps always on, the
+   stream's forced language or detection per pass, its keywords, the silence gate. Word times are shifted by t0.
+2. **Dropping committed words** (`fresh`, `HypothesisBuffer.insert`): keep the words that start after the last
+   committed end − 0.1 s; when the first kept word starts within 1 s of that end, drop the shortest n-gram (n ≤ 5)
+   that repeats the tail of the committed words still in the buffer. F-032 says "longest". Both orders give the same
+   result on all 108 runs (the full replay was run once with each), so the code keeps the source's shortest-first.
+3. **LocalAgreement-2** (`agree`): commit the longest common prefix of the previous call's pending words and the
+   kept words, exact strings. The commit carries this pass's times and probabilities; the rest becomes `Pending`.
+4. **Sentence trim** (`trimSentence`): after a call that committed words, if the buffer holds more than 15 s, cut
+   at the end of the second-to-last sentence of the committed words. A sentence ends at a word ending in `.`, `?` or
+   `!` (closing quotes allowed) before a word starting with an upper-case letter or a digit (opening quotes allowed).
+   Only words still in the buffer are scanned; a boundary at or before t0 would not move it, so this equals scanning
+   all committed words. Committed words ending at the cut leave the buffer (`chunk_at`).
+5. **Stop** commits `Pending` verbatim without a pass (`pass_ms` 0.0) and ends the stream; the next `Process` starts
+   a new one. A `Stop` without a stream, and a 0-sample first call, return
+   `{"text":"","words":[],"pending":"","language":"","received":0.00,"pass_ms":0.0}`. A 0-sample later call runs a
+   pass on the unchanged buffer. A call over 480,000 samples fails with `ErrTooLong` ("audio limit is 30 s") and
+   feeds nothing.
+
+### `received` (F-032 item 7)
+
+Before any trim the engine prints n · (1/16000); after a trim in `long-other-gaps` it prints 674,480 samples as
+"42.15" where every closed form in t0 and n prints "42.16". Plain sums of the chunks in float32 or float64 miss 12
+to 56 of the 929 values. A grid of 64 variants of the trim's arithmetic (word time in float32 or float64, offset in
+float32 or float64, the cut rounded or truncated, the length divided or multiplied, the offset from the absolute word
+time or summed) has one variant that prints all 929 `received` values. The engine holds a word time as
+`float32(frames) · 0.08f` after the pass' buffer offset, the offset as a float64 sum of those, the cut rounded to the
+sample. It prints `received` as offset + (buffer samples) · (1/16000) in float64. `streamWord.end` carries that float
+next to the exact `Word`, and the trim moves the offset to it. Only one recorded value (two calls) separates this
+variant from the next best, so it is the simplest fit, not proven.
+
+### Parity: 108 runs, 930 calls (`just stream-parity`)
+
+`TestStreamMatchesEngineAll` (build tag `oracle`) rebuilds every run from `manifest.json` and `testdata/audio`
+(checking `pcm_sha256`), feeds the recorded chunks into a fresh `Stream` and compares every call with `calls.json`.
+A call's **decision** is rc, the error, `text`, `pending`, `language` and `received`: everything but the word times
+and probabilities. **JSON equal** is the whole object byte for byte, `pass_ms` dropped. The words are compared where
+`text` is equal.
+
+| set      | runs, every decision equal | calls, decision equal  | JSON equal | final text = engine stream | buffer starts |
+| -------- | -------------------------- | ---------------------- | ---------- | -------------------------- | ------------- |
+| clips    | 22 / 32                    | 193 / 224              | 92         | 28 / 32                    | 125 / 125     |
+| chunks   | 40 / 64                    | 454 / 535              | 257        | 60 / 64                    | 267 / 267     |
+| language | 2 / 4                      | 21 / 32                | 12         | 3 / 4                      | 15 / 15       |
+| long     | 0 / 3                      | 115 / 128              | 62         | 2 / 3                      | 58 / 63       |
+| edge     | 5 / 5                      | 11 / 11                | 10         | 5 / 5                      | 1 / 1         |
+| **all**  | **69 / 108**               | **794 / 930 (85.4 %)** | **433**    | **98 / 108**               | **466 / 471** |
+
+By field, over all 930 calls: rc 850, `text` 849, `pending` 826, `language` 930, `received` 930. "Buffer starts" is
+F-032's inferred t0 against ours on the calls that have one. The five that differ are `long-clean` calls 40 to 44,
+after that run's first divergence (call 17), where other commits move the trim. Committed words compared: 1465.
+Start exact 1403 (95.8 %), end exact 1447 (98.8 %), both within 80 ms 1448 (98.8 %), probability within 0.01 1369
+(93.4 %), all three exact 716 (48.9 %), which is F-033's timestamp and probability parity. So byte-equal JSON is
+mostly a matter of the third decimal of a probability.
+
+**Why calls differ** (`TestStreamDivergences`). Each run's first call whose decision differs, replayed to that call:
+39 runs. In 38 of them our pass spells other words than the engine's pass. In one (`ls-other-4198-12281-0004.c0.5`
+call 5) the pass spells the same words, but our time for `James."` puts it before the last committed end − 0.1 s, so
+it is dropped as committed. No first divergence comes from the bookkeeping: with the same pass, every call decides as
+the engine does. For the 38 pass differences, the margin is our beam's score (Σ log p over the text tokens / their
+number) minus the engine's pass text teacher-forced in its canonical spelling, on our window:
+
+- 32 of 38 within ±0.07 nats per token, the median +0.0058: near ties. The same handful of short passes recurs in
+  the 0.5 s, 1 s and 2 s sets: "Jan Carlo fitait là." / "fit ses là." (+0.0018), "gli" / "vi accumulano" (+0.0060),
+  "Vanke strafrecht ziet erbij." / "strafreziekte bij zich." (+0.0074), "Diese Paris." / "Pare." (+0.0227).
+- Four below −0.1 (−0.32, −0.23 twice, −0.12): passes over the first second or two that the engine ends without the
+  final mark or with "..." ("Here are some" against our "Here are some.", "These are"). The score leaves EOS out, so
+  it does not measure where a hypothesis stops; these are ties on the end, not on the words.
+- +0.159: `fleurs-pl_pl-10047713455444904767.c2`, the clip whose offline transcript our search misses (F-026).
+- +0.343: `long-silence-lead` at 34 s (below).
+
+No rule was tuned on these. The fast regression `TestStreamMatchesEngine` (no tag) replays 11 runs (three clips at
+1 s, one at 2 s, a forced language, `long-silence-lead` and the five edge runs) in about 6 s. It requires the edge
+runs exactly, every `received` and `language`, and floors just below the measured 7 / 11 runs, 71 / 83 decisions,
+56 / 56 words within 80 ms and 11 / 11 final texts.
+
+### The Accept as written (Phase 8)
+
+`TestStreamAccept`: the 32 clips in 1 s chunks, the final committed text (every call's text and the stop's, joined)
+against the offline transcript; normalised = `eval.Words` (lower case, punctuation dropped).
+
+| stream       | offline text         | equal   | normalised | word errors      |
+| ------------ | -------------------- | ------- | ---------- | ---------------- |
+| ours         | the engine's fixture | 18 / 32 | 24 / 32    | 25 / 459 (5.4 %) |
+| ours         | our `Transcribe`     | 18 / 32 | 24 / 32    | 22 / 457 (4.8 %) |
+| the engine's | the engine's fixture | 18 / 32 | 24 / 32    | 19 / 459 (4.1 %) |
+
+The Accept's text half does not hold, for us or for the engine: a stream commits from passes over less audio than
+the offline pass, F-032's four reasons. Each stream misses 14 clips; 13 are the same, plus `fleurs-it_it-10210638754804006465`
+for ours (the "gli" / "vi" tie above) and one for the engine's. The
+embedding half holds since 8.2 (F-027: mean per-frame cosine 0.999828, every clip ≥ 0.999033).
+
+### Buffers over 30 s with nothing to trim (8.4)
+
+`long-silence-lead` is 32.5 s of zeros, then `ls-clean-6930-75918-0000`, fed in 1 s chunks. Nothing is committed in
+the silence, so the sentence trim never fires and the buffer passes 30 s at the 31st call. The engine's passes at 33,
+34, 35, 36 and 36.01 s give "Vielen Dank." [de], "Coming forward, we'll try.", "Current Court returned to its
+place.", "Concord returned to its place amidst the tents." and "Current Court returned to its place amidst the
+tents."; the stop commits the last with word times 33.12, 33.44, … 35.76.
+
+Evidence on what the engine does:
+
+- **Times.** Every stop time is a multiple of 0.08 s from the stream start. A pass over the last 30 s exactly starts
+  at 6.01 s and would put the words off that grid (our model: 33.05, 33.45, …). So the window starts on the frame
+  grid, at 0 or at a multiple of 1280 samples.
+- **`received`** at 36.01 s prints "36.01", which is n · (1/16000) with the offset at 0. An offset moved by
+  float32 frame times would print "36.00" (our first attempt did).
+- **Windows ≤ 30 s.** F-032's brute force on the engine found no single t0 and no single window length within 30 s
+  that serves the 33 to 36 s passes together.
+- **Our model, every window start on the grid** (`[s, end)`, s = 0, 0.08, … up to end − 1 s, 2116 passes without
+  the 30 s check; `TestStreamWindowScan`, `just stream-parity -run TestStreamWindowScan`, 7 min):
+
+  | call    | the engine's pass                                 | starts that reproduce it  | s = 0 (whole buffer) | last ≤ 30 s on the grid |
+  | ------- | ------------------------------------------------- | ------------------------- | -------------------- | ----------------------- |
+  | 33 s    | [de] "Vielen Dank."                               | 272 of 401                | yes                  | yes (3.04 s)            |
+  | 34 s    | "Coming forward, we'll try."                      | 0 of 413                  | no                   | no                      |
+  | 35 s    | "Current Court returned to its place."            | 251 of 426                | yes                  | yes (5.04 s)            |
+  | 36 s    | "Concord returned to its place amidst the tents." | 212 of 438, all ≥ 16.40 s | no                   | no (6.00 s)             |
+  | 36.01 s | "Current Court returned to its place amidst …"    | 205 of 438                | yes                  | yes (6.08 s)            |
+
+So the engine most likely passes the whole buffer beyond 30 s: `needle_transcribe`'s 30 s check guards the public
+call, not the stream's internal pass, and the window, the times and `received` all fit an offset of 0. The 34 s and
+36 s passes are out of our model's reach from any start, which is W2A8 noise on a 0.5 s fragment after 32 s of
+zeros.
+
+**Decision.** The port never feeds more than 30 s to a pass (PLAN.md 8.4). `limit` drops the oldest audio in whole
+80 ms frames once the buffer exceeds 30 s, so a pass sees the last 30 s, or up to one frame less, on the frame grid.
+It moves the offset by the exact sample time, which keeps `received` at the engine's (36.01). The committed words in
+the dropped audio go with it, as in the trim. This also bounds memory in a long silence; the engine's buffer appears
+to grow without bound there. On the evidence above it gives the same passes as the whole buffer, 3 of 5. Its stream
+then differs from the engine's at 34 and 36 s and commits "Current Court returned to its" at 36 s, where the engine
+waits and commits the whole sentence at the stop. What still differs: any stream whose speech needs more than 30 s
+of context from before the window. None is recorded, and recording more needs new engine runs.
+
+**Not covered.** The stream fixtures have keywords off, so `StreamOptions.Keywords` is checked only as
+`Transcribe`'s. `pass_ms` is the call's wall time. Nothing pins its exact span in the engine (the stop's 0.0 aside).
+The sentence splitter is F-032's rule, not a Moses port: abbreviations such as "Mr." before a name would end a
+sentence. None occurs in the fixtures.
