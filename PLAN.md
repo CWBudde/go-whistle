@@ -759,15 +759,42 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
 
 ### 6.5 Public pipeline & limits (`whistle/`, `cmd/whistle`)
 
-- [ ] `whistle.Load(path, opts)` over `.cact` or safetensors; `(*Model).Transcribe(pcm, opts)`, `TranscribeWAV`,
+- [x] `whistle.Load(path, opts)` over `.cact` or safetensors; `(*Model).Transcribe(pcm, opts)`, `TranscribeWAV`,
       `Embed`; built only from the exported `frontend`, `encoder` and `decoder` APIs. Greedy decoding until 6.6.
-- [ ] The 30 s limit: an error whose message contains "30 s" for more than 480,000 samples.
-- [ ] Result JSON byte-compatible with the engine in field names, order and number formatting; silence returns exactly
+      (2026-10-10) — `Load(path, ...Option)` (`WithVocabulary`, `WithoutMmap`; a safetensors checkpoint takes the
+      tokenizer from the `whistle.cact` next to it) builds `encoder.Best()` and `decoder.Best()`. `Transcribe` takes
+      `TranscribeOptions{Language, Keywords, WordTimestamps, Depth}`: keywords, timestamps and depths 2–7 return
+      `ErrNotSupported`, an unknown language or a depth outside 2..8 an error. The decoding sits behind an internal
+      `strategy` seam; the greedy one is `decoder.GreedyMemory` step for step over the exported API, with the clock
+      between the steps. `Embed` returns `Embedding{Values, Frames, Dim}` (`TestLoadSafetensors`,
+      `TestTranscribeOptionsRejected`, `docs/FINDINGS.md` F-027).
+- [x] The 30 s limit: an error whose message contains "30 s" for more than 480,000 samples.
+      (2026-10-10) — `ErrTooLong` is the engine's own text, `audio limit is 30 s` (recorded stderr for 480,001
+      samples). `Transcribe`, `Embed` and the CLI reject 480,001 samples; 480,000 give 375 frames
+      (`TestTranscribeLimit`, `TestTranscribeCmdLimit`, `TestTooLongIsTheEngineText`).
+- [x] Result JSON byte-compatible with the engine in field names, order and number formatting; silence returns exactly
       `{"text":"","language":"","words":[],"ttft_ms":0.0,"decode_tps":0.0}`.
-- [ ] `ttft_ms` and `decode_tps` measured the same way as the engine (TTFT includes the front end and the encoder).
-- [ ] Minimal `whistle transcribe <wav> [--language] [--json]`.
-- [ ] **Accept:** the transcripts and `language` of `Transcribe` equal `decoder.Greedy` on the 32 clips, and the JSON
+      (2026-10-10) — `Result.MarshalJSON`/`UnmarshalJSON` by hand: `text`, `language`, `words` (only when non-nil),
+      `ttft_ms`, `decode_tps`; `%.1f` for the timing, `%.2f` for times, `%.3f` for probabilities; `"` escaped,
+      non-ASCII raw. The engine prints `words` only with `--audio-word-timestamps`, for silence too, so the exact
+      JSON above is the timestamps-on form, `whistle.Silence()`; `Result{}` is the engine's form without timestamps.
+      Gating real silence to it is 6.6 (F-027).
+- [x] `ttft_ms` and `decode_tps` measured the same way as the engine (TTFT includes the front end and the encoder).
+      (2026-10-10) — TTFT from the PCM in hand to the first token after the language token; `decode_tps` is the
+      tokens after it, EOS included, over their time. The engine's TTFT is 0.66 + 1.084 ms per second of audio
+      (r 0.980 over the 32 clips, median of 3 runs), so it includes the encoder, as ours does (3.30 + 13.04 ms/s,
+      r 0.991). Its `decode_tps` does not depend on the text length (r −0.147). Medians: engine 7.5 ms / 1401 tok/s
+      (5 beams), Go 85.5 ms / 677 tok/s (greedy). Whether the engine stops the TTFT clock at the language token or at
+      the first text token is below the fits' resolution (F-027).
+- [x] Minimal `whistle transcribe <wav> [--language] [--json]`.
+      (2026-10-10) — plus `--model` (default `models/whistle/whistle.cact`); prints the text, or the JSON line with
+      `--json` (`TestTranscribeCmdText`, `TestTranscribeCmdJSON`).
+- [x] **Accept:** the transcripts and `language` of `Transcribe` equal `decoder.Greedy` on the 32 clips, and the JSON
       round-trips byte-identical against recorded engine output.
+      (2026-10-10) — `TestTranscribeMatchesGreedy`: text and language equal on 32/32 (`-short`: 3 clips); text equal
+      to the engine's on 22/32, as in Phase 5. `TestResultRoundTripsEngineOutput`: the ten raw engine outputs in
+      `whistle/testdata/needle-cli/` (with and without timestamps, quotes, Polish, silence, a 30 s clip) unmarshal and
+      marshal back byte-identical (F-027).
 
 ### 6.6 Silence gate & integration (`whistle/`; needs 6.1, 6.2, 6.5)
 
@@ -797,7 +824,11 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 
 - [ ] 8.1 Stream oracle (`tools/oracle`, `testdata/oracle/stream/`): `needle_stream_transcribe_process`/`_stop` with
       1 s chunks over the 32 clips, recording every call's output, plus two concatenated streams longer than 30 s.
-- [ ] 8.2 `Embed`: the encoder output per 80 ms frame, the same layout as `needle_embed` (delivered with 6.5).
+- [x] 8.2 `Embed`: the encoder output per 80 ms frame, the same layout as `needle_embed` (delivered with 6.5).
+      (2026-10-10) — `(*Model).Embed(pcm)`: `Frames` rows of 512 values (`enc.final_norm` of the lane mean), at most
+      30 s, no frame under 160 samples. Against `testdata/oracle/<clip>.embed.safetensors` (`TestEmbedMatchesEngine`):
+      mean per-frame cosine 0.999828, every clip ≥ 0.999033, so the phase's "embeddings match at cosine ≥ 0.99"
+      holds (F-027).
 - [ ] 8.3 `Stream`: buffer the incoming chunks; every ~1 s re-transcribe the buffer; commit the longest word prefix on
       which two consecutive passes agree; report `pending`, `received` and `pass_ms`; `Stop()` flushes (U12).
 - [ ] 8.4 Buffers longer than 30 s: trim committed audio the way the engine does (U12).
