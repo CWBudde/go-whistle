@@ -1019,7 +1019,8 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       (2026-10-10) — reworded by the user's decision; was: "on fixture clips fed in 1 s chunks, the final committed text
       equals the offline transcript, and the embeddings match the engine at cosine ≥ 0.99". The engine's own stream
       meets that on 18 of 32 clips, so no engine-faithful stream can. Met: 18 of 32 against the engine's 18; the
-      final text equals the engine's stream on 98 of 108 runs, 797 of 930 calls equal (8.3); embeddings ≥ 0.999033.
+      final text equals the engine's stream on 98 of 108 runs, and 797 of 930 calls (85.7 %) equal the engine's (8.3,
+      F-036); embeddings ≥ 0.999033.
       (2026-10-10) — at 1 s chunks our final committed text equals the offline transcript on 18 of 32 clips
       (normalised 24 of 32, 25 word errors in 459), against the engine's offline text and against our own
       `Transcribe` alike; the engine's own stream also gives 18 of 32 (24 normalised, 19 word errors), 13 of the 14
