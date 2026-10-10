@@ -707,7 +707,9 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       engine's own text has non-words). Safetensors: language 32/32, exact 10/32, mean CER 0.0543, max 0.2235. Search
       harness `just decoder-probe` (beam 4 over four stages, then single-axis/pair/stage descent; 2.6 min from the
       prior, 3.6 min from a start wrong on all 12 axes, both end at `decoder.Best()`); fast regression
-      `TestGreedyMatchesEngine` (three clips exact, no tag) (F-021 to F-024).
+      `TestGreedyMatchesEngine` (three clips exact, no tag) (F-021 to F-024). Re-run on the F-020 encoder
+      (`log=soft-76db`) after the merge: language 32/32, exact 22/32, every clip stops at `</s>`, mean WER 0.0583 /
+      CER 0.0228, max CER 0.1655 (fleurs-pl_pl-10013271501230525766).
 
 ## Phase 6 — Engine-parity decoding
 
