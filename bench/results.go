@@ -23,6 +23,7 @@ type Run struct {
 	Date         string  `json:"date"`   // RFC 3339, local time
 	Commit       string  `json:"commit"` // git describe of the working tree
 	Machine      Machine `json:"machine"`
+	Inputs       Inputs  `json:"inputs"`         // the model and the clips the run transcribed
 	LoadAvgStart string  `json:"load_avg_start"` // 1, 5 and 15 min load average before the run
 	LoadAvgEnd   string  `json:"load_avg_end"`   // and after it
 	Seconds      float64 `json:"seconds"`        // the run's wall time

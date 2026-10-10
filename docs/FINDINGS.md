@@ -3206,7 +3206,10 @@ with like?
   passes.
 - **Report.** Both sides write JSON (`bench/results/go.json`, `engine.json`); `whistle-bench report` renders
   `bench/RESULTS.md` from them. Its tables are padded the way prettier pads them, so the generated file and the JSON
-  pass `treefmt --fail-on-change` unchanged.
+  pass `treefmt --fail-on-change` unchanged. Each run records its machine (CPU, cores, core types, OS, architecture)
+  and its inputs (the model's SHA-256 and a SHA-256 over the clip manifest's ids and WAV digests). The report divides
+  the Go side by the engine's only when both match; otherwise it names each side's CPU, leaves the ratios empty and
+  says that the results are not comparable (PR #33 review).
 
 ### What the engine's clock measures
 

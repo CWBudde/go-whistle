@@ -49,6 +49,11 @@ func measure(ctx context.Context, cfg config) (*bench.GoResults, error) {
 		return nil, err
 	}
 
+	res.Run.Inputs, err = bench.InputsOf(cfg.model, cfg.audio)
+	if err != nil {
+		return nil, err
+	}
+
 	res.Modes = []bench.GoMode{{Mode: modes[0]}, {Mode: modes[1]}}
 
 	for i := range res.Modes {

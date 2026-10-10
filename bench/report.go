@@ -31,7 +31,9 @@ func Render(w io.Writer, g *GoResults, e *EngineResults) error {
 		"and `" + EngineResultsPath + "` (`just oracle-bench`); do not edit it by hand. Method and reading:\n" +
 		"`docs/FINDINGS.md` F-040.\n\n")
 
-	same := g != nil && e != nil && SameMachine(g.Run.Machine, e.Run.Machine)
+	// The sides are compared only when they measured the same model and
+	// clips on the same machine.
+	same := g != nil && e != nil && SameMachine(g.Run.Machine, e.Run.Machine) && SameInputs(g.Run.Inputs, e.Run.Inputs)
 
 	renderRuns(&b, g, e, same)
 	renderAccept(&b, g)
@@ -67,6 +69,8 @@ func renderRuns(b *strings.Builder, g *GoResults, e *EngineResults, same bool) {
 	t.row("memory", gibString(gr.Machine.MemoryGiB), gibString(er.Machine.MemoryGiB))
 	t.row("OS", or(gr.Machine.OS), or(er.Machine.OS))
 	t.row("Go", or(gr.Machine.GoVersion), or(er.Machine.GoVersion))
+	t.row("model SHA-256", or(short(gr.Inputs.Model)), or(short(er.Inputs.Model)))
+	t.row("clips SHA-256", or(short(gr.Inputs.Clips)), or(short(er.Inputs.Clips)))
 
 	workersGo, workersEngine, engine, passes, passesEngine := missing, missing, missing, missing, missing
 	if g != nil {
@@ -96,15 +100,16 @@ func renderRuns(b *strings.Builder, g *GoResults, e *EngineResults, same bool) {
 	b.WriteString("\n")
 
 	if g != nil && e != nil && !same {
-		b.WriteString(differentMachines + "\n\n")
+		b.WriteString(notComparable + "\n\n")
 	}
 }
 
-// differentMachines is the report's warning when the Go and the engine
-// results were measured on different machines (SameMachine).
-const differentMachines = "**The Go and the engine results come from different machines** (CPU, cores, OS or " +
-	"architecture differ), so this report does not compare them: re-run `just bench` and `just oracle-bench` on " +
-	"the same machine for the ratios."
+// notComparable is the report's warning when the Go and the engine
+// results were measured on different machines (SameMachine) or on
+// different inputs (SameInputs).
+const notComparable = "**The Go and the engine results are not comparable**: they come from different " +
+	"machines (CPU, cores, OS or architecture) or transcribed different inputs (model or clips), so this report " +
+	"does not compare them. Re-run `just bench` and `just oracle-bench` on the same machine and inputs for the ratios."
 
 func renderAccept(b *strings.Builder, g *GoResults) {
 	b.WriteString("## WER: packed against float (Phase 9 Accept)\n\n")
@@ -198,7 +203,8 @@ func renderSpeed(b *strings.Builder, g *GoResults, e *EngineResults, same bool) 
 		fmt.Fprintf(b, "## Speed: %s\n\n%s\n", title, t)
 
 		if g != nil && e != nil && !same {
-			b.WriteString("The Go and the engine columns come from different machines; compare within a side only.\n\n")
+			b.WriteString("The Go and the engine columns are not comparable (machine or inputs); compare within a side " +
+				"only.\n\n")
 		}
 
 		if k == 0 && e != nil && e.Library.OutsideClock.N > 0 {
@@ -262,8 +268,8 @@ func renderPublished(b *strings.Builder, g *GoResults, e *EngineResults, same bo
 	note := "The published figures come from another machine and clip set; the engine on the same machine is the " +
 		"yardstick. A TTFT ratio above 1 is slower than the engine, a decode ratio below 1 too."
 	if g != nil && e != nil && !same {
-		note = "The published figures come from another machine and clip set. The Go and the engine rows come from " +
-			"different machines too, so there are no ratios."
+		note = "The published figures come from another machine and clip set. The Go and the engine rows are not " +
+			"comparable either (machine or inputs), so there are no ratios."
 	}
 
 	fmt.Fprintf(b, "## Against the published figures\n\n%s\n%s\n\n", t, note)

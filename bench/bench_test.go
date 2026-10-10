@@ -2,6 +2,7 @@ package bench
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -79,6 +80,8 @@ func TestTableLayout(t *testing.T) {
 	}
 }
 
+var sampleInputs = Inputs{Model: "model digest", Clips: "clips digest"}
+
 func sampleSet(ttft, tps float64) Set {
 	s := Summary{N: 1, Median: ttft, P90: ttft, Min: ttft, Max: ttft}
 	r := Summary{N: 1, Median: tps, P90: tps, Min: tps, Max: tps}
@@ -88,7 +91,9 @@ func sampleSet(ttft, tps float64) Set {
 
 func TestRender(t *testing.T) {
 	g := &GoResults{
-		Run: Run{Date: "2026-10-10T20:00:00+02:00", Commit: "abc", Machine: Machine{CPU: "CPU X", Cores: 8}},
+		Run: Run{
+			Date: "2026-10-10T20:00:00+02:00", Commit: "abc", Machine: Machine{CPU: "CPU X", Cores: 8}, Inputs: sampleInputs,
+		},
 		Modes: []GoMode{
 			{Mode: "packed", Clips: sampleSet(60, 800), Long: sampleSet(300, 500), EqualEngine: 31},
 			{Mode: "float", Clips: sampleSet(58, 500), Long: sampleSet(290, 400), EqualEngine: 31},
@@ -96,7 +101,7 @@ func TestRender(t *testing.T) {
 		WER: &WER{Utterances: 200, Words: 4167, PackedErrors: 223, FloatErrors: 223, EngineErrors: 221},
 	}
 	e := &EngineResults{
-		Run: Run{Machine: Machine{CPU: "CPU X", Cores: 8}}, Version: "3.2.0", Threads: "4",
+		Run: Run{Machine: Machine{CPU: "CPU X", Cores: 8}, Inputs: sampleInputs}, Version: "3.2.0", Threads: "4",
 		Library: EngineLibrary{Clips: sampleSet(6, 1500)},
 	}
 
@@ -133,22 +138,33 @@ func TestRender(t *testing.T) {
 	}
 }
 
-func TestRenderOtherMachine(t *testing.T) {
+func TestRenderNotComparable(t *testing.T) {
+	m := Machine{CPU: "CPU X", Cores: 8, OS: "os 1", Arch: "arm64"}
 	g := &GoResults{
-		Run:   Run{Machine: Machine{CPU: "CPU X", Cores: 8, OS: "os 1", Arch: "arm64"}},
+		Run:   Run{Machine: m, Inputs: sampleInputs},
 		Modes: []GoMode{{Mode: "packed", Clips: sampleSet(60, 800)}, {Mode: "float", Clips: sampleSet(58, 500)}},
 	}
 
-	for name, m := range map[string]Machine{
-		"other CPU":     {CPU: "CPU Y", Cores: 8, OS: "os 1", Arch: "arm64"},
-		"other cores":   {CPU: "CPU X", Cores: 4, OS: "os 1", Arch: "arm64"},
-		"other OS":      {CPU: "CPU X", Cores: 8, OS: "os 2", Arch: "arm64"},
-		"other arch":    {CPU: "CPU X", Cores: 8, OS: "os 1", Arch: "amd64"},
-		"unknown CPU":   {Cores: 8, OS: "os 1", Arch: "arm64"},
-		"engine absent": {},
+	with := func(f func(*Run)) Run {
+		r := Run{Machine: m, Inputs: sampleInputs}
+		f(&r)
+
+		return r
+	}
+
+	for name, r := range map[string]Run{
+		"other CPU":      with(func(r *Run) { r.Machine.CPU = "CPU Y" }),
+		"other cores":    with(func(r *Run) { r.Machine.Cores = 4 }),
+		"other OS":       with(func(r *Run) { r.Machine.OS = "os 2" }),
+		"other arch":     with(func(r *Run) { r.Machine.Arch = "amd64" }),
+		"unknown CPU":    with(func(r *Run) { r.Machine.CPU = "" }),
+		"other model":    with(func(r *Run) { r.Inputs.Model = "other model" }),
+		"other clips":    with(func(r *Run) { r.Inputs.Clips = "other clips" }),
+		"unknown inputs": with(func(r *Run) { r.Inputs = Inputs{} }),
+		"engine absent":  {},
 	} {
 		t.Run(name, func(t *testing.T) {
-			e := &EngineResults{Run: Run{Machine: m}, Library: EngineLibrary{Clips: sampleSet(6, 1500)}}
+			e := &EngineResults{Run: r, Library: EngineLibrary{Clips: sampleSet(6, 1500)}}
 
 			var b bytes.Buffer
 
@@ -159,14 +175,68 @@ func TestRenderOtherMachine(t *testing.T) {
 
 			out := b.String()
 			if strings.Contains(out, "this machine") || strings.Contains(out, "10.00×") {
-				t.Errorf("results from two machines are compared as one:\n%s", out)
+				t.Errorf("results that are not comparable are compared:\n%s", out)
 			}
 
-			if !strings.Contains(out, "come from different machines") ||
-				!strings.Contains(out, "| Go packed, CPU X ") {
-				t.Errorf("report does not say the machines differ:\n%s", out)
+			if !strings.Contains(out, "are not comparable") || !strings.Contains(out, "| Go packed, CPU X ") {
+				t.Errorf("report does not say the results are not comparable:\n%s", out)
 			}
 		})
+	}
+}
+
+func TestInputs(t *testing.T) {
+	dir := t.TempDir()
+	model := filepath.Join(dir, "model.cact")
+	manifest := filepath.Join(dir, "manifest.json")
+
+	write := func(path, content string) {
+		t.Helper()
+
+		err := os.WriteFile(path, []byte(content), 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write(model, "weights")
+	write(manifest, `{"clips":[{"id":"a","sha256":"01"},{"id":"b","sha256":"02"}]}`)
+
+	in, err := InputsOf(model, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if in.Model != "9a129038d9a00aed0cf6a7ea059ca50a813449061ab87848cf1a13eafdf33b2c" { // sha256("weights")
+		t.Errorf("model digest %q", in.Model)
+	}
+
+	again, err := InputsOf(model, dir)
+	if err != nil || !SameInputs(in, again) {
+		t.Errorf("the same files fingerprint differently: %+v, %+v, %v", in, again, err)
+	}
+
+	write(manifest, `{"clips":[{"id":"a","sha256":"01"},{"id":"b","sha256":"03"}]}`)
+
+	other, err := InputsOf(model, dir)
+	if err != nil || other.Clips == in.Clips || other.Model != in.Model {
+		t.Errorf("a changed clip digest: %+v against %+v, %v", other, in, err)
+	}
+
+	write(manifest, `{"clips":[]}`)
+
+	_, err = InputsOf(model, dir)
+	if err == nil {
+		t.Error("a manifest without clips fingerprints")
+	}
+
+	_, err = InputsOf(filepath.Join(dir, "missing.cact"), dir)
+	if err == nil {
+		t.Error("a missing model fingerprints")
+	}
+
+	if SameInputs(Inputs{}, Inputs{}) {
+		t.Error("two unknown inputs count as the same")
 	}
 }
 

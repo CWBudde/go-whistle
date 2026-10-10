@@ -28,6 +28,23 @@ type benchConfig struct {
 	warmUp, runs, long, loads int    // untimed runs, timed passes over the clips, timed 30 s runs, timed loads
 }
 
+// check rejects counts that leave nothing to time: at least one timed pass,
+// 30 s run and load, and no negative warm-up.
+func (c benchConfig) check() error {
+	switch {
+	case c.warmUp < 0:
+		return fmt.Errorf("-warmup %d: want 0 or more", c.warmUp)
+	case c.runs < 1:
+		return fmt.Errorf("-runs %d: want at least 1 timed pass over the clips", c.runs)
+	case c.long < 1:
+		return fmt.Errorf("-long %d: want at least 1 timed 30 s run", c.long)
+	case c.loads < 1:
+		return fmt.Errorf("-loads %d: want at least 1 timed needle_load", c.loads)
+	}
+
+	return nil
+}
+
 // benchClip is one clip with its samples, its WAV and the committed
 // fixture's transcript.
 type benchClip struct {
@@ -78,6 +95,11 @@ func cmdBench(ctx context.Context, cfg benchConfig, log io.Writer) error {
 	}
 
 	modelPath := filepath.Join(cfg.modelDir, model.File)
+
+	res.Run.Inputs, err = bench.InputsOf(modelPath, cfg.audioDir)
+	if err != nil {
+		return err
+	}
 
 	res.CLI, err = benchCLI(ctx, cfg, filepath.Join(cfg.engineDir, "needle"), modelPath, clips, long, log)
 	if err != nil {

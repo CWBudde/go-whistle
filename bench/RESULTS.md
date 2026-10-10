@@ -15,6 +15,8 @@ and `bench/results/engine.json` (`just oracle-bench`); do not edit it by hand. M
 | memory              | 48 GiB                            | 48 GiB                                                     |
 | OS                  | macOS 27.0.1 (26A434)             | macOS 27.0.1 (26A434)                                      |
 | Go                  | go1.27.1                          | go1.27.1                                                   |
+| model SHA-256       | b6e02f0485                        | b6e02f0485                                                 |
+| clips SHA-256       | 3f723030a1                        | 3f723030a1                                                 |
 | engine              | —                                 | 3.2.0 (2ae11323dc)                                         |
 | workers             | GOMAXPROCS 15                     | CLI `--threads 4`, library default (fast cores, at most 4) |
 | passes per clip     | 1 warm-up + 5 timed; 30 s: 1 + 10 | 1 warm-up + 5 timed; 30 s: 1 + 10                          |
