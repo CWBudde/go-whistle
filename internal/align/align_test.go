@@ -136,6 +136,41 @@ func TestWords(t *testing.T) {
 	}
 }
 
+// TestWordsControlTokens: a control token before the first word joins that
+// word instead of becoming an empty word of its own, one inside the text
+// joins the current word, and only control tokens give no word.
+func TestWordsControlTokens(t *testing.T) {
+	tok := toyTokenizer(t)
+
+	for _, tc := range []struct {
+		pieces []string
+		want   []Word
+	}{
+		{[]string{"<s>", "▁was", "▁am"}, []Word{
+			{Text: "was", Start: 0, End: 2, Core: [2]int{1, 2}},
+			{Text: "am", Start: 2, End: 3, Core: [2]int{2, 3}},
+		}},
+		{[]string{"<unk>", "<s>", "You", "▁was"}, []Word{
+			{Text: "You", Start: 0, End: 3, Core: [2]int{0, 3}},
+			{Text: "was", Start: 3, End: 4, Core: [2]int{3, 4}},
+		}},
+		{[]string{"▁was", "<s>", "▁am"}, []Word{
+			{Text: "was", Start: 0, End: 2, Core: [2]int{0, 2}},
+			{Text: "am", Start: 2, End: 3, Core: [2]int{2, 3}},
+		}},
+		{[]string{"<s>", "<pad>"}, nil},
+	} {
+		got, err := Words(tok, toyIDs(t, tok, tc.pieces...))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("Words(%q):\n got %+v\nwant %+v", tc.pieces, got, tc.want)
+		}
+	}
+}
+
 func TestProbability(t *testing.T) {
 	logp := []float64{math.Log(0.5), math.Log(0.9), math.Log(0.2)}
 	w := Word{Start: 0, End: 3, Core: [2]int{0, 2}}
