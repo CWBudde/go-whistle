@@ -66,14 +66,16 @@ func resampleWith(mono []float32, rate int, spec filterSpec) ([]float32, error) 
 		return nil, fmt.Errorf("frontend: %d samples at %d Hz resample to %.0f, more than %d", len(mono), rate, scaled, math.MaxInt32)
 	}
 
-	outLen := int(scaled)
-	if outLen == 0 {
-		return []float32{}, nil
-	}
-
+	// The resampler validates the rate, so build it before the empty
+	// output's early return: acceptance must not depend on the length.
 	r, err := newResampler(rate, spec)
 	if err != nil {
 		return nil, err
+	}
+
+	outLen := int(scaled)
+	if outLen == 0 {
+		return []float32{}, nil
 	}
 
 	up, down := r.Ratio()

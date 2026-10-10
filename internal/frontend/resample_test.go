@@ -176,11 +176,15 @@ func TestResampleSameRateCopies(t *testing.T) {
 	}
 }
 
+// TestResampleRejectsRates: an unsupported rate is rejected whatever the
+// length, also when the output rounds to no samples.
 func TestResampleRejectsRates(t *testing.T) {
 	for _, rate := range []int{0, -8000, 1, minRate - 1, 1_000_000_000} {
-		_, err := Resample(make([]float32, 1<<20), rate)
-		if !errors.Is(err, ErrSampleRate) {
-			t.Errorf("%d Hz: got %v, want ErrSampleRate", rate, err)
+		for _, n := range []int{0, 1, 1 << 20} {
+			_, err := Resample(make([]float32, n), rate)
+			if !errors.Is(err, ErrSampleRate) {
+				t.Errorf("%d Hz, %d samples: got %v, want ErrSampleRate", rate, n, err)
+			}
 		}
 	}
 }
