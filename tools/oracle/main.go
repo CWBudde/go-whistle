@@ -165,6 +165,11 @@ func dispatchBench(ctx context.Context, fs *flag.FlagSet, args []string, audio *
 		return fmt.Errorf("%s: %w", cmdNameBench, err)
 	}
 
+	err = cfg.check()
+	if err != nil {
+		return fmt.Errorf("%s: %w", cmdNameBench, err)
+	}
+
 	cfg.audioDir = *audio
 
 	return cmdBench(ctx, cfg, log)
