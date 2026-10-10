@@ -79,6 +79,17 @@ def upstream_rev(root):
     return out.stdout.strip()
 
 
+def upstream_changes(root):
+    """The checkout's local changes under needle/, the package load_upstream imports, as `git status` lists them
+    (untracked files included); None when root is not a git checkout."""
+    try:
+        out = subprocess.run(["git", "-C", root, "status", "--porcelain", "--", "needle"], capture_output=True,
+                             text=True, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return out.stdout.splitlines()
+
+
 def pinned_digest(lock=HUB_LOCK):
     """The SHA-256 the hub manifest pins for the safetensors checkpoint."""
     with open(lock) as f:
@@ -98,9 +109,12 @@ def provenance(upstream, safetensors, allow_unpinned):
     """The upstream and weights pins to record: the pins themselves when the inputs are the pinned ones. A mismatch
     is an error, or with allow_unpinned is recorded as what was actually used."""
     rev, digest = upstream_rev(upstream), file_digest(safetensors)
+    changes = upstream_changes(upstream) if rev else None
     problems = []
     if rev is None or not rev.startswith(UPSTREAM_PIN):
         problems.append(f"{upstream} is at {rev or 'no git revision'}, not {UPSTREAM_PIN}")
+    if changes:
+        problems.append(f"{upstream} has local changes under needle/: " + "; ".join(changes[:5]))
     if digest != pinned_digest():
         problems.append(f"{safetensors} has sha256 {digest}, not the {WEIGHTS_PIN} checkpoint of {HUB_LOCK}")
     if not problems:
@@ -109,7 +123,7 @@ def provenance(upstream, safetensors, allow_unpinned):
         sys.exit("unpinned inputs (pass --allow-unpinned to record them as such):\n  " + "\n  ".join(problems))
     for p in problems:
         print("warning:", p, file=sys.stderr)
-    return (rev[:10] if rev else "unverified"), "sha256:" + digest
+    return (rev[:10] + ("-dirty" if changes else "") if rev else "unverified"), "sha256:" + digest
 
 
 def load_upstream(root):
