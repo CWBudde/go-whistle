@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"slices"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/cwbudde/go-whistle/internal/tokenizer"
 )
@@ -211,6 +212,28 @@ func TestKeywordPerCharBytes(t *testing.T) {
 
 	if got := k.Bonus(ids, -1); got != 2 {
 		t.Errorf("Bonus(%q) = %g, want 2 characters", kw, got)
+	}
+
+	// Byte runs that are not valid UTF-8 count as the tokenizer decodes
+	// them: one U+FFFD per byte that starts no valid sequence.
+	for _, kw := range []string{"\x80", "a\x80b", "\xe6\x97", "\xe6\x97\xa5x", "\xc3\xa9\x80"} {
+		ids := tok.Encode(kw)
+
+		text, err := tok.Decode(ids)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		want := float64(utf8.RuneCountInString(text))
+
+		k, err := NewKeywords(tok, []string{kw}, Bias{Weight: 1, PerChar: true, Revoke: 1, Forms: FormBare})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got := k.Bonus(ids, -1); got != want {
+			t.Errorf("Bonus(%q) = %g, want %g characters (%q)", kw, got, want, text)
+		}
 	}
 }
 

@@ -204,12 +204,16 @@ func NewKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) (*Keywords
 
 	ids := encodeKeywords(tok, keywords, b)
 
-	weight := func(int) float64 { return b.Weight }
-	if b.PerChar {
-		weight = func(id int) float64 { return b.Weight * float64(pieceChars(tok, id)) }
+	if !b.PerChar {
+		return build(ids, func(int) float64 { return b.Weight }, b), nil
 	}
 
-	return build(ids, weight, b), nil
+	ws := make([][]float64, len(ids))
+	for i, s := range ids {
+		ws[i] = charWeights(tok, s, b.Weight)
+	}
+
+	return buildWeighted(ids, ws, b), nil
 }
 
 // encodeKeywords tokenises the spellings of the keywords under b, a bare
@@ -238,32 +242,77 @@ func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) [][]int
 	return ids
 }
 
-// pieceChars is the number of characters token id spells: the runes of its
-// piece without the leading "▁", and for a byte piece one for the byte
-// that starts a UTF-8 character and none for a continuation byte, so a
-// character in byte pieces counts once.
-func pieceChars(tok *tokenizer.Tokenizer, id int) int {
-	p := tok.Piece(id)
-	if tok.Type(id) != tokenizer.TypeByte {
-		return utf8.RuneCountInString(strings.TrimPrefix(p, "▁"))
+// charWeights is the PerChar bonus of each token of a spelling: weight
+// times the change of the characters its tokens so far decode to, spaces
+// not counted. A byte run decodes as Tokenizer.Decode does it, one U+FFFD
+// per byte that starts no valid sequence, so whether a byte is a character
+// of its own can depend on the bytes after it; a token's share may then be
+// negative, but a whole spelling earns its decoded characters. A byte
+// decision is final once 4 bytes follow, so each token costs O(1).
+func charWeights(tok *tokenizer.Tokenizer, ids []int, weight float64) []float64 {
+	ws := make([]float64, len(ids))
+
+	var (
+		run          []byte
+		done, commit int // characters before the run's undecided tail; the tail's start
+		last         int // the characters after the previous token
+	)
+
+	for i, id := range ids {
+		switch {
+		case id == textStart:
+		case tok.Type(id) == tokenizer.TypeByte:
+			v, _ := strconv.ParseUint(strings.TrimSuffix(strings.TrimPrefix(tok.Piece(id), "<0x"), ">"), 16, 8)
+			run = append(run, byte(v))
+
+			for len(run)-commit >= utf8.UTFMax {
+				_, size := utf8.DecodeRune(run[commit:])
+				commit += size
+				done++
+			}
+		default:
+			done += utf8.RuneCount(run[commit:])
+			run, commit = run[:0], 0
+
+			if t := tok.Type(id); t == tokenizer.TypeNormal || t == tokenizer.TypeUserDefined {
+				done += utf8.RuneCountInString(strings.ReplaceAll(tok.Piece(id), "▁", ""))
+			}
+		}
+
+		now := done + utf8.RuneCount(run[commit:])
+		ws[i] = weight * float64(now-last)
+		last = now
 	}
 
-	v, err := strconv.ParseUint(strings.TrimSuffix(strings.TrimPrefix(p, "<0x"), ">"), 16, 8)
-	if err != nil || v&0xC0 == 0x80 {
-		return 0
-	}
-
-	return 1
+	return ws
 }
 
 // build is the automaton over the token sequences ids, a token's bonus
 // given by weight; a sequence that starts with textStart is anchored at
 // the start of the text.
 func build(ids [][]int, weight func(id int) float64, b Bias) *Keywords {
+	ws := make([][]float64, len(ids))
+
+	for i, s := range ids {
+		ws[i] = make([]float64, len(s))
+		for j, id := range s {
+			if id != textStart {
+				ws[i][j] = weight(id)
+			}
+		}
+	}
+
+	return buildWeighted(ids, ws, b)
+}
+
+// buildWeighted is build with the bonus of token j of spelling i in
+// ws[i][j]. A node's bonus comes from the first spelling through it; the
+// spellings through a node share its prefix, so their bonuses agree.
+func buildWeighted(ids [][]int, ws [][]float64, b Bias) *Keywords {
 	k := &Keywords{next: []map[int]int{{}}, fail: []int{0}, up: []int{0}, w: []float64{0}, depth: []int{0}, end: []bool{false}, bias: b}
 
-	for _, s := range ids {
-		k.add(s, weight)
+	for i, s := range ids {
+		k.add(s, ws[i])
 	}
 
 	k.link()
@@ -355,26 +404,21 @@ func (k *Keywords) Bonus(text []int, eos int) float64 {
 }
 
 // add inserts one spelling.
-func (k *Keywords) add(ids []int, weight func(int) float64) {
+func (k *Keywords) add(ids []int, ws []float64) {
 	if len(ids) == 0 || (len(ids) == 1 && ids[0] == textStart) {
 		return
 	}
 
 	n := 0
 
-	for _, id := range ids {
+	for i, id := range ids {
 		c, ok := k.next[n][id]
 		if !ok {
-			w := 0.0
-			if id != textStart {
-				w = weight(id)
-			}
-
 			c = len(k.next)
 			k.next = append(k.next, map[int]int{})
 			k.fail = append(k.fail, 0)
 			k.up = append(k.up, n)
-			k.w = append(k.w, w)
+			k.w = append(k.w, ws[i])
 			k.depth = append(k.depth, k.depth[n]+1)
 			k.end = append(k.end, false)
 			k.next[n][id] = c
