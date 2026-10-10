@@ -37,6 +37,8 @@ func TestRootHasTranscribe(t *testing.T) {
 	for flag, def := range map[string]string{
 		"model":    filepath.Join("models", "whistle", "whistle.cact"),
 		"language": "",
+		"keywords": "",
+		"depth":    "0",
 		"json":     "false",
 	} {
 		f := cmd.Flags().Lookup(flag)
@@ -119,6 +121,40 @@ func TestTranscribeCmdBadLanguage(t *testing.T) {
 	_, err := runCmd(t, "transcribe", "--model", cactPath, "--language", "xx", clipPath)
 	if err == nil || !strings.Contains(err.Error(), `"xx"`) {
 		t.Errorf("err = %v, want an error naming the language", err)
+	}
+}
+
+func TestTranscribeCmdKeywordsAndDepth(t *testing.T) {
+	requireModel(t)
+
+	// The engine's keyword case en-cowleys-lower-missed
+	// (testdata/oracle/keywords, docs/FINDINGS.md F-029).
+	kw := filepath.Join(t.TempDir(), "keywords.txt")
+
+	err := os.WriteFile(kw, []byte("cowley's\n"), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runCmd(t, "transcribe", "--model", cactPath, "--keywords", kw,
+		"../../testdata/audio/ls-other-3080-5040-0011.wav")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "Here are some verses of Cowley's. Tell me how you like them.\n"; out != want {
+		t.Errorf("--keywords: stdout = %q, want %q", out, want)
+	}
+
+	_, err = runCmd(t, "transcribe", "--model", cactPath, "--keywords", filepath.Join(t.TempDir(), "missing.txt"),
+		clipPath)
+	if err == nil || !strings.Contains(err.Error(), "keywords") {
+		t.Errorf("missing keywords file: err = %v", err)
+	}
+
+	_, err = runCmd(t, "transcribe", "--model", cactPath, "--depth", "1", clipPath)
+	if err == nil || !strings.Contains(err.Error(), "depth 1") {
+		t.Errorf("--depth 1: err = %v, want an error naming the depth", err)
 	}
 }
 

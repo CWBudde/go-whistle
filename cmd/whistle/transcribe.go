@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cwbudde/go-whistle/whistle"
 	"github.com/spf13/cobra"
@@ -16,6 +18,8 @@ func newTranscribeCmd() *cobra.Command {
 	var (
 		model    string
 		language string
+		keywords string
+		depth    int
 		asJSON   bool
 	)
 
@@ -25,9 +29,22 @@ func newTranscribeCmd() *cobra.Command {
 		Long: "Transcribe a RIFF WAV file (8/16/24/32-bit PCM or float, any channels and rate) of at most 30 s and\n" +
 			"print the text, or with --json the engine's JSON object:\n" +
 			`  {"text":"...","language":"en","ttft_ms":0.0,"decode_tps":0.0}` + "\n\n" +
-			"Decoding is the engine's beam search (5 beams); silence gives the empty text.",
+			"Decoding is the engine's beam search (5 beams); silence gives the empty text. --keywords names a file of\n" +
+			"words and phrases to favour, one per line, and --depth runs fewer decoder layers (2..8), as the engine's\n" +
+			"--audio-keywords and --audio-depth do.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts := whistle.TranscribeOptions{Language: language, Depth: depth}
+
+			if keywords != "" {
+				raw, err := os.ReadFile(keywords) // #nosec G304 -- the user names the file.
+				if err != nil {
+					return fmt.Errorf("keywords: %w", err)
+				}
+
+				opts.Keywords = strings.Split(string(raw), "\n")
+			}
+
 			m, err := whistle.Load(model)
 			if err != nil {
 				return err
@@ -35,12 +52,14 @@ func newTranscribeCmd() *cobra.Command {
 
 			defer func() { _ = m.Close() }()
 
-			return runTranscribe(m, args[0], whistle.TranscribeOptions{Language: language}, asJSON, cmd.OutOrStdout())
+			return runTranscribe(m, args[0], opts, asJSON, cmd.OutOrStdout())
 		},
 	}
 
 	cmd.Flags().StringVar(&model, "model", defaultModelPath, "Model file: whistle.cact or whistle.safetensors")
 	cmd.Flags().StringVar(&language, "language", "", "Force the language (en, de, fr, es, it, nl, pl); default: detect it")
+	cmd.Flags().StringVar(&keywords, "keywords", "", "File of words and phrases to favour, one per line")
+	cmd.Flags().IntVar(&depth, "depth", 0, "Decoder layers to run, 2..8 (the engine's ladder); default: all")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print the result as the engine's JSON object")
 
 	return cmd
