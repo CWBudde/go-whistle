@@ -77,6 +77,10 @@ mel-fixture *args:
 encoder-probe *args:
     go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbe(Baselines|Search)$' ./internal/encoder/ {{args}}
 
+# Search the decoder hypotheses by teacher forcing the committed engine transcripts, then decode every clip greedily (WHISTLE_PROBE_SRC/BEAM/TOP/KEY)
+decoder-probe *args:
+    go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbe(Baselines|Search|Greedy)$' ./internal/decoder/ {{args}}
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
