@@ -20,6 +20,9 @@ const (
 	// kernelNibble4 interleaves the nibble tables of four activations, so
 	// one index decode feeds four lookups; leftover rows use kernelNibble.
 	kernelNibble4
+	// kernelLUT rounds the nibble tables to 14-bit integers in two byte
+	// planes and looks up a block of 32 rows per shuffle (lut.go, F-034).
+	kernelLUT
 )
 
 func (k kernel) String() string {
@@ -30,6 +33,8 @@ func (k kernel) String() string {
 		return "nibble"
 	case kernelNibble4:
 		return "nibble4"
+	case kernelLUT:
+		return "lut"
 	default:
 		return fmt.Sprintf("kernel %d", uint8(k))
 	}
@@ -41,6 +46,12 @@ type scratch struct {
 	xh   []float32           // x̂ of up to four activations, rotated and group-padded
 	nib  [][16]float32       // per index nibble, its value for each of the 16 codes
 	nib4 [][2][16][4]float32 // per index byte, both nib tables of four activations, interleaved; nil until a GEMM needs it
+
+	// The lut kernel's state, nil until it runs: the byte-plane tables of
+	// one activation, the group steps and the blocked output.
+	tab   []byte
+	steps []float32
+	y     []float32
 }
 
 // scratchPools holds one *sync.Pool per row layout, so matrices of the
@@ -73,8 +84,15 @@ func (m *Matrix) GEMM(dst, x []float32, rows int) {
 	m.gemm(m.best(), dst, x, rows)
 }
 
-// best is the fastest kernel measured on Whistle's shapes (F-028).
-func (m *Matrix) best() kernel { return kernelNibble4 }
+// best is the fastest kernel measured on Whistle's shapes: lut where the
+// assembly runs it (F-034), else nibble4 (F-028).
+func (m *Matrix) best() kernel {
+	if lutAsm && m.groupBytes <= lutMaxGroupBytes {
+		return kernelLUT
+	}
+
+	return kernelNibble4
+}
 
 func (m *Matrix) gemm(k kernel, dst, x []float32, rows int) {
 	if rows < 0 || len(x) != rows*m.in || len(dst) != rows*m.out {
@@ -83,6 +101,11 @@ func (m *Matrix) gemm(k kernel, dst, x []float32, rows int) {
 
 	s, _ := m.scratch.Get().(*scratch)
 	defer m.scratch.Put(s)
+
+	if k == kernelLUT {
+		m.gemmLUT(s, dst, x, rows)
+		return
+	}
 
 	pad := m.groups * m.group
 	i := 0
@@ -128,7 +151,7 @@ func (m *Matrix) rotate(xh, x []float32) {
 
 	for g := range m.groups {
 		xg := xh[g*m.group : (g+1)*m.group]
-		fwht(xg)
+		fwhtF32(xg)
 
 		for k := range xg {
 			xg[k] *= scale
@@ -299,7 +322,8 @@ func invSqrt(group int) float32 { return float32(1 / math.Sqrt(float64(group))) 
 // fwht multiplies x in place by the ±1 Sylvester Hadamard matrix,
 // H_2n = [[H_n, H_n], [H_n, -H_n]]; len(x) is a power of two. Duplicated
 // from internal/cact (cq.go fwht), which keeps it unexported; this copy runs
-// on activations and is the one 9.4 vectorises.
+// on activations, and fwhtF32 runs it in assembly with the same stages in
+// the same order, so with the same bits (F-034).
 func fwht(x []float32) {
 	for h := 1; h < len(x); h *= 2 {
 		for i := 0; i < len(x); i += 2 * h {

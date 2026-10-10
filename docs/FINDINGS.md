@@ -2372,3 +2372,135 @@ clips where the engine's own stream equals it.
 **Determinism.** The library has no thread setting. It runs on its default, the fast cores (at most 4, here 4), and
 F-025 found the transcripts identical at 1 to 8 threads. Every run also checks the library against the CLI at
 `--threads 4`. `just oracle-stream` was run twice, and the second run left `git status` clean.
+
+## F-034 — CQ LUT kernel in NEON and AVX2: byte-plane tables and a 32-row index (9.4, `internal/cq`) (2026-10-10)
+
+**Question.** F-028's pure-Go `nibble`/`nibble4` kernels are 2.2–5.7× slower than the NEON float GEMM, because every
+table lookup is scalar. Can assembly make the packed path at least as fast as the float path, single-threaded, while
+the 9.1 Accept (cosine ≥ 0.99999 against `cact.CQ` + float GEMM on the real tensors) still holds?
+
+**Design** (`internal/cq/lut.go`, the `lut` kernel). A byte shuffle (NEON `TBL`, AVX2 `VPSHUFB`) looks up 16 bytes in a
+16-entry byte table with one instruction. The F-028 nibble tables are float32 and differ per index position, so three
+changes make them fit:
+
+- **Integer tables in two byte planes.** Per activation group, each nibble table entry e (2 bits: cb[lo]·x̂[2q] +
+  cb[hi]·x̂[2q+1]; 4 bits: cb[c]·x̂[q]) is rounded to v = round(e · lutQ/M) with lutQ = 8191. M = max |cb| times the
+  group's largest |x̂[2q]| + |x̂[2q+1]| (2 bits) or |x̂[q]| (4 bits), so |v| ≤ 8191 (14 bits). v is stored as lo = v &
+  127 and hi = v>>7 + 64, both in [0, 127]: a shuffle reads each plane, and two lookups add in one byte without
+  overflow.
+- **A repacked index.** `cq.New` copies the index once into blocks of 32 rows. Per block and index byte j, the 32 rows'
+  bytes are adjacent (`lutLayout`), so one vector load holds byte j of 16 (NEON) or 32 (AVX2) rows, and one shuffle
+  looks up a table for all of them. The norms are blocked the same way. Rows past `Out` are zero; a `Rows` view computes
+  the blocks it overlaps and copies its rows out, so the mHC φ views need no repack of their own.
+- **Exact integer sums.** Per row and group, each plane's lookups are summed in uint16: at most 2·groupBytes · 127, so
+  groupBytes ≤ 256 (`lutMaxGroupBytes`; Whistle has 32 and 64). At the end of a group, 128·Σhi + Σlo − 16384·groupBytes
+  (the hi offset) is an exact int32. It is converted to float32 and added to y times norm · step_g, with step_g =
+  M/(lutQ·√G).
+
+The rotation is the plain FWHT; its 1/√G is folded into step_g. The assembly does exactly the float32 operations of the
+Go reference (`lutTables2Generic`, `lutTables4Generic`, `lutLookupGeneric`, `fwht`), in the same order. There is no FMA
+(the Go side writes `float32(a*b)` to prevent fusion), round-to-nearest-even both in `FCVTNS`/`VCVTPS2DQ` and in
+`math.RoundToEven`, and the FWHT stages run in `fwht`'s order. So assembly and Go reference agree bit for bit.
+`asm_test.go` checks each routine and the whole GEMM, including views that start and end inside a block.
+
+**Kernels.** Per block of 32 rows and index byte j:
+
+| step        | NEON (`lut_arm64.s`)                                         | AVX2 (`lut_amd64.s`)                                          |
+| ----------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
+| loads       | 2 × 16 index bytes, 64 table bytes (`LD1` ×4)                | 32 index bytes, 4 × 16 table bytes (`VBROADCASTI128`)         |
+| nibbles     | `AND`, `USHR` per vector: 4                                  | `VPAND`, `VPSRLW`, `VPAND`: 3                                 |
+| lookups     | 8 `TBL` (2 planes × 2 nibbles × 2 vectors)                   | 4 `VPSHUFB`                                                   |
+| sums        | 4 byte `ADD`, 8 `UADDW`/`UADDW2` into 8 uint16 accumulators  | 2 `VPADDB`, 4 `VPUNPCK*BW` with zero, 4 `VPADDW`              |
+| group end   | `USHLL #7`, `UADDW`, `SUB`, `SCVTF`, `FMUL`, `FADD`          | the same; in-lane unpacks permute rows, `VPERM2I128` restores |
+| table build | `FMUL` by element, `FCVTNS`, `UZP1`, `SHRN #7`               | `VMULPS`, `VCVTPS2DQ`, `VPACKSSDW`, `VPSRAW`, `VPACKUSWB`     |
+| FWHT        | h = 1, 2, 4 in registers (`UZP1`/`UZP2`), then 8 floats/pass | h = 1, 2, 4 in registers (`VPERMILPS`, `VPERM2F128`, blends)  |
+
+On NEON that is 24 vector instructions per 32 rows and index byte, i.e. per 128 weights of CQ2 or 64 of CQ4; on AVX2,
+17 and 5 loads. Go 1.25 (`go.mod`) lacks the NEON float instructions and `SHRN`, so they are `WORD`-encoded, as in
+`internal/tensor`. Every word was checked against Go 1.27's mnemonics with `go tool objdump`. On amd64 the kernel
+needs AVX2 only (`cpu.X86.HasAVX2` at run time); without it `lutAsm` is false, and the Go reference runs.
+
+**Accuracy** (`TestWhistleGEMM`, the 11 real tensors of F-028, five activation rows, worst row). In each build `lut`
+equals its Go reference bit for bit; the float reference (`tensor.MatMulTransB`) is NEON, purego Go or AVX2+FMA, which
+moves the last digit in two places:
+
+| tensor          | CQ  | shape        | 1 − cos arm64 / purego / amd64 | max \|Δ\| / max \|y\| |
+| --------------- | --- | ------------ | ------------------------------ | --------------------- |
+| layer00.q_proj  | 2   | (384, 512)   | 2.05e-8 / 2.05e-8 / 2.05e-8    | 1.3e-4                |
+| layer03.k_proj  | 2   | (96, 512)    | 2.28e-8 / 2.28e-8 / 2.28e-8    | 2.2e-4                |
+| cross05.v_proj  | 2   | (512, 512)   | 1.98e-8 / 1.98e-8 / 1.98e-8    | 8.9e-5                |
+| enc00.pw1       | 2   | (1024, 512)  | 1.48e-8 / 1.48e-8 / 1.48e-8    | 1.5e-4                |
+| enc07.out_proj  | 2   | (512, 512)   | 1.24e-8 / 1.24e-8 / 1.24e-8    | 1.7e-4                |
+| stem.pw_1       | 2   | (128, 128)   | 1.90e-8 / 1.90e-8 / 1.90e-8    | 1.9e-4                |
+| stem.out        | 2   | (512, 1280)  | 1.51e-8 / 1.51e-8 / 1.51e-8    | 1.3e-4                |
+| engram0.tables  | 2   | (73728, 128) | 1.44e-8 / 1.44e-8 / 1.44e-8    | 1.4e-4                |
+| embedding       | 4   | (8199, 512)  | 7.83e-8 / 7.83e-8 / 7.83e-8    | 4.3e-4                |
+| mhc_phi_pre     | 4   | (32, 2048)   | 5.89e-8 / 5.89e-8 / 5.90e-8    | 3.5e-4                |
+| enc.mhc_phi_res | 4   | (128, 2048)  | 3.63e-8 / 3.63e-8 / 3.64e-8    | 1.1e-4                |
+
+The worst 1 − cos, 7.8e-8, is 128× inside the Accept's 1e-5. That is the table rounding: the F-028 kernels stay near
+1e-13. The table width was measured with the Go reference on the same tensors. With int8 tables (lutQ = 127, one plane)
+the worst 1 − cos is 5.2e-4, 52× outside the Accept. With 12 bits (lutQ = 2047, which would let a byte hold four
+lookups) it is 2.0e-6, a margin of 5×. 14 bits is the widest that adds two lookups per byte. `TestKernels` bounds every
+element on random matrices by the float32 bound of F-028 plus the rounding bound 2·groupBytes · n · M/(2·lutQ·√G) per
+group.
+
+**Speed** (`BenchmarkGEMM`, Apple M5 Pro, `-cpu 1`, mean of 3 × 0.5 s, random packed matrices; float is
+`tensor.MatMulTransB` on the dequantised matrix). The default build runs the NEON `lut`; "purego" is the same benchmark
+under `-tags purego`, where `lut` is the Go reference. amd64 ran under emulation only, so it has no timings here.
+
+| shape                    | rows | float NEON | `lut` NEON | `nibble4` (9.1) | `lut` vs float   | `lut` vs `nibble4` | MB float32 | MB `lut` |
+| ------------------------ | ---- | ---------- | ---------- | --------------- | ---------------- | ------------------ | ---------- | -------- |
+| k_proj (96, 512) CQ2     | 1    | 1.79 µs    | 1.15 µs    | 6.50 µs         | 1.56× faster     | 5.7×               | 0.197      | 0.0277   |
+| q_proj (384, 512) CQ2    | 1    | 7.52 µs    | 2.91 µs    | 18.5 µs         | 2.58× faster     | 6.4×               | 0.786      | 0.111    |
+| out (512, 512) CQ2       | 1    | 10.1 µs    | 3.68 µs    | 24.0 µs         | 2.75× faster     | 6.5×               | 1.049      | 0.148    |
+| pw1 (1024, 512) CQ2      | 1    | 22.0 µs    | 6.84 µs    | 45.8 µs         | 3.21× faster     | 6.7×               | 2.097      | 0.295    |
+| stem.out (512, 1280) CQ2 | 1    | 25.3 µs    | 9.18 µs    | 59.6 µs         | 2.76× faster     | 6.5×               | 2.621      | 0.369    |
+| phi_res (128, 2048) CQ4  | 1    | 9.37 µs    | 8.89 µs    | 52.2 µs         | 1.05× faster     | 5.9×               | 1.049      | 0.279    |
+| head (8199, 512) CQ4     | 1    | 192 µs     | 97.2 µs    | 652 µs          | 1.98× faster     | 6.7×               | 16.79      | 4.467    |
+| q_proj (384, 512) CQ2    | 5    | 20.3 µs    | 14.5 µs    | 74.7 µs         | 1.40× faster     | 5.2×               | 0.786      | 0.111    |
+| head (8199, 512) CQ4     | 5    | 461 µs     | 487 µs     | 2.34 ms         | **1.06× slower** | 4.8×               | 16.79      | 4.467    |
+| q_proj (384, 512) CQ2    | 375  | 1.21 ms    | 1.09 ms    | 5.24 ms         | 1.11× faster     | 4.8×               | 0.786      | 0.111    |
+
+Under purego the Go reference of `lut` is 2.2–4.9× slower than `nibble4` (q_proj 57.4 vs 19.5 µs, head 2.29 vs
+0.654 ms), so `best()` is `lut` only where `lutAsm` is true, and `nibble4` elsewhere.
+
+**Where the time goes** (one GEMV, NEON). q_proj: FWHT 0.16 µs, tables 0.36 µs, lookup 2.33 µs. k_proj: 0.16, 0.37 and
+0.59 µs. phi_res: 0.62, 2.1 and 6.0 µs. head: 0.16, 0.53 and 96 µs. The lookup takes 1.5 ns per block and index
+byte; at an assumed 4.5 GHz that is about 3.5 of its 24 vector instructions per cycle, close to four vector pipes. The
+rest is table building, which costs O(In · 16) per activation whatever Out is. That is why the small k_proj gains least
+among the CQ2 shapes, and the 2048-wide φ_res least of all.
+
+**Batches.** The kernel runs one activation at a time (five GEMVs cost 487 µs on the head, the same as one 5-row
+GEMM). Only the index load and the nibble split (4 of 24 instructions) could be shared between activations, while the
+float GEMM's 4×4 blocking reuses every weight four times. So the float GEMM catches up with batches: `lut` is still
+1.40× faster at 5 rows of q_proj and 1.11× at 375 rows, but 1.06× slower on the 5-beam head.
+
+**Tried and rejected.** Unrolling the NEON loop over two index bytes in separate registers: within 1 % (head 97.1 vs
+97.2 µs). The loop is limited by instruction throughput, not latency.
+
+**Counted, not built.**
+
+- Pairing two index bytes of one row in adjacent lanes, with a 2-register `TBL` (index + 16 for the odd lanes) and
+  `UADALP` as the widening add: also 24 instructions per 32 rows and byte, because the + 16 costs an `ORR` per vector.
+- 6+6-bit planes, so that a byte holds four lookups: 22 instead of 24 instructions, for 12-bit tables (5× margin,
+  above).
+- Not tried: a 2-activation lookup would save the shared 4 of 24 instructions per extra activation (about 7 % at 5
+  rows); it needs 31 of the 32 NEON registers.
+
+**Memory.** The blocked copy of index and norms comes on top of the packed form: 33.27 MB for all 152 CQ matrices with
+the assembly against 16.63 MB in the purego build (`TestWhistleAllMatrices`), still 6.6× less than float32
+(218.77 MB). `cact.Open` reads the whole 16.9 MB `.cact` into memory, so today the copy is extra heap. With an mmap-ed
+file the `lut` kernel never touches the original index pages (`Row` does, for gathers), so they would not count toward
+RSS. If 9.2 needs the memory back, the kernel could run on the original layout and transpose 16 rows × 16 bytes in
+registers: 64 `TRN1`/`TRN2`, about 8 more instructions per 32 rows and byte (+⅓).
+
+**Consequences for 9.2.**
+
+- Use `Matrix.GEMV`/`GEMM` as they are. `best()` picks `lut` on arm64 and on amd64 with AVX2. The packed path is now
+  faster than the float path on all seven benchmarked GEMV shapes and on the batches of q_proj. The exception is the
+  5-beam head, which is 6 % slower; for it, 9.5's parallelism over row blocks applies directly, since blocks are
+  independent.
+- Outputs differ from the float path by up to 4.3e-4 of max |y| (1 − cos ≤ 7.8e-8), much more than F-028's 5.7e-7. Tests
+  pinned to float fixtures need cosine checks, as AGENTS.md asks.
+- The 64 MB RSS target: about 35 MB of CQ weights with the file read into memory, about 18 MB new heap with an mmap.
