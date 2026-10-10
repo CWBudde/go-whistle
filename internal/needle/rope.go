@@ -41,6 +41,19 @@ func NewRope(headDim, seqLen int, theta float64) *Rope {
 	return r
 }
 
+// Mix returns tables that map x to (1 − g)·x + g·RoPE(x), which is again
+// of apply's form with cos' = 1 − g + g·cos and sin' = g·sin. The encoder
+// probe uses it for a pe_gate-weighted rotation (docs/FINDINGS.md F-014).
+func (r *Rope) Mix(g float32) *Rope {
+	m := &Rope{cos: make([]float32, len(r.cos)), sin: make([]float32, len(r.sin)), half: r.half, n: r.n}
+	for i := range r.cos {
+		m.cos[i] = 1 - g + g*r.cos[i]
+		m.sin[i] = g * r.sin[i]
+	}
+
+	return m
+}
+
 // HeadDim is the head width the tables rotate.
 func (r *Rope) HeadDim() int { return 2 * r.half }
 
