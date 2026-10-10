@@ -106,9 +106,9 @@ func run(d *decoder.Decoder, ex expander, root *decoder.State, opt Options) (Res
 		pool = append(slices.Clone(pool), alive...)
 	}
 
-	best := slices.MaxFunc(pool, func(a, b *hyp) int { return cmp.Compare(s.score(a), s.score(b)) })
+	best := slices.MaxFunc(pool, func(a, b *hyp) int { return cmp.Compare(s.final(a), s.final(b)) })
 
-	return result(d, best, s.score(best))
+	return result(d, best, s.final(best))
 }
 
 // languageStep starts the hypotheses after the prompt: the forced
@@ -180,6 +180,15 @@ func (s *beam) length(h *hyp) int {
 
 // score is h's normalised ranking score.
 func (s *beam) score(h *hyp) float64 { return h.adj / s.opt.penalty(s.length(h)) }
+
+// final is h's score for the final pick.
+func (s *beam) final(h *hyp) float64 {
+	if s.opt.rankModel {
+		return h.sum / s.opt.penalty(s.length(h))
+	}
+
+	return s.score(h)
+}
 
 // child is h extended by c.
 func (s *beam) child(h *hyp, c cand) *hyp {

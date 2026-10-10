@@ -117,6 +117,14 @@ decoder-probe *args:
 search-probe *args:
     go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbeBeam$' ./internal/search/ {{args}}
 
+# Beam-decode every clip at ladder depths 2..8 against the committed engine --audio-depth transcripts (WHISTLE_PROBE_MISSES)
+depth-probe *args:
+    go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbeDepth$' ./internal/search/ {{args}}
+
+# Score the keyword biasing variants against the committed engine keyword transcripts and report the leader (WHISTLE_PROBE_TOP/KEY)
+keywords-probe *args:
+    go test -tags oracle -count=1 -v -timeout 120m -run 'TestProbeKeywords$' ./internal/search/ {{args}}
+
 # WER of the Go pipeline and of the engine on the LibriSpeech test-clean subset, and how often the transcripts are equal (audio: oracle-librispeech-audio)
 eval-librispeech:
     WHISTLE_EVAL_LIBRISPEECH=1 go test -count=1 -v -timeout 60m -run 'TestEvalLibriSpeech$' ./whistle/

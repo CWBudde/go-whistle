@@ -1895,6 +1895,185 @@ than float32. Over all 152 CQ matrices (`TestWhistleAllMatrices`): 16.63 MB pack
 - The sums run in a different order than the float path's. That changes outputs by about 1e-7 relative, so tests pinned
   bit for bit to the float path need tolerances or new fixtures.
 
+## F-029 — Keyword biasing: an Aho-Corasick bonus of 2 nats per token, revoked on failure (U9) (2026-10-10)
+
+**Question.** U9: the engine biases its decoding toward the words and phrases of a keyword file "through an
+Aho-Corasick automaton" (PLAN.md reference card), but the bonus, its revocation and the spellings it matches are
+closed. `testdata/oracle/keywords` holds the engine's text with and without the file for 53 cases over 19 clips (F-025).
+
+**Automaton.** `search.NewKeywords(tok, keywords, bias)` tokenises every keyword with `RefTokenizer` in the spellings
+`Bias.Forms` selects and builds an Aho-Corasick automaton over the token ids. The vocabulary has no dummy prefix, so
+a word inside the text is spelled `" "+word` (`▁C ow ley ' s`) and the first word of a transcript bare (`C ow ley ' s`);
+`FormSpace` and `FormBare` are these two, and `FormCapital` and `FormLower` add the first letter upper- and lower-cased.
+`internal/tokenizer` needed nothing new. Each node carries φ, the bonus of the partial match since the last completed
+keyword on its path. `Keywords.Adjust` is a `search.Adjust`: it reruns the automaton over a hypothesis' text and adds to
+every next token the change of the hypothesis' bonus:
+
+- a token that advances a match earns `Bias.Weight` (or Weight × its characters under `PerChar`), plus
+  `Bias.Complete` when it completes a keyword;
+- a token that breaks a partial match falls back through the failure links to the longest suffix that is still a
+  keyword prefix and loses `Bias.Revoke` × the bonus of the part it drops; EOS breaks every partial match;
+- a completed keyword's bonus is never taken back.
+
+Every token outside the automaton falls back to the root and gets the same change, so `Adjust` touches the whole row
+once and only the automaton's tokens individually. The bonus enters the adjusted log-probability, which ranks, prunes
+and picks the hypotheses; `Result.LogProbs` stay the model's. Without keywords `search.Beam` is unchanged
+(`just search-probe` still gives 31/32).
+
+**Harness.** `internal/search/keywords_probe_test.go` (build tag `oracle`, `just keywords-probe`) decodes every case
+with `search.Default()` plus the variant's `Adjust`, and ranks the variants by exact equality with the engine's text with
+the keywords, then mean CER and WER. It runs on a memo per clip that keeps each prefix's 16 best tokens by the model and
+the model's log p of every token any variant's automaton holds. A token outside the automaton gets the same change as
+every other such token, so the best candidates after the bias are among those two sets, and the memo is exact (it fails
+if fewer than 6 of the 16 lie outside the automaton). The leader is rerun with the real `Beam`: it gives the memo's
+transcript on 53 of 53 cases. Three grids (`WHISTLE_PROBE_GRID`):
+
+1. 2550 variants on `Default()`: weight 0.25 … 5 per token, or a quarter of that per character, × revocation 0, 0.5,
+   1 × completion bonus 0, 1, 2 × 5 form sets × phrase split or not, and the completion bonus alone (1 … 8);
+2. 576 variants around grid 1's leader: weight 1 … 8 × revocation 0.5, 1 × completion 0, 1 × 3 form sets × the bias
+   as a renormalised logit bias or not × the final pick by the model's score alone or not;
+3. 720 variants: weight 1.5 … 3 × revocation 0.5, 1 × completion 0, 1 × 3 form sets × final pick, on five search rules
+   (Whisper's `StopK`/`AdmitAboveLive` and the F-026 runners-up), each also run without keywords.
+
+**Winner** (exact of 53 against the engine's text with the keywords):
+
+| axis             | winner                                                                 | best alternative per value                                                                             |
+| ---------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| weight           | **2 nats per token**                                                   | 1.75, 2.25, 1.5: 44; 1, 1.25, 2.5: 42; 3, 3.5: 41; 4: 38; 5: 31; 8: 17; per character (¼ of these): 43 |
+| revocation       | **all** (1)                                                            | half: 44; none: 42                                                                                     |
+| completion bonus | **1**, tied by 2 (exact, WER, CER)                                     | 0: 45 at CER 0.0122 (vs 0.0120); 3 … 8 and the completion bonus alone: 34 at best                      |
+| forms            | **after a space and bare, as written, capital and lower first letter** | without lower: 44; without capital: 44; space and bare only: 44; after a space only: 42                |
+| phrases          | **one keyword per line**                                               | each word on its own: 43                                                                               |
+| logit bias       | **no**: the bonus is a score term                                      | renormalised (the normaliser takes the bonus back where the model is sure): 29                         |
+| final pick       | **by the adjusted score**                                              | by the model's score alone, the bias steering only the pruning: 41                                     |
+| search rule      | **Whisper's (`Default()`)**                                            | the others: 44 with keywords and 47/53 without (Whisper's: 50/53)                                      |
+| result           | **45/53**, WER 0.0366, CER 0.0120                                      | no keywords: 27/53 against the text with them                                                          |
+
+`search.DefaultBias()` is the winner: weight 2, revocation 1, completion 1, all four forms, no split.
+
+**Per kind** (the winner; "without" is our search without keywords against the engine's text without them):
+
+| kind       | cases | with keywords: exact | without keywords: exact | our text changed |
+| ---------- | ----- | -------------------- | ----------------------- | ---------------- |
+| present    | 15    | 14                   | 14                      | 1                |
+| missed     | 16    | 13                   | 15                      | 12               |
+| distractor | 8     | 7                    | 8                       | 3                |
+| phrase     | 12    | 10                   | 11                      | 8                |
+| list       | 2     | 1                    | 2                       | 2                |
+| total      | 53    | **45**               | **50**                  | 26               |
+
+The engine's text changes on 24 cases (F-025), ours on 26. Biasing reproduces "Cowley's" from "cowley's" (the
+capitalised form), "transfer" winning against the audio, both words of the German list, "aliviar", "accomunano", "the
+door" and "did it", and leaves "Fisichella", "Sanct" and "continuümmodel" out, each exactly as the engine does.
+
+**The 8 mismatches**, each teacher-forced both ways under the winner (the engine's text in its most likely spelling or
+`RefTokenizer`'s, whichever ranks higher; Default's score with the bonus, per text token):
+
+- 3 cases on `fleurs-pl_pl-10047713455444904767` (`pl-gubernatora-missed`, `pl-dziewietnastu-policjantow-phrase`,
+  `pl-zgodnie-present`), the clip our search already misses without keywords (F-026). Δ −0.0001, −0.0195 (search misses)
+  and a model gap of 0.2087 on a transcript that is not Polish.
+- `it-montagne-distractor`: we take the distractor "montagne", the engine keeps "montagna". Model gap 0.0036 per token,
+  a near-tie.
+- `pl-wysp-missed`: both write "wysp"; the engine also changes "i słynące" to "micłynące" further on. Model gap 0.0125.
+- `fr-cristaux-renale-declare-list`: we write "rénale" from the list, the engine keeps "régionale". Model gap 0.0247.
+- `de-diese-paare-phrase`: the engine writes "Diese Paare … Adoptionsplan", although "Adoptionsplan" is not a keyword;
+  ours keeps "Adduktionsplan". After "Diese Paare" our model puts "Adoptionsplan" 2.4 nats below "Adduktionsplan"
+  (model gap 0.0641 per token), so no bias on the keyword reproduces it: a model gap.
+- `de-paare-missed`: the mirror case. The engine writes "Paare … Adduktionsplan", ours "Paare … Adoptionsplan", although
+  the engine's text ranks 0.0688 per token higher under our model and bias: a search miss. The step trace shows why:
+  "Adoptionsplan" is one token shorter, so three weaker hypotheses spelling it reach EOS one step before the leader. All
+  of them carry the same +7 keyword bonus, so they rank above the last live hypothesis, Whisper's rule admits them, and
+  with two more EOS candidates the search has its 5 finished hypotheses before the leader ends. The HF admission rule
+  (EOS only among the step's best 5) avoids it here, but loses 3 cases without keywords (grid 3), so the engine does not
+  run it.
+
+**Accept: not met.** With keywords our transcripts equal the engine's on 45 of 53 cases (84.9 %); without keywords on 50
+of 53 (94.3 %), and the reference rate is 31 of 32 clips (96.9 %, F-026). Leaving out the 3 cases on the clip we
+already miss without keywords: 45 of 50 (90 %). Four of the five other mismatches are near-ties or model gaps (two of
+them 2.4-nat gaps on the German pair); one is a search miss our search rules cannot avoid without losing parity
+elsewhere. No variant in 3846 reaches 46.
+
+**Speed.** 72 ms per case with keywords against 61 ms without (F-026), M5 Pro; the automaton is rerun over the text of
+every live hypothesis at every step.
+
+**Fast regression.** `TestKeywordsMatchEngine` (no tag, skips without `models/`): a lower-cased missed name the engine
+writes capitalised, a distractor that loses and one that wins, and the German list, each with the engine's text, its
+change against the run without keywords and a ranking score above floors just below the measured values.
+`TestKeywordBonus` and `TestKeywordAdjust` pin the bonus rules on token ids (no model).
+
+## F-030 — The depth ladder: upstream's sub-network, lanes by position (2026-10-10)
+
+**Question.** The engine's `--audio-depth N` (help: "endpoint-preserving ladder depth of the speech decoder (2..full;
+default full)") runs N of the 8 decoder layers. Which layers, and how do the mHC lanes, the engram sites and the final
+norm behave when layers are skipped? `testdata/oracle/depth` holds the engine's transcripts at depths 2–7 for the 32
+clips (F-025); depth 8 is the default.
+
+**Upstream.** `architecture.py` defines the ladder for training nested sub-networks:
+
+- `_ladder_layer_order(8)` = 0, 7, 3, 5, 1, 2, 4, 6: both endpoints, then the middle of the largest gap, the leftmost
+  of equal gaps. `ladder_layer_indices(depth)` takes the first `depth` of it, sorted: d2 {0, 7}, d3 {0, 3, 7}, d4 {0, 3,
+  5, 7}, d5 {0, 1, 3, 5, 7}, d6 {0, 1, 2, 3, 5, 7}, d7 {0, 1, 2, 3, 4, 5, 7}.
+- `Stack` with `exit_depth` (`subnetwork_only`) runs a layer whose rank is below the depth with its own weights and
+  passes the stream on unchanged for the others. An active layer's lane is its position among the active layers:
+  `sub_positions = cumsum(active) − 1`, `sub_lane = one_hot(sub_positions mod 4)`, so `pre_off` and `post_off` follow
+  the position, not the layer index. `ladder_slice`/`ladder_config` give the same network as a standalone model:
+  the selected layers renumbered 0 … N−1 (hence lanes by position), the engram sites remapped to the new indices,
+  `final_norm` kept.
+- The engram site flags stay on the original layers 3 and 7, so a site acts only when its layer runs.
+
+**Port.** `decoder.LadderOrder` and `decoder.LadderLayers` port the two functions. `(*Decoder).WithDepth(n)` returns a
+decoder that shares the weights, runs `LadderLayers(8, n)` in order and gives the i-th of them the lane offsets of lane
+i mod 4 (`needle.MHC.WithLane`, additive). Skipped layers leave the stream as it is, an engram site acts only at an
+active layer, and the final norm and the head stay. The encoder always runs all 8 layers. A `Memory` serves every depth;
+`WithDepth(8)` equals the decoder logit for logit (`TestWithDepth`). Greedy decoding and `search.Beam` both run on it.
+
+**Harness.** `internal/search/depth_probe_test.go` (build tag `oracle`, `just depth-probe`) beam-decodes the 32 clips
+with `search.Default()` at every depth and compares with the engine's text at that depth. Each mismatch is
+teacher-forced both ways, as in F-026: the engine's text in its most likely spelling against ours, by Default's ranking
+score per text token. It is a search miss when the engine's text ranks higher under our model, otherwise a model gap of
+Δ.
+
+**Variants** (exact of 32 at depths 2 / 3 / 4 / 5 / 6 / 7; measured with a temporary switch in `WithDepth`, not kept):
+
+| mHC lane of the i-th active layer (layer l)   | d2     | d3     | d4     | d5     | d6     | d7     | d8     |
+| --------------------------------------------- | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+| **i mod 4 (upstream's sub-network)**          | **24** | **27** | **29** | **29** | **28** | **24** | **31** |
+| l mod 4 (the layer keeps its full-depth lane) | 13     | 10     | 15     | 15     | 22     | 23     | 31     |
+| i mod 4, but the last layer keeps l mod 4 = 3 | 13     | 9      | 29     | 21     | 23     | 23     | 31     |
+| (N − 1 − i) mod 4 (a control)                 | 5      | 6      | 8      | 13     | 3      | 5      | 4      |
+
+Lanes by position win at every depth; at d4 the last variant coincides with it (layer 7 is the fourth active layer).
+The engine's own text at depth N equals its full-depth text on only 7 / 11 / 11 / 16 / 15 / 19 of 32 clips, so the
+match rates above are not inherited from the full depth.
+
+**Result** (`search.Default()` on `WithDepth`, M5 Pro):
+
+| depth | layers              | beam exact | WER    | CER    | greedy exact | search misses | model gaps (max Δ) | engine = its full depth | beam ms per clip |
+| ----- | ------------------- | ---------- | ------ | ------ | ------------ | ------------- | ------------------ | ----------------------- | ---------------- |
+| 2     | 0, 7                | 24/32      | 0.0426 | 0.0131 | 18/32        | 2             | 6 (0.0116)         | 7/32                    | 25               |
+| 3     | 0, 3, 7             | 27/32      | 0.0312 | 0.0110 | 18/32        | 1             | 4 (0.0277)         | 11/32                   | 31               |
+| 4     | 0, 3, 5, 7          | 29/32      | 0.0051 | 0.0015 | 19/32        | 1             | 2 (0.0022)         | 11/32                   | 37               |
+| 5     | 0, 1, 3, 5, 7       | 29/32      | 0.0047 | 0.0015 | 22/32        | 0             | 3 (0.0025)         | 16/32                   | 43               |
+| 6     | 0, 1, 2, 3, 5, 7    | 28/32      | 0.0065 | 0.0040 | 20/32        | 1             | 3 (0.0288)         | 15/32                   | 46               |
+| 7     | 0, 1, 2, 3, 4, 5, 7 | 24/32      | 0.0254 | 0.0088 | 21/32        | 3             | 5 (0.0155)         | 19/32                   | 54               |
+| 8     | all                 | 31/32      | 0.0208 | 0.0085 | 22/32        | 1             | 0                  | 32/32                   | 59               |
+
+**The mismatches** (31 over depths 2–7) are all near-ties: 23 model gaps of at most 0.0288 nats per text token (median
+0.0025), where our model ranks our transcript higher, and 8 search misses of at most 0.0196 per token. No search rule
+can fix a model gap. The differences are a comma, a capital ("Free State" / "free state"), a quote, one word ("cannot"
+/ "could not", "Teil und" / "Teilen"), or a syllable in the FLEURS clips the engine already garbles. A truncated decoder
+is less sure of itself, so more of its choices are near-ties, and the engine's W2A8 numerics flip them; at full depth
+the one mismatch has Δ 0.0093.
+
+**Accept: not met.** The rate at full depth is 31/32 (96.9 %). At depths 2–7 our transcripts equal the engine's on 24,
+27, 29, 29, 28 and 24 of 32 (75 %–90.6 %, 161 of 192 = 83.9 % overall). Every mismatch is a near-tie of at most 0.029
+nats per token. The ladder itself is settled by the variant table; the remaining gap is numeric, so the W2A8 path
+(Phase 9) is the place to close it.
+
+**Fast regression.** `TestDepthMatchesEngine` (no tag, skips without `models/`): three short clips at depths 2 and 4
+whose engine text differs from the full depth's, each reproduced exactly with a ranking score above floors just below
+the measured values. `TestLadderOrder` pins the port against upstream's output for 1, 2, 3, 5, 8 and 12 layers.
+
 ## F-031 — The silence gate, beam search in `Transcribe`, and the LibriSpeech check (U10) (2026-10-10)
 
 **Question.** U10: by which measure and threshold does the engine decide that a clip is silence and return the empty
