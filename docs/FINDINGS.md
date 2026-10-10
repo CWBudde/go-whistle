@@ -1492,6 +1492,113 @@ safetensors). The rest is the 5-beam search and the engine's W2A8 arithmetic, wh
 (LibriSpeech test-other and test-clean, FLEURS de). It requires the engine's language and text exactly, and the
 teacher-forced mean log-probability above floors just below the measured −0.0880 / −0.0548 / −0.0652.
 
+## F-025 — The decoding oracle corpus: depth, keywords, silence, limits, LibriSpeech (2026-10-10)
+
+**Purpose.** Phase 6 needs engine output beyond the 32 default transcripts: truncated ladders (6.4), keyword biasing
+(6.3), where the engine returns the empty JSON (6.6), the length limits (6.5) and a LibriSpeech subset for WER (6.6).
+Five `tools/oracle` subcommands record them, one `just` recipe each.
+
+**CLI, not the library.** Every recipe runs the `needle` CLI with `--audio-word-timestamps --threads 4`, the flags of
+the existing fixtures plus the thread pin. Only the CLI has `--audio-depth`: `needle_transcribe` takes language,
+keywords and word timestamps, but no depth. The CLI also gives every set the same normalised JSON as
+`testdata/oracle/<clip>.json` (`normaliseJSON`: timing fields dropped, keys sorted, values verbatim). Synthetic signals
+are written as 32-bit float WAVs, so the CLI reads exactly the float32 samples that `pcm_sha256` names. The silence
+and limits recipes also run `needle_transcribe` (libneedle3 via purego, `word_timestamps` 1) on the same samples. Its
+JSON equals the CLI's on all 320 sweep signals (the run fails otherwise) and on all 19 limit signals the CLI
+accepts. The two differ only at 0 samples (below). The engine prefixes CLI errors with `argv[0]`, so the tool runs
+the CLI as `needle` from the temp directory that holds the WAV, which keeps the messages free of paths.
+
+**Determinism.** 1, 2, 3, 4 and 8 threads give byte-identical JSON on all 32 clips. The default is "the device's fast
+cores, at most 4" (4 here); the pin only fixes the configuration across machines. Every recipe was run twice, and the
+second run left `git status` clean. The same holds for `oracle-run` and `oracle-probes` after the shared changes
+(thread pin, WAV writer, `probe.Spec` fields). The LibriSpeech audio was also fetched a second time, with the first
+copy moved aside: identical WAVs, identical `subset.json`.
+
+**Layout and size.** Each set has a `manifest.json` and one `transcripts.json`. The latter is an object keyed by fixture
+name whose values are the objects a per-clip `<name>.json` would hold. One file per transcript was the first layout:
+843 files, 1.47 MB of content, but 3.8 MB on disk, since the file system rounds every file up to a 4 KiB block. Now:
+
+| set (`testdata/oracle/`) | recipe                                                   | content                                                                   | files | bytes     | `du -sk` |
+| ------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------- | ----- | --------- | -------- |
+| `depth/`                 | `oracle-depth`                                           | 32 clips × depth 2–7                                                      | 2     | 353,800   | 348      |
+| `keywords/`              | `oracle-keywords`                                        | 53 cases over 19 clips, 7 languages: keyword file + transcript with it    | 55    | 142,170   | 356      |
+| `silence/`               | `oracle-silence`                                         | 320 signals: parameters, digest, empty or not, text (manifest only)       | 1     | 197,254   | 196      |
+| `limits/`                | `oracle-limits`                                          | 22 signals: CLI exit and stderr, `needle_transcribe` code and error, JSON | 2     | 22,503    | 24       |
+| `librispeech/`           | `oracle-librispeech` (audio: `oracle-librispeech-audio`) | 200 utterances: `subset.json` (ids, SHA-256, reference) + engine JSON     | 3     | 652,567   | 644      |
+| total                    |                                                          |                                                                           | 63    | 1,368,294 | 1,568    |
+
+**Depth.** `--audio-depth 8` is byte-identical to the default on 32/32 clips (`oracle depth` re-checks it on every run),
+so 8 is the full ladder. The CLI refuses 1 ("--audio-depth takes a layer count of 2 or more, not "1"") and fails to
+load the model at 9. Clips whose text equals the full-depth text: depth 2 7/32, 3 11/32, 4 11/32, 5 16/32, 6 15/32, 7
+19/32. Not monotone, so 6.4 compares per depth.
+
+**Keywords.** Cases are derived from the reference transcripts and the engine's own text. `oracle keywords` checks
+each kind against both (`checkKind`) and re-checks the run without keywords byte for byte against
+`testdata/oracle/<clip>.json`, which the manifest names as `without`. A keyword "hits" a text when its words occur
+consecutively in it after lower-casing and splitting at non-letters (apostrophes kept).
+
+| kind       | definition                                      | cases | text changed | all keywords hit with the file |
+| ---------- | ----------------------------------------------- | ----- | ------------ | ------------------------------ |
+| present    | a reference word the engine already writes      | 15    | 1            | 15                             |
+| missed     | a reference word the engine's text lacks        | 16    | 11           | 9                              |
+| distractor | a plausible word in neither text                | 8     | 2            | 2                              |
+| phrase     | a multi-word reference phrase                   | 12    | 8            | 8 (1 already before)           |
+| list       | several reference words and phrases in one file | 2     | 2            | 1                              |
+
+Biasing is strong but bounded. "Cowley's" (lower case too), "Paare", "Adoptionsplan", "aliviar", "accomunano", "the
+door" and "did it" appear. Two distractors win against the audio ("transfer" for "chance", "luchadoras"). Names far
+from the acoustics do not appear ("Fisichella", "Sanct", "gubernatora", "continuümmodel"). A file changes words
+outside its keywords too: "de-paare" keeps "Adduktionsplan", while the two-word list fixes both. 6.3 tunes against
+this mix.
+
+**Silence sweep.** `probe.SilenceSet` (new kinds `pink`, `step`, `speech`; `quantize16`) over two clips,
+`ls-clean-1320-122617-0003` (en) and `fleurs-de_de-10308608197319017935` (de). The manifest records every parameter
+exactly (linear gains and σ as float64, clip WAV digests, seeds), so the Go side regenerates each signal with
+`Spec.SignalWith` and checks `pcm_sha256`. Sums of products in the generator carry explicit `float64` conversions,
+so no architecture fuses them into an FMA. The Gaussian stream uses `math.Log`, `Sin` and `Cos`, as the F-019 probes
+do; the signals were generated on arm64, and a different last bit elsewhere would show as a digest mismatch.
+159 of 320 signals return exactly the empty JSON. Transitions (last non-empty, first empty):
+
+| family                                                     | result                                                                                                      |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| digital silence, 160 … 480,000 samples                     | always empty                                                                                                |
+| white noise −120 … 0 dBFS (10 dB steps), pink −120 … 0     | always empty: no absolute level opens the gate                                                              |
+| −40 dBFS white noise, middle second (25 %) +Δ dB louder    | Δ ≤ 2.65 empty, Δ ≥ 2.70 "Thank you." (0.05 dB steps)                                                       |
+| the same at −80 and −10 dBFS                               | Δ ≤ 2.6 empty, Δ ≥ 2.7: the threshold is a level ratio, not a level                                         |
+| middle second Δ dB quieter                                 | Δ ≥ −3.25 empty, Δ ≤ −3.5 not                                                                               |
+| +10 dB section of w samples in 64,000                      | w ≤ 480 empty, 560 … 57,600 not, ≥ 58,240 (91 %) empty: a spread between a high and a low percentile        |
+| speech × gain, float, 0 … −120 dB                          | never empty; text unchanged to −100 (en) / −90 (de), hallucinated below: an absolute floor in the front end |
+| speech × gain on the 16-bit grid                           | en: −87 dB "Thank you.", −87.5 empty; de: −82.5 not, −83 empty (0.5 dB steps)                               |
+| speech + white noise, σ = clip RMS · 10^(−SNR/20)          | en: −9.75 dB not, −10 empty; de: −15 not, −15.25 empty (0.25 dB steps)                                      |
+| speech padded with 1, 5, 10 s each side, 23 s before/after | never empty                                                                                                 |
+
+So the gate compares levels within the clip: steady signals at any level are silent, a 2.7 dB step of a quarter of
+the clip is not, and a 10 dB louder section opens it only while it covers between about 0.8 % (560 samples) and 90 %
+of the clip. 6.6 fits the measure and the threshold to these rows.
+
+**Limits** (`probe.LimitSet`; speech excerpts start 2 s into the en clip):
+
+| input                              | CLI                                             | `needle_transcribe`                                |
+| ---------------------------------- | ----------------------------------------------- | -------------------------------------------------- |
+| 0 samples                          | exit 1, `needle: silence-0.wav holds no audio`  | rc 0, exactly the empty JSON                       |
+| 1 sample (silence or speech) … 161 | the empty JSON                                  | the same                                           |
+| 1279, 1280, 1281 samples of speech | "you"                                           | the same                                           |
+| 480,000 samples                    | silence: the empty JSON; speech: its transcript | the same                                           |
+| 480,001 samples (silence, speech)  | exit 1, `needle: audio limit is 30 s`           | rc −1, `needle_last_error` = `audio limit is 30 s` |
+
+The limit is inclusive, and the length check runs before the silence gate. The CLI refuses an empty WAV; the
+library treats 0 samples as silence.
+
+**LibriSpeech subset.** `oracle librispeech-audio` streams all of `test-clean.tar.gz` (346,663,984 bytes, SHA-256
+`39fde525…6c23`, pinned in `lsArchiveSHA256`; about 45 s) and keeps, per speaker, the 5 utterances of at most 480,000
+samples with the smallest SHA-256 of `"go-whistle 6.1/<utterance id>"`. The rule does not depend on the tar order
+(`TestSelectSubset` reverses it). 40 speakers × 5 = 200 utterances, 1.49–28.41 s (mean 7.75 s), 4167 reference words.
+The WAVs go to `models/corpus/librispeech/` (git-ignored); `subset.json` holds ids, members, sample counts, WAV SHA-256
+and references. `oracle librispeech` fetches the audio when a WAV is missing or differs, and a re-fetch must reproduce
+the committed `subset.json`. The engine's WER on the subset is 221/4167 = 5.30 % (103 utterances without a word error),
+normalised by upper-casing and punctuation removal only. Upstream's 4.31 % is over all of test-clean with a fuller
+normaliser; 6.6 computes both sides with one.
+
 ## F-027 — The public pipeline: the engine's JSON, the 30 s limit and its timing (2026-10-10)
 
 **Question.** What exactly does the engine print for a transcript, so that `whistle.Result` can match it byte for
@@ -1582,3 +1689,113 @@ Phase 5 count on the F-020 encoder. `Embed` (PLAN.md 8.2) is `encoder.Embed` beh
 
 **Safetensors.** The checkpoint has no tokenizer (F-007). `Load` takes it from `whistle.cact` next to the file, or
 from `WithVocabulary(path)`. If neither exists, it fails with a message that names `WithVocabulary`.
+
+## F-028 — CQ GEMV in the rotated domain, straight from the packed `.cact` (2026-10-10)
+
+**Question.** Can a linear layer multiply by a CQ matrix without dequantising it, and how fast is that in pure Go?
+Which Whistle tensors can use it as stored?
+
+**Maths.** `cact.CQ` dequantises row r, group g as w = H · c · n / √G, with c the addressed codebook levels, n the FP16
+norm and H the ±1 Sylvester matrix (F-004). H is symmetric, so w · x_g = n · (c · x̂_g) with x̂_g = H · x_g / √G. A
+product therefore rotates each 128-wide group of the activation once (FWHT-128 and the 1/√G scale) and is then a
+gather-and-accumulate over the packed indices, scaled by one norm per group. Padding columns past `In` get zeros in
+x, which drops them as `CQ` does.
+
+**Code.** `cact.File.CQPacked(i)` returns a CQ record as stored: the index bitstream and the FP16 norms (both alias
+the file data), the record and index widths, the group, the shape and the codebook `CQ` uses. `cq.New` builds a
+`Matrix` from it for 2 and 4 bits; it keeps the index bytes and widens the norms to float32 once. `GEMV(dst, x)` and
+`GEMM(dst, x, rows)` compute y = W · x. `Rows(lo, hi)` is a view of a row range, and `Row(dst, r)` dequantises one row
+with `CQ`'s arithmetic, bit for bit. `internal/cq` has its own copy of the FWHT, because 9.4 will vectorise the
+activation side.
+
+**Kernels** (pure Go, no assembly):
+
+| kernel             | per index byte                                                                                    | role                             |
+| ------------------ | ------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `gather`           | decode each index, `cb[idx] · x̂[k]`                                                               | reference                        |
+| `nibble`           | two lookups in 16-entry tables built per activation, one per index nibble (2 bits: an index pair) | GEMV, and GEMM rows left over    |
+| `nibble4`          | the same tables for four activations interleaved: one index decode feeds four adjacent entries    | GEMM, four activations at a time |
+| byte LUT, rejected | one lookup in a 256-entry table per index byte, built from the two nibble tables per activation   | removed                          |
+
+The nibble kernels read eight index bytes as one little-endian word and the tables through fixed-size array pointers, so
+a word costs one bounds check. On arm64 a lookup is then about three integer instructions, one load and a float add. The
+byte table saves half the lookups but costs 256 entries per index byte to build and leaves L1 (128 KB for a 512-wide CQ2
+row). In one 0.2 s run before its removal, it won only on `pw1` (40.4 vs 47.4 µs) and lost everywhere else, e.g. 24.2 vs
+19.4 µs on `q_proj`, 151 vs 58 µs on `phi_res` and 728 vs 658 µs on the head. So `best()` is `nibble4`, which runs
+`nibble` for fewer than four rows.
+
+**Which tensors qualify.** All 152 CQ records of `whistle.cact` (145 CQ2, 7 CQ4, group 128) are stored `[out, in]`.
+That is the orientation the float path multiplies by (`internal/needle` `linear` → `MatMulTransB(dst, out, x, w, …)`),
+so the kernel needs no transform at run time. `Entry.Transform` maps safetensors to `.cact`; the stored bytes already
+include it:
+
+- `transpose` (143 Flax Dense kernels: q/k/v/gate/out of the self- and cross-attentions, `pw1`, `pw2`, the engram
+  `key_proj`/`value_proj`, `stem.pw_1`, `stem.pw_2`, `stem.out`): `GEMV`/`GEMM` as they are.
+- `lane-major` (the six mHC φ): the stored `(L·lanes, n·C)` stacks all layers. Layer l is `Rows(4l, 4l+4)` for
+  φ_pre/φ_post and `Rows(16l, 16l+16)` for φ_res, the slices `mhc.go` takes (`TestWhistlePhiRows`).
+- `reshape` (`embedding`, the two engram tables): the tied head is `GEMV`/`GEMM` over the 8199 embedding rows. The
+  input embedding and the engram tables are row gathers, which `Row` serves without dequantising the rest.
+
+1-bit, 3-bit and ternary records do not occur in Whistle, and `New` rejects them. The safetensors backend has no packed
+form, so it keeps the float path.
+
+**Accuracy** (`TestWhistleGEMM`): each kernel against `cact.CQ(i)` followed by `tensor.MatMulTransB`, on five
+activation rows (four Gaussian, one Gaussian cubed for heavy tails), so `nibble4` runs one block of four plus one
+leftover row. The worst of the five rows:
+
+| tensor                   | CQ  | shape   | rows    | float NEON | float purego | `gather` | `nibble` | `nibble4` | MB float32 | MB packed |
+| ------------------------ | --- | ------- | ------- | ---------- | ------------ | -------- | -------- | --------- | ---------- | --------- |
+| k_proj (96, 512) CQ2     | 1   | 1.84 µs | 8.88 µs | 50.8 µs    | 7.25 µs      | 7.29 µs  | 0.197    | 0.0138    |
+| q_proj (384, 512) CQ2    | 1   | 7.70 µs | 34.4 µs | 204 µs     | 20.2 µs      | 20.1 µs  | 0.786    | 0.0553    |
+| out (512, 512) CQ2       | 1   | 10.6 µs | 45.9 µs | 274 µs     | 25.6 µs      | 25.8 µs  | 1.049    | 0.0737    |
+| pw1 (1024, 512) CQ2      | 1   | 22.8 µs | 91.7 µs | 601 µs     | 49.7 µs      | 50.2 µs  | 2.097    | 0.1475    |
+| stem.out (512, 1280) CQ2 | 1   | 28.1 µs | 127 µs  | 651 µs     | 61.2 µs      | 61.5 µs  | 2.621    | 0.1843    |
+| phi_res (128, 2048) CQ4  | 1   | 9.69 µs | 52.3 µs | 264 µs     | 55.8 µs      | 55.6 µs  | 1.049    | 0.1393    |
+| head (8199, 512) CQ4     | 1   | 192 µs  | 748 µs  | 4.19 ms    | 653 µs       | 652 µs   | 16.79    | 2.230     |
+| q_proj (384, 512) CQ2    | 5   | 20.4 µs | 173 µs  | 982 µs     | 96.1 µs      | 76.9 µs  | 0.786    | 0.0553    |
+| head (8199, 512) CQ4     | 5   | 464 µs  | 3.71 ms | 20.9 ms    | 3.27 ms      | 2.33 ms  | 16.79    | 2.230     |
+| q_proj (384, 512) CQ2    | 375 | 1.21 ms | 12.9 ms | 73.4 ms    | 7.22 ms      | 5.43 ms  | 0.786    | 0.0553    |
+
+The Accept asks for cosine ≥ 0.99999, i.e. 1 − cos ≤ 1e-5. The worst kernel is almost eight orders of magnitude below
+it: both sides compute the same product in float32, in a different order. The largest |Δ| is 5.7e-7 of max |y| (5.4e-7
+for `nibble4`). `Row` equals `CQ`'s rows bit for bit. On random matrices (`TestKernels`, groups 8 to 128, every padding
+case), every kernel stays within the float32 bound γ(In + log2 G + 8) · Σ_g n · Σ_k |cb| · Σ_j |x_j| / √G of a float64
+reference built with the explicit Hadamard matrix.
+
+**Speed** (`BenchmarkGEMM`, Apple M5 Pro, `-cpu 1`, mean of 3 × 0.5 s, random packed matrices of each shape). The
+float baseline is `tensor.MatMulTransB` on the dequantised matrix: the NEON kernel by default, the Go loop under
+`-tags purego`. The CQ kernels are pure Go in both builds.
+
+| shape                    | rows | float NEON | float purego | `gather` | `nibble` | `nibble4` | MB float32 | MB packed |
+| ------------------------ | ---- | ---------- | ------------ | -------- | -------- | --------- | ---------- | --------- |
+| k_proj (96, 512) CQ2     | 1    | 1.78 µs    | 10.1 µs      | 49.8 µs  | 7.03 µs  | 7.14 µs   | 0.197      | 0.0138    |
+| q_proj (384, 512) CQ2    | 1    | 7.54 µs    | 36.6 µs      | 198 µs   | 19.5 µs  | 19.9 µs   | 0.786      | 0.0553    |
+| out (512, 512) CQ2       | 1    | 10.6 µs    | 46.7 µs      | 282 µs   | 26.6 µs  | 27.3 µs   | 1.049      | 0.0737    |
+| pw1 (1024, 512) CQ2      | 1    | 23.6 µs    | 92.8 µs      | 562 µs   | 49.6 µs  | 49.9 µs   | 2.097      | 0.1475    |
+| stem.out (512, 1280) CQ2 | 1    | 26.8 µs    | 128 µs       | 700 µs   | 64.8 µs  | 64.3 µs   | 2.621      | 0.1843    |
+| phi_res (128, 2048) CQ4  | 1    | 10.3 µs    | 52.8 µs      | 283 µs   | 59.9 µs  | 60.7 µs   | 1.049      | 0.1393    |
+| head (8199, 512) CQ4     | 1    | 206 µs     | 749 µs       | 4.22 ms  | 653 µs   | 656 µs    | 16.79      | 2.230     |
+| q_proj (384, 512) CQ2    | 5    | 20.3 µs    | 186 µs       | 995 µs   | 96.2 µs  | 77.2 µs   | 0.786      | 0.0553    |
+| head (8199, 512) CQ4     | 5    | 470 µs     | 3.72 ms      | 21.1 ms  | 3.27 ms  | 2.33 ms   | 16.79      | 2.230     |
+| q_proj (384, 512) CQ2    | 375  | 1.21 ms    | 13.0 ms      | 73.9 ms  | 7.23 ms  | 6.25 ms   | 0.786      | 0.0553    |
+
+Pure Go against pure Go, `nibble4` is 1.15× (head) to 2.4× (375 encoder frames) faster than the float loop on every
+shape except the CQ4 φ_res, where it is 1.06× slower. Against the NEON float GEMM it is 2.2× (stem.out, pw1) to 5.7×
+(φ_res) slower: the float kernel does four FMAs per vector instruction, while the lookups are scalar. Batching four
+activations saves 20 % (q_proj, 5 rows) to 29 % (head, 5 rows) against `nibble`, because the index decode is shared.
+
+**Memory.** "MB packed" is `Matrix.Bytes`: the index bytes, the float32 norms and the codebook. Per weight this is
+2.25 bits for CQ2 and 4.25 for CQ4 (the file's 2.125 and 4.125 plus the widened norms), i.e. 14.2× and 7.5× less
+than float32. Over all 152 CQ matrices (`TestWhistleAllMatrices`): 16.63 MB packed against 218.77 MB as float32
+(13.2×). The index bytes alias the `.cact` data, so with an mmap-ed file only the norms (1.7 MB) are new heap.
+
+**Consequences for 9.2.**
+
+- `weights.Source` needs a way to hand out `cact.Packed` (for example an optional interface on the `.cact` backend), and
+  the linear call sites need to call `Matrix.GEMM` when a tensor is packed. Every site multiplies by `[out, in]`
+  already; φ needs `Rows`, and the embedding and engram gathers need `Row`.
+- Single-threaded, the packed path is slower than today's NEON float path on every shape. It wins only on memory (13×).
+  9.4 (a NEON LUT kernel, for example vector loads of the four interleaved entries of `nibble4`, or `TBL` lookups in
+  8-bit tables) and 9.5 have to recover the speed.
+- The sums run in a different order than the float path's. That changes outputs by about 1e-7 relative, so tests pinned
+  bit for bit to the float path need tolerances or new fixtures.

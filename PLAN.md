@@ -721,19 +721,45 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
 
 ### 6.1 Decoding oracle corpus (`tools/oracle`, `testdata/oracle/`, `justfile`)
 
-- [ ] Depth runs: engine transcripts at `--audio-depth 2..7` for the 32 fixture clips (`testdata/oracle/depth/`).
-- [ ] Keyword runs (`testdata/oracle/keywords/`): per case a keyword file and the transcript with and without it. Cases:
+- [x] Depth runs: engine transcripts at `--audio-depth 2..7` for the 32 fixture clips (`testdata/oracle/depth/`).
+      (2026-10-10) — `just oracle-depth`: 192 transcripts in `depth/transcripts.json` (`<clip>.d<N>`). Each run
+      re-checks that `--audio-depth 8` equals `testdata/oracle/<clip>.json` byte for byte (32/32); 1 is refused, 9
+      fails to load. Text equal to the full depth: d2 7, d3 11, d4 11, d5 16, d6 15, d7 19 of 32 (F-025).
+- [x] Keyword runs (`testdata/oracle/keywords/`): per case a keyword file and the transcript with and without it. Cases:
       a word the engine already gets right, a word it misses against the reference transcript, a wrong but plausible
       word, a multi-word phrase.
-- [ ] Silence sweep (`testdata/oracle/silence/`), signals from `tools/oracle/probe`: digital silence of several
+      (2026-10-10) — `just oracle-keywords`: 53 cases over 19 clips in all 7 languages (15 present, 16 missed, 8
+      distractor, 12 phrase, 2 lists), each a `<case>.txt` plus its transcript in `transcripts.json`; without is the
+      committed `testdata/oracle/<clip>.json`, re-checked byte for byte. Each kind is checked against the reference and
+      the engine's text. The text changes on 24 cases; 9 of 16 missed words appear, 2 of 8 distractors win (F-025).
+- [x] Silence sweep (`testdata/oracle/silence/`), signals from `tools/oracle/probe`: digital silence of several
       lengths, white/pink noise at several levels, a speech clip attenuated in steps down to −90 dBFS, speech padded
       with long silence. Record whether the engine returns the empty JSON.
-- [ ] Limits (`testdata/oracle/limits/`): 480,000 vs 480,001 samples (the exact error text), 0 and a handful of samples.
-- [ ] LibriSpeech test-clean subset (`testdata/oracle/librispeech/`): about 200 utterances, seeded and spread over the
+      (2026-10-10) — `just oracle-silence`: 320 signals of `probe.SilenceSet` (new kinds pink, step, speech with gain,
+      padding, noise, 16-bit grid); every parameter exact in the manifest plus the samples' SHA-256. 159 return exactly
+      the empty JSON; `needle_transcribe` agrees with the CLI on all 320. Silence of any length and steady white or pink
+      noise at any level: empty. Empty until a noise step of +2.65 dB (+2.70 opens) at −80, −40 and −10 dBFS alike; a
+      +10 dB section opens it from 560 samples to 90 % of the clip; 16-bit speech empty from −87.5 dB (en) / −83 dB
+      (de); SNR empty from −10 dB (en) / −15.25 dB (de); exact float gain and padding never empty (F-025).
+- [x] Limits (`testdata/oracle/limits/`): 480,000 vs 480,001 samples (the exact error text), 0 and a handful of samples.
+      (2026-10-10) — `just oracle-limits`, CLI and `needle_transcribe`: 480,000 samples transcribe; 480,001 give CLI
+      exit 1 `needle: audio limit is 30 s` and rc −1 with `needle_last_error` `audio limit is 30 s`, for silence too
+      (the length check precedes the silence gate). 0 samples: CLI exit 1 `needle: <file> holds no audio`, library rc 0
+      and the empty JSON. 1–161 samples of speech: the empty JSON; 1279–1281: "you" (F-025).
+- [x] LibriSpeech test-clean subset (`testdata/oracle/librispeech/`): about 200 utterances, seeded and spread over the
       speakers, with ids, SHA-256, reference text and the engine JSON. The audio stays git-ignored under
       `models/corpus/` and a `just` recipe fetches it.
-- [ ] **Accept:** every `just oracle-*` recipe regenerates its fixtures deterministically (a re-run leaves no diff), and
+      (2026-10-10) — `just oracle-librispeech-audio` streams all of test-clean (archive SHA-256 pinned) and keeps per
+      speaker the 5 utterances ≤ 30 s with the smallest SHA-256 of `"go-whistle 6.1/<id>"`: 40 × 5 = 200, 1.5–28.4 s,
+      WAVs in `models/corpus/librispeech/`, `subset.json` with ids, SHA-256 and references. `just oracle-librispeech`
+      fetches when needed and records the engine JSON; engine WER 221/4167 = 5.30 % with upper-casing and punctuation
+      removal only (F-025).
+- [x] **Accept:** every `just oracle-*` recipe regenerates its fixtures deterministically (a re-run leaves no diff), and
       the repo grows by less than 2 MB.
+      (2026-10-10) — Each new recipe run twice, `git status` clean after the second run; `oracle-clips`, `oracle-run`
+      and `oracle-probes` re-run with no diff; the LibriSpeech audio re-fetched byte-identically. The five sets hold
+      1,368,294 bytes in 63 files, `du -sk` 1568 (one `transcripts.json` per set instead of 843 small files, which
+      took 3.8 MB in 4 KiB blocks) (F-025).
 
 ### 6.2 Beam search (`internal/search`, `internal/decoder`, `internal/needle`)
 
@@ -837,10 +863,22 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 
 ## Phase 9 — Native quantised path & performance
 
-- [ ] 9.1 CQ LUT GEMV kernel (`internal/cq`, plus an additive raw-blob accessor in `internal/cact`): a 2/4-bit LUT GEMV
+- [x] 9.1 CQ LUT GEMV kernel (`internal/cq`, plus an additive raw-blob accessor in `internal/cact`): a 2/4-bit LUT GEMV
       in the rotated (Hadamard) domain. Apply FWHT-128 to the activation groups once and multiply by the codebook
       values, instead of dequantising the weights. Pure Go. **Accept:** equal to dequantise + GEMV at cosine
       ≥ 0.99999 on real `.cact` tensors, with a benchmark against the float GEMV.
+      (2026-10-10) — `cact.File.CQPacked` returns a CQ record as stored (index bitstream and FP16 norms aliasing the
+      file, widths, group, shape, codebook); `TestWhistleCQPacked` decodes all 152 records from it to exactly `CQ`.
+      `cq.Matrix` (`New`, `GEMV`, `GEMM`, `Rows`, `Row`) rotates each activation group once by FWHT-128 / √128 and
+      sums per-activation 16-entry nibble tables over the packed index words; `GEMM` interleaves the tables of four
+      activations so one index decode feeds four lookups. The `gather` reference stays; a 256-entry byte table lost
+      on every shape but `pw1` and was removed. All 152 CQ tensors are stored `[out, in]` and qualify as is; the mHC
+      φ need `Rows` per layer, and the embedding and engram gathers use `Row`. `TestWhistleGEMM` on 11 real tensors
+      (CQ2 q/k/v/out/pw1/stem/engram table, CQ4 embedding head and φ) against `CQ` + `tensor.MatMulTransB`: worst
+      1 − cos 1.7e-13 for any kernel, max |Δ| ≤ 5.7e-7 of max |y|. Single-threaded on the M5 Pro, the pure-Go kernel
+      is 1.15–2.4× faster than the pure-Go float loop on 9 of 10 shapes, but 2.2–5.7× slower than the NEON float
+      GEMM (q_proj 20.1 vs 7.7 µs, head 652 vs 192 µs). Memory: 16.63 MB for all CQ matrices against 218.77 MB as
+      float32 (13.2×). Details and what 9.2 needs: `docs/FINDINGS.md` F-028.
 - [ ] 9.2 Run straight from the packed `.cact`: wire the 9.1 kernel into `needle`, `encoder` and `decoder` behind
       `weights.Source`. Memory target: under 64 MB RSS for the model.
 - [ ] 9.3 Optional int8 activations and an int8 KV cache (`act_bits 8`, `kv_bits 8`) to mirror the engine's numerics,

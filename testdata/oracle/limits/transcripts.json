@@ -1,0 +1,364 @@
+{
+  "silence-1": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "silence-480000": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "speech-1": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "speech-10": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "speech-100": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "speech-1279": {
+    "language": "en",
+    "text": "you",
+    "words": [
+      {
+        "word": "you",
+        "start": 0.00,
+        "end": 0.00,
+        "probability": 0.868
+      }
+    ]
+  },
+  "speech-1280": {
+    "language": "en",
+    "text": "you",
+    "words": [
+      {
+        "word": "you",
+        "start": 0.00,
+        "end": 0.00,
+        "probability": 0.868
+      }
+    ]
+  },
+  "speech-1281": {
+    "language": "en",
+    "text": "you",
+    "words": [
+      {
+        "word": "you",
+        "start": 0.00,
+        "end": 0.00,
+        "probability": 0.868
+      }
+    ]
+  },
+  "speech-159": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "speech-160": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "speech-16000": {
+    "language": "en",
+    "text": "that betrayed to",
+    "words": [
+      {
+        "word": "that",
+        "start": 0.00,
+        "end": 0.48,
+        "probability": 0.713
+      },
+      {
+        "word": "betrayed",
+        "start": 0.48,
+        "end": 0.88,
+        "probability": 0.992
+      },
+      {
+        "word": "to",
+        "start": 0.88,
+        "end": 0.96,
+        "probability": 0.861
+      }
+    ]
+  },
+  "speech-161": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "speech-2": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "speech-2560": {
+    "language": "en",
+    "text": "Yeah.",
+    "words": [
+      {
+        "word": "Yeah.",
+        "start": 0.00,
+        "end": 0.08,
+        "probability": 0.596
+      }
+    ]
+  },
+  "speech-3": {
+    "language": "",
+    "text": "",
+    "words": []
+  },
+  "speech-32000": {
+    "language": "en",
+    "text": "that betrayed to the scout the other",
+    "words": [
+      {
+        "word": "that",
+        "start": 0.24,
+        "end": 0.48,
+        "probability": 0.948
+      },
+      {
+        "word": "betrayed",
+        "start": 0.48,
+        "end": 0.96,
+        "probability": 0.999
+      },
+      {
+        "word": "to",
+        "start": 0.96,
+        "end": 1.04,
+        "probability": 0.998
+      },
+      {
+        "word": "the",
+        "start": 1.04,
+        "end": 1.20,
+        "probability": 0.999
+      },
+      {
+        "word": "scout",
+        "start": 1.20,
+        "end": 1.60,
+        "probability": 0.975
+      },
+      {
+        "word": "the",
+        "start": 1.60,
+        "end": 1.84,
+        "probability": 0.756
+      },
+      {
+        "word": "other",
+        "start": 1.84,
+        "end": 1.92,
+        "probability": 0.813
+      }
+    ]
+  },
+  "speech-4000": {
+    "language": "en",
+    "text": "I don't know.",
+    "words": [
+      {
+        "word": "I",
+        "start": 0.08,
+        "end": 0.16,
+        "probability": 0.087
+      },
+      {
+        "word": "don't",
+        "start": 0.16,
+        "end": 0.24,
+        "probability": 0.816
+      },
+      {
+        "word": "know.",
+        "start": 0.24,
+        "end": 0.24,
+        "probability": 0.887
+      }
+    ]
+  },
+  "speech-480000": {
+    "language": "en",
+    "text": "And there was something in his air in the manner that betrayed to the scout the utter confusion of the state of his mind.",
+    "words": [
+      {
+        "word": "And",
+        "start": 0.00,
+        "end": 0.16,
+        "probability": 0.554
+      },
+      {
+        "word": "there",
+        "start": 0.16,
+        "end": 0.56,
+        "probability": 0.998
+      },
+      {
+        "word": "was",
+        "start": 0.56,
+        "end": 0.72,
+        "probability": 0.979
+      },
+      {
+        "word": "something",
+        "start": 0.72,
+        "end": 1.04,
+        "probability": 0.994
+      },
+      {
+        "word": "in",
+        "start": 1.04,
+        "end": 1.28,
+        "probability": 1.000
+      },
+      {
+        "word": "his",
+        "start": 1.28,
+        "end": 1.36,
+        "probability": 0.999
+      },
+      {
+        "word": "air",
+        "start": 1.36,
+        "end": 1.68,
+        "probability": 0.389
+      },
+      {
+        "word": "in",
+        "start": 1.68,
+        "end": 1.84,
+        "probability": 0.758
+      },
+      {
+        "word": "the",
+        "start": 1.84,
+        "end": 1.92,
+        "probability": 0.996
+      },
+      {
+        "word": "manner",
+        "start": 1.92,
+        "end": 2.24,
+        "probability": 0.998
+      },
+      {
+        "word": "that",
+        "start": 2.24,
+        "end": 2.48,
+        "probability": 1.000
+      },
+      {
+        "word": "betrayed",
+        "start": 2.48,
+        "end": 2.88,
+        "probability": 1.000
+      },
+      {
+        "word": "to",
+        "start": 2.88,
+        "end": 3.04,
+        "probability": 0.997
+      },
+      {
+        "word": "the",
+        "start": 3.04,
+        "end": 3.20,
+        "probability": 0.999
+      },
+      {
+        "word": "scout",
+        "start": 3.20,
+        "end": 3.52,
+        "probability": 0.971
+      },
+      {
+        "word": "the",
+        "start": 3.52,
+        "end": 3.84,
+        "probability": 0.974
+      },
+      {
+        "word": "utter",
+        "start": 3.84,
+        "end": 4.16,
+        "probability": 0.999
+      },
+      {
+        "word": "confusion",
+        "start": 4.16,
+        "end": 4.72,
+        "probability": 1.000
+      },
+      {
+        "word": "of",
+        "start": 4.72,
+        "end": 4.96,
+        "probability": 1.000
+      },
+      {
+        "word": "the",
+        "start": 4.96,
+        "end": 5.04,
+        "probability": 0.998
+      },
+      {
+        "word": "state",
+        "start": 5.04,
+        "end": 5.28,
+        "probability": 0.993
+      },
+      {
+        "word": "of",
+        "start": 5.28,
+        "end": 5.44,
+        "probability": 1.000
+      },
+      {
+        "word": "his",
+        "start": 5.44,
+        "end": 5.60,
+        "probability": 0.999
+      },
+      {
+        "word": "mind.",
+        "start": 5.60,
+        "end": 5.84,
+        "probability": 1.000
+      }
+    ]
+  },
+  "speech-8000": {
+    "language": "en",
+    "text": "or that.",
+    "words": [
+      {
+        "word": "or",
+        "start": 0.00,
+        "end": 0.24,
+        "probability": 0.332
+      },
+      {
+        "word": "that.",
+        "start": 0.24,
+        "end": 0.48,
+        "probability": 0.601
+      }
+    ]
+  }
+}

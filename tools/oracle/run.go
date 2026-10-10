@@ -29,7 +29,9 @@ var timingKeys = []string{"ttft_ms", "decode_tps"}
 
 type runConfig struct {
 	audioDir  string // corpus: manifest.json + <id>.wav
-	outDir    string // testdata/oracle
+	outDir    string // testdata/oracle or one of its subdirectories
+	oracleDir string // testdata/oracle, the committed full-depth clip fixtures
+	corpusDir string // models/corpus/librispeech, the git-ignored LibriSpeech subset
 	modelDir  string // whistle download --dir
 	engineDir string // engine/<platform>
 }
@@ -182,25 +184,68 @@ func readClip(path, wantSHA256 string) ([]byte, error) {
 	return raw, nil
 }
 
-// transcribe runs the needle CLI on wav and returns its JSON with the timing fields removed, keys sorted and
-// indented, so that a re-run of the same engine diffs clean.
-func transcribe(ctx context.Context, needle, model, wav string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, needle, "--model", model, "--audio", wav, "--audio-word-timestamps")
+// cliThreads pins the engine's worker threads. Its default is the device's fast cores, at most 4; 1, 2, 3, 4 and 8
+// threads give byte-identical JSON on all 32 clips (docs/FINDINGS.md F-025), so the pin only fixes the configuration.
+const cliThreads = "4"
+
+// transcribe runs the needle CLI on wav with word timestamps, the pinned thread count and the extra flags, and
+// returns its JSON normalised by normaliseJSON, so that a re-run of the same engine diffs clean.
+func transcribe(ctx context.Context, needle, model, wav string, extra ...string) ([]byte, error) {
+	res, err := runNeedle(ctx, "", needle, model, wav, extra...)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Exit != 0 {
+		return nil, fmt.Errorf("needle: exit %d: %s", res.Exit, res.Stderr)
+	}
+
+	return normaliseJSON(res.stdout)
+}
+
+// cliResult is one needle CLI run: its exit code and stderr (with the program name the engine prefixes reduced to
+// "needle"), and its stdout.
+type cliResult struct {
+	Exit   int    `json:"exit"`
+	Stderr string `json:"stderr,omitempty"`
+	stdout []byte
+}
+
+// runNeedle runs the needle CLI on wav in dir (the current directory when empty) and returns its outcome; err is set
+// only when it could not run. Relative paths are resolved against dir.
+func runNeedle(ctx context.Context, dir, needle, model, wav string, extra ...string) (cliResult, error) {
+	args := append([]string{"--model", model, "--audio", wav, "--audio-word-timestamps", "--threads", cliThreads},
+		extra...)
+	cmd := exec.CommandContext(ctx, needle, args...) // #nosec G204 -- the engine dir and the flags are the tool's own.
+	cmd.Args[0] = "needle"                           // the engine prefixes its errors with argv[0]
+	cmd.Dir = dir
 
 	cmd.Env = append(os.Environ(), "NEEDLE_TELEMETRY=0", "DO_NOT_TRACK=1")
 
-	var stderr bytes.Buffer
+	var stdout, stderr bytes.Buffer
 
-	cmd.Stderr = &stderr
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("needle: %w: %s", err, strings.TrimSpace(stderr.String()))
+	err := cmd.Run()
+
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		return cliResult{Exit: exit.ExitCode(), Stderr: strings.TrimSpace(stderr.String())}, nil
 	}
 
+	if err != nil {
+		return cliResult{}, fmt.Errorf("needle: %w", err)
+	}
+
+	return cliResult{Stderr: strings.TrimSpace(stderr.String()), stdout: stdout.Bytes()}, nil
+}
+
+// normaliseJSON removes the timing fields from the engine's JSON and re-encodes it with sorted keys and indentation.
+// Values are kept verbatim (json.RawMessage), so "0.40" stays "0.40".
+func normaliseJSON(out []byte) ([]byte, error) {
 	var fields map[string]json.RawMessage
 
-	err = json.Unmarshal(out, &fields)
+	err := json.Unmarshal(out, &fields)
 	if err != nil {
 		return nil, fmt.Errorf("needle output is not a JSON object: %w: %q", err, out)
 	}

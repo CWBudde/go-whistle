@@ -16,23 +16,32 @@ import (
 const sampleRate = 16000
 
 // writeWAV16 writes pcm as a canonical 44-byte-header, 16-bit mono 16 kHz RIFF WAV.
-func writeWAV16(w io.Writer, pcm []int16) error {
-	n := uint32(2 * len(pcm)) // #nosec G115 -- clips are a few seconds long.
+func writeWAV16(w io.Writer, pcm []int16) error { return writeWAV(w, 1, 2, len(pcm), pcm) }
+
+// writeWAVFloat writes pcm as a canonical 44-byte-header, 32-bit IEEE float mono 16 kHz RIFF WAV, which hands the
+// engine CLI the samples exactly.
+func writeWAVFloat(w io.Writer, pcm []float32) error { return writeWAV(w, 3, 4, len(pcm), pcm) }
+
+// writeWAV writes n mono 16 kHz samples of width bytes in the given WAVE format tag (1 PCM, 3 IEEE float).
+func writeWAV(w io.Writer, format uint16, width, n int, samples any) error {
+	size := uint32(width * n) // #nosec G115 -- at most 30 s and one sample.
 
 	var b bytes.Buffer
 
-	b.Grow(44 + int(n))
+	b.Grow(44 + int(size))
 	b.WriteString("RIFF")
-	_ = binary.Write(&b, binary.LittleEndian, 36+n)
+	_ = binary.Write(&b, binary.LittleEndian, 36+size)
 	b.WriteString("WAVEfmt ")
-	// fmt: chunk size, PCM, mono, rate, byte rate, block align, bits per sample.
-	for _, v := range []any{uint32(16), uint16(1), uint16(1), uint32(sampleRate), uint32(2 * sampleRate), uint16(2), uint16(16)} {
+	// fmt: chunk size, format, mono, rate, byte rate, block align, bits per sample.
+	for _, v := range []any{
+		uint32(16), format, uint16(1), uint32(sampleRate), uint32(width * sampleRate), uint16(width), uint16(8 * width),
+	} {
 		_ = binary.Write(&b, binary.LittleEndian, v)
 	}
 
 	b.WriteString("data")
-	_ = binary.Write(&b, binary.LittleEndian, n)
-	_ = binary.Write(&b, binary.LittleEndian, pcm)
+	_ = binary.Write(&b, binary.LittleEndian, size)
+	_ = binary.Write(&b, binary.LittleEndian, samples)
 
 	_, err := w.Write(b.Bytes())
 	if err != nil {
