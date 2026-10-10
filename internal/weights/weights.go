@@ -10,6 +10,11 @@
 // a CQ tensor dequantised, on its first Tensor call and cached. Every
 // tensor and byte slice handed out is a fresh heap copy that never aliases
 // the file data, so it stays valid after Close.
+//
+// The exception is the packed path (Options.Packed, Packer): a .cact
+// source then also serves its CQ tensors as cq.Matrix values that multiply
+// straight from the stored indices, which alias the file data and are only
+// valid until Close (docs/FINDINGS.md F-037).
 package weights
 
 import (
@@ -21,6 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cwbudde/go-whistle/internal/cact"
+	"github.com/cwbudde/go-whistle/internal/cq"
 )
 
 // Lookup errors.
@@ -62,6 +68,34 @@ type Options struct {
 	Names []cact.Entry
 	// NoMmap reads the file into memory even where it could be mapped.
 	NoMmap bool
+	// Packed makes a .cact source a Packer that serves its CQ tensors
+	// packed, for model code that multiplies by them without a float32
+	// copy (docs/FINDINGS.md F-037). Off, Matrix reports no tensor as
+	// packed, and the model runs on the dequantised float32 values. The
+	// safetensors backend has no packed form and ignores it.
+	Packed bool
+}
+
+// Packer is a Source that can serve CQ tensors packed (docs/FINDINGS.md
+// F-037).
+type Packer interface {
+	// Matrix returns tensor name as a cq.Matrix built from its stored
+	// form, and true, if the tensor is CQ and the source serves it packed;
+	// otherwise nil and false. The matrix is built on the first call and
+	// cached like Tensor's values, and no float32 copy is made. Its
+	// indices alias the file data, so it is valid until Close only.
+	Matrix(name string) (*cq.Matrix, bool, error)
+}
+
+// PackedMatrix is src's Matrix for name if src is a Packer, and nil and
+// false otherwise.
+func PackedMatrix(src Source, name string) (*cq.Matrix, bool, error) {
+	p, ok := src.(Packer)
+	if !ok {
+		return nil, false, nil
+	}
+
+	return p.Matrix(name)
 }
 
 func (o Options) names() []cact.Entry {
@@ -121,7 +155,8 @@ type core struct {
 	closed bool
 
 	cacheMu sync.Mutex
-	cache   map[string]*cell // unbounded until Release or Close (F-007)
+	cache   map[string]*cell    // unbounded until Release or Close (F-007)
+	mats    map[string]*matCell // the packed matrices, as cache (F-037)
 
 	decodes atomic.Int64 // tensors decoded so far, for the laziness tests
 }
@@ -133,10 +168,18 @@ type cell struct {
 	err  error
 }
 
+// matCell is one name's packed matrix, built once.
+type matCell struct {
+	once sync.Once
+	m    *cq.Matrix
+	ok   bool
+	err  error
+}
+
 func newCore(entries []cact.Entry, cfg Config, file *mapping, be backend) *core {
 	return &core{
 		entries: entries, index: indexNames(entries), cfg: cfg, be: be, file: file,
-		cache: map[string]*cell{},
+		cache: map[string]*cell{}, mats: map[string]*matCell{},
 	}
 }
 
@@ -248,6 +291,24 @@ func (c *core) Release(name string) {
 	defer c.cacheMu.Unlock()
 
 	delete(c.cache, name)
+	delete(c.mats, name)
+}
+
+// Cached lists, in map order, the names the float32 cache holds an entry
+// for: read with Tensor and neither released nor closed since.
+func (c *core) Cached() []string {
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
+
+	var names []string
+
+	for _, e := range c.entries {
+		if c.cache[e.Name] != nil {
+			names = append(names, e.Name)
+		}
+	}
+
+	return names
 }
 
 func (c *core) Close() error {
@@ -261,7 +322,7 @@ func (c *core) Close() error {
 	c.closed = true
 
 	c.cacheMu.Lock()
-	c.cache = nil
+	c.cache, c.mats = nil, nil
 	c.cacheMu.Unlock()
 
 	c.be.close()
@@ -276,6 +337,21 @@ func (c *core) entry(name string) (int, cact.Entry, error) {
 	}
 
 	return i, c.entries[i], nil
+}
+
+// matCell returns name's packed matrix cell, adding an empty one. The
+// caller holds mu shared and has checked closed.
+func (c *core) matCell(name string) *matCell {
+	c.cacheMu.Lock()
+	defer c.cacheMu.Unlock()
+
+	mc := c.mats[name]
+	if mc == nil {
+		mc = &matCell{}
+		c.mats[name] = mc
+	}
+
+	return mc
 }
 
 // cell returns name's cache cell, adding an empty one. The caller holds mu
