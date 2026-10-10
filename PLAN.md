@@ -886,8 +886,12 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
 - [x] Beam search wired into `Transcribe` (with keywords and depth once 6.3/6.4 are merged).
       (2026-10-10) — beam search part done: `search.Beam(d, mem, search.Default())` behind the `strategy` seam, greedy
       kept for tests. The F-027 clock reads the search's steps through `Options.Adjust` (TTFT at the first step after
-      the language token, `decode_tps` over the steps), chained before any keyword hook (`TestBeamClock`). Keywords
-      and depths 2–7 still return `ErrNotSupported`; they follow once 6.3 and 6.4 are merged (F-031).
+      the language token, `decode_tps` over the steps), chained before any keyword hook (`TestBeamClock`) (F-031).
+      (2026-10-10) — keywords and depth wired: `TranscribeOptions.Keywords` builds `search.NewKeywords` under
+      `search.DefaultBias()` (entries trimmed, newlines split like the engine's file), `Depth` 2–7 runs the
+      `decoder.WithDepth` rung built at `Load` on the same `Memory`; `whistle transcribe --keywords file --depth N`.
+      Through `Transcribe` the F-029 fast keyword cases and the F-030 depth-2/4 clips equal the engine
+      (`TestTranscribeKeywordsMatchEngine`, `TestTranscribeDepthMatchesEngine`).
 - [x] `just eval-librispeech`: WER of the Go pipeline and of the engine on the 6.1 subset.
       (2026-10-10) — `TestEvalLibriSpeech` (runs only with `WHISTLE_EVAL_LIBRISPEECH`; skips without the model or
       audio) transcribes the 200 utterances with `TranscribeWAV` and scores both sides with the manifest's `wer_rule`

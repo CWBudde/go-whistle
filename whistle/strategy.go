@@ -12,7 +12,13 @@ import (
 // Transcribe sees only this seam: the engine's beam search, or greedy
 // decoding for tests.
 type strategy interface {
-	decode(d *decoder.Decoder, mem *decoder.Memory, lang string, clk *clock) (decoded, error)
+	decode(d *decoder.Decoder, mem *decoder.Memory, req request, clk *clock) (decoded, error)
+}
+
+// request is one call's decoding settings.
+type request struct {
+	lang   string        // the forced language, or empty to detect it
+	adjust search.Adjust // the keyword bias (docs/FINDINGS.md F-029), or nil
 }
 
 // decoded is a strategy's transcript before detokenisation.
@@ -74,17 +80,17 @@ func (c *clock) tps() float64 {
 // hold the same number of text tokens. So the first call stops the TTFT
 // clock at the first step after the language token, as greedy's does, and
 // the first call of every later step counts one more token: decode_tps is a
-// rate over the search's steps. An Adjust already in opt (keywords) still
-// runs after the clock.
+// rate over the search's steps. An Adjust already in opt, then the
+// request's keyword bias, still run after the clock.
 type beam struct {
 	opt search.Options
 }
 
-func (b beam) decode(d *decoder.Decoder, mem *decoder.Memory, lang string, clk *clock) (decoded, error) {
+func (b beam) decode(d *decoder.Decoder, mem *decoder.Memory, req request, clk *clock) (decoded, error) {
 	opt := b.opt
-	opt.Language = lang
+	opt.Language = req.lang
 
-	step, next := -1, opt.Adjust
+	step, next, bias := -1, opt.Adjust, req.adjust
 	opt.Adjust = func(tokens []int, logp []float64) {
 		if len(tokens) != step {
 			step = len(tokens)
@@ -94,6 +100,10 @@ func (b beam) decode(d *decoder.Decoder, mem *decoder.Memory, lang string, clk *
 
 		if next != nil {
 			next(tokens, logp)
+		}
+
+		if bias != nil {
+			bias(tokens, logp)
 		}
 	}
 
@@ -111,7 +121,12 @@ func (b beam) decode(d *decoder.Decoder, mem *decoder.Memory, lang string, clk *
 // until EOS or MaxTokens predicted tokens (docs/FINDINGS.md F-023, F-024).
 type greedy struct{}
 
-func (greedy) decode(d *decoder.Decoder, mem *decoder.Memory, lang string, clk *clock) (decoded, error) {
+func (greedy) decode(d *decoder.Decoder, mem *decoder.Memory, req request, clk *clock) (decoded, error) {
+	if req.adjust != nil {
+		return decoded{}, fmt.Errorf("greedy: keywords: %w", ErrNotSupported)
+	}
+
+	lang := req.lang
 	s := d.NewState(mem)
 
 	logits, err := d.Extend(s, d.Prompt())
