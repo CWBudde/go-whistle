@@ -129,6 +129,10 @@ keywords-probe *args:
 align-probe *args:
     go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbe' ./internal/align/ {{args}}
 
+# Replay every engine stream of testdata/oracle/stream call by call, report the parity per set and explain the first divergence of each run
+stream-parity *args:
+    go test -tags oracle -count=1 -v -timeout 60m -run 'TestStream(MatchesEngineAll|Divergences|Accept)$' ./whistle/ {{args}}
+
 # WER of the Go pipeline and of the engine on the LibriSpeech test-clean subset, and how often the transcripts are equal (audio: oracle-librispeech-audio)
 eval-librispeech:
     WHISTLE_EVAL_LIBRISPEECH=1 go test -count=1 -v -timeout 60m -run 'TestEvalLibriSpeech$' ./whistle/
