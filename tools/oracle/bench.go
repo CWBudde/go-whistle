@@ -47,7 +47,8 @@ func (c benchConfig) check() error {
 
 // benchPCM decodes a clip's WAV. needle_transcribe gets the samples as
 // they are, while whistle-bench resamples to 16 kHz, so any other rate is
-// rejected rather than timed as different audio.
+// rejected rather than timed as different audio, and so is a clip without
+// samples.
 func benchPCM(raw []byte) ([]float32, error) {
 	pcm, rate, err := readWAV(raw)
 	if err != nil {
@@ -57,6 +58,12 @@ func benchPCM(raw []byte) ([]float32, error) {
 	if rate != sampleRate {
 		return nil, fmt.Errorf("sample rate %d Hz, want %d: the engine library gets the samples as they are", rate,
 			sampleRate)
+	}
+
+	// An empty clip has nothing to time, and the 30 s clip tiles the first
+	// one: an empty first clip would never fill it.
+	if len(pcm) == 0 {
+		return nil, errors.New("no samples")
 	}
 
 	return pcm, nil

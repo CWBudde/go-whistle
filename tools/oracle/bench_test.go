@@ -52,4 +52,16 @@ func TestBenchPCMRate(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "8000 Hz") {
 		t.Errorf("8 kHz: %v", err)
 	}
+
+	b.Reset()
+
+	err = writeWAV16(&b, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = benchPCM(b.Bytes())
+	if err == nil || !strings.Contains(err.Error(), "no samples") {
+		t.Errorf("empty clip: %v", err)
+	}
 }
