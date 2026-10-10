@@ -68,7 +68,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
-	cmd.AddCommand(newDownloadCmd(), newTranscribeCmd(), newStreamCmd())
+	cmd.AddCommand(newDownloadCmd(), newTranscribeCmd(), newStreamCmd(), newEmbedCmd())
 
 	return cmd
 }
