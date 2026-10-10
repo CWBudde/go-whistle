@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/cwbudde/go-whistle/internal/needle"
-	"github.com/cwbudde/go-whistle/internal/tensor"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
 
@@ -29,9 +28,9 @@ type block struct {
 	gate      float32 // σ(attn_gate)
 	hada0     *needle.HadamardMLP
 	hada      *needle.HadamardMLP
-	pw1       []float32 // [glu, dim]
-	pw2       []float32 // [dim, dim]
-	dw        []float32 // [dwKernel, half]
+	pw1       needle.Linear // [glu, dim]
+	pw2       needle.Linear // [dim, dim]
+	dw        []float32     // [dwKernel, half]
 	dwKernel  int
 	glu, half int // pw1's width and the GLU output's
 }
@@ -101,12 +100,12 @@ func (b *block) loadConv(src weights.Source, prefix string) error {
 
 	b.glu = shape[0]
 
-	b.pw1, err = matrix(src, prefix+"pw1", b.glu, b.dim)
+	b.pw1, err = needle.LoadLinear(src, prefix+"pw1", b.glu, b.dim)
 	if err != nil {
 		return err
 	}
 
-	b.pw2, err = matrix(src, prefix+"pw2", b.dim, b.dim)
+	b.pw2, err = needle.LoadLinear(src, prefix+"pw2", b.dim, b.dim)
 	if err != nil {
 		return err
 	}
@@ -212,7 +211,7 @@ func (b *block) conv(x []float32, t int) {
 	b.convNorm.Apply(n, x)
 
 	p := make([]float32, t*b.glu)
-	tensor.MatMulTransB(p, b.glu, n, b.pw1, t, b.glu, d)
+	b.pw1.Apply(p, n, t)
 
 	c := b.depthwise(b.gated(p, t), t)
 
@@ -228,7 +227,7 @@ func (b *block) conv(x []float32, t int) {
 	}
 
 	o := make([]float32, t*d)
-	tensor.MatMulTransB(o, d, c, b.pw2, t, d, d)
+	b.pw2.Apply(o, c, t)
 
 	if b.h.ConvNorm == NormAfterPW2 {
 		b.convOut.Apply(o, o)

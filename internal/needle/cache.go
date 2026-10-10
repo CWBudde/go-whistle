@@ -51,9 +51,9 @@ func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float3
 
 	qW, kW, vW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v
 	q, k, v := make([]float32, t*qW), make([]float32, t*kW), make([]float32, t*vW)
-	linear(q, x, t, a.qProj, qW, a.dim)
-	linear(k, x, t, a.kProj, kW, a.dim)
-	linear(v, x, t, a.vProj, vW, a.dim)
+	a.qProj.Apply(q, x, t)
+	a.kProj.Apply(k, x, t)
+	a.vProj.Apply(v, x, t)
 
 	if a.taps > 0 {
 		q = a.extendTaps(q, t, qW, a.qTaps, &c.qHist)
@@ -134,13 +134,13 @@ func (e *Engram) Extend(tokens []int, c *EngramCache) (*EngramKV, error) {
 			}
 
 			row := col*e.slots + idx[col]
-			copy(emb[i*w+col*e.sub:i*w+(col+1)*e.sub], e.tables[row*e.sub:(row+1)*e.sub])
+			e.tables.Row(emb[i*w+col*e.sub:i*w+(col+1)*e.sub], row)
 		}
 	}
 
 	k, vRaw := make([]float32, t*e.dim), make([]float32, t*e.dim)
-	linear(k, emb, t, e.keyProj, e.dim, w)
-	linear(vRaw, emb, t, e.valProj, e.dim, w)
+	e.keyProj.Apply(k, emb, t)
+	e.valProj.Apply(vRaw, emb, t)
 
 	rh := len(c.vRaw) / e.dim
 	all := append(slices.Clone(c.vRaw), vRaw...)

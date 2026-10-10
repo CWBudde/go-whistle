@@ -25,9 +25,9 @@ type cross struct {
 	dim, heads, qk, v   int
 	norm, post          needle.ZCRMSNorm
 	qNorm, kNorm        needle.ZCRMSNorm
-	qProj, kProj, vProj []float32 // [heads·qk | heads·qk | heads·v, dim]
-	gateProj, outProj   []float32 // [heads·v, dim], [dim, heads·v]
-	resid               float32   // the residual factor from cross_gate
+	qProj, kProj, vProj needle.Linear // [heads·qk | heads·qk | heads·v, dim]
+	gateProj, outProj   needle.Linear // [heads·v, dim], [dim, heads·v]
+	resid               float32       // the residual factor from cross_gate
 	noNorm              bool
 }
 
@@ -37,24 +37,24 @@ func loadCross(src weights.Source, prefix string, h Hypothesis) (*cross, error) 
 	c := &cross{h: h}
 	l := &loader{src: src, prefix: prefix}
 
-	normIn := l.tensor("norm_in", 1)
-	post := l.tensor("post_norm", 1)
-	qNorm := l.tensor("q_norm", 1)
-	kNorm := l.tensor("k_norm", 1)
-	gate := l.tensor("attn_gate", 1)
+	normIn := l.vector("norm_in")
+	post := l.vector("post_norm")
+	qNorm := l.vector("q_norm")
+	kNorm := l.vector("k_norm")
+	gate := l.vector("attn_gate")
 	c.dim, c.qk = len(normIn), len(qNorm)
 
-	var qW, vW int
-
-	c.qProj, qW = l.matrix("q_proj", c.dim)
-	c.kProj, _ = l.matrix("k_proj", c.dim)
-	c.vProj, vW = l.matrix("v_proj", c.dim)
-	c.gateProj, _ = l.matrix("gate_proj", c.dim)
-	c.outProj, _ = l.matrix("out_proj", vW)
+	c.qProj = l.matrix("q_proj", c.dim)
+	c.kProj = l.matrix("k_proj", c.dim)
+	c.vProj = l.matrix("v_proj", c.dim)
+	c.gateProj = l.matrix("gate_proj", c.dim)
+	c.outProj = l.matrix("out_proj", c.vProj.Out())
 
 	if l.err != nil {
 		return nil, l.err
 	}
+
+	qW, vW := c.qProj.Out(), c.vProj.Out()
 
 	if c.qk == 0 || qW%c.qk != 0 || len(kNorm) != c.qk || len(post) != c.dim || len(gate) != 1 {
 		return nil, fmt.Errorf("decoder: %s: q_proj width %d, norms %d/%d/%d", prefix, qW, c.qk, len(kNorm), len(post))
@@ -63,7 +63,7 @@ func loadCross(src weights.Source, prefix string, h Hypothesis) (*cross, error) 
 	c.heads = qW / c.qk
 	c.v = vW / c.heads
 
-	if vW%c.heads != 0 || len(c.kProj) != qW*c.dim || len(c.gateProj) != vW*c.dim || len(c.outProj) != c.dim*vW {
+	if vW%c.heads != 0 || c.kProj.Out() != qW || c.gateProj.Out() != vW || c.outProj.Out() != c.dim {
 		return nil, fmt.Errorf("decoder: %s projections do not fit %d heads of %d/%d", prefix, c.heads, c.qk, c.v)
 	}
 
@@ -81,8 +81,8 @@ type loader struct {
 	err    error
 }
 
-// tensor returns a tensor of the given rank.
-func (l *loader) tensor(name string, rank int) []float32 {
+// vector returns a rank-1 tensor.
+func (l *loader) vector(name string) []float32 {
 	if l.err != nil {
 		return nil
 	}
@@ -94,8 +94,8 @@ func (l *loader) tensor(name string, rank int) []float32 {
 		return nil
 	}
 
-	if len(shape) != rank {
-		l.err = fmt.Errorf("decoder: %s%s has shape %v, want rank %d", l.prefix, name, shape, rank)
+	if len(shape) != 1 {
+		l.err = fmt.Errorf("decoder: %s%s has shape %v, want rank 1", l.prefix, name, shape)
 
 		return nil
 	}
@@ -103,20 +103,25 @@ func (l *loader) tensor(name string, rank int) []float32 {
 	return data
 }
 
-// matrix returns a [out, in] matrix with in columns and its row count.
-func (l *loader) matrix(name string, in int) ([]float32, int) {
-	data := l.tensor(name, 2)
-	if data == nil {
-		return nil, 0
+// matrix returns a [out, in] matrix with in columns, packed where the
+// source serves it packed (needle.LoadLinear).
+func (l *loader) matrix(name string, in int) needle.Linear {
+	if l.err != nil {
+		return needle.Linear{}
 	}
 
-	if in <= 0 || len(data)%in != 0 {
-		l.err = fmt.Errorf("decoder: %s%s has %d values, not rows of %d", l.prefix, name, len(data), in)
+	if in <= 0 {
+		l.err = fmt.Errorf("decoder: %s%s: no rows of %d", l.prefix, name, in)
 
-		return nil, 0
+		return needle.Linear{}
 	}
 
-	return data, len(data) / in
+	w, err := needle.LoadLinear(l.src, l.prefix+name, 0, in)
+	if err != nil {
+		l.err = fmt.Errorf("decoder: %w", err)
+	}
+
+	return w
 }
 
 // setQKNorm builds the q/k norms of the QKNorm axis.
@@ -164,8 +169,8 @@ type memory struct {
 func (c *cross) project(enc []float32, frames int, rope *needle.Rope) memory {
 	kW, vW := c.heads*c.qk, c.heads*c.v
 	m := memory{k: make([]float32, frames*kW), v: make([]float32, frames*vW), frames: frames}
-	linear(m.k, enc, frames, c.kProj, kW, c.dim)
-	linear(m.v, enc, frames, c.vProj, vW, c.dim)
+	c.kProj.Apply(m.k, enc, frames)
+	c.vProj.Apply(m.v, enc, frames)
 
 	if !c.noNorm {
 		c.kNorm.Apply(m.k, m.k)
@@ -191,7 +196,7 @@ func (c *cross) branch(h []float32, t, off int, m memory, rope *needle.Rope, kee
 	c.norm.Apply(x, h)
 
 	q := make([]float32, t*qW)
-	linear(q, x, t, c.qProj, qW, c.dim)
+	c.qProj.Apply(q, x, t)
 
 	if !c.noNorm {
 		c.qNorm.Apply(q, q)
@@ -214,7 +219,7 @@ func (c *cross) branch(h []float32, t, off int, m memory, rope *needle.Rope, kee
 		}
 
 		gate := make([]float32, t*oW)
-		linear(gate, gin, t, c.gateProj, oW, c.dim)
+		c.gateProj.Apply(gate, gin, t)
 
 		for i, g := range gate {
 			if c.h.Gate == GateSiLU {
@@ -232,7 +237,7 @@ func (c *cross) branch(h []float32, t, off int, m memory, rope *needle.Rope, kee
 	}
 
 	y := make([]float32, t*c.dim)
-	linear(y, out, t, c.outProj, c.dim, oW)
+	c.outProj.Apply(y, out, t)
 
 	if c.h.Residual != ResNoPostNorm {
 		c.post.Apply(y, y)
@@ -278,11 +283,6 @@ func (c *cross) attend(q []float32, t int, m memory, keep *Attention) []float32 
 	}
 
 	return out
-}
-
-// linear computes dst = x · wᵀ for rows of x of width in and w [out, in].
-func linear(dst, x []float32, rows int, w []float32, out, in int) {
-	tensor.MatMulTransB(dst, out, x, w, rows, out, in)
 }
 
 // sigmoid is jax.nn.sigmoid in float32.

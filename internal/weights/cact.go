@@ -5,12 +5,16 @@ import (
 	"slices"
 
 	"github.com/cwbudde/go-whistle/internal/cact"
+	"github.com/cwbudde/go-whistle/internal/cq"
 )
 
 // Cact serves a .cact file: entry i of the name map is record i. FP16 and
 // FP32 records are widened, CQ records dequantised (cact.File.CQ, F-004).
+// Opened with Options.Packed, Matrix also serves the CQ records packed.
 type Cact struct {
 	*core
+
+	packed bool
 }
 
 // OpenCact opens a .cact file, mapped where the platform allows it.
@@ -66,7 +70,7 @@ func newCact(file *mapping, opts Options) (*Cact, error) {
 		return nil, err
 	}
 
-	return &Cact{newCore(entries, cfg, file, &cactBackend{f: f})}, nil
+	return &Cact{core: newCore(entries, cfg, file, &cactBackend{f: f}), packed: opts.Packed}, nil
 }
 
 type cactBackend struct {
@@ -91,3 +95,50 @@ func (b *cactBackend) decode(i int) ([]float32, error) {
 func (b *cactBackend) raw(i int) ([]byte, error) { return b.f.Raw(i) }
 
 func (b *cactBackend) close() { b.f = nil }
+
+// Matrix serves CQ tensor name packed when the source was opened with
+// Options.Packed (Packer, docs/FINDINGS.md F-037): cq.NewGather on the
+// record as stored, so the lut kernel's blocked copy waits for the
+// caller's Prepare or first product. Other tensors, CQ widths internal/cq
+// has no kernel for (only 2 and 4 bits; the caller falls back to Tensor)
+// and every tensor in float mode give nil and false.
+func (c *Cact) Matrix(name string) (*cq.Matrix, bool, error) {
+	i, _, err := c.entry(name)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if !c.packed {
+		return nil, false, nil
+	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.closed {
+		return nil, false, fmt.Errorf("weights: %s: %w", name, ErrClosed)
+	}
+
+	be, _ := c.be.(*cactBackend)
+	if rec, _ := be.f.Record(i); rec.DType != cact.CQ || rec.Bits != 2 && rec.Bits != 4 {
+		return nil, false, nil
+	}
+
+	mc := c.matCell(name)
+	mc.once.Do(func() {
+		var p cact.Packed
+
+		p, mc.err = be.f.CQPacked(i)
+		if mc.err == nil {
+			mc.m, mc.err = cq.NewGather(p)
+		}
+
+		if mc.err != nil {
+			mc.err = fmt.Errorf("weights: %s: %w", name, mc.err)
+		}
+
+		mc.ok = mc.err == nil
+	})
+
+	return mc.m, mc.ok, mc.err
+}

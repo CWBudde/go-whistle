@@ -133,6 +133,10 @@ align-probe *args:
 eval-librispeech:
     WHISTLE_EVAL_LIBRISPEECH=1 go test -count=1 -v -timeout 60m -run 'TestEvalLibriSpeech$' ./whistle/
 
+# Peak RSS, Go heap and resident .cact pages of Load + one 30 s Transcribe, packed vs float, each in a fresh process
+mem-probe:
+    WHISTLE_MEM_PROBE=1 go test -count=1 -v -run 'TestMemProbe$' ./internal/weights/
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
