@@ -69,6 +69,29 @@ func loadClips(audioDir, oracleDir string) ([]clip, error) {
 	return clips, nil
 }
 
+// checkFixtureModel rejects engine fixtures recorded with another model
+// than the one benchmarked: dir/manifest.json names the model's SHA-256,
+// and only fixtures of that model are a reference for its transcripts.
+func checkFixtureModel(dir, modelSHA256 string) error {
+	var manifest struct {
+		Model struct {
+			SHA256 string `json:"sha256"`
+		} `json:"model"`
+	}
+
+	err := readJSON(filepath.Join(dir, "manifest.json"), &manifest)
+	if err != nil {
+		return err
+	}
+
+	if manifest.Model.SHA256 != modelSHA256 {
+		return fmt.Errorf("%s: the engine fixtures were recorded with model %q, the benchmarked model is %q",
+			dir, manifest.Model.SHA256, modelSHA256)
+	}
+
+	return nil
+}
+
 // longClip is the 30 s clip: the first corpus clip tiled. It reads that
 // clip alone (checked against its digest), not the whole corpus.
 func longClip(audio string) ([]float32, error) {

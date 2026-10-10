@@ -51,6 +51,17 @@ func measure(ctx context.Context, cfg config) (*bench.GoResults, error) {
 
 	res.Run.Inputs, err = bench.InputsOf(cfg.model, cfg.audio)
 	if err != nil {
+		return nil, fmt.Errorf("inputs: %w", err)
+	}
+
+	// The clips' and the LibriSpeech subset's engine transcripts give the
+	// equality counts and the engine's WER; they must be of this model.
+	err = checkFixtureModel(cfg.oracle, res.Run.Inputs.Model)
+	if err == nil && cfg.wer {
+		err = checkFixtureModel(cfg.lsDir, res.Run.Inputs.Model)
+	}
+
+	if err != nil {
 		return nil, err
 	}
 

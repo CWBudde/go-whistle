@@ -97,6 +97,24 @@ func TestLongClip(t *testing.T) {
 	}
 }
 
+// TestCheckFixtureModel accepts the committed fixtures for the pinned
+// model and rejects them for another one.
+func TestCheckFixtureModel(t *testing.T) {
+	const pinned = "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+
+	for _, dir := range []string{testOracle, testOracle + "/librispeech"} {
+		err := checkFixtureModel(dir, pinned)
+		if err != nil {
+			t.Errorf("%s with the pinned model: %v", dir, err)
+		}
+
+		err = checkFixtureModel(dir, "0000")
+		if err == nil || !strings.Contains(err.Error(), "recorded with model") {
+			t.Errorf("%s with another model: %v", dir, err)
+		}
+	}
+}
+
 // TestLoadLibriSpeech reads the committed subset fixtures; the audio is
 // not needed.
 func TestLoadLibriSpeech(t *testing.T) {
