@@ -91,10 +91,10 @@ func (d *doctor) line(name, value string, err error) {
 func (d *doctor) run(modelPath, clip string) error {
 	d.line("model", modelPath, nil)
 
-	ok := d.checkFile(modelPath)
+	ok, format := d.checkFile(modelPath)
 	d.checkSiblings(modelPath)
 
-	d.line("weights", weightsMode(modelPath), nil)
+	d.line("weights", weightsMode(format), nil)
 	d.line("go", fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH), nil)
 	d.line("kernels", kernels(), nil)
 	d.line("workers", fmt.Sprintf("GOMAXPROCS %d, %d CPUs", runtime.GOMAXPROCS(0), runtime.NumCPU()), nil)
@@ -119,14 +119,14 @@ func (d *doctor) run(modelPath, clip string) error {
 	return nil
 }
 
-// checkFile reports the model's size, format and digest; false when it is
-// missing or not a model file.
-func (d *doctor) checkFile(path string) bool {
+// checkFile reports the model's size, format and digest, and returns the
+// format (modelFormat's); false when it is missing or not a model file.
+func (d *doctor) checkFile(path string) (bool, string) {
 	info, err := os.Stat(path)
 	if err != nil {
 		d.line("file", "missing", fmt.Errorf("%w; run `whistle download`", err))
 
-		return false
+		return false, ""
 	}
 
 	d.line("size", fmt.Sprintf("%d bytes (%.1f MB)", info.Size(), float64(info.Size())/1e6), nil)
@@ -138,7 +138,7 @@ func (d *doctor) checkFile(path string) bool {
 	if err != nil {
 		d.line("sha256", "", err)
 
-		return false
+		return false, format
 	}
 
 	f, found := d.pinnedFile(filepath.Base(path), sum)
@@ -152,7 +152,7 @@ func (d *doctor) checkFile(path string) bool {
 		d.line("sha256", fmt.Sprintf("%s = pinned %s@%.8s %s", sum, d.pinned.Repo, d.pinned.Revision, f.Path), nil)
 	}
 
-	return true
+	return true, format
 }
 
 // pinnedFile is the pinned file named name, or the one whose digest is sum.
@@ -332,13 +332,18 @@ func modelFormat(path string) (string, error) {
 	}
 }
 
-// weightsMode is how whistle.Load runs the file's weights.
-func weightsMode(path string) string {
-	if strings.EqualFold(filepath.Ext(path), ".safetensors") {
+// weightsMode is how whistle.Load runs weights of the given format
+// (modelFormat's): weights.Open tells the formats by their first bytes, not
+// by the file name.
+func weightsMode(format string) string {
+	switch {
+	case strings.HasPrefix(format, ".cact"):
+		return "packed: CQ matrices straight from the file (whistle.Load's default; WithFloatWeights dequantises)"
+	case strings.HasPrefix(format, ".safetensors"):
 		return "float32 (a safetensors checkpoint is float32)"
+	default:
+		return "unknown (not a model file)"
 	}
-
-	return "packed: CQ matrices straight from the file (whistle.Load's default; WithFloatWeights dequantises)"
 }
 
 // kernels names the assembly kernels this build and CPU run, mirroring the

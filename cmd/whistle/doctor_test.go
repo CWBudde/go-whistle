@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cwbudde/go-whistle/internal/cact"
 	"github.com/cwbudde/go-whistle/internal/hub"
 	"github.com/cwbudde/go-whistle/whistle"
 )
@@ -158,13 +160,30 @@ func TestKernels(t *testing.T) {
 	}
 }
 
+// The mode follows the format of the file's first bytes, as weights.Open
+// does, whatever the file is called.
 func TestWeightsMode(t *testing.T) {
-	if got := weightsMode("m/whistle.cact"); !strings.HasPrefix(got, "packed") {
-		t.Errorf(".cact: %q", got)
-	}
+	dir := t.TempDir()
 
-	if got := weightsMode("m/whistle.safetensors"); !strings.HasPrefix(got, "float32") {
-		t.Errorf(".safetensors: %q", got)
+	for name, c := range map[string]struct {
+		data []byte
+		want string
+	}{
+		"cact-as.safetensors": {binary.LittleEndian.AppendUint32(nil, cact.Tag), "packed"},
+		"safetensors-as.bin":  {append([]byte{2, 0, 0, 0, 0, 0, 0, 0}, '{'), "float32"},
+		"model.cact":          {[]byte("123456789"), "unknown"},
+	} {
+		path := filepath.Join(dir, name)
+
+		err := os.WriteFile(path, append(c.data, make([]byte, 16)...), 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		format, _ := modelFormat(path)
+		if got := weightsMode(format); !strings.HasPrefix(got, c.want) {
+			t.Errorf("%s: %q, want %s", name, got, c.want)
+		}
 	}
 }
 
