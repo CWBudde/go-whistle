@@ -845,12 +845,35 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
 
 ### 6.6 Silence gate & integration (`whistle/`; needs 6.1, 6.2, 6.5)
 
-- [ ] Silence gate: a loudness-range measure (e.g. a percentile spread of frame RMS in dB). Pick the measure and the
+- [x] Silence gate: a loudness-range measure (e.g. a percentile spread of frame RMS in dB). Pick the measure and the
       threshold from the 6.1 silence sweep (U10); return the exact empty JSON for silence.
-- [ ] Beam search wired into `Transcribe` (with keywords and depth once 6.3/6.4 are merged).
-- [ ] `just eval-librispeech`: WER of the Go pipeline and of the engine on the 6.1 subset.
-- [ ] **Accept:** transcripts equal the engine's on ≥ 95% of fixtures (with the rest explained in FINDINGS), and
+      (2026-10-10) — `internal/silence`: per front-end frame (Hann 400 centred every 160, zero padded) the mel energy
+      of channels 6–57 (centres 261–3307 Hz, the site's "250-3500 Hz") in dB; silence iff the nearest-rank p99 − p10
+      spread is ≤ 5 dB. Classifies all 340 sweep and limit verdicts like the engine, empty up to 4.985 dB
+      (step +2.65 dB), transcribed from 5.011 dB (en SNR −9.75 dB). The other 2 of the 342 are over 30 s and rejected
+      first. Leaderboard of 340 measures (`go test -tags oracle -run TestFitGate ./internal/silence/`): the full band
+      15 wrong (pink noise), flat 250–3500 Hz bins 12, the time-domain RMS 29; band edges ±1 channel and p9/p10 also
+      separate, the window and padding are not identified. `Transcribe` runs it after the length check and returns
+      `Result{}` (the engine's JSON without timestamps; `Silence()` once Phase 7 adds them) without decoding
+      (`TestGateMatchesEngine`, `TestTranscribeSilenceSweep`, `TestTranscribeLimits`; `docs/FINDINGS.md` F-031).
+- [x] Beam search wired into `Transcribe` (with keywords and depth once 6.3/6.4 are merged).
+      (2026-10-10) — beam search part done: `search.Beam(d, mem, search.Default())` behind the `strategy` seam, greedy
+      kept for tests. The F-027 clock reads the search's steps through `Options.Adjust` (TTFT at the first step after
+      the language token, `decode_tps` over the steps), chained before any keyword hook (`TestBeamClock`). Keywords
+      and depths 2–7 still return `ErrNotSupported`; they follow once 6.3 and 6.4 are merged (F-031).
+- [x] `just eval-librispeech`: WER of the Go pipeline and of the engine on the 6.1 subset.
+      (2026-10-10) — `TestEvalLibriSpeech` (runs only with `WHISTLE_EVAL_LIBRISPEECH`; skips without the model or
+      audio) transcribes the 200 utterances with `TranscribeWAV` and scores both sides with the manifest's `wer_rule`
+      through `internal/eval` (it reproduces the engine's 221 errors exactly): Go 223/4167 = 5.35 %, engine 5.30 %,
+      text equal on 181/200, language 200/200, 42.5–66.0 s for 1549 s of audio on a shared machine (F-031).
+- [x] **Accept:** transcripts equal the engine's on ≥ 95% of fixtures (with the rest explained in FINDINGS), and
       LibriSpeech test-clean WER is within 0.3 absolute of the engine on the same subset.
+      (2026-10-10) — Fixtures: 31/32 (96.9 %) equal in text and language through `Transcribe`
+      (`TestTranscribeMatchesEngine`); the miss, `fleurs-pl_pl-10047713455444904767`, is F-026's search miss (the
+      engine's text scores higher under our model, its prefix leaves the beam 0.135 nats behind the fifth). LibriSpeech
+      subset: 5.35 % against 5.30 %, +0.05 percentage points. Of the 19 texts that differ from the engine's, 8 only in
+      punctuation; under teacher forcing our model prefers ours on 17 by at most 0.025 nats per token, the other 2 are
+      search misses by under 0.001 (F-031). Holds without keywords at full depth; 6.3/6.4 add those.
 
 ## Phase 7 — Word timestamps & output JSON
 
@@ -936,7 +959,7 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 | U7  | Decoder prompt format, language detection — resolved: `[<s>]`, argmax language, F-023/F-024 | 5       | language + teacher-forced score   |
 | U8  | Beam length normalisation, EOS rules — resolved: Whisper's at 5 beams, Σ log p / len, F-026 | 6.2     | transcript parity                 |
 | U9  | Keyword bias weight and revocation                                                          | 6.3     | keyword fixture parity            |
-| U10 | Silence gate measure and threshold                                                          | 6.6     | threshold sweep                   |
+| U10 | Silence gate — resolved: p99 − p10 of 250–3500 Hz mel frame energy ≤ 5 dB, F-031            | 6.6     | threshold sweep                   |
 | U11 | Timestamp algorithm (heads/layers, DTW), word probability                                   | 7.2–7.3 | timestamp parity                  |
 | U12 | Streaming commit rule details, behaviour beyond 30 s                                        | 8.3–8.4 | stream parity                     |
 
