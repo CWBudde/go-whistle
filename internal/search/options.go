@@ -109,6 +109,11 @@ type Options struct {
 	Admit     Admit   // which EOS candidates finish a hypothesis (not StopAll)
 	Lang      LangStep
 	Adjust    Adjust // nil for none
+
+	// rankModel picks the final hypothesis by the model's log-probability
+	// instead of the adjusted one: Adjust then steers only the pruning (a
+	// keyword probe axis, docs/FINDINGS.md F-029).
+	rankModel bool
 }
 
 // Default is the variant the evidence on the 32 fixture clips picked
