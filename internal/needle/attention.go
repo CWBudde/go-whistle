@@ -257,33 +257,66 @@ func (a *Attention) normRotate(q, k []float32, t, off int, rope *Rope, tr *attnT
 	}
 }
 
+// attendGEMMRows is the query block from which attend batches each head
+// into two GEMMs; below it, one dot product and one axpy per key is
+// cheaper than gathering the head's keys and values (docs/FINDINGS.md
+// F-035).
+const attendGEMMRows = 8
+
 // attend is softmax(q kᵀ / √qk) v per query head with its KV head, the
 // heads concatenated per row, for t query rows at positions off … off+t−1
 // against the keys and values of k and v (off + t rows when causal).
 // Masked logits are left out, which equals upstream's float32-min fill:
 // their weights are exactly 0.
 func (a *Attention) attend(q, k, v []float32, t, off int, mask Mask, tr *attnTrace) []float32 {
-	qW, kW, vW, oW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v, a.heads*a.v
-	keys := len(k) / kW
-	out := make([]float32, t*oW)
-	scores := make([]float32, keys)
-	scale := float32(math.Sqrt(float64(a.qk))) // jnp.sqrt(float32(qk)); upstream divides by it
+	keys := len(k) / (a.kvHeads * a.qk)
 
 	if tr != nil {
 		tr.probs = make([]float32, a.heads*t*keys)
 	}
 
+	var out []float32
+	if t >= attendGEMMRows {
+		out = a.attendGEMM(q, k, v, t, off, mask, tr)
+	} else {
+		out = a.attendRows(q, k, v, t, off, mask, tr)
+	}
+
+	if tr != nil {
+		tr.attn = slices.Clone(out)
+	}
+
+	return out
+}
+
+// attendScale is the logits' divisor, jnp.sqrt(float32(qk)); upstream
+// divides by it.
+func (a *Attention) attendScale() float32 { return float32(math.Sqrt(float64(a.qk))) }
+
+// keysAt is the number of keys query row i at position off + i sees.
+func keysAt(keys, off, i int, mask Mask) int {
+	if mask == MaskCausal {
+		return off + i + 1
+	}
+
+	return keys
+}
+
+// attendRows is attend one query row at a time: a dot product per key for
+// the logits and an axpy per key for the weighted values.
+func (a *Attention) attendRows(q, k, v []float32, t, off int, mask Mask, tr *attnTrace) []float32 {
+	qW, kW, vW, oW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v, a.heads*a.v
+	keys := len(k) / kW
+	out := make([]float32, t*oW)
+	scores := make([]float32, keys)
+	scale := a.attendScale()
+
 	for h := range a.heads {
 		kv := a.kvHead(h)
 
 		for i := range t {
-			n := keys
-			if mask == MaskCausal {
-				n = off + i + 1
-			}
-
 			qi := q[i*qW+h*a.qk : i*qW+(h+1)*a.qk]
-			s := scores[:n]
+			s := scores[:keysAt(keys, off, i, mask)]
 
 			for j := range s {
 				s[j] = tensor.DotProduct(qi, k[j*kW+kv*a.qk:j*kW+(kv+1)*a.qk]) / scale
@@ -302,8 +335,58 @@ func (a *Attention) attend(q, k, v []float32, t, off int, mask Mask, tr *attnTra
 		}
 	}
 
-	if tr != nil {
-		tr.attn = slices.Clone(out)
+	return out
+}
+
+// attendGEMM is attend for a block of query rows: per KV head it gathers
+// the keys (keys × qk) and the transposed values (v × keys) once, and per
+// query head it computes all logits as Q·Kᵀ and all outputs as P·V with
+// tensor.MatMulTransB. The weights of masked keys are set to 0, so they
+// add exact zeros to P·V. The sums run in the GEMM's order instead of one
+// key after the other.
+func (a *Attention) attendGEMM(q, k, v []float32, t, off int, mask Mask, tr *attnTrace) []float32 {
+	qW, kW, vW, oW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v, a.heads*a.v
+	keys := len(k) / kW
+	out := make([]float32, t*oW)
+	qh, kh, vT := make([]float32, t*a.qk), make([]float32, keys*a.qk), make([]float32, a.v*keys)
+	probs := make([]float32, t*keys)
+	scale := a.attendScale()
+	group := a.heads / a.kvHeads
+
+	for kv := range a.kvHeads {
+		for j := range keys {
+			copy(kh[j*a.qk:(j+1)*a.qk], k[j*kW+kv*a.qk:j*kW+(kv+1)*a.qk])
+
+			for d, x := range v[j*vW+kv*a.v : j*vW+(kv+1)*a.v] {
+				vT[d*keys+j] = x
+			}
+		}
+
+		for h := kv * group; h < (kv+1)*group; h++ {
+			for i := range t {
+				copy(qh[i*a.qk:(i+1)*a.qk], q[i*qW+h*a.qk:i*qW+(h+1)*a.qk])
+			}
+
+			tensor.MatMulTransB(probs, keys, qh, kh, t, keys, a.qk)
+
+			for i := range t {
+				row := probs[i*keys : (i+1)*keys]
+				n := keysAt(keys, off, i, mask)
+
+				for j := range row[:n] {
+					row[j] /= scale
+				}
+
+				softmaxInPlace(row[:n])
+				clear(row[n:])
+
+				if tr != nil {
+					copy(tr.probs[(h*t+i)*keys:], row)
+				}
+			}
+
+			tensor.MatMulTransB(out[h*a.v:], oW, probs, vT, t, a.v, keys)
+		}
 	}
 
 	return out
