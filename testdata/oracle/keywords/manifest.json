@@ -1,0 +1,1030 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "model": {
+    "repo": "Cactus-Compute/whistle",
+    "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    "file": "whistle.cact",
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "command": "needle --audio-word-timestamps [--audio-keywords \u003ccase\u003e.txt]",
+  "threads": "4",
+  "match": "a keyword hits a text when its words occur consecutively in it, after lower-casing and turning every character other than a letter, digit or apostrophe into a word break",
+  "transcripts": "transcripts.json: \u003ccase\u003e, the run with the keyword file",
+  "cases": [
+    {
+      "name": "en-cowleys-missed",
+      "clip": "ls-other-3080-5040-0011",
+      "language": "en",
+      "kind": "missed",
+      "keywords": [
+        "Cowley's"
+      ],
+      "keywords_file": "en-cowleys-missed.txt",
+      "without": "../ls-other-3080-5040-0011.json",
+      "with": "en-cowleys-missed",
+      "reference": "HERE ARE SOME VERSES OF COWLEY'S TELL ME HOW YOU LIKE THEM",
+      "text_without": "Here are some verses of colonies. Tell me how you like them.",
+      "text_with": "Here are some verses of Cowley's. Tell me how you like them.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "en-cowleys-lower-missed",
+      "clip": "ls-other-3080-5040-0011",
+      "language": "en",
+      "kind": "missed",
+      "keywords": [
+        "cowley's"
+      ],
+      "keywords_file": "en-cowleys-lower-missed.txt",
+      "without": "../ls-other-3080-5040-0011.json",
+      "with": "en-cowleys-lower-missed",
+      "reference": "HERE ARE SOME VERSES OF COWLEY'S TELL ME HOW YOU LIKE THEM",
+      "text_without": "Here are some verses of colonies. Tell me how you like them.",
+      "text_with": "Here are some verses of Cowley's. Tell me how you like them.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "en-verses-present",
+      "clip": "ls-other-3080-5040-0011",
+      "language": "en",
+      "kind": "present",
+      "keywords": [
+        "verses"
+      ],
+      "keywords_file": "en-verses-present.txt",
+      "without": "../ls-other-3080-5040-0011.json",
+      "with": "en-verses-present",
+      "reference": "HERE ARE SOME VERSES OF COWLEY'S TELL ME HOW YOU LIKE THEM",
+      "text_without": "Here are some verses of colonies. Tell me how you like them.",
+      "text_with": "Here are some verses of colonies. Tell me how you like them.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "en-curses-distractor",
+      "clip": "ls-other-3080-5040-0011",
+      "language": "en",
+      "kind": "distractor",
+      "keywords": [
+        "curses"
+      ],
+      "keywords_file": "en-curses-distractor.txt",
+      "without": "../ls-other-3080-5040-0011.json",
+      "with": "en-curses-distractor",
+      "reference": "HERE ARE SOME VERSES OF COWLEY'S TELL ME HOW YOU LIKE THEM",
+      "text_without": "Here are some verses of colonies. Tell me how you like them.",
+      "text_with": "Here are some verses of colonies. Tell me how you like them.",
+      "changed": false,
+      "hits_reference": 0,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "en-verses-of-cowleys-phrase",
+      "clip": "ls-other-3080-5040-0011",
+      "language": "en",
+      "kind": "phrase",
+      "keywords": [
+        "verses of Cowley's"
+      ],
+      "keywords_file": "en-verses-of-cowleys-phrase.txt",
+      "without": "../ls-other-3080-5040-0011.json",
+      "with": "en-verses-of-cowleys-phrase",
+      "reference": "HERE ARE SOME VERSES OF COWLEY'S TELL ME HOW YOU LIKE THEM",
+      "text_without": "Here are some verses of colonies. Tell me how you like them.",
+      "text_with": "Here are some verses of Cowley's. Tell me how you like them.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "en-chance-present",
+      "clip": "ls-other-7902-96591-0023",
+      "language": "en",
+      "kind": "present",
+      "keywords": [
+        "chance"
+      ],
+      "keywords_file": "en-chance-present.txt",
+      "without": "../ls-other-7902-96591-0023.json",
+      "with": "en-chance-present",
+      "reference": "BUT THERE WAS NO CHANCE FOR HIS BODY THERE THE HEAD WOULD NOT GO FIRST",
+      "text_without": "But there was no chance for his body there, and the head would not go first.",
+      "text_with": "But there was no chance for his body there, and the head would not go first.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "en-transfer-distractor",
+      "clip": "ls-other-7902-96591-0023",
+      "language": "en",
+      "kind": "distractor",
+      "keywords": [
+        "transfer"
+      ],
+      "keywords_file": "en-transfer-distractor.txt",
+      "without": "../ls-other-7902-96591-0023.json",
+      "with": "en-transfer-distractor",
+      "reference": "BUT THERE WAS NO CHANCE FOR HIS BODY THERE THE HEAD WOULD NOT GO FIRST",
+      "text_without": "But there was no chance for his body there, and the head would not go first.",
+      "text_with": "But there was no transfer of his body there, and the head would not go first.",
+      "changed": true,
+      "hits_reference": 0,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "en-no-chance-phrase",
+      "clip": "ls-other-7902-96591-0023",
+      "language": "en",
+      "kind": "phrase",
+      "keywords": [
+        "no chance for his body"
+      ],
+      "keywords_file": "en-no-chance-phrase.txt",
+      "without": "../ls-other-7902-96591-0023.json",
+      "with": "en-no-chance-phrase",
+      "reference": "BUT THERE WAS NO CHANCE FOR HIS BODY THERE THE HEAD WOULD NOT GO FIRST",
+      "text_without": "But there was no chance for his body there, and the head would not go first.",
+      "text_with": "But there was no chance for his body there, and the head would not go first.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "en-the-door-phrase",
+      "clip": "ls-clean-5639-40744-0011",
+      "language": "en",
+      "kind": "phrase",
+      "keywords": [
+        "the door"
+      ],
+      "keywords_file": "en-the-door-phrase.txt",
+      "without": "../ls-clean-5639-40744-0011.json",
+      "with": "en-the-door-phrase",
+      "reference": "SHE FOUND THE DOOR BUT IT WAS LOCKED OUTSIDE",
+      "text_without": "She found a door, but it was locked outside.",
+      "text_with": "She found the door, but it was locked outside.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "en-looked-distractor",
+      "clip": "ls-clean-5639-40744-0011",
+      "language": "en",
+      "kind": "distractor",
+      "keywords": [
+        "looked"
+      ],
+      "keywords_file": "en-looked-distractor.txt",
+      "without": "../ls-clean-5639-40744-0011.json",
+      "with": "en-looked-distractor",
+      "reference": "SHE FOUND THE DOOR BUT IT WAS LOCKED OUTSIDE",
+      "text_without": "She found a door, but it was locked outside.",
+      "text_with": "She found a door, but it was locked outside.",
+      "changed": false,
+      "hits_reference": 0,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "en-sanct-missed",
+      "clip": "ls-other-4198-12281-0004",
+      "language": "en",
+      "kind": "missed",
+      "keywords": [
+        "Sanct"
+      ],
+      "keywords_file": "en-sanct-missed.txt",
+      "without": "../ls-other-4198-12281-0004.json",
+      "with": "en-sanct-missed",
+      "reference": "BY THE BELLY OF SANCT JAMES WHAT SHALL WE POOR DEVILS DRINK THE WHILE",
+      "text_without": "By the belly of St. James, what shall we poor devils drink the while?",
+      "text_with": "By the belly of St. James, what shall we poor devils drink the while?",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "en-sanct-james-phrase",
+      "clip": "ls-other-4198-12281-0004",
+      "language": "en",
+      "kind": "phrase",
+      "keywords": [
+        "Sanct James"
+      ],
+      "keywords_file": "en-sanct-james-phrase.txt",
+      "without": "../ls-other-4198-12281-0004.json",
+      "with": "en-sanct-james-phrase",
+      "reference": "BY THE BELLY OF SANCT JAMES WHAT SHALL WE POOR DEVILS DRINK THE WHILE",
+      "text_without": "By the belly of St. James, what shall we poor devils drink the while?",
+      "text_with": "By the belly of St. James, what shall we poor devils drink the while?",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "en-devils-present",
+      "clip": "ls-other-4198-12281-0004",
+      "language": "en",
+      "kind": "present",
+      "keywords": [
+        "devils"
+      ],
+      "keywords_file": "en-devils-present.txt",
+      "without": "../ls-other-4198-12281-0004.json",
+      "with": "en-devils-present",
+      "reference": "BY THE BELLY OF SANCT JAMES WHAT SHALL WE POOR DEVILS DRINK THE WHILE",
+      "text_without": "By the belly of St. James, what shall we poor devils drink the while?",
+      "text_with": "By the belly of St. James, what shall we poor devils drink the while?",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "en-did-it-phrase",
+      "clip": "ls-other-4198-12281-0014",
+      "language": "en",
+      "kind": "phrase",
+      "keywords": [
+        "did it"
+      ],
+      "keywords_file": "en-did-it-phrase.txt",
+      "without": "../ls-other-4198-12281-0014.json",
+      "with": "en-did-it-phrase",
+      "reference": "CAN YOU TELL WITH WHAT INSTRUMENTS THEY DID IT",
+      "text_without": "\"Can you tell with what instruments they did?\"",
+      "text_with": "Can you tell with what instruments they did it?",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "en-scout-present",
+      "clip": "ls-clean-1320-122617-0003",
+      "language": "en",
+      "kind": "present",
+      "keywords": [
+        "scout"
+      ],
+      "keywords_file": "en-scout-present.txt",
+      "without": "../ls-clean-1320-122617-0003.json",
+      "with": "en-scout-present",
+      "reference": "THERE WAS SOMETHING IN HIS AIR AND MANNER THAT BETRAYED TO THE SCOUT THE UTTER CONFUSION OF THE STATE OF HIS MIND",
+      "text_without": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "text_with": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "en-stout-distractor",
+      "clip": "ls-clean-1320-122617-0003",
+      "language": "en",
+      "kind": "distractor",
+      "keywords": [
+        "stout"
+      ],
+      "keywords_file": "en-stout-distractor.txt",
+      "without": "../ls-clean-1320-122617-0003.json",
+      "with": "en-stout-distractor",
+      "reference": "THERE WAS SOMETHING IN HIS AIR AND MANNER THAT BETRAYED TO THE SCOUT THE UTTER CONFUSION OF THE STATE OF HIS MIND",
+      "text_without": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "text_with": "There was something in his air and manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "changed": false,
+      "hits_reference": 0,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "en-uncas-present",
+      "clip": "ls-clean-1320-122617-0012",
+      "language": "en",
+      "kind": "present",
+      "keywords": [
+        "Uncas"
+      ],
+      "keywords_file": "en-uncas-present.txt",
+      "without": "../ls-clean-1320-122617-0012.json",
+      "with": "en-uncas-present",
+      "reference": "FOUR OR FIVE OF THE LATTER ONLY LINGERED ABOUT THE DOOR OF THE PRISON OF UNCAS WARY BUT CLOSE OBSERVERS OF THE MANNER OF THEIR CAPTIVE",
+      "text_without": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+      "text_with": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "de-paare-missed",
+      "clip": "fleurs-de_de-10308608197319017935",
+      "language": "de",
+      "kind": "missed",
+      "keywords": [
+        "Paare"
+      ],
+      "keywords_file": "de-paare-missed.txt",
+      "without": "../fleurs-de_de-10308608197319017935.json",
+      "with": "de-paare-missed",
+      "reference": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+      "text_without": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "text_with": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "de-adoptionsplan-missed",
+      "clip": "fleurs-de_de-10308608197319017935",
+      "language": "de",
+      "kind": "missed",
+      "keywords": [
+        "Adoptionsplan"
+      ],
+      "keywords_file": "de-adoptionsplan-missed.txt",
+      "without": "../fleurs-de_de-10308608197319017935.json",
+      "with": "de-adoptionsplan-missed",
+      "reference": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+      "text_without": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "text_with": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "de-adaptionsplan-distractor",
+      "clip": "fleurs-de_de-10308608197319017935",
+      "language": "de",
+      "kind": "distractor",
+      "keywords": [
+        "Adaptionsplan"
+      ],
+      "keywords_file": "de-adaptionsplan-distractor.txt",
+      "without": "../fleurs-de_de-10308608197319017935.json",
+      "with": "de-adaptionsplan-distractor",
+      "reference": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+      "text_without": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "text_with": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "changed": false,
+      "hits_reference": 0,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "de-baby-present",
+      "clip": "fleurs-de_de-10308608197319017935",
+      "language": "de",
+      "kind": "present",
+      "keywords": [
+        "Baby"
+      ],
+      "keywords_file": "de-baby-present.txt",
+      "without": "../fleurs-de_de-10308608197319017935.json",
+      "with": "de-baby-present",
+      "reference": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+      "text_without": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "text_with": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "de-diese-paare-phrase",
+      "clip": "fleurs-de_de-10308608197319017935",
+      "language": "de",
+      "kind": "phrase",
+      "keywords": [
+        "Diese Paare"
+      ],
+      "keywords_file": "de-diese-paare-phrase.txt",
+      "without": "../fleurs-de_de-10308608197319017935.json",
+      "with": "de-diese-paare-phrase",
+      "reference": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+      "text_without": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "text_with": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "de-paare-adoptionsplan-list",
+      "clip": "fleurs-de_de-10308608197319017935",
+      "language": "de",
+      "kind": "list",
+      "keywords": [
+        "Paare",
+        "Adoptionsplan"
+      ],
+      "keywords_file": "de-paare-adoptionsplan-list.txt",
+      "without": "../fleurs-de_de-10308608197319017935.json",
+      "with": "de-paare-adoptionsplan-list",
+      "reference": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+      "text_without": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden.",
+      "text_with": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden.",
+      "changed": true,
+      "hits_reference": 2,
+      "hits_without": 0,
+      "hits_with": 2
+    },
+    {
+      "name": "de-fast-jeder-phrase",
+      "clip": "fleurs-de_de-10229344228128634115",
+      "language": "de",
+      "kind": "phrase",
+      "keywords": [
+        "Fast jeder"
+      ],
+      "keywords_file": "de-fast-jeder-phrase.txt",
+      "without": "../fleurs-de_de-10229344228128634115.json",
+      "with": "de-fast-jeder-phrase",
+      "reference": "Jeder nimmt an der Gesellschaft teil und benutzt Transportsysteme. Fast jeder beklagt sich über die Transportsysteme.x",
+      "text_without": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "text_with": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, fast jeder beklagt sich über die Transportsysteme.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "de-gesellschaft-present",
+      "clip": "fleurs-de_de-10229344228128634115",
+      "language": "de",
+      "kind": "present",
+      "keywords": [
+        "Gesellschaft"
+      ],
+      "keywords_file": "de-gesellschaft-present.txt",
+      "without": "../fleurs-de_de-10229344228128634115.json",
+      "with": "de-gesellschaft-present",
+      "reference": "Jeder nimmt an der Gesellschaft teil und benutzt Transportsysteme. Fast jeder beklagt sich über die Transportsysteme.x",
+      "text_without": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "text_with": "Jeder nimmt an der Gesellschaft Teil und benutzt Transportsysteme, was jeder beklagt sich über die Transportsysteme.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "fr-fisichella-missed",
+      "clip": "fleurs-fr_fr-10174413140250646001",
+      "language": "fr",
+      "kind": "missed",
+      "keywords": [
+        "Fisichella"
+      ],
+      "keywords_file": "fr-fisichella-missed.txt",
+      "without": "../fleurs-fr_fr-10174413140250646001.json",
+      "with": "fr-fisichella-missed",
+      "reference": "Giancarlo Fisichella a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "text_without": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "text_with": "Jan Carlo Fittiella a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "fr-giancarlo-fisichella-phrase",
+      "clip": "fleurs-fr_fr-10174413140250646001",
+      "language": "fr",
+      "kind": "phrase",
+      "keywords": [
+        "Giancarlo Fisichella"
+      ],
+      "keywords_file": "fr-giancarlo-fisichella-phrase.txt",
+      "without": "../fleurs-fr_fr-10174413140250646001.json",
+      "with": "fr-giancarlo-fisichella-phrase",
+      "reference": "Giancarlo Fisichella a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "text_without": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "text_with": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "fr-voiture-present",
+      "clip": "fleurs-fr_fr-10174413140250646001",
+      "language": "fr",
+      "kind": "present",
+      "keywords": [
+        "voiture"
+      ],
+      "keywords_file": "fr-voiture-present.txt",
+      "without": "../fleurs-fr_fr-10174413140250646001.json",
+      "with": "fr-voiture-present",
+      "reference": "Giancarlo Fisichella a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "text_without": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "text_with": "Jan Carlo Fitierla a perdu le contrôle de sa voiture et a terminé la course peu après le démarrage.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "fr-cristaux-missed",
+      "clip": "fleurs-fr_fr-10385751433252343757",
+      "language": "fr",
+      "kind": "missed",
+      "keywords": [
+        "cristaux"
+      ],
+      "keywords_file": "fr-cristaux-missed.txt",
+      "without": "../fleurs-fr_fr-10385751433252343757.json",
+      "with": "fr-cristaux-missed",
+      "reference": "Les deux composés réagissent l'un avec l'autre pour former des cristaux qui peuvent bloquer la fonction rénale, ont déclaré des chercheurs de l'université.",
+      "text_without": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "text_with": "Les deux composés réagissent là avec l'autre pour former des cristaux qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "fr-renale-missed",
+      "clip": "fleurs-fr_fr-10385751433252343757",
+      "language": "fr",
+      "kind": "missed",
+      "keywords": [
+        "rénale"
+      ],
+      "keywords_file": "fr-renale-missed.txt",
+      "without": "../fleurs-fr_fr-10385751433252343757.json",
+      "with": "fr-renale-missed",
+      "reference": "Les deux composés réagissent l'un avec l'autre pour former des cristaux qui peuvent bloquer la fonction rénale, ont déclaré des chercheurs de l'université.",
+      "text_without": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "text_with": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "fr-cristal-distractor",
+      "clip": "fleurs-fr_fr-10385751433252343757",
+      "language": "fr",
+      "kind": "distractor",
+      "keywords": [
+        "cristal"
+      ],
+      "keywords_file": "fr-cristal-distractor.txt",
+      "without": "../fleurs-fr_fr-10385751433252343757.json",
+      "with": "fr-cristal-distractor",
+      "reference": "Les deux composés réagissent l'un avec l'autre pour former des cristaux qui peuvent bloquer la fonction rénale, ont déclaré des chercheurs de l'université.",
+      "text_without": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "text_with": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "changed": false,
+      "hits_reference": 0,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "fr-cristaux-renale-declare-list",
+      "clip": "fleurs-fr_fr-10385751433252343757",
+      "language": "fr",
+      "kind": "list",
+      "keywords": [
+        "cristaux",
+        "rénale",
+        "ont déclaré"
+      ],
+      "keywords_file": "fr-cristaux-renale-declare-list.txt",
+      "without": "../fleurs-fr_fr-10385751433252343757.json",
+      "with": "fr-cristaux-renale-declare-list",
+      "reference": "Les deux composés réagissent l'un avec l'autre pour former des cristaux qui peuvent bloquer la fonction rénale, ont déclaré des chercheurs de l'université.",
+      "text_without": "Les deux composés réagissent là avec l'autre pour former des Christos qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "text_with": "Les deux composés réagissent là avec l'autre pour former des cristaux qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université.",
+      "changed": true,
+      "hits_reference": 3,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "es-aliviar-missed",
+      "clip": "fleurs-es_419-10236991702517253859",
+      "language": "es",
+      "kind": "missed",
+      "keywords": [
+        "aliviar"
+      ],
+      "keywords_file": "es-aliviar-missed.txt",
+      "without": "../fleurs-es_419-10236991702517253859.json",
+      "with": "es-aliviar-missed",
+      "reference": "No ha podido tomarse medicamentos para aliviar el dolor, porque está prohibido su uso en los Juegos.",
+      "text_without": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "text_with": "No ha podido tomarse medicamentos para aliviar el dolor porque está prohibido su uso en los juegos.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "es-aliviar-el-dolor-phrase",
+      "clip": "fleurs-es_419-10236991702517253859",
+      "language": "es",
+      "kind": "phrase",
+      "keywords": [
+        "aliviar el dolor"
+      ],
+      "keywords_file": "es-aliviar-el-dolor-phrase.txt",
+      "without": "../fleurs-es_419-10236991702517253859.json",
+      "with": "es-aliviar-el-dolor-phrase",
+      "reference": "No ha podido tomarse medicamentos para aliviar el dolor, porque está prohibido su uso en los Juegos.",
+      "text_without": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "text_with": "No ha podido tomarse medicamentos para aliviar el dolor porque está prohibido su uso en los juegos.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "es-medicamentos-present",
+      "clip": "fleurs-es_419-10236991702517253859",
+      "language": "es",
+      "kind": "present",
+      "keywords": [
+        "medicamentos"
+      ],
+      "keywords_file": "es-medicamentos-present.txt",
+      "without": "../fleurs-es_419-10236991702517253859.json",
+      "with": "es-medicamentos-present",
+      "reference": "No ha podido tomarse medicamentos para aliviar el dolor, porque está prohibido su uso en los Juegos.",
+      "text_without": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "text_with": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "es-homenaje-present",
+      "clip": "fleurs-es_419-10149016836336603986",
+      "language": "es",
+      "kind": "present",
+      "keywords": [
+        "homenaje"
+      ],
+      "keywords_file": "es-homenaje-present.txt",
+      "without": "../fleurs-es_419-10149016836336603986.json",
+      "with": "es-homenaje-present",
+      "reference": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "text_without": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "text_with": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "es-luchadoras-distractor",
+      "clip": "fleurs-es_419-10149016836336603986",
+      "language": "es",
+      "kind": "distractor",
+      "keywords": [
+        "luchadoras"
+      ],
+      "keywords_file": "es-luchadoras-distractor.txt",
+      "without": "../fleurs-es_419-10149016836336603986.json",
+      "with": "es-luchadoras-distractor",
+      "reference": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "text_without": "Los luchadores compañeros de Luna también le rindieron homenaje.",
+      "text_with": "Los luchadoras compañeros de Luna también le rindieron homenaje.",
+      "changed": true,
+      "hits_reference": 0,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "it-accomunano-missed",
+      "clip": "fleurs-it_it-10210638754804006465",
+      "language": "it",
+      "kind": "missed",
+      "keywords": [
+        "accomunano"
+      ],
+      "keywords_file": "it-accomunano-missed.txt",
+      "without": "../fleurs-it_it-10210638754804006465.json",
+      "with": "it-accomunano-missed",
+      "reference": "Eppure gli uccelli hanno molte caratteristiche che li accomunano ai dinosauri.",
+      "text_without": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "text_with": "Eppure gli uccelli hanno molte caratteristiche che vi accomunano ai dinosauri.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "it-li-accomunano-phrase",
+      "clip": "fleurs-it_it-10210638754804006465",
+      "language": "it",
+      "kind": "phrase",
+      "keywords": [
+        "li accomunano"
+      ],
+      "keywords_file": "it-li-accomunano-phrase.txt",
+      "without": "../fleurs-it_it-10210638754804006465.json",
+      "with": "it-li-accomunano-phrase",
+      "reference": "Eppure gli uccelli hanno molte caratteristiche che li accomunano ai dinosauri.",
+      "text_without": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "text_with": "Eppure gli uccelli hanno molte caratteristiche che li accomunano ai dinosauri.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "it-uccelli-present",
+      "clip": "fleurs-it_it-10210638754804006465",
+      "language": "it",
+      "kind": "present",
+      "keywords": [
+        "uccelli"
+      ],
+      "keywords_file": "it-uccelli-present.txt",
+      "without": "../fleurs-it_it-10210638754804006465.json",
+      "with": "it-uccelli-present",
+      "reference": "Eppure gli uccelli hanno molte caratteristiche che li accomunano ai dinosauri.",
+      "text_without": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "text_with": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "it-montagna-present",
+      "clip": "fleurs-it_it-1006729518827641482",
+      "language": "it",
+      "kind": "present",
+      "keywords": [
+        "montagna"
+      ],
+      "keywords_file": "it-montagna-present.txt",
+      "without": "../fleurs-it_it-1006729518827641482.json",
+      "with": "it-montagna-present",
+      "reference": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "text_without": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "text_with": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "it-montagne-distractor",
+      "clip": "fleurs-it_it-1006729518827641482",
+      "language": "it",
+      "kind": "distractor",
+      "keywords": [
+        "montagne"
+      ],
+      "keywords_file": "it-montagne-distractor.txt",
+      "without": "../fleurs-it_it-1006729518827641482.json",
+      "with": "it-montagne-distractor",
+      "reference": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "text_without": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "text_with": "L'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+      "changed": false,
+      "hits_reference": 0,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "nl-varkens-missed",
+      "clip": "fleurs-nl_nl-1004717084892689357",
+      "language": "nl",
+      "kind": "missed",
+      "keywords": [
+        "Varkens"
+      ],
+      "keywords_file": "nl-varkens-missed.txt",
+      "without": "../fleurs-nl_nl-1004717084892689357.json",
+      "with": "nl-varkens-missed",
+      "reference": "Varkens dragen de ziekte bij zich en dragen het via muggen over op mensen.",
+      "text_without": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+      "text_with": "Varkensdragelen ziet erbij, zich aandragen het via mugen overal mensen.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "nl-muggen-missed",
+      "clip": "fleurs-nl_nl-1004717084892689357",
+      "language": "nl",
+      "kind": "missed",
+      "keywords": [
+        "muggen"
+      ],
+      "keywords_file": "nl-muggen-missed.txt",
+      "without": "../fleurs-nl_nl-1004717084892689357.json",
+      "with": "nl-muggen-missed",
+      "reference": "Varkens dragen de ziekte bij zich en dragen het via muggen over op mensen.",
+      "text_without": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+      "text_with": "Vanke strafreziekte bij zich en dragen het via muggen overal mensen.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "nl-dragen-de-ziekte-phrase",
+      "clip": "fleurs-nl_nl-1004717084892689357",
+      "language": "nl",
+      "kind": "phrase",
+      "keywords": [
+        "dragen de ziekte"
+      ],
+      "keywords_file": "nl-dragen-de-ziekte-phrase.txt",
+      "without": "../fleurs-nl_nl-1004717084892689357.json",
+      "with": "nl-dragen-de-ziekte-phrase",
+      "reference": "Varkens dragen de ziekte bij zich en dragen het via muggen over op mensen.",
+      "text_without": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+      "text_with": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "nl-continuummodel-missed",
+      "clip": "fleurs-nl_nl-10042455874761876908",
+      "language": "nl",
+      "kind": "missed",
+      "keywords": [
+        "continuümmodel"
+      ],
+      "keywords_file": "nl-continuummodel-missed.txt",
+      "without": "../fleurs-nl_nl-10042455874761876908.json",
+      "with": "nl-continuummodel-missed",
+      "reference": "Volgens Angel (2006) kunnen organisaties beter presteren met een aanpak op basis van het continuümmodel.",
+      "text_without": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "text_with": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "nl-organisaties-present",
+      "clip": "fleurs-nl_nl-10042455874761876908",
+      "language": "nl",
+      "kind": "present",
+      "keywords": [
+        "organisaties"
+      ],
+      "keywords_file": "nl-organisaties-present.txt",
+      "without": "../fleurs-nl_nl-10042455874761876908.json",
+      "with": "nl-organisaties-present",
+      "reference": "Volgens Angel (2006) kunnen organisaties beter presteren met een aanpak op basis van het continuümmodel.",
+      "text_without": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "text_with": "Volgens Angel 2006 kunnen organisaties beter presteren met een aanpak op basis van het continuummodel.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "pl-gubernatora-missed",
+      "clip": "fleurs-pl_pl-10047713455444904767",
+      "language": "pl",
+      "kind": "missed",
+      "keywords": [
+        "gubernatora"
+      ],
+      "keywords_file": "pl-gubernatora-missed.txt",
+      "without": "../fleurs-pl_pl-10047713455444904767.json",
+      "with": "pl-gubernatora-missed",
+      "reference": "Zgodnie z oświadczeniem biura gubernatora wśród rannych było dziewiętnastu policjantów.",
+      "text_without": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+      "text_with": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "pl-dziewietnastu-policjantow-phrase",
+      "clip": "fleurs-pl_pl-10047713455444904767",
+      "language": "pl",
+      "kind": "phrase",
+      "keywords": [
+        "dziewiętnastu policjantów"
+      ],
+      "keywords_file": "pl-dziewietnastu-policjantow-phrase.txt",
+      "without": "../fleurs-pl_pl-10047713455444904767.json",
+      "with": "pl-dziewietnastu-policjantow-phrase",
+      "reference": "Zgodnie z oświadczeniem biura gubernatora wśród rannych było dziewiętnastu policjantów.",
+      "text_without": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+      "text_with": "Zgodnie z oświadczeniem Burego Bernatorowi Śródranych płodzi w ją nas opolicjantów.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "pl-zgodnie-present",
+      "clip": "fleurs-pl_pl-10047713455444904767",
+      "language": "pl",
+      "kind": "present",
+      "keywords": [
+        "Zgodnie"
+      ],
+      "keywords_file": "pl-zgodnie-present.txt",
+      "without": "../fleurs-pl_pl-10047713455444904767.json",
+      "with": "pl-zgodnie-present",
+      "reference": "Zgodnie z oświadczeniem biura gubernatora wśród rannych było dziewiętnastu policjantów.",
+      "text_without": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+      "text_with": "Zgodnie z oświadczeniem wyreguber na towarów śródranych płodzi w ją nas obolicjantów.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    },
+    {
+      "name": "pl-wysp-missed",
+      "clip": "fleurs-pl_pl-10013271501230525766",
+      "language": "pl",
+      "kind": "missed",
+      "keywords": [
+        "wysp"
+      ],
+      "keywords_file": "pl-wysp-missed.txt",
+      "without": "../fleurs-pl_pl-10013271501230525766.json",
+      "with": "pl-wysp-missed",
+      "reference": "Większość mniejszych wysp to narody niezależne lub sprzymierzone z Francją i słynące jako luksusowe nadmorskie miejscowości wypoczynkowe.",
+      "text_without": "W większość mniejszych wyzptów to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "text_with": "W większość mniejszych wysp to narody niezależne lub wspomnieżone z Francją, micłynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 1
+    },
+    {
+      "name": "pl-luksusowe-missed",
+      "clip": "fleurs-pl_pl-10013271501230525766",
+      "language": "pl",
+      "kind": "missed",
+      "keywords": [
+        "luksusowe"
+      ],
+      "keywords_file": "pl-luksusowe-missed.txt",
+      "without": "../fleurs-pl_pl-10013271501230525766.json",
+      "with": "pl-luksusowe-missed",
+      "reference": "Większość mniejszych wysp to narody niezależne lub sprzymierzone z Francją i słynące jako luksusowe nadmorskie miejscowości wypoczynkowe.",
+      "text_without": "W większość mniejszych wyzptów to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "text_with": "W większość mniejszych wyzptów to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "changed": false,
+      "hits_reference": 1,
+      "hits_without": 0,
+      "hits_with": 0
+    },
+    {
+      "name": "pl-francja-present",
+      "clip": "fleurs-pl_pl-10013271501230525766",
+      "language": "pl",
+      "kind": "present",
+      "keywords": [
+        "Francją"
+      ],
+      "keywords_file": "pl-francja-present.txt",
+      "without": "../fleurs-pl_pl-10013271501230525766.json",
+      "with": "pl-francja-present",
+      "reference": "Większość mniejszych wysp to narody niezależne lub sprzymierzone z Francją i słynące jako luksusowe nadmorskie miejscowości wypoczynkowe.",
+      "text_without": "W większość mniejszych wyzptów to narody niezależne lub wspomnieżone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "text_with": "W większość mniejszych wyzptów to narody niezależne lub wspierzone z Francją i słynące ekologiczowe nadwalskie miejscowości wypoczynkowe.",
+      "changed": true,
+      "hits_reference": 1,
+      "hits_without": 1,
+      "hits_with": 1
+    }
+  ]
+}

@@ -1,0 +1,516 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "model": {
+    "repo": "Cactus-Compute/whistle",
+    "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    "file": "whistle.cact",
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "command": "needle --audio-word-timestamps",
+  "threads": "4",
+  "generator": "tools/oracle/probe LimitSet",
+  "input": "each signal is written as a 32-bit float mono 16 kHz WAV, so the CLI reads the float32 samples whose SHA-256 is pcm_sha256 exactly",
+  "lib_check": "lib is needle_transcribe (libneedle3, word_timestamps 1) on the same samples: its return code (tokens generated, or \u003c 0), needle_last_error, whether it returned exactly empty_json and whether its JSON equals the CLI's after dropping the timing fields",
+  "empty_json": "{\"text\":\"\",\"language\":\"\",\"words\":[],\"ttft_ms\":0.0,\"decode_tps\":0.0}",
+  "clips": {
+    "fleurs-de_de-10308608197319017935": "544cab4432eb05943f0457107e0858124b53ca35bde5c4447143506fc936abc2",
+    "ls-clean-1320-122617-0003": "b3441360742f4a1b3ae938fe7dc666aa0b9ff6214f766edb4c23d916f691e3b9"
+  },
+  "signals": [
+    {
+      "name": "silence-0",
+      "kind": "silence",
+      "samples": 0,
+      "purpose": "No samples at all, and one.",
+      "pcm_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "cli": {
+        "exit": 1,
+        "stderr": "needle: silence-0.wav holds no audio"
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": false
+      },
+      "empty": false,
+      "text": "",
+      "language": ""
+    },
+    {
+      "name": "silence-1",
+      "kind": "silence",
+      "samples": 1,
+      "purpose": "No samples at all, and one.",
+      "pcm_sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "silence-1"
+    },
+    {
+      "name": "speech-1",
+      "kind": "speech",
+      "samples": 1,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 32001,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "397f6b73851ee5974b04d04285b2910e0295cfc4a8876ff5c79808a9fbe3eda8",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "speech-1"
+    },
+    {
+      "name": "speech-2",
+      "kind": "speech",
+      "samples": 2,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 32002,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "cd696555eeda37eaf874a5e94e0fddf87a349ccfd4fbe72269864db48c623ad3",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "speech-2"
+    },
+    {
+      "name": "speech-3",
+      "kind": "speech",
+      "samples": 3,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 32003,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "572e9dd15d3f195cccca461d27159acfe95822a08aec70d68d8887bf97140952",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "speech-3"
+    },
+    {
+      "name": "speech-10",
+      "kind": "speech",
+      "samples": 10,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 32010,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "dcdf2bcad5a56ec524ac673ce5bdd281ca9e9195288f6825fb266c8e9c563f16",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "speech-10"
+    },
+    {
+      "name": "speech-100",
+      "kind": "speech",
+      "samples": 100,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 32100,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "f8fc5edc2253781ecee90a3773435943e29047dd65d25cafe5b93c61619e060c",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "speech-100"
+    },
+    {
+      "name": "speech-159",
+      "kind": "speech",
+      "samples": 159,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 32159,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "1d5cd8410fd9fe035fef9bf7c70e18823ad9553e871b42fc34722f412f781dc6",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "speech-159"
+    },
+    {
+      "name": "speech-160",
+      "kind": "speech",
+      "samples": 160,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 32160,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "de3d569492868cdf956f5e692f12317db29e8035fa184c3954b93d3295e531d6",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "speech-160"
+    },
+    {
+      "name": "speech-161",
+      "kind": "speech",
+      "samples": 161,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 32161,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "15153206cbfe12d86a84836b6de6ae804e98a8a6e194ee915ca10d8ae1a26f6c",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "speech-161"
+    },
+    {
+      "name": "speech-1279",
+      "kind": "speech",
+      "samples": 1279,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 33279,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "03c5d339222ca6dc633931be87ac77ce046250e1549389e5d167bd73fec154eb",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 2,
+        "empty": false,
+        "same_as_cli": true
+      },
+      "empty": false,
+      "text": "you",
+      "language": "en",
+      "transcript": "speech-1279"
+    },
+    {
+      "name": "speech-1280",
+      "kind": "speech",
+      "samples": 1280,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 33280,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "0240a08617d0edd108ce07581e1233cc96955ef3ca7f62a0c40804d28abe973d",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 2,
+        "empty": false,
+        "same_as_cli": true
+      },
+      "empty": false,
+      "text": "you",
+      "language": "en",
+      "transcript": "speech-1280"
+    },
+    {
+      "name": "speech-1281",
+      "kind": "speech",
+      "samples": 1281,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 33281,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "2da6b938f1e9445cf726bc1f554de2e958d885ab3fec7f8c0325cb9bfbf61c32",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 2,
+        "empty": false,
+        "same_as_cli": true
+      },
+      "empty": false,
+      "text": "you",
+      "language": "en",
+      "transcript": "speech-1281"
+    },
+    {
+      "name": "speech-2560",
+      "kind": "speech",
+      "samples": 2560,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 34560,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "470e4ef7b6f505858e4738f5a85ebd1047e248a18537004c5ae399a6c68286d3",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 3,
+        "empty": false,
+        "same_as_cli": true
+      },
+      "empty": false,
+      "text": "Yeah.",
+      "language": "en",
+      "transcript": "speech-2560"
+    },
+    {
+      "name": "speech-4000",
+      "kind": "speech",
+      "samples": 4000,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 36000,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "bf5baa607f4ae4fb7288cc8f46f7f6d6aca062fd8e082a4dd7608001ae04f8b4",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 6,
+        "empty": false,
+        "same_as_cli": true
+      },
+      "empty": false,
+      "text": "I don't know.",
+      "language": "en",
+      "transcript": "speech-4000"
+    },
+    {
+      "name": "speech-8000",
+      "kind": "speech",
+      "samples": 8000,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 40000,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "ce03f2b09b5b1cbc010058bcff8c771aa2db97952039a6e273d7aa7d15798ded",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 3,
+        "empty": false,
+        "same_as_cli": true
+      },
+      "empty": false,
+      "text": "or that.",
+      "language": "en",
+      "transcript": "speech-8000"
+    },
+    {
+      "name": "speech-16000",
+      "kind": "speech",
+      "samples": 16000,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 48000,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "4056e716a0272b4fd0d9db0261023ce2d91cd373f20d10151af81284ccd1402d",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 6,
+        "empty": false,
+        "same_as_cli": true
+      },
+      "empty": false,
+      "text": "that betrayed to",
+      "language": "en",
+      "transcript": "speech-16000"
+    },
+    {
+      "name": "speech-32000",
+      "kind": "speech",
+      "samples": 32000,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_from": 32000,
+      "clip_to": 64000,
+      "purpose": "A speech excerpt of a handful of samples up to 2 s: the shortest input, the frame edges at 160 and 1280 samples, and when a short excerpt starts to transcribe.",
+      "pcm_sha256": "05062b2c9b98f41848776dc5ef5a4167b824ee78712e66615bd85208c5c58352",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 11,
+        "empty": false,
+        "same_as_cli": true
+      },
+      "empty": false,
+      "text": "that betrayed to the scout the other",
+      "language": "en",
+      "transcript": "speech-32000"
+    },
+    {
+      "name": "silence-480000",
+      "kind": "silence",
+      "samples": 480000,
+      "purpose": "Exactly 30 s and one sample more: the limit is inclusive, and the exact error text.",
+      "pcm_sha256": "124617c1f65e92d3bc895fbd869e4bb16a30754b198f59e6e973949b9aaa1b01",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 0,
+        "empty": true,
+        "same_as_cli": true
+      },
+      "empty": true,
+      "text": "",
+      "language": "",
+      "transcript": "silence-480000"
+    },
+    {
+      "name": "speech-480000",
+      "kind": "speech",
+      "samples": 480000,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_to": 100560,
+      "purpose": "Exactly 30 s and one sample more: the limit is inclusive, and the exact error text.",
+      "pcm_sha256": "33ad9accfbb9901344355c3abb6d767900ad08efa816edf4078050acefc96876",
+      "cli": {
+        "exit": 0
+      },
+      "lib": {
+        "rc": 32,
+        "empty": false,
+        "same_as_cli": true
+      },
+      "empty": false,
+      "text": "And there was something in his air in the manner that betrayed to the scout the utter confusion of the state of his mind.",
+      "language": "en",
+      "transcript": "speech-480000"
+    },
+    {
+      "name": "silence-480001",
+      "kind": "silence",
+      "samples": 480001,
+      "purpose": "Exactly 30 s and one sample more: the limit is inclusive, and the exact error text.",
+      "pcm_sha256": "bac06b80a55f7b83c2d7a83ba183d897cd621b462b5f118ea6f6f120f4ed2add",
+      "cli": {
+        "exit": 1,
+        "stderr": "needle: audio limit is 30 s"
+      },
+      "lib": {
+        "rc": -1,
+        "error": "audio limit is 30 s",
+        "empty": false,
+        "same_as_cli": false
+      },
+      "empty": false,
+      "text": "",
+      "language": ""
+    },
+    {
+      "name": "speech-480001",
+      "kind": "speech",
+      "samples": 480001,
+      "gain": 1,
+      "clip": "ls-clean-1320-122617-0003",
+      "clip_to": 100560,
+      "purpose": "Exactly 30 s and one sample more: the limit is inclusive, and the exact error text.",
+      "pcm_sha256": "4001d33912f70dd495f5022624f932543b8fe20046652b9a8df8c25a9e59f273",
+      "cli": {
+        "exit": 1,
+        "stderr": "needle: audio limit is 30 s"
+      },
+      "lib": {
+        "rc": -1,
+        "error": "audio limit is 30 s",
+        "empty": false,
+        "same_as_cli": false
+      },
+      "empty": false,
+      "text": "",
+      "language": ""
+    }
+  ]
+}

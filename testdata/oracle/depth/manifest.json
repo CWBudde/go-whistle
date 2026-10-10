@@ -1,0 +1,86 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "model": {
+    "repo": "Cactus-Compute/whistle",
+    "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    "file": "whistle.cact",
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "command": "needle --audio-word-timestamps --audio-depth N",
+  "threads": "4",
+  "transcripts": "transcripts.json: \u003cclip\u003e.d\u003cN\u003e",
+  "full_depth": 8,
+  "depths": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "clips": [
+    "ls-clean-6930-75918-0000",
+    "ls-clean-6930-75918-0007",
+    "ls-clean-1320-122617-0003",
+    "ls-clean-1320-122617-0012",
+    "ls-clean-5639-40744-0011",
+    "ls-clean-5639-40744-0014",
+    "ls-clean-260-123440-0018",
+    "ls-clean-260-123440-0007",
+    "ls-clean-7729-102255-0045",
+    "ls-clean-7729-102255-0012",
+    "ls-other-7902-96591-0023",
+    "ls-other-7902-96591-0005",
+    "ls-other-7018-75788-0016",
+    "ls-other-7018-75788-0019",
+    "ls-other-4198-12281-0004",
+    "ls-other-4198-12281-0014",
+    "ls-other-3080-5040-0018",
+    "ls-other-3080-5040-0011",
+    "ls-other-8280-266249-0032",
+    "ls-other-8280-266249-0029",
+    "fleurs-de_de-10229344228128634115",
+    "fleurs-de_de-10308608197319017935",
+    "fleurs-fr_fr-10174413140250646001",
+    "fleurs-fr_fr-10385751433252343757",
+    "fleurs-es_419-10149016836336603986",
+    "fleurs-es_419-10236991702517253859",
+    "fleurs-it_it-1006729518827641482",
+    "fleurs-it_it-10210638754804006465",
+    "fleurs-nl_nl-10042455874761876908",
+    "fleurs-nl_nl-1004717084892689357",
+    "fleurs-pl_pl-10013271501230525766",
+    "fleurs-pl_pl-10047713455444904767"
+  ],
+  "same_text_as_full": [
+    {
+      "depth": 2,
+      "clips": 7
+    },
+    {
+      "depth": 3,
+      "clips": 11
+    },
+    {
+      "depth": 4,
+      "clips": 11
+    },
+    {
+      "depth": 5,
+      "clips": 16
+    },
+    {
+      "depth": 6,
+      "clips": 15
+    },
+    {
+      "depth": 7,
+      "clips": 19
+    }
+  ]
+}
