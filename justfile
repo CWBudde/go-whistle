@@ -109,6 +109,10 @@ encoder-probe *args:
 decoder-probe *args:
     go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbe(Baselines|Search|Greedy)$' ./internal/decoder/ {{args}}
 
+# Score the beam search variants against the committed engine transcripts and report the leader (WHISTLE_PROBE_TOP/KEY)
+search-probe *args:
+    go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbeBeam$' ./internal/search/ {{args}}
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html

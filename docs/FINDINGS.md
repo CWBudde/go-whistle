@@ -1599,6 +1599,101 @@ the committed `subset.json`. The engine's WER on the subset is 221/4167 = 5.30 %
 normalised by upper-casing and punctuation removal only. Upstream's 4.31 % is over all of test-clean with a fuller
 normaliser; 6.6 computes both sides with one.
 
+## F-026 — Beam search: Whisper's rules at 5 beams (U8) (2026-10-10)
+
+**Question.** U8: the engine decodes with 5 beams (PLAN.md reference card, step 6), but how does it rank hypotheses
+of different lengths, when does it stop, and is the language token part of the beam? Greedy decoding with F-021 to
+F-024 reproduces 22 of the 32 committed engine transcripts (PLAN.md Phase 5).
+
+**Forkable state.** A beam continues its parent's prefix, so `decoder.State.Fork` shares it instead of copying.
+`needle.KVCache.Fork` keeps the keys and values of the prefix in the same arrays and caps the fork's slices at their
+length (`slices.Clip`). `Extend` only appends, so the fork's first append moves its rows to a new array, while the
+parent may keep appending in place behind the fork's cap. The tap history of the KV cache and both histories of
+`needle.EngramCache` are replaced, never written, by every `Extend`, so a fork shares them as is. The encoder memory
+(`decoder.Memory`, the cross-attention keys and values) is one pointer shared by every state. `internal/search` forks
+a state only when two live hypotheses still hold it; the last holder extends it in place.
+
+- `internal/needle` `TestAttentionFork`: a prefix fed row by row (the parent has spare capacity), then the parent, a
+  fork and a fork of the fork each take their own 4 rows, interleaved. Each equals `Forward` on its whole sequence
+  within the F-009 contract (max |Δ| ≤ 2.4e-7). With the cap removed, the test fails. `TestEngramFork`: two branches,
+  max |Δ| ≤ 2.4e-7.
+- `internal/decoder` `TestForkMatchesFullRun`: the real decoder after the prompt, the language token and 5 text
+  tokens; three branches take 8 different tokens each, interleaved. Every branch's logits equal a fresh state fed its
+  whole sequence in one pass within the contract (worst max |Δ| 4.6e-5 at max |logit| 102), with the same argmax.
+
+**Search.** `internal/search.Beam` keeps the 5 best live hypotheses by summed log-probability. Per step it takes each
+live hypothesis' 6 best next tokens; that is enough for every admission rule below. The axes of `Options`:
+
+- the length normalisation: the summed log p over 1, over L, over L^α, or over GNMT's ((5 + L) / 6)^α;
+- what L counts: the text tokens, the text tokens with EOS, or the whole sequence with the prompt;
+- the stopping rule: StopAll (finished hypotheses stay in the beam, ranked by the normalised score, until all 5 are
+  finished), StopBest (the best finished one reaches the best live one), StopK (5 finished, Whisper with patience 1)
+  or StopHF (the worst of the best 5 finished reaches the best live one, Hugging Face `early_stopping=False`);
+- which EOS candidates finish a hypothesis: those among the step's best 5 (Hugging Face) or every one ranked above the
+  last live hypothesis kept (Whisper);
+- the language step: argmax, argmax with its log p in the score, or one beam per language token.
+
+At the end the best finished hypothesis by the normalised score wins; with none finished, the best live one wins.
+`Options.Adjust` is a per-step hook on each live hypothesis' log-probabilities for keyword biasing (PLAN.md 6.3); it
+runs on one goroutine at a time.
+
+**Harness.** `internal/search/probe_test.go` (build tag `oracle`, `just search-probe`) decodes the 32 clips
+(`encoder.Best()`, `decoder.Best()`, `.cact` weights) with every variant of the grid: 20 normalisations (none, L, and
+L^α and GNMT for α ∈ {0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.5, 2, 3}) × 3 lengths (NormNone ignores L) × 7 stop/admission
+pairs × 3 language steps = 1218 variants. It ranks them by exact transcript equality with the engine, then by mean CER
+and WER (`internal/eval`). The search runs on a memo of each prefix's 16 best next tokens, shared by all variants of a
+clip: the whole grid costs 10,569 decoder positions and 3.6 s on an Apple M5 Pro. The leader is then rerun with the
+real `Beam`, which gives the memo's transcript on 32 of 32 clips.
+
+**Winner** (exact of 32, mean WER / CER against the engine's text):
+
+| axis          | winner                                         | best alternative per value                                                                         |
+| ------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| normalisation | **Σ log p / L** (= L^α at α = 1)               | GNMT α = 1.2: 31 (CER 0.0096); L^α or GNMT at α 0.6–2: 30; none and α ≤ 0.4: 29; L^3: 28           |
+| L             | **text tokens**, ties with text tokens + EOS   | the whole sequence: 30                                                                             |
+| stop          | **5 finished** (StopK)                         | StopAll, StopBest, StopHF: 29 each                                                                 |
+| admission     | **every EOS above the last live kept**         | among the step's best 5: 30                                                                        |
+| language step | **argmax**, ties with argmax-scored and beamed | (the language token is the argmax with rank 0 on 32 of 32 clips, F-024, and no variant changes it) |
+| result        | **31/32 exact**, WER 0.0208, CER 0.0085        | greedy: 22/32, WER 0.0583, CER 0.0228                                                              |
+
+That is Whisper's beam search (`BeamSearchDecoder` with patience 1 and `MaximumLikelihoodRanker` without a length
+penalty) at 5 beams, with Whisper's language step. Twelve variants tie with the leader and give its transcript on all
+32 clips: L with or without EOS, the three language steps, and `pow α=1`, which is the same formula. The clips cannot
+separate them. `search.Default()` takes Whisper's: L without EOS and the argmax language token, which is also
+`decoder.Greedy`'s.
+
+**Beam width** (otherwise the winner): 1 beam 22/32 (= greedy), 2 27, 3 29, 4 29, **5 31**, 6 29, 8 29, 10 27. Exact
+matches peak at the published width of 5. Wider beams lower the mean WER (0.0113 at 8) but match the engine less
+often.
+
+**The remaining mismatch.** `fleurs-pl_pl-10047713455444904767`: the engine writes "… wyreguber na towarów śródranych
+płodzi w ją nas obolicjantów.", ours "… Burego Bernatorowi Śródranych płaci wiążąc na supolicjantów."; neither is
+Polish, and greedy has a third reading. Teacher forcing the engine's text through `RefTokenizer` gives Σ log p
+−22.5562, but the engine emits whatever pieces its model picks, not the canonical spelling. A beam search of width 16
+over the token sequences that spell the engine's text exactly finds a 50-token spelling with Σ log p −14.2704 (score
+−0.2854 with EOS over 50 text tokens), above our transcript's −15.6215 (−0.2947 over 53). So under our model the
+engine's transcript ranks higher; it is a search miss, not a model gap. Each of its tokens is within our top 5 at its
+step (worst rank 3). Its prefix stays in our beam until text token 43 (`▁ob` of "obolicjantów"). There it falls out
+with Σ log p −13.5889, 0.1350 nats behind the fifth live hypothesis (−13.4539). A gap that small at one pruning step is
+within the engine's W2A8 noise: teacher forcing puts the engine's token at our top-1 on only 97.7 % of positions
+(F-024).
+
+**Lesson for teacher forcing.** On this clip the canonical `RefTokenizer` spelling of a transcript scores 8.3 nats
+below its best spelling. F-021's teacher-forced scores use the canonical spelling. That is fine for ranking decoder
+hypotheses against each other, but it understates an engine transcript's likelihood wherever the engine produced a
+non-canonical spelling.
+
+**Speed** (the leader, clips one after another, a step's beams on all cores, M5 Pro): beam 61 ms per clip against
+46 ms for greedy decoding, mean over the 32 clips.
+
+**Fast regression.** `TestBeamMatchesEngine` (no tag, skips without `models/`) beam-decodes three short clips on which
+greedy decoding fails: LibriSpeech test-other and test-clean, and FLEURS de. It requires the engine's language and
+text exactly, and ranking scores above floors just below the measured −0.0993 / −0.1492 / −0.0878.
+`TestOneBeamIsGreedy` pins one beam without normalisation to `decoder.GreedyMemory`, token for token.
+
+**Not covered.** The language step and the EOS term of L are unresolved; the clips cannot separate them. The keyword
+hook is exercised by a ban test (`TestAdjust`) only; its biasing rules are PLAN.md 6.3.
+
 ## F-027 — The public pipeline: the engine's JSON, the 30 s limit and its timing (2026-10-10)
 
 **Question.** What exactly does the engine print for a transcript, so that `whistle.Result` can match it byte for

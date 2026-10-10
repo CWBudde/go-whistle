@@ -763,13 +763,34 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
 
 ### 6.2 Beam search (`internal/search`, `internal/decoder`, `internal/needle`)
 
-- [ ] `decoder.State.Fork`: copy-on-write KV per beam; the encoder memory (cross K/V) is shared by all beams.
-- [ ] Beam search: 5 beams, max 320 tokens. Candidates for the length normalisation (`logp / len`, `logp / len^α`,
+- [x] `decoder.State.Fork`: copy-on-write KV per beam; the encoder memory (cross K/V) is shared by all beams.
+      (2026-10-10) — `needle.KVCache.Fork` shares the prefix's keys and values and caps the fork's slices, so the
+      first append copies them; the tap and engram histories are replaced on every `Extend` and shared as is; the
+      `decoder.Memory` pointer is shared. Three interleaved branches each equal a fresh state fed their whole
+      sequence (`TestForkMatchesFullRun`, worst max |Δ| 4.6e-5 at |logit| 102; `TestAttentionFork`,
+      `TestEngramFork` ≤ 2.4e-7) (`docs/FINDINGS.md` F-026).
+- [x] Beam search: 5 beams, max 320 tokens. Candidates for the length normalisation (`logp / len`, `logp / len^α`,
       GNMT), the EOS rule (all beams finished, best finished beats best alive, K finished) and whether the language
       step is beamed or argmax (U8).
-- [ ] Move `editDistance`/`wer`/`cer` from the decoder tests into `internal/eval` for reuse.
-- [ ] **Accept:** the variant is picked by evidence on the 32 clips (`.cact` weights); target ≥ 31/32 transcripts equal
+      (2026-10-10) — `search.Beam(d, mem, search.Default())`, with per-token log-probs, the score and an `Adjust`
+      hook for 6.3. `just search-probe` scores 1218 variants (none / len / len^α / GNMT with α 0.2–3 × L of text,
+      text + EOS or the whole sequence × all-finished / best-beats-alive / 5-finished / HF × two EOS admission rules ×
+      argmax / scored / beamed language) on a shared prefix memo in 3.6 s. Winner: Whisper's search, Σ log p / text
+      tokens, stop at 5 finished, every EOS ranked above the last live beam admitted, language by argmax: 31/32
+      exact. The best alternatives: GNMT α 1.2 31/32 (higher CER); all-finished, best-beats-alive, HF 29; EOS
+      admitted only among the step's best 5: 30. 12 variants tie with the winner (L with EOS, any language step) on
+      all 32 transcripts. Width: 1 → 22, 3 → 29, 5 → 31, 6 → 29, 10 → 27 (F-026).
+- [x] Move `editDistance`/`wer`/`cer` from the decoder tests into `internal/eval` for reuse.
+      (2026-10-10) — `eval.EditDistance`, `eval.Words`, `eval.WER`, `eval.CER` with unit tests; the decoder probe
+      uses them.
+- [x] **Accept:** the variant is picked by evidence on the 32 clips (`.cact` weights); target ≥ 31/32 transcripts equal
       to the engine's, every remaining mismatch explained by its log-probability margin.
+      (2026-10-10) — 31/32 exact (greedy 22/32), mean WER 0.0208 / CER 0.0085 against the engine's text; the real
+      search equals the probe's memo on 32/32. The mismatch, `fleurs-pl_pl-10047713455444904767` (neither text is
+      Polish), is a near-tie: the engine's text in its most likely spelling scores Σ log p −14.2704 (−0.2854 per
+      text token) under our model against our −15.6215 (−0.2947), and its prefix leaves our beam at text token 43,
+      0.1350 nats behind the fifth live beam. Beam 61 ms per clip, greedy 46 ms. Fast regression
+      `TestBeamMatchesEngine` (three clips greedy misses, exact, no tag) (F-026).
 
 ### 6.3 Keyword biasing (`internal/search`, `internal/tokenizer`; needs 6.1)
 
@@ -913,7 +934,7 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 | U5  | Whether the encoder and decoder share the Hadamard permutations                             | 2/4     | block parity / encoder cosine     |
 | U6  | Cross-attention position in the block — resolved: after the self-attention, F-021           | 5       | teacher-forced transcript score   |
 | U7  | Decoder prompt format, language detection — resolved: `[<s>]`, argmax language, F-023/F-024 | 5       | language + teacher-forced score   |
-| U8  | Beam length normalisation, EOS rules                                                        | 6.2     | transcript parity                 |
+| U8  | Beam length normalisation, EOS rules — resolved: Whisper's at 5 beams, Σ log p / len, F-026 | 6.2     | transcript parity                 |
 | U9  | Keyword bias weight and revocation                                                          | 6.3     | keyword fixture parity            |
 | U10 | Silence gate measure and threshold                                                          | 6.6     | threshold sweep                   |
 | U11 | Timestamp algorithm (heads/layers, DTW), word probability                                   | 7.2–7.3 | timestamp parity                  |

@@ -102,6 +102,67 @@ func TestAttentionExtendMatchesForward(t *testing.T) {
 	}
 }
 
+// TestAttentionFork pins KVCache.Fork (docs/FINDINGS.md F-026): after a
+// shared prefix fed row by row (so the parent's arrays have spare
+// capacity), the parent, a fork and a fork of the fork each continue with
+// their own rows, interleaved. Every branch must equal Forward on its own
+// whole sequence under the F-009 contract, so no branch writes into
+// another's rows or tap history.
+func TestAttentionFork(t *testing.T) {
+	const prefix, tail = 5, 4
+
+	r := rand.New(rand.NewPCG(43, 47))
+	ta := newTinyAttention(r, "", 3)
+
+	a, err := LoadAttention(ta.src, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rope := NewRope(ta.qk, prefix+tail, 1e5)
+	shared := randVec(r, prefix*ta.dim, 1)
+	tails := [][]float32{randVec(r, tail*ta.dim, 1), randVec(r, tail*ta.dim, 1), randVec(r, tail*ta.dim, 1)}
+
+	var parent KVCache
+
+	for i := range prefix {
+		_, err = a.Extend(shared[i*ta.dim:(i+1)*ta.dim], 1, &parent, rope)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	child := parent.Fork()
+	grand := child.Fork()
+	caches := []*KVCache{&parent, &child, &grand}
+	got := make([][]float32, len(caches))
+
+	// Row i of every branch, the grandchild first and the parent last.
+	for i := range tail {
+		for b := len(caches) - 1; b >= 0; b-- {
+			y, err := a.Extend(tails[b][i*ta.dim:(i+1)*ta.dim], 1, caches[b], rope)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got[b] = append(got[b], y...)
+		}
+	}
+
+	for b, name := range []string{"parent", "fork", "fork of fork"} {
+		want, err := a.Forward(append(slices.Clone(shared), tails[b]...), prefix+tail, MaskCausal, rope)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		checkContract(t, name, got[b], want[prefix*ta.dim:])
+
+		if caches[b].Len() != prefix+tail {
+			t.Errorf("%s: Len %d, want %d", name, caches[b].Len(), prefix+tail)
+		}
+	}
+}
+
 // TestAttentionExtendErrors: a RoPE table shorter than Len()+t, one of
 // the wrong head width and a ragged input are rejected, and a rejected
 // call leaves the cache as it was.
@@ -197,6 +258,55 @@ func TestEngramExtendMatchesForward(t *testing.T) {
 	_, err = e.Extend([]int{4, -1}, &c)
 	if err == nil || c.Len() != 0 {
 		t.Errorf("negative token: err %v, Len %d", err, c.Len())
+	}
+}
+
+// TestEngramFork pins EngramCache.Fork (docs/FINDINGS.md F-026): two
+// branches after a shared prefix, extended alternately with different
+// tokens, each equal Forward on their whole sequence.
+func TestEngramFork(t *testing.T) {
+	r := rand.New(rand.NewPCG(53, 59))
+
+	e, err := LoadEngram(tinyEngram(r, "", 7), "", []int{2, 3}, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	shared := []int{2, 8192, 5, 17, 5, 17}
+	tails := [][]int{{5, 3, 9, 9, 1}, {6, 3, 5, 17, 1}}
+
+	var parent EngramCache
+
+	for _, tok := range shared {
+		_, err = e.Extend([]int{tok}, &parent)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	child := parent.Fork()
+	caches := []*EngramCache{&parent, &child}
+	got := make([]EngramKV, len(caches))
+
+	for i := range tails[0] {
+		for b := len(caches) - 1; b >= 0; b-- {
+			kv, err := e.Extend(tails[b][i:i+1], caches[b])
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got[b].K, got[b].V = append(got[b].K, kv.K...), append(got[b].V, kv.V...)
+		}
+	}
+
+	for b, name := range []string{"parent", "fork"} {
+		want, err := e.Forward(append(slices.Clone(shared), tails[b]...))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		off := len(shared) * e.Dim()
+		checkEngramKV(t, name, &got[b], &EngramKV{K: want.K[off:], V: want.V[off:]})
 	}
 }
 
