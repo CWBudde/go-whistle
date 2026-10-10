@@ -968,6 +968,16 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       behind a flag.
 - [ ] 9.4 Plan 9 assembly (NEON/AVX2) for the LUT GEMV, the FWHT, the Monarch Kronecker products and the
       softmax/Sinkhorn hot loops, with pure-Go fallbacks and equivalence tests (see `go-plan9-assembly`).
+      (2026-10-10) — partial, the `internal/cq` half: a new `lut` kernel with NEON (`lut_arm64.s`) and AVX2
+      (`lut_amd64.s`, chosen at run time) assembly for the FWHT, the table build and the lookup, each with a Go
+      reference that it equals bit for bit (`asm_test.go`); `purego` and other architectures keep `nibble4`. Nibble
+      tables are rounded to 14-bit integers in two byte planes, and `cq.New` repacks the index into blocks of 32 rows,
+      so one `TBL`/`VPSHUFB` looks up 16 or 32 rows. Accuracy on the 11 real tensors: worst 1 − cos 7.8e-8 in every
+      build (arm64, purego, amd64 AVX2 in Docker). Single-threaded on the M5 Pro, the GEMV beats the NEON float GEMM
+      on all seven F-028 shapes: 1.05× (φ_res) to 3.2× (pw1), q_proj 2.91 vs 7.52 µs, head 97 vs 192 µs; 4.8–6.7×
+      faster than `nibble4`. Batched: 1.40× at 5 rows of q_proj, 1.11× at 375, but 1.06× slower on the 5-beam head.
+      The blocked copy doubles the CQ memory to 33.27 MB (still 6.6× below float32). Details: `docs/FINDINGS.md`
+      F-034. The Monarch and softmax/Sinkhorn half is in `internal/needle`.
 - [ ] 9.5 Parallelism: the encoder over time blocks and heads; the decoder over beams.
 - [ ] 9.6 Benchmarks (`bench/`): TTFT and decode tok/s against the engine on the same machine. The engine publishes
       11.1 ms TTFT and 1319 tok/s on an M4 Pro with 5 beams. Also the real-time factor for 30 s clips.
