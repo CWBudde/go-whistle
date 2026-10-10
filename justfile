@@ -145,10 +145,9 @@ mem-probe:
 bench *args:
     go run ./bench/cmd/whistle-bench run {{args}}
 
-# Benchmark the Needle 3 engine (CLI and libneedle3) on the same clips into bench/results/engine.json, then re-render bench/RESULTS.md
+# Benchmark the Needle 3 engine (CLI and libneedle3) on the same clips into bench/results/engine.json (-out), then re-render bench/RESULTS.md from it
 oracle-bench *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle bench {{args}}
-    go run ./bench/cmd/whistle-bench report
 
 # Clean build artifacts
 clean:

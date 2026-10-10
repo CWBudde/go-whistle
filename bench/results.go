@@ -171,3 +171,42 @@ func ReadJSON(path string, v any) (bool, error) {
 
 	return true, nil
 }
+
+// WriteReport renders reportPath from the results at goPath and
+// enginePath; a side whose file does not exist is left out. Both
+// whistle-bench and `oracle bench` call it with the paths they wrote.
+func WriteReport(goPath, enginePath, reportPath string) error {
+	g, e := new(GoResults), new(EngineResults)
+
+	ok, err := ReadJSON(goPath, g)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		g = nil
+	}
+
+	ok, err = ReadJSON(enginePath, e)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		e = nil
+	}
+
+	var b bytes.Buffer
+
+	err = Render(&b, g, e)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(reportPath, b.Bytes(), 0o600) // #nosec G306 G703 -- a flag or the default path.
+	if err != nil {
+		return fmt.Errorf("write %s: %w", reportPath, err)
+	}
+
+	return nil
+}

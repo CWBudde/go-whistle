@@ -25,6 +25,7 @@ type benchConfig struct {
 	runConfig
 
 	out                       string // the results JSON, bench/results/engine.json
+	goResults, report         string // the Go results and the report rendered from them and out
 	warmUp, runs, long, loads int    // untimed runs, timed passes over the clips, timed 30 s runs, timed loads
 }
 
@@ -143,6 +144,14 @@ func cmdBench(ctx context.Context, cfg benchConfig, log io.Writer) error {
 	}
 
 	_, _ = fmt.Fprintf(log, "wrote %s\n", cfg.out)
+
+	// The report reads the file just written, whatever -out names.
+	err = bench.WriteReport(cfg.goResults, cfg.out, cfg.report)
+	if err != nil {
+		return fmt.Errorf("report: %w", err)
+	}
+
+	_, _ = fmt.Fprintf(log, "wrote %s\n", cfg.report)
 
 	return nil
 }

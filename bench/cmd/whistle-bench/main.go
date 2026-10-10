@@ -165,34 +165,7 @@ func run(ctx context.Context, cfg config, goPath, enginePath, reportPath string)
 // report renders reportPath from the results that exist; a side without
 // its JSON file is shown as not run.
 func report(goPath, enginePath, reportPath string) error {
-	g, e := new(bench.GoResults), new(bench.EngineResults)
-
-	ok, err := bench.ReadJSON(goPath, g)
-	if err != nil {
-		return fmt.Errorf("report: %w", err)
-	}
-
-	if !ok {
-		g = nil
-	}
-
-	ok, err = bench.ReadJSON(enginePath, e)
-	if err != nil {
-		return fmt.Errorf("report: %w", err)
-	}
-
-	if !ok {
-		e = nil
-	}
-
-	var b bytes.Buffer
-
-	err = bench.Render(&b, g, e)
-	if err != nil {
-		return fmt.Errorf("report: %w", err)
-	}
-
-	err = os.WriteFile(reportPath, b.Bytes(), 0o600) // #nosec G703 -- a flag or the default path.
+	err := bench.WriteReport(goPath, enginePath, reportPath)
 	if err != nil {
 		return fmt.Errorf("report: %w", err)
 	}

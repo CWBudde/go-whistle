@@ -152,6 +152,8 @@ func dispatchBench(ctx context.Context, fs *flag.FlagSet, args []string, audio *
 
 	cfg := benchConfig{}
 	fs.StringVar(&cfg.out, "out", bench.EngineResultsPath, "results JSON")
+	fs.StringVar(&cfg.goResults, "go", bench.GoResultsPath, "the Go results (JSON) the report pairs with -out")
+	fs.StringVar(&cfg.report, "report", bench.ReportPath, "the report rendered from -go and -out")
 	fs.StringVar(&cfg.oracleDir, "oracle", oracleDir, "directory holding the committed clip fixtures")
 	fs.StringVar(&cfg.modelDir, "models", filepath.Join("models", "whistle"), "directory holding whistle.cact")
 	fs.StringVar(&cfg.engineDir, "engine", filepath.Join("engine", plat), "directory holding needle and libneedle3")

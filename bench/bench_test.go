@@ -298,6 +298,32 @@ func TestRenderWithoutResults(t *testing.T) {
 	}
 }
 
+// TestWriteReport renders from the paths it is given, a non-default
+// engine file included, and leaves out a side whose file is missing.
+func TestWriteReport(t *testing.T) {
+	dir := t.TempDir()
+	enginePath, reportPath := filepath.Join(dir, "run.json"), filepath.Join(dir, "RESULTS.md")
+
+	err := WriteJSON(enginePath, EngineResults{Version: "9.9.9", Revision: "abcdef1234567"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = WriteReport(filepath.Join(dir, "missing-go.json"), enginePath, reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(out), "9.9.9 (abcdef1234)") {
+		t.Errorf("the report does not use the engine file it was given:\n%s", out)
+	}
+}
+
 func TestJSONRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sub", "go.json")
 	in := GoResults{GOMAXPROCS: 3, WER: &WER{Words: 7}, Modes: []GoMode{{Mode: "packed", MaxRSSPeakMiB: 1.5}}}
