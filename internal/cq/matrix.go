@@ -40,8 +40,23 @@ type Matrix struct {
 }
 
 // New builds a Matrix from a packed CQ tensor. Index stays shared with p;
-// the norms are widened to float32 once.
+// the norms are widened to float32 once, and the lut kernel's blocked copy
+// is built (Prepare).
 func New(p cact.Packed) (*Matrix, error) {
+	m, err := NewGather(p)
+	if err != nil {
+		return nil, err
+	}
+
+	m.Prepare()
+
+	return m, nil
+}
+
+// NewGather builds a Matrix like New but leaves the lut kernel's blocked
+// copy to the first GEMM or Prepare, for a tensor that Row reads and no
+// product needs: the engram tables (docs/FINDINGS.md F-037).
+func NewGather(p cact.Packed) (*Matrix, error) {
 	switch {
 	case p.Bits != 2 && p.Bits != 4, p.Width != p.Bits:
 		return nil, fmt.Errorf("cq: %d-bit CQ (index width %d) not supported, only 2 and 4", p.Bits, p.Width)
@@ -74,11 +89,6 @@ func New(p cact.Packed) (*Matrix, error) {
 
 	m.lutStep = lutStepOf(m.group)
 	m.lut = &lutLayout{index: m.index, norms: m.norms, out: m.out, rowBytes: m.rowBytes, groups: m.groups}
-
-	if m.best() == kernelLUT {
-		m.lut.blocks()
-	}
-
 	m.scratch = scratchPool(m.groups*m.group, m.rowBytes)
 
 	return m, nil
@@ -93,13 +103,23 @@ func (m *Matrix) In() int { return m.in }
 // Bits is the index width, 2 or 4.
 func (m *Matrix) Bits() int { return m.width }
 
+// Prepare builds the blocked copy of the index and the norms that the lut
+// kernel multiplies by (F-034), if that kernel runs and the copy is not
+// built yet. A GEMM calls it; calling it at load time keeps the work out
+// of the first product. It is safe for concurrent use.
+func (m *Matrix) Prepare() {
+	if m.best() == kernelLUT {
+		m.lut.blocks()
+	}
+}
+
 // Bytes is the memory the matrix holds: the packed indices, the float32
-// norms and the codebook, and for the lut kernel the blocked copy of its
-// rows' indices and norms (F-034). Index bytes shared with a file or
+// norms and the codebook, and once built the lut kernel's blocked copy of
+// its rows' indices and norms (F-034). Index bytes shared with a file or
 // another view count in full.
 func (m *Matrix) Bytes() int {
 	n := len(m.index) + 4*len(m.norms) + 4*len(m.cb)
-	if m.best() == kernelLUT {
+	if m.best() == kernelLUT && m.lut.built.Load() {
 		b0, b1 := m.lutSpan()
 		n += (b1 - b0) * lutRows * (m.rowBytes + 4*m.groups)
 	}

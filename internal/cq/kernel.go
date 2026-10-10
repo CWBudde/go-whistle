@@ -44,7 +44,7 @@ func (k kernel) String() string {
 // row layout: pad = Groups·Group activation floats, rowBytes index bytes.
 type scratch struct {
 	xh   []float32           // x̂ of up to four activations, rotated and group-padded
-	nib  [][16]float32       // per index nibble, its value for each of the 16 codes
+	nib  [][16]float32       // per index nibble, its value for each of the 16 codes; nil until a nibble kernel runs
 	nib4 [][2][16][4]float32 // per index byte, both nib tables of four activations, interleaved; nil until a GEMM needs it
 
 	// The lut kernel's state, nil until it runs: the byte-plane tables of
@@ -65,7 +65,7 @@ func scratchPool(pad, rowBytes int) *sync.Pool {
 	}
 
 	p, _ := scratchPools.LoadOrStore([2]int{pad, rowBytes}, &sync.Pool{New: func() any {
-		return &scratch{xh: make([]float32, 4*pad), nib: make([][16]float32, 2*rowBytes)}
+		return &scratch{xh: make([]float32, 4*pad)}
 	}})
 
 	return p.(*sync.Pool) //nolint:forcetypeassert // only *sync.Pool is stored
@@ -109,6 +109,10 @@ func (m *Matrix) gemm(k kernel, dst, x []float32, rows int) {
 
 	pad := m.groups * m.group
 	i := 0
+
+	if s.nib == nil {
+		s.nib = make([][16]float32, 2*m.rowBytes)
+	}
 
 	if k == kernelNibble4 && rows >= 4 {
 		if s.nib4 == nil {

@@ -3,6 +3,7 @@ package cq
 import (
 	"math"
 	"sync"
+	"sync/atomic"
 )
 
 // The lut kernel (docs/FINDINGS.md F-034) is the nibble kernel recast for
@@ -39,8 +40,9 @@ const (
 // zero.
 type lutLayout struct {
 	once                  sync.Once
-	index                 []byte    // the root matrix's packed rows
-	norms                 []float32 // the root matrix's [out][groups] norms
+	built                 atomic.Bool // idx and norm are set
+	index                 []byte      // the root matrix's packed rows
+	norms                 []float32   // the root matrix's [out][groups] norms
 	out, rowBytes, groups int
 
 	// idx[(b·rowBytes + j)·lutRows + i] is index byte j of row b·lutRows + i.
@@ -67,6 +69,8 @@ func (l *lutLayout) blocks() (idx []byte, norm []float32) {
 				l.norm[(b*l.groups+g)*lutRows+i] = n
 			}
 		}
+
+		l.built.Store(true)
 	})
 
 	return l.idx, l.norm
