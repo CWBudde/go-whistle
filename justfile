@@ -141,6 +141,15 @@ eval-librispeech:
 mem-probe:
     WHISTLE_MEM_PROBE=1 go test -count=1 -v -run 'TestMemProbe$' ./internal/weights/
 
+# Benchmark the Go side, packed vs float (Load, TTFT, tok/s, RTF, peak RSS, LibriSpeech WER), into bench/results/go.json and bench/RESULTS.md
+bench *args:
+    go run ./bench/cmd/whistle-bench run {{args}}
+
+# Benchmark the Needle 3 engine (CLI and libneedle3) on the same clips into bench/results/engine.json, then re-render bench/RESULTS.md
+oracle-bench *args:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle bench {{args}}
+    go run ./bench/cmd/whistle-bench report
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
