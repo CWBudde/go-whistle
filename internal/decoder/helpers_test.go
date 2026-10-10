@@ -21,6 +21,8 @@ const (
 )
 
 // openModel opens a weight file or skips the test when it is missing.
+//
+//nolint:unparam // the probe harness (build tag oracle) also opens the safetensors weights
 func openModel(t testing.TB, path string) weights.Source {
 	t.Helper()
 
@@ -105,6 +107,8 @@ func loadClips(t testing.TB, ids ...string) []clip {
 
 // encode runs the encoder hypothesis encoder.Best() on the clips, with the
 // output tap of the Memory axis, and returns one memory input per clip.
+//
+//nolint:unparam // the probe harness (build tag oracle) also encodes with the lane-mean tap
 func encode(t testing.TB, src weights.Source, clips []clip, tap MemoryTap) ([][]float32, []int) {
 	t.Helper()
 

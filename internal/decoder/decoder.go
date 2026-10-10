@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 
 	"github.com/cwbudde/go-whistle/internal/needle"
 	"github.com/cwbudde/go-whistle/internal/tensor"
@@ -176,6 +177,32 @@ func (d *Decoder) NewState(m *Memory) *State {
 
 // Len is the number of tokens fed so far.
 func (s *State) Len() int { return len(s.tokens) }
+
+// Fork returns a state with s's history that extends independently of s,
+// as one beam's continuation (docs/FINDINGS.md F-026). The memory is
+// shared, never copied, and so are the cached keys and values of the
+// prefix until either state appends to them (needle.KVCache.Fork).
+func (s *State) Fork() *State {
+	f := &State{
+		mem:    s.mem,
+		kv:     make([]needle.KVCache, len(s.kv)),
+		engram: make([]needle.EngramCache, len(s.engram)),
+		tokens: slices.Clip(s.tokens),
+	}
+
+	for i := range s.kv {
+		f.kv[i] = s.kv[i].Fork()
+	}
+
+	for i := range s.engram {
+		f.engram[i] = s.engram[i].Fork()
+	}
+
+	return f
+}
+
+// Memory is the encoder memory the state attends to.
+func (s *State) Memory() *Memory { return s.mem }
 
 // Tokens is the token history.
 func (s *State) Tokens() []int { return append([]int(nil), s.tokens...) }

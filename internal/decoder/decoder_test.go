@@ -198,6 +198,110 @@ func TestIncrementalMatchesFullRun(t *testing.T) {
 	t.Logf("%d positions: worst max |Δ| %.3g at max |logit| %.3g", len(seq), worst, worstRef)
 }
 
+// TestForkMatchesFullRun pins State.Fork (docs/FINDINGS.md F-026): after a
+// shared prefix (the prompt, the language token and five text tokens of a
+// greedy transcript), the parent, a fork and a fork of that fork continue
+// with different tokens, one at a time and interleaved. Every branch's
+// logits equal a fresh state fed its whole sequence in one pass within the
+// F-009 contract, with the same argmax, so extending one branch never
+// changes another.
+func TestForkMatchesFullRun(t *testing.T) {
+	src := openModel(t, whistleCactPath)
+	clips := loadClips(t, fastClips[2])
+	encs, frames := encode(t, src, clips, MemFinalNorm)
+
+	d, err := Load(src, nil, Best())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mem, err := d.Memory(encs[0], frames[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := d.GreedyMemory(mem, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seq, err := d.Targets(r.Language, r.Text)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const tail = 8
+
+	shared := len(d.Prompt()) + 1 + 5
+	if len(seq) < shared+tail {
+		t.Fatalf("greedy transcript of %d tokens is too short", len(seq))
+	}
+
+	// The greedy continuation, the same tokens reversed, and every other
+	// token of it.
+	tails := [][]int{slices.Clone(seq[shared : shared+tail]), slices.Clone(seq[shared : shared+tail]), nil}
+	slices.Reverse(tails[1])
+
+	for i := range tail {
+		tails[2] = append(tails[2], seq[shared+(2*i)%tail])
+	}
+
+	parent := d.NewState(mem)
+
+	_, err = d.Extend(parent, seq[:shared])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	child := parent.Fork()
+	states := []*State{parent, child, child.Fork()}
+	got := make([][]float32, len(states))
+
+	for i := range tail {
+		for b := len(states) - 1; b >= 0; b-- {
+			step, err := d.Extend(states[b], tails[b][i:i+1])
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got[b] = append(got[b], step...)
+		}
+	}
+
+	v := d.Vocab()
+
+	for b, name := range []string{"parent", "fork", "fork of fork"} {
+		whole := append(slices.Clone(seq[:shared]), tails[b]...)
+
+		full, err := d.Extend(d.NewState(mem), whole)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !slices.Equal(states[b].Tokens(), whole) || states[b].Memory() != mem {
+			t.Errorf("%s: tokens %v, want %v", name, states[b].Tokens(), whole)
+		}
+
+		var worst, worstRef float64
+
+		for i := range tail {
+			step, ref := got[b][i*v:(i+1)*v], full[(shared+i)*v:(shared+i+1)*v]
+			maxAbs, refMax, cos := compare(step, ref)
+
+			if maxAbs > 1e-5*math.Max(1, refMax) || cos < 0.99999 || argmax(step) != argmax(ref) {
+				t.Errorf("%s position %d: max |Δ| %.3g at max |ref| %.3g, cosine %.9f, argmax %d vs %d", name,
+					shared+i, maxAbs, refMax, cos, argmax(step), argmax(ref))
+			}
+
+			if maxAbs > worst {
+				worst, worstRef = maxAbs, refMax
+			}
+		}
+
+		t.Logf("%s: %d positions after the fork, worst max |Δ| %.3g at max |logit| %.3g", name, tail, worst, worstRef)
+	}
+}
+
 // compare returns max |got − want|, max |want| and the cosine.
 func compare(got, want []float32) (maxAbs, refMax, cos float64) {
 	var dot, gg, ww float64
