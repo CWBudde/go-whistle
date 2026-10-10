@@ -3190,8 +3190,9 @@ with like?
   - Peak RSS: a fresh child process per mode (`whistle-bench child`) runs `Load` and one 30 s `Transcribe` and reports
     `ru_maxrss` after each, as `just mem-probe` does. `ru_maxrss` is a high-water mark, so the child loads the model
     before it reads any audio and builds the 30 s clip from the first clip alone (PR #33 review: decoding all 32 clips
-    first had put 40.6 MiB after `Load`; the committed values are now three fresh children's median, 37.9 packed and
-    238.9 float, with the 30 s peaks unchanged at 124.9–126.0 MiB packed).
+    first had put 40.6 MiB after `Load`). The committed memory values are the median of three fresh children per mode
+    after that fix: after `Load` 37.9 MiB packed and 238.9 float, the 30 s peak 125.7 and 489.3 (the full run's
+    children had given 125.3 and 489.4). A platform without `ru_maxrss` reports 0, which the report shows as missing.
   - WER: the 200 LibriSpeech utterances of F-025, digests checked, both modes per utterance in alternating order. The
     manifest's `wer_rule` goes through `internal/eval` as in `TestEvalLibriSpeech`. The run fails unless the rule
     reproduces `manifest.json`'s count for every engine transcript and its totals.
@@ -3257,7 +3258,7 @@ run and 5.2–5.5 during the engine's (`bench/RESULTS.md` has every row).
 | decode, 30 s clip (tok/s)     | 620       | 408      | 1082           | 0.57×           |
 | RTF, 30 s clip                | 0.0165    | 0.0192   | 0.0048         | 3.4×            |
 | model load (ms)               | 7.0       | 138.7    | 2.7            | 2.6×            |
-| peak RSS, load + 30 s (MiB)   | 125.3     | 489.4    | 70.0 (CLI)     | 1.8×            |
+| peak RSS, load + 30 s (MiB)   | 125.7     | 489.3    | 70.0 (CLI)     | 1.8×            |
 | equal to the engine, 32 clips | 31/32     | 31/32    | 32/32 (CLI)    | —               |
 
 - **TTFT** is 8× the engine's on the clips and 8.6× on the 30 s clip. Both grow with the audio: the 30 s clip takes
@@ -3268,7 +3269,7 @@ run and 5.2–5.5 during the engine's (`bench/RESULTS.md` has every row).
   under a different load.
 - **Real-time factor**: 0.016–0.017, about 60× faster than real time, against the engine's 0.005 (2.8–3.4×).
 - **Load**: 7.0 ms packed against `needle_load`'s 2.7 ms, which gets the bytes already in memory; float takes 139 ms.
-- **Memory**: a 30 s run peaks at 125.3 MiB packed against the engine CLI's 70.0 MiB (model load included in both;
+- **Memory**: a 30 s run peaks at 125.7 MiB packed against the engine CLI's 70.0 MiB (model load included in both;
   ours includes the Go runtime), and 37.9 MiB after `Load`. F-037's open levers (the stem's activation spike, `GOGC`
   headroom) are the difference.
 - **Against the published figures**: the engine here gives 7.5 ms and 1383 tok/s, the published M4 Pro figures 11.1 ms

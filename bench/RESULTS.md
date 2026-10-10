@@ -93,7 +93,7 @@ The published figures come from another machine and clip set; the engine on the 
 | peak RSS (MiB, ru_maxrss of a fresh process) | Go packed | Go float | engine CLI |
 | -------------------------------------------- | --------: | -------: | ---------: |
 | after the model load                         |      37.9 |    238.9 |          — |
-| one 30 s transcription, load included        |     125.3 |    489.4 |       70.0 |
+| one 30 s transcription, load included        |     125.7 |    489.3 |       70.0 |
 | largest over the 32 clips, load included     |         — |        — |       54.5 |
 
 The Go figures come from a fresh `whistle-bench` child per mode (`Load`, then one `Transcribe` of the 30 s clip, as `just mem-probe`); the engine's from the CLI processes of the speed runs.
