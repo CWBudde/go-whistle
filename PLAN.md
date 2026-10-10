@@ -714,7 +714,7 @@ Following the upstream porting blog, logits are compared by **cosine and top-1**
       (`log=soft-76db`) after the merge: language 32/32, exact 22/32, every clip stops at `</s>`, mean WER 0.0583 /
       CER 0.0228, max CER 0.1655 (fleurs-pl_pl-10013271501230525766).
 
-## Phase 6 — Engine-parity decoding
+## Phase 6 — Engine-parity decoding — ✅ DONE (2026-10-10)
 
 Split into sub-phases with disjoint package scopes so that independent work can run in parallel. 6.1, 6.2 and 6.5 have
 no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything and carries the phase **Accept**.
@@ -805,8 +805,14 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
       upper- and lower-cased, on Whisper's search unchanged: 45/53. Alternatives: no revocation 42, half 44; per
       character 43; split phrases 43; completion bonus alone 34; logit bias 29; model-only final pick 41; other search
       rules 44 (and 47/53 without keywords). `internal/tokenizer` needed nothing new (F-029).
-- [ ] **Accept:** transcripts with keywords equal the engine's on the keyword fixtures at the same rate as without.
-      partial: (2026-10-10) — with keywords 45/53 (84.9 %) against 50/53 (94.3 %) without on the same cases; the
+- [x] **Accept:** at least 85 % of the keyword fixture cases equal the engine's transcript, and F-029 explains every
+      mismatch by its log-probability margin (a near-tie), a miss the case shares with the run without keywords, or a
+      documented search miss.
+      (2026-10-10) — reworded by the user's decision; was: "transcripts with keywords equal the engine's on the keyword
+      fixtures at the same rate as without", which no variant of 3846 reached (best 46/53 against 50/53). Met at 46/53
+      (86.8 %): of the 7 mismatches, 3 are the Polish clip missed without keywords, 3 near-ties (0.0036, 0.0125, 0.0247
+      nats per token) and 1 search miss (`de-paare-missed`, a follow-up in Phase 10).
+      (2026-10-10) — with keywords 45/53 (84.9 %) against 50/53 (94.3 %) without on the same cases; the
       reference rate is 31/32 (96.9 %, F-026). Per kind, with / without: present 14/14, missed 13/15, distractor 7/8,
       phrase 10/11, list 1/2 of 15/16/8/12/2. Of the 8 mismatches, 3 are on the Polish clip we already miss without
       keywords; 3 are near-ties or small model gaps (0.0036, 0.0125, 0.0247 nats per token); `de-diese-paare-phrase` is
@@ -827,8 +833,13 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
       site acts only at an active layer, the final norm stays; weights and `Memory` are shared, depth 8 equals the
       decoder logit for logit. Lanes by position beat the layer's own lane at every depth (d2–d7: 24/27/29/29/28/24
       against 13/10/15/15/22/23 of 32) (F-030).
-- [ ] **Accept:** transcripts at depths 2–7 equal the 6.1 depth fixtures at the same rate as the full depth does.
-      partial: (2026-10-10) — `just depth-probe`, `search.Default()` on `WithDepth`: depth 2 24/32, 3 27/32, 4 29/32,
+- [x] **Accept:** every transcript at depths 2–7 that differs from the 6.1 depth fixtures is a near-tie: the engine's
+      text and ours are at most 0.03 nats per text token apart under our model.
+      (2026-10-10) — reworded by the user's decision; was: "transcripts at depths 2–7 equal the 6.1 depth fixtures at
+      the same rate as the full depth does". A truncated network magnifies tiny numeric differences: the engine's own
+      depth-N text equals its full-depth text on only 7–19 of 32 clips. Met: all 31 mismatches of 192 are at most
+      0.0288 nats per text token apart (numbers below).
+      (2026-10-10) — `just depth-probe`, `search.Default()` on `WithDepth`: depth 2 24/32, 3 27/32, 4 29/32,
       5 29/32, 6 28/32, 7 24/32 (161/192 = 83.9 %) against 31/32 at full depth; greedy 18–22/32. All 31 mismatches
       are near-ties: 23 model gaps of at most 0.0288 nats per text token (median 0.0025) and 8 search misses of at
       most 0.0196. The engine's own text at depth N equals its full-depth text on only 7–19 of 32. Fast regression
@@ -958,7 +969,7 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       with the numbers masked (fleurs-de, ls-clean, `silence-2s` exactly; `tiled-30s`, whose transcript differs,
       in structure) (F-033).
 
-## Phase 8 — Streaming & embeddings
+## Phase 8 — Streaming & embeddings — ✅ DONE (2026-10-10)
 
 - [x] 8.1 Stream oracle (`tools/oracle`, `testdata/oracle/stream/`): `needle_stream_transcribe_process`/`_stop` with
       1 s chunks over the 32 clips, recording every call's output, plus two concatenated streams longer than 30 s.
@@ -1001,9 +1012,14 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       the whole buffer. The port never feeds more than 30 s: it drops the oldest audio in whole frames and passes the
       last 30 s on the grid. Under our model both give the same 3 of 5 passes after the silence; the engine's 34 s and
       36 s passes are reached from neither (`TestStreamWindowScan`), so that run's last calls still differ (F-036).
-- [ ] **Accept:** on fixture clips fed in 1 s chunks, the final committed text equals the offline transcript, and
+- [x] **Accept:** on fixture clips fed in 1 s chunks, the final committed text equals the offline transcript at least
+      as often as the engine's own stream does, with the call-by-call parity against the engine's stream reported, and
       the embeddings match the engine at cosine ≥ 0.99.
-      partial: (2026-10-10) — at 1 s chunks our final committed text equals the offline transcript on 18 of 32 clips
+      (2026-10-10) — reworded by the user's decision; was: "on fixture clips fed in 1 s chunks, the final committed text
+      equals the offline transcript, and the embeddings match the engine at cosine ≥ 0.99". The engine's own stream
+      meets that on 18 of 32 clips, so no engine-faithful stream can. Met: 18 of 32 against the engine's 18; the
+      final text equals the engine's stream on 98 of 108 runs, 797 of 930 calls equal (8.3); embeddings ≥ 0.999033.
+      (2026-10-10) — at 1 s chunks our final committed text equals the offline transcript on 18 of 32 clips
       (normalised 24 of 32, 25 word errors in 459), against the engine's offline text and against our own
       `Transcribe` alike; the engine's own stream also gives 18 of 32 (24 normalised, 19 word errors), 13 of the 14
       misses shared (`TestStreamAccept`, F-036). The embedding half holds since 8.2 (F-027: every clip ≥ 0.999033).
@@ -1026,9 +1042,12 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       is 1.15–2.4× faster than the pure-Go float loop on 9 of 10 shapes, but 2.2–5.7× slower than the NEON float
       GEMM (q_proj 20.1 vs 7.7 µs, head 652 vs 192 µs). Memory: 16.63 MB for all CQ matrices against 218.77 MB as
       float32 (13.2×). Details and what 9.2 needs: `docs/FINDINGS.md` F-028.
-- [ ] 9.2 Run straight from the packed `.cact`: wire the 9.1 kernel into `needle`, `encoder` and `decoder` behind
+- [x] 9.2 Run straight from the packed `.cact`: wire the 9.1 kernel into `needle`, `encoder` and `decoder` behind
       `weights.Source`. Memory target: under 64 MB RSS for the model.
-      (2026-10-10) — partial: the packed path runs the whole model and is `whistle.Load`'s default for `.cact`
+      (2026-10-10) — the target counts the model's weights, by the user's decision: the live Go heap plus the resident
+      `.cact` pages, 34.1 MiB (numbers below). The 127.6 MiB process peak of a 30 s `Transcribe` (activations and GC
+      headroom) is a separate goal that does not block 9.2 (F-037 "Open").
+      (2026-10-10) — the packed path runs the whole model and is `whistle.Load`'s default for `.cact`
       (`WithFloatWeights()` keeps float). `weights.Options.Packed` makes the `.cact` source a `weights.Packer` whose
       `Matrix(name)` serves each CQ record as a cached `cq.Matrix` without a float32 copy. `needle.Linear` (`Apply`,
       `Row`, `Rows`) runs all 152 CQ tensors: the attention and cross-attention projections, `pw1`/`pw2`, the stem, the
@@ -1077,6 +1096,9 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 - [ ] CLI polish on top of 6.5: `whistle transcribe [--language] [--keywords] [--word-timestamps] [--depth] [--json]`,
       `whistle stream` (stdin PCM or a WAV played in chunks), `whistle embed`, `whistle doctor`
 - [ ] README quickstart, examples and Go API docs
+- [ ] Follow-up from 6.3: `de-paare-missed`, the one keyword search miss. Weaker hypotheses with the shared keyword
+      bonus end one token earlier and fill Whisper's 5 finished slots (F-029); find the engine's rule that keeps the
+      right one.
 - [ ] Optional: an HTTP server (`/transcribe`, `/stream` over WebSocket)
 - [ ] Optional: a js/wasm build (as in go-pocket-tts) with a small web demo
 - [ ] Optional: the Needle 3 text model (tool calling) on top of `internal/needle` and `.cact`, which reuses most of the work
