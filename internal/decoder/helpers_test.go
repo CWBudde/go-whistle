@@ -5,9 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-	"unicode"
 
 	"github.com/cwbudde/go-whistle/internal/encoder"
 	"github.com/cwbudde/go-whistle/internal/frontend"
@@ -130,59 +128,4 @@ func encode(t testing.TB, src weights.Source, clips []clip, tap MemoryTap) ([][]
 	}
 
 	return outs, frames
-}
-
-// editDistance is the Levenshtein distance between a and b.
-func editDistance[T comparable](a, b []T) int {
-	prev, cur := make([]int, len(b)+1), make([]int, len(b)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-
-	for i := range a {
-		cur[0] = i + 1
-
-		for j := range b {
-			cost := 1
-			if a[i] == b[j] {
-				cost = 0
-			}
-
-			cur[j+1] = min(prev[j+1]+1, cur[j]+1, prev[j]+cost)
-		}
-
-		prev, cur = cur, prev
-	}
-
-	return prev[len(b)]
-}
-
-// normWords lower-cases text and strips punctuation for the WER.
-func normWords(text string) []string {
-	f := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '\''
-	})
-
-	return f
-}
-
-// wer is the word error rate of hyp against ref, case and punctuation
-// ignored.
-func wer(ref, hyp string) float64 {
-	r := normWords(ref)
-	if len(r) == 0 {
-		return float64(len(normWords(hyp)))
-	}
-
-	return float64(editDistance(r, normWords(hyp))) / float64(len(r))
-}
-
-// cer is the character error rate of hyp against ref over the raw runes.
-func cer(ref, hyp string) float64 {
-	r := []rune(ref)
-	if len(r) == 0 {
-		return float64(len([]rune(hyp)))
-	}
-
-	return float64(editDistance(r, []rune(hyp))) / float64(len(r))
 }

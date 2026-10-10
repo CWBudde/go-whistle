@@ -31,6 +31,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/cwbudde/go-whistle/internal/eval"
 	"github.com/cwbudde/go-whistle/internal/tokenizer"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
@@ -606,7 +607,7 @@ func TestProbeGreedy(t *testing.T) {
 					return
 				}
 
-				rows[i] = greedyRow{c: c, r: r, wer: wer(c.Text, r.Text), cer: cer(c.Text, r.Text)}
+				rows[i] = greedyRow{c: c, r: r, wer: eval.WER(c.Text, r.Text), cer: eval.CER(c.Text, r.Text)}
 			})
 		}
 

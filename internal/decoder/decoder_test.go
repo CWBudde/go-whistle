@@ -37,28 +37,6 @@ func TestHypothesisRoundTrip(t *testing.T) {
 	}
 }
 
-func TestErrorRates(t *testing.T) {
-	cases := []struct {
-		ref, hyp string
-		wer, cer float64
-	}{
-		{"She found a door.", "She found a door.", 0, 0},
-		{"She found a door.", "she found the door", 0.25, 5.0 / 17},
-		{"a b c d", "a c d e", 0.5, 3.0 / 7},
-		{"", "", 0, 0},
-	}
-
-	for _, c := range cases {
-		if w := wer(c.ref, c.hyp); math.Abs(w-c.wer) > 1e-12 {
-			t.Errorf("wer(%q, %q) = %v, want %v", c.ref, c.hyp, w, c.wer)
-		}
-
-		if r := cer(c.ref, c.hyp); math.Abs(r-c.cer) > 1e-12 {
-			t.Errorf("cer(%q, %q) = %v, want %v", c.ref, c.hyp, r, c.cer)
-		}
-	}
-}
-
 // fastClips are short clips from LibriSpeech test-other, test-clean and
 // FLEURS de on which greedy decoding with Best() reproduces the engine's
 // transcript exactly (docs/FINDINGS.md F-024).
