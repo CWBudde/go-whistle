@@ -906,20 +906,54 @@ no prerequisites; 6.3 and 6.4 need the 6.1 fixtures; 6.6 integrates everything a
       punctuation; under teacher forcing our model prefers ours on 17 by at most 0.025 nats per token, the other 2 are
       search misses by under 0.001 (F-031). Holds without keywords at full depth; 6.3/6.4 add those.
 
-## Phase 7 — Word timestamps & output JSON
+## Phase 7 — Word timestamps & output JSON — ✅ DONE (2026-10-10)
 
 One session: `internal/decoder` (capture hook), `internal/align` (new) and `whistle/`. The 32 fixture JSONs already hold
 the engine's word times and probabilities, so this phase needs no new oracle runs; teacher-force the engine's text.
 
-- [ ] 7.1 Cross-attention capture: per decoded token, the attention probabilities per layer and head over the 80 ms
+- [x] 7.1 Cross-attention capture: per decoded token, the attention probabilities per layer and head over the 80 ms
       frames, through a decoder hook that costs nothing when off.
-- [ ] 7.2 Word grouping: tokens starting with `▁` begin words; byte pieces are merged. `probability` per word:
+      (2026-10-10) — `decoder.State.SetCapture(fn)` reports per `Extend` call and layer that runs a
+      `decoder.Attention` (probabilities `[tokens, heads, frames]` and the output gate); off it is one nil check per
+      layer, on the logits are bit-identical, a row-by-row feed is within 1.1e-6 of one pass, a fork does not inherit
+      it, a ladder rung reports only its layers (`TestCapture`). Timing uses one extra teacher-forced pass over the
+      winning transcript instead of capturing in every beam: 26.0 ms on a 6.3 s clip, `Transcribe` 143.9 → 170.4 ms
+      (+18 %, `BenchmarkWordTimestamps`), 93 % of it the decoder pass (`docs/FINDINGS.md` F-033).
+- [x] 7.2 Word grouping: tokens starting with `▁` begin words; byte pieces are merged. `probability` per word:
       candidates are the mean or the product of the token probabilities (U11). Match the engine.
-- [ ] 7.3 Timestamps: aggregate the attention over heads and layers (candidates: all layers, the last layer, the
+      (2026-10-10) — `align.Words`: the engine's word strings on 477 of 477 transcripts (8156 words: fixtures,
+      LibriSpeech, keyword and depth runs). Time and probability come from the word's core tokens, without Whisper's
+      punctuation words (`string.punctuation` substring test: `,` `.` `!"` out, `."` `?"` in). `just align-probe`
+      probability leaderboard, 8156 words: **Whisper's mean of the core tokens' p over the whole vocabulary** 50.6 %
+      equal to three decimals, 91.1 % within 0.01, mean |Δ| 0.0036; renormalised over text pieces ties (50.6 / 91.2);
+      keyword-adjusted 50.3 / 90.5 (on the keyword cases 42.2 / 80.7 against 44.5 / 87.2 raw); geometric mean 49.7 /
+      85.5; mean over all tokens 45.8 / 83.6; product, min, max, first/last lower. The rest is the engine's W2A8 token
+      probabilities (F-033).
+- [x] 7.3 Timestamps: aggregate the attention over heads and layers (candidates: all layers, the last layer, the
       best-aligned heads) and run a monotonic DTW alignment over the 80 ms frames (U11).
-- [ ] 7.4 `words` in `whistle.Result` and `--word-timestamps` in the CLI.
-- [ ] **Accept:** timestamps are monotone and within [0, duration], start/end are within 80 ms of the engine on ≥ 90% of
+      (2026-10-10) — Whisper's `find_alignment` with its default alignment heads, every head of the last half of the
+      layers that run (4–7; on a ladder rung its last half): per-head z-score per frame over all positions, no median
+      filter, rows = the queries predicting the language token, each text token and EOS, `dtw(−matrix)`, jump times.
+      Grid of 69,120 variants plus whole-layer subsets, greedy head fits and ladder rungs, fitted on LibriSpeech:
+      exact start / end 94.6 % / 98.8 % (layers 4–7) against ≤ 85 % / 90 % for any other layer subset, 85.3 % /
+      88.5 % for a fitted 16-head set, 77.7 % / 82.3 % for the last layer, 71.9 % / 78.8 % for all heads; depth runs
+      95.0 % / 98.0 % with the rung's last half. Every start but the first is exact on 99.0 %, every end on 98.8 %.
+      The first word's start is not identified; an energy onset (silence gate levels within 14 dB of p99, fitted)
+      floors it. Teacher forced, `align.Default`, start and end within 80 ms: LibriSpeech (train) 99.1 %, held out
+      99.3 % (fixtures 99.3, keywords 99.2, depth 99.3); without the onset 94.6 % held out (F-033).
+- [x] 7.4 `words` in `whistle.Result` and `--word-timestamps` in the CLI.
+      (2026-10-10) — `TranscribeOptions.WordTimestamps` fills `Result.Words` (one capture pass on the search's rung and
+      `Memory`, then `align.Align`); silence returns `Silence()`; `whistle transcribe --word-timestamps` prints a line
+      per word, or with `--json` the engine's line (`TestTranscribeCmdWordTimestamps`).
+- [x] **Accept:** timestamps are monotone and within [0, duration], start/end are within 80 ms of the engine on ≥ 90% of
       words, and the JSON is byte-compatible in field names and order.
+      (2026-10-10) — Through `Transcribe` on the 32 fixtures (`TestTranscribeWordsMatchEngine`): every result's words
+      spell its text, are monotone (start ≤ end ≤ next start), on the 80 ms grid and within [0, duration]; start and
+      end within 80 ms on 97.4 % of the engine's 459 words (start 97.8 %, end 97.6 %; 451 paired by string, the
+      Polish search miss of F-026 counting as failures), exact 93.9 % / 97.2 %, probability within 0.01 on 90.6 %.
+      `TestTranscribeWordsJSON`: the raw engine outputs with timestamps in `whistle/testdata/needle-cli/` equal ours
+      with the numbers masked (fleurs-de, ls-clean, `silence-2s` exactly; `tiled-30s`, whose transcript differs,
+      in structure) (F-033).
 
 ## Phase 8 — Streaming & embeddings
 
@@ -1020,7 +1054,7 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 | U8  | Beam length normalisation, EOS rules — resolved: Whisper's at 5 beams, Σ log p / len, F-026 | 6.2     | transcript parity                 |
 | U9  | Keyword bias weight and revocation — best fit: 2 nats per token, full revocation, F-029     | 6.3     | keyword fixture parity            |
 | U10 | Silence gate — resolved: p99 − p10 of 250–3500 Hz mel frame energy ≤ 5 dB, F-031            | 6.6     | threshold sweep                   |
-| U11 | Timestamp algorithm (heads/layers, DTW), word probability                                   | 7.2–7.3 | timestamp parity                  |
+| U11 | Timestamps — Whisper's alignment, last half of the layers; first start fitted, F-033        | 7.2–7.3 | timestamp parity                  |
 | U12 | Stream commit rule — resolved: LocalAgreement-2, 15 s sentence trim, F-032; > 30 s open     | 8.3–8.4 | stream parity                     |
 
 ## Non-goals

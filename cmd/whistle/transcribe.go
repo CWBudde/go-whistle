@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -21,6 +22,7 @@ func newTranscribeCmd() *cobra.Command {
 		keywords string
 		depth    int
 		asJSON   bool
+		words    bool
 	)
 
 	cmd := &cobra.Command{
@@ -31,10 +33,11 @@ func newTranscribeCmd() *cobra.Command {
 			`  {"text":"...","language":"en","ttft_ms":0.0,"decode_tps":0.0}` + "\n\n" +
 			"Decoding is the engine's beam search (5 beams); silence gives the empty text. --keywords names a file of\n" +
 			"words and phrases to favour, one per line, and --depth runs fewer decoder layers (2..8), as the engine's\n" +
-			"--audio-keywords and --audio-depth do.",
+			"--audio-keywords and --audio-depth do. --word-timestamps adds every word's start, end and probability\n" +
+			"(the engine's --audio-word-timestamps): a line per word after the text, or the JSON's \"words\".",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts := whistle.TranscribeOptions{Language: language, Depth: depth}
+			opts := whistle.TranscribeOptions{Language: language, Depth: depth, WordTimestamps: words}
 
 			if keywords != "" {
 				raw, err := os.ReadFile(keywords) // #nosec G304 -- the user names the file.
@@ -61,28 +64,39 @@ func newTranscribeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&keywords, "keywords", "", "File of words and phrases to favour, one per line")
 	cmd.Flags().IntVar(&depth, "depth", 0, "Decoder layers to run, 2..8 (the engine's ladder); default: all")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print the result as the engine's JSON object")
+	cmd.Flags().BoolVar(&words, "word-timestamps", false, "Add each word's start, end and probability")
 
 	return cmd
 }
 
 // runTranscribe transcribes the WAV file at path with m and writes the text
-// or the JSON line to out.
+// or the JSON line to out. With word timestamps the text is followed by a
+// line per word, as upstream's playground prints them.
 func runTranscribe(m *whistle.Model, path string, opts whistle.TranscribeOptions, asJSON bool, out io.Writer) error {
 	res, err := m.TranscribeWAV(path, opts)
 	if err != nil {
 		return err
 	}
 
-	line := []byte(res.Text)
+	var b bytes.Buffer
 
 	if asJSON {
-		line, err = res.MarshalJSON()
+		line, err := res.MarshalJSON()
 		if err != nil {
 			return err
 		}
+
+		b.Write(line)
+		b.WriteByte('\n')
+	} else {
+		b.WriteString(res.Text + "\n")
+
+		for _, w := range res.Words {
+			fmt.Fprintf(&b, "  %6.2f - %5.2f  %-20s %.2f\n", w.Start.Seconds(), w.End.Seconds(), w.Text, w.Probability)
+		}
 	}
 
-	_, err = fmt.Fprintf(out, "%s\n", line)
+	_, err = out.Write(b.Bytes())
 	if err != nil {
 		return fmt.Errorf("write result: %w", err)
 	}

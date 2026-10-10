@@ -125,6 +125,10 @@ depth-probe *args:
 keywords-probe *args:
     go test -tags oracle -count=1 -v -timeout 120m -run 'TestProbeKeywords$' ./internal/search/ {{args}}
 
+# Fit the word timestamps and probabilities against the engine's recorded words, teacher forced (WHISTLE_PROBE_TOP; cache: WHISTLE_ALIGN_CACHE/FRESH)
+align-probe *args:
+    go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbe' ./internal/align/ {{args}}
+
 # WER of the Go pipeline and of the engine on the LibriSpeech test-clean subset, and how often the transcripts are equal (audio: oracle-librispeech-audio)
 eval-librispeech:
     WHISTLE_EVAL_LIBRISPEECH=1 go test -count=1 -v -timeout 60m -run 'TestEvalLibriSpeech$' ./whistle/

@@ -2373,6 +2373,187 @@ clips where the engine's own stream equals it.
 F-025 found the transcripts identical at 1 to 8 threads. Every run also checks the library against the CLI at
 `--threads 4`. `just oracle-stream` was run twice, and the second run left `git status` clean.
 
+## F-033 — Word timestamps: Whisper's alignment on the last half of the decoder layers (U11) (2026-10-10)
+
+**Question.** U11: with `--audio-word-timestamps` the engine prints every word with `start`, `end` (two decimals) and
+`probability` (three decimals). Which words, which probability, and which attention and alignment give the times?
+The site says only that the times come "from the decoder's own attention".
+
+**Evidence.** Every engine transcript recorded with words: the 32 fixtures (459 words), the LibriSpeech subset (200,
+4174 words), the 53 keyword cases (773 words) and the 192 depth runs (2750 words), 8156 words in all (F-025). All 918
+times in the fixtures and every time in the other sets are multiples of 0.08 s, so the engine aligns on the 80 ms
+encoder frames. Words are contiguous (an end equals the next start) except after punctuation: "Transportsysteme,"
+ends at 3.68 and "was" starts at 4.24. One fixture word has zero length. That is the shape of Whisper's
+`find_alignment` (jump times, `merge_punctuations`), and the fits below confirm it.
+
+**Instrument.**
+
+- **Capture (PLAN.md 7.1).** `decoder.State.SetCapture(fn)` reports, per `Extend` call and decoder layer that runs,
+  the cross-attention probabilities `[tokens, heads, frames]` and the output gate. Off, `Extend` pays one nil check per
+  layer; on, the logits are bit-identical (`TestCapture`, which also checks rows that sum to 1, a row-by-row feed
+  within 1.1e-6 of a one-pass feed, a fork that does not inherit the hook, and a ladder rung that reports only its
+  layers).
+- **Teacher forcing.** `internal/align/probe_test.go` (build tag `oracle`, `just align-probe`) forces each engine
+  text in its most likely spelling under our model (F-026's constrained beam of width 16; with the keyword bias for
+  the keyword cases; on the ladder rung for the depth runs). Every spelling decodes to the engine's text. One pass
+  over `<s>`, the language token, the text tokens and EOS captures the attention and the token probabilities. The
+  477 items take 1.4 min on an M5 Pro and are cached in a gob file.
+- **Splits.** The LibriSpeech subset is the training set. The fixtures, the keyword cases and the depth runs are held
+  out.
+- **Scores.** Per word: the start and the end within 80 ms (|Δ| ≤ one frame), both within 80 ms (the Accept), exact
+  frames, and the mean |Δ| in frames. For the probability: equal to three decimals, within 0.01, mean |Δ|.
+
+### Word grouping (7.2)
+
+A token whose piece starts with `▁` begins a word; every other token continues it, byte pieces included (no piece
+has an inner `▁`, and one is a lone `▁`). So the words are the transcript split at its spaces, punctuation attached.
+The engine's word strings joined by spaces are its text on all 477 transcripts, and `align.Words` reproduces them on
+477 of 477 (8156 words), in the most likely spelling and in `RefTokenizer`'s.
+
+Inside a word, the time and the probability come from its tokens without Whisper's punctuation words
+(`Word.Core`). Whisper's `split_tokens_on_spaces` starts a word at a token with a leading space or at a punctuation
+token, and tests punctuation with Python's substring operator: `subword.strip() in string.punctuation`. So `,`, `.`,
+`!`, `?`, `;` and `!"` are punctuation words, while `."`, `?"`, `,"` and `.,` are not and stay part of their word.
+`merge_punctuations` then glues a mark to its neighbour but keeps the neighbour's time and probability. The engine
+follows this to the quirk (`TestProbePunctuation`, keyword cases reuse fixture clips, so counts repeat):
+
+| trailing piece        | engine's end = the end without it | = the end with it | either |
+| --------------------- | --------------------------------- | ----------------- | ------ |
+| `,`                   | 321                               | 11                | 12     |
+| `.` (last word / not) | 251 / 38                          | 0 / 6             | 0      |
+| `?`, `!`, `;`         | 15, 4, 5                          | 0                 | 0      |
+| `!"`                  | 6                                 | 0                 | 0      |
+| `."`, `?"`, `,"`      | 0                                 | 12, 5, 15         | 0      |
+
+A leading `▁"` forms one Whisper word with the token after it and is timed with it (13 of 13 where it matters). The
+`,` and `:` exceptions are pauses before a quote that our DTW gives to the mark and the engine to the word, numerics
+rather than a rule (two `:` cases, both before `▁"`).
+
+### Probability (7.2)
+
+`TestProbeProbability`, all 8156 words; the source of the token probability × the aggregate × the tokens:
+
+| candidate                                                    | exact (3 decimals) | within 0.01 | mean abs Δ |
+| ------------------------------------------------------------ | ------------------ | ----------- | ---------- |
+| **mean p · core tokens · softmax over the whole vocabulary** | **50.6 %**         | **91.1 %**  | **0.0036** |
+| mean p · core tokens · renormalised over the text pieces     | 50.6 %             | 91.2 %      | 0.0035     |
+| mean p · core tokens · keyword-adjusted, clipped at 1        | 50.3 %             | 90.5 %      | 0.0053     |
+| mean p · core tokens · keyword-adjusted, renormalised        | 50.2 %             | 90.5 %      | 0.0049     |
+| geometric mean (= length-normalised product) · core tokens   | 49.7 %             | 85.5 %      | 0.0069     |
+| mean p · all tokens of the word                              | 45.8 %             | 83.6 %      | 0.0102     |
+| product, min, max, first or last token                       | lower              |             |            |
+
+The winner is Whisper's `word_probabilities`: the mean of the token probabilities of the word's core tokens, from
+the model's softmax over the whole vocabulary. Renormalising over the text pieces changes nothing measurable (the
+specials hold almost no mass). The keyword cases separate the raw model from the beam's biased score: raw 44.5 %
+exact / 87.2 % within 0.01, keyword-adjusted 42.2 % / 80.7 %. Per set: LibriSpeech 59.5 % / 95.2 %, fixtures
+49.5 % / 92.2 %, keywords 44.5 % / 87.1 %, depth 38.9 % / 86.0 %. The rest is the engine's W2A8 arithmetic in the
+token probabilities themselves (F-024: our top-1 agrees with the engine's token on 97.7 % of positions).
+
+### Times (7.3)
+
+**Grid** (`TestProbeTimes`, 69,120 variants in 1.6 min, ranked on LibriSpeech by exact frames): 192 matrix configs
+(gate weighting, query rows, lead rows, normalisation, median filter) × 12 head sets (all 64 heads, layers 0–3, 4–7,
+6–7, each single layer) × the cost, the step pattern, the end rule, the core tokens and an offset of −1, 0 or +1
+frame. Without the onset rule below. The best variant per axis value:
+
+| axis          | winner                         | best alternatives (LibriSpeech exact start / end)                                                            |
+| ------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| heads         | **layers 4–7** 94.6 % / 98.8 % | layer 7 77.7 / 82.3; layer 5 75.3 / 77.6; layers 6–7 72.4 / 77.4; all 64 71.9 / 78.8; layers 0–3 61.8 / 64.0 |
+| output gate   | **unweighted**                 | weighted by the head's mean gate on the row 87.3 / 91.5                                                      |
+| rows          | **the predicting queries**     | the token's own query 45.5 / 43.5                                                                            |
+| lead rows     | **1 (the `<s>` row)**          | none 94.5 / 98.8 (the first word then starts at frame 0: fixtures within 80 ms 92.6 %, against 95.6 %)       |
+| normalisation | **z per frame, all positions** | z per frame over the DTW rows 94.3 / 98.4; none 69.0 / 72.2; z per row 67.9 / 71.8                           |
+| median filter | **none (width 1)**             | 3: 87.8 / 91.3; 5: 67.8 / 72.2; 7 (Whisper's default on 20 ms frames): 43.2 / 48.2                           |
+| cost          | **−matrix**                    | −log of the probabilities 68.9 / 72.1                                                                        |
+| step pattern  | **Whisper's**                  | no shared columns 71.9 / 78.8                                                                                |
+| end           | **the next row's first frame** | one past the last frame of the word's row 71.9 / 78.8                                                        |
+| core tokens   | **on**                         | off 94.6 / 86.8                                                                                              |
+| offset        | **0**                          | +1 frame 63.7 / 69.6; −1 frame 57.0 / 59.2                                                                   |
+
+The leader's fixtures (held out) are 92.6 % / 99.1 % exact, 95.6 % within 80 ms; every remaining start miss but 50
+of 5121 is the first word's (below).
+
+**Whole layers** (`TestProbeLayers`, all 255 subsets of whole layers × normalisation × filter × gate): layers 4–7
+(every head of the last half) give 94.6 % / 98.8 % exact; the next subsets, {5, 7}, {4, 6, 7}, {0, 5, 6, 7}, reach
+85 % / 89–90 %. **Fitted heads** (`TestProbeHeads`, greedy forward selection on LibriSpeech, up to 16 heads) stall at
+85.3 % / 88.5 % exact (held out 83.2 % / 86.9 %): a head set fitted to the data loses to the plain last half by 9
+points. That is Whisper's default when a model has no `alignment_heads`: `all_heads[n_text_layer // 2:] = True`.
+
+**Ladder rungs** (`TestProbeDepth`, 2750 words): on depth N the engine uses the last half of the layers that run
+(`LastHalf` of the capture: depth 2 → {7}, 3 → {3, 7}, 4 → {5, 7}, 5 and 6 → {3, 5, 7}, 7 → {3, 4, 5, 7}). Exact
+start / end 95.0 % / 98.0 % over all depths, at least 93.8 % / 96.7 % per depth; the layers 4–7 that run give
+84.7 % / 86.9 %, all layers that run 72.1 % / 76.0 %.
+
+**The algorithm** (`align.Default`, everything but the first word identified to the frame):
+
+1. One teacher-forced pass over `<s>`, the language token, the text tokens and EOS, the cross-attention captured.
+2. Every head of the last half of the layers that ran, each z-scored per frame over all positions of the pass
+   (Whisper's `std_mean` over the token axis, before the rows are cut out); no median filter; the mean over the
+   heads.
+3. The DTW rows are the queries that predict the language token (the `<s>` row, which absorbs leading frames), each
+   text token and EOS; cost −matrix; Whisper's `dtw` (steps from the diagonal, the row above or the column before,
+   ties to the column move) and its backtrace.
+4. A word starts at the first frame of its first core token's row and ends at the first frame of the row after its
+   last core token (Whisper's jump times); times are frames × 80 ms.
+
+**The first word's start is not identified.** With the algorithm above every start but the first is exact on
+99.0 % of words (50 misses in 5121, the fixtures, LibriSpeech and keyword sets), every end on 98.8 %, but the first
+word's start only on 12 of 285 transcripts (4 %): ours is too early, mostly frame 1,
+where the engine's is at the speech onset (first words mostly last 2–3 frames). Neither the attention nor a rule on
+it explains the engine (`probefirst_test.go`, first-start exact of 285): the input rows as lead (11), the
+normalisation over the DTW rows (14), all heads (12), heads averaged before the z-score (≤ 22), per-row transforms
+(row z-score, log, ÷ max, sqrt, square, frame 0 dropped: at most 27 %), other lead rows (EOS, the mean row,
+constants −0.5 … 1.5: ≤ 56), Whisper's `max_duration` truncation (end − 2 × median: 20), end − 3 frames (115). The
+best fit is an energy onset (`TestProbeOnset`): the first 10 ms frame whose speech-band level (the silence gate's,
+F-031) comes within X dB of the clip's 99th percentile, rounded to the 80 ms grid, as a floor under the DTW start.
+X = 14 dB, fitted on LibriSpeech (`TestProbeOnsetFit`), gives first starts exact on 65.5 % / 56.2 % / 56.6 %
+(LibriSpeech / fixtures / keywords) and within 80 ms on 92.5 % / 100 % / 96.2 %. `Options.Onset` carries it; it is
+a fit, not the engine's rule.
+
+**Result, teacher forced** (`TestProbeLeader`, `align.Default`):
+
+| set                     | words | start and end within 80 ms | exact start / end | probability within 0.01 |
+| ----------------------- | ----- | -------------------------- | ----------------- | ----------------------- |
+| LibriSpeech (train)     | 4174  | 99.1 %                     | 97.5 % / 98.8 %   | 95.2 %                  |
+| fixtures (held out)     | 459   | 99.3 %                     | 95.9 % / 99.1 %   | 92.2 %                  |
+| keywords (held out)     | 773   | 99.2 %                     | 95.9 % / 99.0 %   | 87.1 %                  |
+| depth (held out)        | 2750  | 99.3 %                     | 95.0 % / 98.0 %   | 86.0 %                  |
+| held out together       | 3982  | 99.3 %                     | 95.3 % / 98.3 %   |                         |
+| without the onset rule  | 3982  | 94.6 % (held out)          | 92.0 % / 98.3 %   |                         |
+| without the core tokens | 3982  | 90.1 % (held out)          | 95.3 % / 88.2 %   |                         |
+
+### Pipeline (7.4)
+
+- `TranscribeOptions.WordTimestamps` fills `Result.Words` after the search: one more decoder pass over the chosen
+  transcript on the same ladder rung and `Memory`, with the capture on (`timeWords` in `whistle/transcribe.go`), then
+  `align.Align`. The probabilities are the pass's own, without keyword bias. A silent clip returns `Silence()`, the
+  engine's `{"text":"","language":"","words":[],"ttft_ms":0.0,"decode_tps":0.0}`. `Transcribe` computes the gate's
+  levels once and uses them for the silence verdict and the onset.
+- Times stay on the 80 ms grid and within the clip: the DTW's EOS row holds at least the last frame, so an end is at
+  most the last frame's start, and the code caps at the last grid point within the samples.
+- **The extra pass instead of capturing inside every beam.** `BenchmarkWordTimestamps` on a 6.3 s clip (M5 Pro):
+  `Transcribe` 143.9 ms without timestamps, 170.4 ms with (+18 %); the pass alone 26.0 ms. The decoder's `Extend`
+  over the ~30 positions is 93 % of it; the alignment the rest. Over the 32 fixtures: 125.7 against 152.6 ms per clip
+  (+21 %, `TestTranscribeWordsMatchEngine`).
+- `whistle transcribe --word-timestamps` prints the text and a line per word (upstream's playground format), or with
+  `--json` the engine's JSON line.
+
+**End to end, the 32 fixtures through `Transcribe`** (`TestTranscribeWordsMatchEngine`): 31 of 32 texts equal the
+engine's (F-026); our words are paired with the engine's by their strings, so the Polish search miss costs its
+differing words. Of the engine's 459 words, 451 pair up; start and end within 80 ms on 97.4 % of all 459 (start
+97.8 %, end 97.6 %), exact 93.9 % / 97.2 %, probability within 0.01 on 90.6 % (mean |Δ| 0.0040). Every result's
+words spell its text, are monotone (start ≤ end ≤ next start), lie on the grid and within [0, duration].
+
+**JSON** (`TestTranscribeWordsJSON`): the clips behind the raw engine outputs with timestamps in
+`whistle/testdata/needle-cli/` (F-027) give the engine's bytes with every number masked: `fleurs-de…`,
+`ls-clean-1320-122617-0003` and `silence-2s` exactly; `tiled-30s` (the first clip tiled to 480,000 samples), whose
+transcript differs from the engine's ("air" for "heir", and the engine drops a repetition), with the strings masked
+and the word objects collapsed too. F-027's marshaller needed no change.
+
+**Not covered.** The first word's start (the onset rule is a fit). The probabilities' last decimal (W2A8). Depth runs
+end to end through `Transcribe` (teacher forced only). Streaming passes (F-032) reuse the same words, untested here.
+
 ## F-034 — CQ LUT kernel in NEON and AVX2: byte-plane tables and a 32-row index (9.4, `internal/cq`) (2026-10-10)
 
 **Question.** F-028's pure-Go `nibble`/`nibble4` kernels are 2.2–5.7× slower than the NEON float GEMM, because every

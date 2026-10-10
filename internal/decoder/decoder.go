@@ -166,11 +166,38 @@ func (d *Decoder) Memory(enc []float32, frames int) (*Memory, error) {
 // self-attention KV caches with their tap history and the engram caches
 // (docs/FINDINGS.md F-022).
 type State struct {
-	mem    *Memory
-	kv     []needle.KVCache
-	engram []needle.EngramCache
-	tokens []int
+	mem     *Memory
+	kv      []needle.KVCache
+	engram  []needle.EngramCache
+	tokens  []int
+	capture Capture
 }
+
+// Attention is one decoder layer's cross-attention for the tokens of one
+// Extend call (PLAN.md 7.1, docs/FINDINGS.md F-033): row i is the query of
+// the token fed at position Pos+i, the one that predicts the next token.
+type Attention struct {
+	Layer  int // the decoder layer, 0 … 7
+	Pos    int // the position of the first fed token
+	Tokens int // the fed tokens, the rows
+	Heads  int
+	Frames int
+	// Probs is softmax(q̂k̂ᵀ/√48) per token and head over the encoder
+	// frames, [Tokens, Heads, Frames].
+	Probs []float32
+	// Gate is the output gate σ(gate_proj(x)) per token and value channel,
+	// [Tokens, Heads·64]; nil when the Hypothesis has no gate.
+	Gate []float32
+}
+
+// Capture receives every Attention of the layers that run, in layer order,
+// once per Extend call. The slices are the receiver's to keep.
+type Capture func(Attention)
+
+// SetCapture makes the state report its cross-attention to fn on every
+// later Extend; nil turns it off. Off, Extend pays one nil check per
+// layer. A Fork does not inherit it.
+func (s *State) SetCapture(fn Capture) { s.capture = fn }
 
 // NewState starts a sequence against the memory m.
 func (d *Decoder) NewState(m *Memory) *State {
@@ -403,8 +430,14 @@ func (d *Decoder) layer(l int, mhc *needle.MHC, s *State, stream []float32, t, o
 	}
 
 	c, mem := d.cross[l], s.mem.layers[l]
+
+	var keep *Attention
+	if s.capture != nil {
+		keep = &Attention{Layer: l, Pos: off, Tokens: t, Heads: c.heads, Frames: mem.frames}
+	}
+
 	hook := func(h []float32, t int) error {
-		for i, v := range c.branch(h, t, off, mem, d.crossRope()) {
+		for i, v := range c.branch(h, t, off, mem, d.crossRope(), keep) {
 			h[i] += v
 		}
 
@@ -430,7 +463,7 @@ func (d *Decoder) layer(l int, mhc *needle.MHC, s *State, stream []float32, t, o
 	}
 
 	if d.h.CrossPos == CrossOutside {
-		br := c.branch(needle.CollapseLanes(out, d.lanes, d.dim), t, off, mem, d.crossRope())
+		br := c.branch(needle.CollapseLanes(out, d.lanes, d.dim), t, off, mem, d.crossRope(), keep)
 
 		for i := range t {
 			for k := range d.lanes {
@@ -440,6 +473,10 @@ func (d *Decoder) layer(l int, mhc *needle.MHC, s *State, stream []float32, t, o
 				}
 			}
 		}
+	}
+
+	if keep != nil {
+		s.capture(*keep)
 	}
 
 	return out, nil
