@@ -2883,6 +2883,11 @@ Start exact 1403 (95.8 %), end exact 1447 (98.8 %), both within 80 ms 1448 (98.8
 (93.4 %), all three exact 716 (48.9 %), which is F-033's timestamp and probability parity. So byte-equal JSON is
 mostly a matter of the third decimal of a probability.
 
+**On the packed path (9.2, F-037).** The numbers above were measured on the float path. Replayed on `main` after
+9.2 made the packed path `Load`'s default: decision equal on 797 of 930 calls (clips 194/224, chunks 456/535, the
+other sets unchanged), every decision of 69 of 108 runs, JSON equal 433, final text equal to the engine's stream 98
+of 108; `TestStreamAccept` unchanged (18/32, normalised 24/32).
+
 **Why calls differ** (`TestStreamDivergences`). Each run's first call whose decision differs, replayed to that call:
 39 runs. In 38 of them our pass spells other words than the engine's pass. In one (`ls-other-4198-12281-0004.c0.5`
 call 5) the pass spells the same words, but our time for `James."` puts it before the last committed end − 0.1 s, so

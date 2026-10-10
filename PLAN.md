@@ -987,7 +987,9 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       runs, `received` and `language` on 930/930; committed words both times within 80 ms 98.8 %, probability within
       0.01 93.4 %; the final text equals the engine's stream on 98 of 108 runs. Every run's first differing call
       follows a pass that spells other words than the engine's (38 runs, 32 within ±0.07 nats per token) or another
-      word time (1), none the bookkeeping (`docs/FINDINGS.md` F-036).
+      word time (1), none the bookkeeping (`docs/FINDINGS.md` F-036). After 9.2 made the packed
+      path the default, the same replay gives 797/930 calls (clips 194, chunks 456, others unchanged), the Accept
+      numbers unchanged.
 - [x] 8.4 Buffers longer than 30 s: trim committed audio the way the engine does (U12).
       (2026-10-10) — The sentence trim keeps the long runs under 30 s as in the engine: all of F-032's inferred
       buffer starts are reproduced up to each run's first divergence (466/471; the five others follow it in
