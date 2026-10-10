@@ -73,6 +73,10 @@ resample-fixture *args:
 mel-fixture *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/mel_fixture.py {{args}}
 
+# Search the encoder hypotheses against the committed needle_embed rows (WHISTLE_PROBE_SRC/BEAM/TOP/CLIPS/KEY)
+encoder-probe *args:
+    go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbe(Baselines|Search)$' ./internal/encoder/ {{args}}
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html
