@@ -6,6 +6,8 @@ import (
 	"math/rand/v2"
 	"slices"
 	"testing"
+
+	"github.com/cwbudde/go-whistle/internal/tokenizer"
 )
 
 func TestParseKeywords(t *testing.T) {
@@ -130,5 +132,83 @@ func TestNewKeywordsRejects(t *testing.T) {
 		if !errors.Is(err, ErrKeywords) {
 			t.Errorf("%s: %v, want ErrKeywords", b, err)
 		}
+	}
+}
+
+// TestKeywordOverlaps pins the review cases of the automaton: the bonus
+// does not depend on the order the keywords are inserted, a keyword that
+// completes as the suffix of a longer keyword's partial match earns its
+// completion and keeps its tokens when that match fails, and a bare
+// spelling matches only at the start of the text.
+func TestKeywordOverlaps(t *testing.T) {
+	b := Bias{Weight: 1, Revoke: 1, Complete: 0.5, Forms: FormSpace}
+
+	for _, order := range [][][]int{{{1, 2, 3}, {1, 2}}, {{1, 2}, {1, 2, 3}}} {
+		k := build(order, unit, b)
+		if got := k.Bonus([]int{1, 2, 3}, -1); got != 3+2*0.5 {
+			t.Errorf("keywords %v: Bonus(1 2 3) = %g, want 4", order, got)
+		}
+	}
+
+	k := build([][]int{{1, 2, 3, 4}, {2, 3}}, unit, b)
+
+	for _, tc := range []struct {
+		text []int
+		want float64
+	}{
+		{[]int{1, 2, 3}, 3 + 0.5},       // "2 3" completes inside "1 2 3 …"
+		{[]int{1, 2, 3, 7}, 2 + 0.5},    // the failure takes back "1" only
+		{[]int{1, 2, 3, 4}, 4 + 2*0.5},  // both complete
+		{[]int{1, 2, 3, 4, 7}, 4 + 1.0}, // and stay
+	} {
+		if got := k.Bonus(tc.text, -1); math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("Bonus(%v) = %g, want %g", tc.text, got, tc.want)
+		}
+	}
+
+	bare := build([][]int{{textStart, 5, 6}, {7}}, unit, b)
+
+	for _, tc := range []struct {
+		text []int
+		want float64
+	}{
+		{[]int{5, 6}, 2 + 0.5},
+		{[]int{7, 5, 6}, 1 + 0.5}, // "5 6" inside the text is no bare match
+		{[]int{5, 7}, 1 + 0.5},    // the failed bare start is taken back
+	} {
+		if got := bare.Bonus(tc.text, -1); math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("bare: Bonus(%v) = %g, want %g", tc.text, got, tc.want)
+		}
+
+		row := make([]float64, 8)
+		bare.Adjust(tc.text[:len(tc.text)-1], row)
+
+		want := tc.want - bare.Bonus(tc.text[:len(tc.text)-1], -1)
+		if last := tc.text[len(tc.text)-1]; math.Abs(row[last]-want) > 1e-12 {
+			t.Errorf("bare: Adjust(%v)[%d] = %g, want %g", tc.text[:len(tc.text)-1], last, row[last], want)
+		}
+	}
+}
+
+// TestKeywordPerCharBytes: under PerChar a keyword character spelled in
+// byte pieces earns one character's weight, not one per "<0xNN>" letter.
+func TestKeywordPerCharBytes(t *testing.T) {
+	d, _ := loadSetup(t)
+	tok := d.Tokenizer()
+
+	const kw = "🎵🎶" // two characters in byte pieces
+
+	ids := tok.Encode(kw)
+	if !slices.ContainsFunc(ids, func(id int) bool { return tok.Type(id) == tokenizer.TypeByte }) {
+		t.Fatalf("%q is no byte-fallback spelling: %v", kw, ids)
+	}
+
+	k, err := NewKeywords(tok, []string{kw}, Bias{Weight: 1, PerChar: true, Revoke: 1, Forms: FormBare})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := k.Bonus(ids, -1); got != 2 {
+		t.Errorf("Bonus(%q) = %g, want 2 characters", kw, got)
 	}
 }

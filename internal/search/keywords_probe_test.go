@@ -431,7 +431,7 @@ func kwExtras(t *testing.T, d *decoder.Decoder, cases []keywordCase, id string) 
 
 			for _, nx := range kw.next {
 				for tok := range nx {
-					if !slices.Contains(extras, tok) {
+					if tok >= 0 && !slices.Contains(extras, tok) { // textStart anchors the bare spellings
 						extras = append(extras, tok)
 					}
 				}

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -109,18 +111,41 @@ func ParseKeywords(s string) []string {
 // keyword list. Its Adjust method is a search Adjust: it reruns the
 // automaton over a hypothesis' text and adds to every next token the
 // change of the hypothesis' bonus. A token that advances a match earns the
-// token's weight, and Bias.Complete on top when it completes a keyword; a
-// token that breaks a partial match falls back to the longest suffix that
-// is still a keyword prefix and takes back Bias.Revoke of the bonus the
-// lost part earned. A completed keyword's bonus is never taken back. EOS
-// ends the text, so it breaks any partial match.
+// token's weight, and Bias.Complete on top for every keyword it completes,
+// a keyword that ends as a suffix of the match included; a token that
+// breaks a partial match falls back to the longest suffix that is still a
+// keyword prefix and takes back Bias.Revoke of the bonus the lost tokens
+// earned, except for the tokens of a completed keyword, whose bonus is
+// never taken back. A bare spelling (FormBare) matches only at the start
+// of the text. EOS ends the text, so it breaks any partial match.
 type Keywords struct {
-	next []map[int]int // goto, per node; node 0 is the root
-	fail []int         // the longest proper suffix that is a node
-	phi  []float64     // the bonus of the partial match since the last completed keyword on the path
-	end  []bool        // a keyword ends here
-	bias Bias
+	next  []map[int]int // goto, per node; node 0 is the root
+	fail  []int         // the longest proper suffix that is a node
+	ws    [][]float64   // the bonus of each token on the path to the node
+	out   [][]int       // the token lengths of the keywords that end at the node, suffixes included
+	end   []bool        // a keyword ends here
+	start kwState       // the state at the start of the text
+	bias  Bias
 }
+
+// kwState is the automaton's state after a text: the node of the longest
+// text suffix that is a keyword prefix, and which of that suffix' tokens
+// belong to a completed keyword (bit i for the path's token i).
+type kwState struct {
+	n   int
+	cov uint64
+}
+
+// textStart is the token in front of every text that anchors the bare
+// spellings; it earns nothing. noToken is a token outside the automaton.
+const (
+	textStart = -2
+	noToken   = -1
+)
+
+// maxKeywordTokens is the longest spelling, in tokens, that the coverage
+// bits of kwState hold.
+const maxKeywordTokens = 63
 
 // NewKeywords tokenises the keywords in the forms of b with tok and builds
 // the automaton.
@@ -134,6 +159,22 @@ func NewKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) (*Keywords
 		return nil, fmt.Errorf("%w: forms %b match neither after a space nor bare", ErrKeywords, b.Forms)
 	}
 
+	ids, err := encodeKeywords(tok, keywords, b)
+	if err != nil {
+		return nil, err
+	}
+
+	weight := func(int) float64 { return b.Weight }
+	if b.PerChar {
+		weight = func(id int) float64 { return b.Weight * float64(pieceChars(tok, id)) }
+	}
+
+	return build(ids, weight, b), nil
+}
+
+// encodeKeywords tokenises the spellings of the keywords under b, a bare
+// one behind textStart.
+func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) ([][]int, error) {
 	var ids [][]int
 
 	for _, kw := range keywords {
@@ -144,31 +185,53 @@ func NewKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) (*Keywords
 
 		for _, w := range words {
 			for _, s := range spellings(w, b.Forms) {
-				ids = append(ids, tok.Encode(s))
+				e := tok.Encode(s)
+				if len(e) > maxKeywordTokens {
+					return nil, fmt.Errorf("%w: %q is %d tokens, more than %d", ErrKeywords, s, len(e), maxKeywordTokens)
+				}
+
+				if len(e) > 0 && !strings.HasPrefix(s, " ") {
+					e = append([]int{textStart}, e...)
+				}
+
+				ids = append(ids, e)
 			}
 		}
 	}
 
-	weight := func(int) float64 { return b.Weight }
-	if b.PerChar {
-		weight = func(id int) float64 {
-			return b.Weight * float64(utf8.RuneCountInString(strings.TrimPrefix(tok.Piece(id), "▁")))
-		}
+	return ids, nil
+}
+
+// pieceChars is the number of characters token id spells: the runes of its
+// piece without the leading "▁", and for a byte piece one for the byte
+// that starts a UTF-8 character and none for a continuation byte, so a
+// character in byte pieces counts once.
+func pieceChars(tok *tokenizer.Tokenizer, id int) int {
+	p := tok.Piece(id)
+	if tok.Type(id) != tokenizer.TypeByte {
+		return utf8.RuneCountInString(strings.TrimPrefix(p, "▁"))
 	}
 
-	return build(ids, weight, b), nil
+	v, err := strconv.ParseUint(strings.TrimSuffix(strings.TrimPrefix(p, "<0x"), ">"), 16, 8)
+	if err != nil || v&0xC0 == 0x80 {
+		return 0
+	}
+
+	return 1
 }
 
 // build is the automaton over the token sequences ids, a token's bonus
-// given by weight.
+// given by weight; a sequence that starts with textStart is anchored at
+// the start of the text.
 func build(ids [][]int, weight func(id int) float64, b Bias) *Keywords {
-	k := &Keywords{next: []map[int]int{{}}, fail: []int{0}, phi: []float64{0}, end: []bool{false}, bias: b}
+	k := &Keywords{next: []map[int]int{{}}, fail: []int{0}, ws: [][]float64{nil}, end: []bool{false}, bias: b}
 
 	for _, s := range ids {
 		k.add(s, weight)
 	}
 
 	k.link()
+	k.start, _ = k.step(kwState{}, textStart)
 
 	return k
 }
@@ -238,17 +301,17 @@ func (k *Keywords) Adjust(text []int, logp []float64) {
 // Adjust adds along it, with EOS at the end when eos ≥ 0, without the
 // normaliser of Bias.Renorm.
 func (k *Keywords) Bonus(text []int, eos int) float64 {
-	n, sum := 0, 0.0
+	st, sum := k.start, 0.0
 
 	for _, id := range text {
 		var d float64
 
-		n, d = k.step(n, id)
+		st, d = k.step(st, id)
 		sum += d
 	}
 
 	if eos >= 0 {
-		_, d := k.step(n, eos)
+		_, d := k.step(st, eos)
 		sum += d
 	}
 
@@ -257,7 +320,7 @@ func (k *Keywords) Bonus(text []int, eos int) float64 {
 
 // add inserts one spelling.
 func (k *Keywords) add(ids []int, weight func(int) float64) {
-	if len(ids) == 0 {
+	if len(ids) == 0 || (len(ids) == 1 && ids[0] == textStart) {
 		return
 	}
 
@@ -266,15 +329,15 @@ func (k *Keywords) add(ids []int, weight func(int) float64) {
 	for _, id := range ids {
 		c, ok := k.next[n][id]
 		if !ok {
-			base := k.phi[n]
-			if k.end[n] {
-				base = 0
+			w := 0.0
+			if id != textStart {
+				w = weight(id)
 			}
 
 			c = len(k.next)
 			k.next = append(k.next, map[int]int{})
 			k.fail = append(k.fail, 0)
-			k.phi = append(k.phi, base+weight(id))
+			k.ws = append(k.ws, append(slices.Clone(k.ws[n]), w))
 			k.end = append(k.end, false)
 			k.next[n][id] = c
 		}
@@ -285,8 +348,11 @@ func (k *Keywords) add(ids []int, weight func(int) float64) {
 	k.end[n] = true
 }
 
-// link sets the failure links breadth first.
+// link sets the failure links breadth first, and with them the keywords
+// that end at each node: its own and those of its failure link.
 func (k *Keywords) link() {
+	k.out = make([][]int, len(k.next))
+
 	queue := make([]int, 0, len(k.next))
 	for _, c := range k.next[0] {
 		queue = append(queue, c)
@@ -295,6 +361,12 @@ func (k *Keywords) link() {
 	for len(queue) > 0 {
 		n := queue[0]
 		queue = queue[1:]
+
+		if k.end[n] {
+			k.out[n] = append(k.out[n], len(k.ws[n]))
+		}
+
+		k.out[n] = append(k.out[n], k.out[k.fail[n]]...)
 
 		for id, c := range k.next[n] {
 			f := k.fail[n]
@@ -311,57 +383,56 @@ func (k *Keywords) link() {
 	}
 }
 
-// state is the node after text.
-func (k *Keywords) state(text []int) int {
-	n := 0
+// state is the state after text.
+func (k *Keywords) state(text []int) kwState {
+	st := k.start
 	for _, id := range text {
-		n, _ = k.step(n, id)
+		st, _ = k.step(st, id)
 	}
 
-	return n
+	return st
 }
 
-// step is the node after token id at node n and the bonus change.
-func (k *Keywords) step(n, id int) (int, float64) {
-	if c, ok := k.next[n][id]; ok {
-		return c, k.gain(n, c)
-	}
+// step is the state after token id at st and the bonus change: the
+// revoked bonus of the tokens the match drops, then the weight of id and
+// the completions when id extends a match.
+func (k *Keywords) step(st kwState, id int) (kwState, float64) {
+	n, f := st.n, st.n
 
-	f := n
-	for f != 0 {
+	c, ok := k.next[n][id]
+	for !ok && f != 0 {
 		f = k.fail[f]
-		if c, ok := k.next[f][id]; ok {
-			return c, k.loss(n, f) + k.gain(f, c)
+		c, ok = k.next[f][id]
+	}
+
+	drop := len(k.ws[n]) - len(k.ws[f])
+	d := k.revoke(k.ws[n][:drop], st.cov)
+
+	if !ok {
+		return kwState{}, d
+	}
+
+	depth := len(k.ws[c])
+	cov := st.cov >> drop
+	d += k.ws[c][depth-1]
+
+	for _, l := range k.out[c] {
+		d += k.bias.Complete
+		cov |= (uint64(1)<<l - 1) << (depth - l)
+	}
+
+	return kwState{n: c, cov: cov}, d
+}
+
+// revoke is the bonus taken back for the dropped tokens ws, those not in a
+// completed keyword by cov.
+func (k *Keywords) revoke(ws []float64, cov uint64) float64 {
+	lost := 0.0
+
+	for i, w := range ws {
+		if cov&(1<<i) == 0 {
+			lost += w
 		}
-	}
-
-	return 0, k.loss(n, 0)
-}
-
-// gain is the bonus of advancing from n to its child c.
-func (k *Keywords) gain(n, c int) float64 {
-	g := k.phi[c]
-	if !k.end[n] {
-		g -= k.phi[n]
-	}
-
-	if k.end[c] {
-		g += k.bias.Complete
-	}
-
-	return g
-}
-
-// loss is the bonus taken back when the match at n falls back to its
-// suffix f.
-func (k *Keywords) loss(n, f int) float64 {
-	if k.end[n] {
-		return 0
-	}
-
-	lost := k.phi[n]
-	if !k.end[f] {
-		lost -= k.phi[f]
 	}
 
 	return -k.bias.Revoke * max(lost, 0)
@@ -399,14 +470,14 @@ func (k *Keywords) changes(text []int, lp func(id int) float64) (float64, map[in
 // change for each token with a transition from the node after text or
 // from one of its suffixes.
 func (k *Keywords) deltas(text []int) (float64, map[int]float64) {
-	n := k.state(text)
-	_, base := k.step(n, -1)
+	st := k.state(text)
+	_, base := k.step(st, noToken)
 	special := map[int]float64{}
 
-	for f := n; ; f = k.fail[f] {
+	for f := st.n; ; f = k.fail[f] {
 		for id := range k.next[f] {
-			if _, ok := special[id]; !ok {
-				_, special[id] = k.step(n, id)
+			if _, ok := special[id]; !ok && id >= 0 {
+				_, special[id] = k.step(st, id)
 			}
 		}
 
