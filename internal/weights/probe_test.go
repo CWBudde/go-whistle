@@ -30,7 +30,7 @@ import (
 // They are slow and machine-dependent, so they run on request only.
 const (
 	memProbeEnv   = "WHISTLE_MEM_PROBE"       // 1: run TestMemProbe (`just mem-probe`)
-	memChildEnv   = "WHISTLE_MEM_PROBE_CHILD" // set by TestMemProbe: packed or float
+	memChildEnv   = "WHISTLE_MEM_PROBE_CHILD" // set by TestMemProbe: packed, float or int8
 	speedProbeEnv = "WHISTLE_SPEED_PROBE"     // 1: run TestSpeedProbe
 	speedWorkers  = "WHISTLE_SPEED_WORKERS"   // n: TestSpeedProbe on tensor.SetWorkers(n) (F-038)
 
@@ -69,8 +69,9 @@ type memReport struct {
 	Elapsed time.Duration
 }
 
-// TestMemProbe measures packed and float in one fresh child process each:
-// the test binary runs itself with memChildEnv set.
+// TestMemProbe measures packed, float and int8 (packed with
+// whistle.WithInt8, docs/FINDINGS.md F-041) in one fresh child process
+// each: the test binary runs itself with memChildEnv set.
 func TestMemProbe(t *testing.T) {
 	if mode := os.Getenv(memChildEnv); mode != "" {
 		memChild(t, mode)
@@ -89,7 +90,7 @@ func TestMemProbe(t *testing.T) {
 	t.Logf("MiB     %6s  %6s  %6s  %6s  %9s  %7s  %6s  %6s  %7s  %9s  %6s  %6s", "base", "load", "heap", "peak",
 		"peak−base", "rss now", "file", "anon", "Go heap", "Go mapped", ".cact", "model")
 
-	for _, mode := range []string{"packed", "float"} {
+	for _, mode := range probeModes {
 		cmd := exec.Command(os.Args[0], "-test.run=^TestMemProbe$", "-test.count=1", "-test.v")
 
 		cmd.Env = append(os.Environ(), memChildEnv+"="+mode)
@@ -136,11 +137,7 @@ func parseMemReport(t *testing.T, out []byte) memReport {
 // memChild is the child process: Load, one 30 s Transcribe, report.
 func memChild(t *testing.T, mode string) {
 	pcm := tiled30s(t)
-
-	var opts []whistle.Option
-	if mode == "float" {
-		opts = append(opts, whistle.WithFloatWeights())
-	}
+	opts := probeOptions(mode)
 
 	runtime.GC()
 
@@ -179,6 +176,22 @@ func memChild(t *testing.T, mode string) {
 	}
 
 	fmt.Println(memProbeLine + string(js)) //nolint:forbidigo // the parent reads this line
+}
+
+// probeModes are the modes the probes compare: the packed default, the
+// float path and the packed path with the engine's int8 numerics.
+var probeModes = []string{"packed", "float", "int8"}
+
+// probeOptions are the Load options of a probe mode.
+func probeOptions(mode string) []whistle.Option {
+	switch mode {
+	case "float":
+		return []whistle.Option{whistle.WithFloatWeights()}
+	case "int8":
+		return []whistle.Option{whistle.WithInt8()}
+	default:
+		return nil
+	}
 }
 
 // maxRSS is ru_maxrss in bytes: darwin reports bytes, linux KiB.
@@ -402,10 +415,11 @@ func tiled30s(t *testing.T) []float32 {
 	return pcm
 }
 
-// TestSpeedProbe loads the model packed and float in one process and
-// alternates them over the corpus, three passes after a warm-up, and over
-// the 30 s clip, six runs each: median TTFT and decode rate per mode, and
-// how many transcripts equal the engine's and each other's.
+// TestSpeedProbe loads the model packed, float and int8 (packed with
+// whistle.WithInt8, docs/FINDINGS.md F-041) in one process and rotates
+// them over the corpus, three passes after a warm-up, and over the 30 s
+// clip, six runs each: median TTFT and decode rate per mode, and how many
+// transcripts equal the engine's and the packed path's.
 // WHISTLE_SPEED_WORKERS=n runs it on n tensor workers instead of the
 // default, GOMAXPROCS; 1 is the single-core kernels (docs/FINDINGS.md
 // F-038), with the decoder's beams still on their own goroutines.
@@ -431,18 +445,13 @@ func TestSpeedProbe(t *testing.T) {
 	t.Logf("%d tensor workers, GOMAXPROCS %d", tensor.Workers(), runtime.GOMAXPROCS(0))
 
 	clips := loadProbeClips(t, 0)
-	modes := []string{"packed", "float"}
+	modes := probeModes
 	models := map[string]*whistle.Model{}
 
 	for _, mode := range modes {
-		var opts []whistle.Option
-		if mode == "float" {
-			opts = append(opts, whistle.WithFloatWeights())
-		}
-
 		start := time.Now()
 
-		m, err := whistle.Load(probeCact, opts...)
+		m, err := whistle.Load(probeCact, probeOptions(mode)...)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -458,7 +467,7 @@ func TestSpeedProbe(t *testing.T) {
 	for pass := range 4 {
 		for _, c := range clips {
 			for k := range modes {
-				mode := modes[(k+pass)%2]
+				mode := modes[(k+pass)%len(modes)]
 
 				res, err := models[mode].Transcribe(c.Samples, whistle.TranscribeOptions{})
 				if err != nil {
@@ -482,7 +491,7 @@ func TestSpeedProbe(t *testing.T) {
 
 	for run := range 7 {
 		for k := range modes {
-			mode := modes[(k+run)%2]
+			mode := modes[(k+run)%len(modes)]
 
 			res, err := models[mode].Transcribe(pcm, whistle.TranscribeOptions{})
 			if err != nil {
@@ -508,10 +517,12 @@ func TestSpeedProbe(t *testing.T) {
 			"equal to the engine %d/%d", mode, median(ttft[mode]), median(tps[mode]), median(long[mode]), equal, len(clips))
 	}
 
-	for i, c := range clips {
-		if p, f := texts["packed"][i], texts["float"][i]; p.Text != f.Text || p.Language != f.Language {
-			t.Logf("%s: packed [%s] %q, float [%s] %q, engine [%s] %q", c.ID, p.Language, p.Text, f.Language, f.Text,
-				c.Language, c.Text)
+	for _, mode := range modes[1:] {
+		for i, c := range clips {
+			if p, f := texts["packed"][i], texts[mode][i]; p.Text != f.Text || p.Language != f.Language {
+				t.Logf("%s: packed [%s] %q, %s [%s] %q, engine [%s] %q", c.ID, p.Language, p.Text, mode, f.Language,
+					f.Text, c.Language, c.Text)
+			}
 		}
 	}
 }

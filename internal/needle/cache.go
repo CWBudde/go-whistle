@@ -8,12 +8,14 @@ import (
 // KVCache is one causal self-attention's decoding state (docs/FINDINGS.md
 // F-022): the raw Q/K/V projections of the last Taps − 1 positions, which
 // the causal taps of the next position read, and the normed, rotated keys
-// and the values of every position so far. The zero value is an empty
-// cache.
+// and the values of every position so far, in float32 or, with Int8.KV,
+// in int8 with a scale per head and position (F-041). The zero value is
+// an empty cache.
 type KVCache struct {
 	n                   int       // positions so far
 	qHist, kHist, vHist []float32 // raw projections of the last Taps − 1 positions, oldest first
 	k, v                []float32 // all positions, row layout
+	k8, v8              Int8Rows  // all positions with Int8.KV instead of k and v
 }
 
 // Len is the number of positions in the cache.
@@ -28,7 +30,7 @@ func (c *KVCache) Len() int { return c.n }
 func (c *KVCache) Fork() KVCache {
 	return KVCache{
 		n: c.n, qHist: c.qHist, kHist: c.kHist, vHist: c.vHist,
-		k: slices.Clip(c.k), v: slices.Clip(c.v),
+		k: slices.Clip(c.k), v: slices.Clip(c.v), k8: c.k8.Clip(), v8: c.v8.Clip(),
 	}
 }
 
@@ -60,11 +62,43 @@ func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float3
 
 	a.normRotate(q, k, t, c.n, rope, nil)
 
-	c.k, c.v = append(c.k, k...), append(c.v, v...)
-	out := a.attend(q, c.k, c.v, t, c.n, MaskCausal, nil)
+	var out []float32
+	if a.int8.KV {
+		out = a.extendInt8(q, k, v, t, c)
+	} else {
+		a.quantQKV(q, k, v)
+		c.k, c.v = append(c.k, k...), append(c.v, v...)
+		out = a.attend(q, c.k, c.v, t, c.n, MaskCausal, nil)
+	}
+
 	c.n += t
 
 	return a.output(t, out, gate, nil), nil
+}
+
+// extendInt8 appends the t new keys and values to c's int8 cache and
+// attends to it (Int8.KV, docs/FINDINGS.md F-041). Decoding steps (t below
+// attendGEMMRows) run AttendInt8 on the codes. A longer block, such as the
+// teacher-forced pass of the word timestamps, runs attend's GEMMs on the
+// values the codes stand for, with the queries quantised as quantQKV does.
+func (a *Attention) extendInt8(q, k, v []float32, t int, c *KVCache) []float32 {
+	if c.k8.Cols == 0 {
+		c.k8, c.v8 = NewInt8Rows(a.kvHeads*a.qk, a.qk), NewInt8Rows(a.kvHeads*a.v, a.v)
+	}
+
+	c.k8, c.v8 = c.k8.Append(k), c.v8.Append(v)
+
+	if t < attendGEMMRows {
+		keys := func(i int) int { return c.n + i + 1 }
+
+		return AttendInt8(q, t, a.heads, c.k8, c.v8, keys, a.attendScale(), a.int8.Act, nil)
+	}
+
+	if a.int8.Act {
+		fakeQuant(q, q, a.qk)
+	}
+
+	return a.attend(q, c.k8.Floats(), c.v8.Floats(), t, c.n, MaskCausal, nil)
 }
 
 // extendTaps applies the causal taps to t new raw rows z of width values,

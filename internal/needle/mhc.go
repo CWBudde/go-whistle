@@ -96,6 +96,15 @@ func (m *MHC) WithLane(lane int) *MHC {
 	return &c
 }
 
+// SetInt8 switches the heads to the engine's int8 numerics
+// (docs/FINDINGS.md F-041): with q.Act, the three φ products quantise
+// each row of rms_unit(stream) to int8, as upstream's
+// _aq(_rms_unit(stream)). Call it before m is used or copied (WithLane).
+func (m *MHC) SetInt8(q Int8) {
+	m.phiPre, m.phiPost = m.phiPre.WithInt8Input(q.Act), m.phiPost.WithInt8Input(q.Act)
+	m.phiRes = m.phiRes.WithInt8Input(q.Act)
+}
+
 // Lanes is the number of residual lanes.
 func (m *MHC) Lanes() int { return m.lanes }
 

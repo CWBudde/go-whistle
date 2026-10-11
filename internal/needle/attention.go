@@ -44,6 +44,7 @@ type Attention struct {
 	qNorm, kNorm        ZCRMSNorm // (qk)
 	gateProj            Linear    // [heads·v, dim]
 	outProj             Linear    // [dim, heads·v]
+	int8                Int8      // SetInt8
 }
 
 // LoadAttention loads the attention with the names prefix+"q_proj", …
@@ -86,6 +87,14 @@ func LoadAttention(src weights.Source, prefix string) (*Attention, error) {
 
 	return a, nil
 }
+
+// SetInt8 switches the attention to the engine's int8 numerics
+// (docs/FINDINGS.md F-041): with q.Act its normed, rotated queries are
+// quantised per head, with q.KV its keys and values per head and
+// position, as upstream's maybe_quant_query and maybe_quant_kv; Extend
+// then keeps the cache in int8 (KVCache). The projections keep float32
+// inputs. Call it before the attention is used.
+func (a *Attention) SetInt8(q Int8) { a.int8 = q }
 
 // Dim is the model width of the input and the output.
 func (a *Attention) Dim() int { return a.dim }
@@ -173,6 +182,7 @@ func (a *Attention) forward(x []float32, t int, mask Mask, rope *Rope, tr *attnT
 
 	q, k, v, gate := a.project(x, t, tr)
 	a.normRotate(q, k, t, 0, rope, tr)
+	a.quantQKV(q, k, v)
 
 	return a.output(t, a.attend(q, k, v, t, 0, mask, tr), gate, tr), nil
 }
@@ -265,6 +275,21 @@ func (a *Attention) normRotate(q, k []float32, t, off int, rope *Rope, tr *attnT
 
 	if tr != nil {
 		tr.qRope, tr.kRope = slices.Clone(q), slices.Clone(k)
+	}
+}
+
+// quantQKV quantises the normed, rotated queries per head (Int8.Act) and
+// the keys and values per head (Int8.KV) in place to the values their
+// int8 codes stand for, as upstream's maybe_quant_query and maybe_quant_kv
+// between the rotation and the attention (docs/FINDINGS.md F-041).
+func (a *Attention) quantQKV(q, k, v []float32) {
+	if a.int8.Act {
+		fakeQuant(q, q, a.qk)
+	}
+
+	if a.int8.KV {
+		fakeQuant(k, k, a.qk)
+		fakeQuant(v, v, a.v)
 	}
 }
 

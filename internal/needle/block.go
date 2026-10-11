@@ -61,6 +61,12 @@ func LoadBlock(src weights.Source, prefix string) (*Block, error) {
 	return b, nil
 }
 
+// SetInt8 switches the block's attention to the engine's int8 numerics
+// (Attention.SetInt8, docs/FINDINGS.md F-041); the HadamardMLP's factors
+// are not CQ products and stay float32, as upstream's. Call it before b
+// is used.
+func (b *Block) SetInt8(q Int8) { b.attn.SetInt8(q) }
+
 // Dim is the model width of the input and the output.
 func (b *Block) Dim() int { return b.dim }
 

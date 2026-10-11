@@ -3542,3 +3542,232 @@ change; it was re-run after 9.5 only because the machine was quieter.
 - **Noise.** The harness alternates the modes within a run, but the Go and the engine runs follow each other, so their
   ratio carries the load difference between those minutes. The run after 9.5 was on a quieter machine (load 2–6) than
   the first (5–8).
+
+## F-041 — The engine's int8 numerics: where it quantises, an int8 KV cache, and what that costs (9.3) (2026-10-11)
+
+**Question.** `whistle.cact` was trained for `act_bits 8` and `kv_bits 8` (PLAN.md's reference card), and the engine runs
+W2A8: 2-bit weights, which the packed path already multiplies (F-037), 8-bit activations and an 8-bit KV cache. We run
+float32 activations and a float32 cache. Do int8 activations and an int8 cache move us closer to the engine, where does
+the engine apply them, and what do they cost or save?
+
+### Upstream's rule
+
+`needle/model/quantize.py` (pin `af2654dffa`) has one quantiser, `fake_quant(x, group_size = x.shape[-1], bits = 8)`:
+s = max|x| / 127 per row (1 for a zero row), q = clip(round(x / s), −128, 127) with `jnp.round` (half to even), x ≈
+s · q, all in float32. `architecture.py` applies it with `quant` set:
+
+- `_aq` (`fake_quant_act`): the attention's input before q/k/v/gate, the gated attention output before `out_proj`, the
+  engram rows before their projections, the mHC heads' input `rms_unit(stream)` and the head's input.
+- `maybe_quant_query`, per head after the norm and RoPE, "matching the native attention kernel".
+- `maybe_quant_kv`, keys and values per head after the norm and RoPE, "Per-head symmetric A8 KV quantization matching
+  the native cache".
+
+The HadamardMLP has none. Whistle's stem, conv module and cross-attention are not in the open code.
+`needle.QuantizeRow` is this rule; `TestQuantizeRow` pins the scale, the ties and the zero row.
+
+### Measuring "closer to the engine"
+
+A transcript is a coarse instrument: on the 200 LibriSpeech utterances, every site we tried moved the count of equal
+texts within 177–184 and the WER within 220–224 errors, noise either way. Two engine outputs are continuous:
+
+- the encoder: `needle_embed`'s rows for the 32 corpus clips, 2205 frames;
+- the decoder: the engine's word probabilities (three decimals) for 7383 words, the 32 clips, the 200 LibriSpeech
+  utterances and the 192 depth-ladder cases (F-025). Our side teacher-forces the engine's own tokens through the
+  timestamp pass (`timeWords`), so every word pairs.
+
+Let a be our output with int8 at one site, b ours in float32 and e the engine's. Then exactly |a − e|² = |b − e|² +
+|a − b|² − 2⟨a − b, e − b⟩. With S = |a − b|², the share ρ = ⟨a − b, e − b⟩ / S is the part of our int8 step that the
+engine takes too: 1 if it quantises the same way at that site (the distance falls by S), 0 for an unrelated
+perturbation (the distance grows by S), and below 1 where the engine quantises the same way but its values differ from
+ours by a sizeable part of the int8 step, so some roundings go the other way. The encoder uses unit-norm frame rows, the
+decoder the probabilities and their logits (clipped to [0.0005, 0.9995]). The standard error is the ratio estimator's
+over clips or utterances, so a site with a small S cannot be read. Throwaway tests computed all of this; none is
+committed.
+
+### Where the engine quantises
+
+Encoder, each site alone (S as the median per-frame 1 − cos against our float32; float32 itself is at a median 1 − cos
+of 7.93e-5 to the engine):
+
+| site, per row of                              | S       | ρ               | verdict           |
+| --------------------------------------------- | ------- | --------------- | ----------------- |
+| mHC input `rms_unit(stream)`, 2048            | 1.14e-5 | **1.08 ± 0.13** | the engine's rule |
+| keys per head, 48                             | 6.2e-6  | **0.27 ± 0.03** | partial           |
+| values per head, 64                           | 2.8e-6  | **1.15 ± 0.41** | the engine's rule |
+| queries per head, 48                          | 1.5e-6  | 1.5 ± 1.4       | too small to read |
+| attention input (q/k/v/gate projections), 512 | 8.3e-6  | −0.72 ± 0.27    | not the engine's  |
+| gated output before `out_proj`, 512           | 3.3e-5  | 0.04 ± 0.12     | not the engine's  |
+| conv module `pw1`/`pw2` inputs, 512           | 2.2e-4  | −0.01 ± 0.10    | not the engine's  |
+| stem pointwise inputs, 128                    | 1.9e-6  | 1.2 ± 0.9       | too small to read |
+| `stem.out` input, 1280                        | 2.9e-6  | −1.3 ± 0.6      | not the engine's  |
+
+Controls: the keys on a grid 1 % coarser (s = max|x| / 125.7) give ρ −0.09 ± 0.04 and per token instead of per head
+0.41 ± 0.10, so the engine quantises the keys on exactly this grid, per head; before RoPE gives 0.47 ± 0.19,
+indistinguishable from after, so we keep upstream's place. The partial ρ fits a key that differs from the engine's by
+about half an int8 step (F-020's encoder gap); the mHC input, whose step is wide against its outliers, keeps nearly every
+rounding the same. At the three CQ inputs that the engine leaves alone, other schemes do not help either: per group of
+128, per group in the rotated (FWHT) domain, per row in the rotated domain and asymmetric per row all give ρ between
+−0.1 and 0.15 there, and bfloat16 rounding at all three −0.09. Whatever the engine's GEMMs read, it is not one of these
+int8 forms.
+
+Decoder, each site alone with the encoder in float32, on the 7383 words (float32 itself at a mean squared probability
+gap of 3.63e-4):
+
+| site                                | S      | ρ (probability) | ρ (logit)       | verdict           |
+| ----------------------------------- | ------ | --------------- | --------------- | ----------------- |
+| mHC input                           | 2.2e-6 | 1.13 ± 0.22     | **0.87 ± 0.13** | the engine's rule |
+| self-attention keys per head        | 2.2e-5 | 0.83 ± 0.08     | **0.82 ± 0.06** | the engine's rule |
+| self-attention queries per head     | 7.2e-6 | 0.82 ± 0.17     | **0.78 ± 0.11** | the engine's rule |
+| self-attention values per head      | 1.1e-6 | 0.97 ± 0.52     | **1.09 ± 0.26** | the engine's rule |
+| attention input                     | 7.4e-7 | 0.59 ± 0.54     | 0.08 ± 0.27     | not read          |
+| gated output before `out_proj`      | 1.8e-6 | −0.13 ± 0.42    | −0.03 ± 0.19    | not the engine's  |
+| cross-attention projections' inputs | 3.4e-6 | 0.14 ± 0.20     | 0.12 ± 0.12     | not the engine's  |
+| cross-attention memory k/v per head | 6.8e-7 | 0.70 ± 0.45     | 0.00 ± 0.26     | not read          |
+| cross-attention queries per head    | 1.2e-7 | 0.3 ± 1.2       | −0.2 ± 0.8      | not read          |
+| engram rows                         | 9.3e-8 | −0.7 ± 1.7      | 0.3 ± 0.8       | not read          |
+| head input                          | 1.1e-6 | −0.31 ± 0.36    | 0.18 ± 0.22     | not the engine's  |
+
+So the engine follows upstream's rule at the mHC heads and in the attention kernel (queries, keys, values per head) and
+not at the other CQ products' inputs, where upstream trained with `_aq` too. Applying upstream's rule everywhere moves us
+away from the engine: decoder gap 3.69e-4 against 3.63e-4 (ρ 0.44 ± 0.06 for the mix), 28/32 corpus clips equal,
+LibriSpeech 178/200.
+
+**One fragile frame.** With the keys and another site on, frame 14 of `fleurs-fr_fr-10174413140250646001` (norm 8, not
+silence) falls from cosine 0.9947 (float32) to 0.63–0.95 against the engine, depending on the combination; the bulk
+moves closer at the same time (median 1 − cos 7.93e-5 → 7.29e-5 with everything below). Our pre-quant values differ
+from the engine's by part of a step, and here one flipped rounding is amplified. The means that F-020's tests use
+(clip means, then their mean) feel such a frame, the medians do not.
+
+### What the flag does
+
+`whistle.WithInt8()` loads the model with `needle.Int8{Act: true, KV: true}`; the default is unchanged. The sites are the
+engine's, as measured above:
+
+- `Act`: the mHC φ products quantise each row of `rms_unit(stream)` (`Linear.WithInt8Input`, which `ApplyShared` turns
+  into one quantised copy for the three φ), and every attention, the encoder's, the decoder's and the cross-attention,
+  quantises its queries per head.
+- `KV`: every attention quantises its keys and values per head and position. The decoder's self-attention cache
+  (`KVCache`) and the cross-attention memory keep them as `needle.Int8Rows`: int8 codes plus a float32 scale per head and
+  row, appended and forked like the float32 slices.
+- A decoding step attends with `needle.AttendInt8`: per head, the int8 query against the int8 keys is an exact int32 dot
+  product times the two scales, then the softmax, then the weights times the value scales against the value codes, key
+  after key. A block of 8 or more rows (the timestamp pass) runs the existing GEMMs on the dequantised cache. The
+  encoder, which has no cache, uses the values the codes stand for in float32.
+- Kept float32, since the engine does not quantise there: the stem, the attention's and the conv module's projections,
+  the cross-attention's projections, the engram and the head.
+
+The encoder and the decoder get it through `encoder.LoadInt8` and `decoder.LoadInt8`; `Load` stays the float32 path.
+Nothing else changes with the flag off. Against `main` (`f26e3d4`), a throwaway test hashed the `Embed` rows of the 32
+clips and the 30 s clip and the text, language, word times and word probabilities of `Transcribe` on the same 33
+inputs with default options, word timestamps, `Depth` 4 and two keywords, packed and float: the four hashes are equal.
+
+**Shared rotation** (F-038's open item, independent of the flag). `cross.project` now computes the memory's keys and
+values with one `needle.ApplyShared`, so the packed k and v projections share the encoder output's rotation and tables.
+`TestProjectSharesRotation` (`internal/decoder`, random packed and float32 weights, 1, 13 and 375 frames) finds the same
+bits as one `Apply` each, and the hashes above did not move.
+
+### Kernels
+
+`dotsI8` (the int32 logits) and `axpysI8` (the weighted value codes) have NEON (`int8kernel_arm64.s`) and AVX2
+(`int8kernel_amd64.s`, chosen at run time) assembly for widths that are multiples of 16, and Go references for the rest
+and for `purego`:
+
+- NEON dots: `SMULL`/`SMULL2` to int16 and `SADALP` into int32 lanes, four keys at once, reduced by `ADDP`. AVX2:
+  `VPMOVSXBW` and `VPMADDWD`. The sums are exact, so every kernel gives the same int32.
+- Axpys: sign-extend, convert, `FMUL` by the weight, `FADD` into 16 outputs kept in registers, key after key. No FMA, so
+  they equal the Go reference bit for bit.
+- `TestInt8KernelsMatchGeneric` covers widths 8 to 128, 1 to 375 keys and padded strides, on arm64, under `purego` and
+  on linux/amd64 (AVX2, Docker emulation). Go 1.25 lacks the NEON integer and vector float instructions, so they are
+  `WORD`-encoded, each checked against `go tool objdump`.
+- `fakeQuant` and `Int8Rows.Append` run their rows on `tensor.Parallel`; each row is its own, so the result does not
+  depend on the worker count.
+
+One decoding step's cross-attention for one layer, 8 heads over 375 frames (`BenchmarkCrossAttendStep`, M5 Pro, one
+core): float32 (`cross.go`'s dot product and axpy per frame) 55.0 µs, int8 in Go 124 µs, int8 with NEON **23.9 µs**
+(2.3× faster than float32). `QuantizeRow` takes 0.83 ns per value (47 ns for a head of 48, 1.69 µs for the mHC's 2048).
+
+### Parity
+
+All on the M5 Pro, packed weights; "int8" is `WithInt8()`. The model-gated tests ran with `WHISTLE_TEST_INT8=1`, which
+makes their `loadModel` pass `WithInt8()`.
+
+| check                                                     | float32 (default)   | int8                  | engine |
+| --------------------------------------------------------- | ------------------- | --------------------- | ------ |
+| `TestTranscribeMatchesEngine`, 32 clips equal             | 31/32               | 30/32                 | —      |
+| depth ladder 2–7, 192 cases equal (throwaway driver)      | 161/192             | **174/192**           | —      |
+| keyword cases, 53 equal (throwaway driver)                | 46/53               | 46/53                 | —      |
+| `TestEmbedMatchesEngine`, mean / worst clip               | 0.999827 / 0.999034 | 0.999719 / 0.994891   | 1      |
+| `Embed`, median frame 1 − cos                             | 7.93e-5             | 7.29e-5               | 0      |
+| teacher-forced word probabilities, mean squared gap, 7383 | 3.63e-4             | **3.33e-4** (ρ 0.91)  | 0      |
+| teacher-forced word times equal to the engine's, 7383     | 6984                | **7044**              | —      |
+| `just stream-parity`, calls with an equal decision        | 797/930             | **812/930**           | —      |
+| stream, final text equal to the engine's stream           | 98/108              | 100/108               | —      |
+| `just eval-librispeech`, WER (200 utterances)             | 223/4167 = 5.35 %   | 222/4167 = **5.33 %** | 5.30 % |
+| LibriSpeech, text equal to the engine's                   | 181/200             | 182/200               | —      |
+| `TestTranscribeWordsMatchEngine`, both times within 80 ms | 97.4 %              | 96.7 %                | —      |
+
+The new miss on the 32 clips is `fleurs-pl_pl-10013271501230525766`, the corpus' second Polish clip: "W większości
+mniejszych wyzwań" against the engine's "W większość mniejszych wyzptów". Its depth-ladder transcripts differ from the
+engine's at depths 2–5 and 7 in float32 already. Under int8 the 30/32 falls below `TestTranscribeMatchesEngine`'s 95 %
+floor (PLAN.md 6.6), and the word times miss their 97 % floor by 0.3 points; both floors were set on float32. So under
+`WHISTLE_TEST_INT8=1` the two tests hold int8 expectations instead (PR #36 review): the misses `int8Misses` (the two
+Polish clips) and at least 93 % of the clips, and the word times at least 96.5 %. The default run keeps the float32
+floors. The keyword cases that differ are not the same: int8 gains
+`fr-cristaux-renale-declare-list` and `pl-wysp-missed` and loses `pl-luksusowe-missed` and `pl-francja-present`. On
+linux/amd64 (AVX2, emulated) `TestInt8MatchesEngine` gives the same 30/32 and `Embed` 0.999706 / 0.994307.
+
+So int8 mirrors the engine in the bulk: the word probabilities' gap falls 8 %, 13 more depth cases, 15 more stream
+decisions and one more LibriSpeech text equal the engine's, and the WER moves to 0.03 points from the engine's. It also
+moves a few fragile outputs the other way (one corpus clip, one encoder frame, two keyword cases).
+
+### Speed
+
+`TestSpeedProbe` (now packed, float32 and int8 rotating in one process), M5 Pro, load average 5–8, two runs:
+
+| median           | packed            | float32         | int8              | int8 vs packed |
+| ---------------- | ----------------- | --------------- | ----------------- | -------------- |
+| TTFT, 32 clips   | 19.2 / 19.6 ms    | 22.2 / 22.3 ms  | 20.9 / 21.0 ms    | 7–9 % slower   |
+| decode, 32 clips | 1057 / 1010 tok/s | 601 / 589 tok/s | 1121 / 1100 tok/s | 6–9 % faster   |
+| TTFT, 30 s clip  | 61 / 62 ms        | 68 / 68 ms      | 65 / 65 ms        | 5–7 % slower   |
+| `Load`           | 13.3 / 10.8 ms    | 157 / 151 ms    | 8.4 / 8.5 ms      | —              |
+
+On one kernel worker (`WHISTLE_SPEED_WORKERS=1`): TTFT 54.2 / 56.0 / 56.8 ms, decode 1081 / 610 / 1179 tok/s, 30 s clip
+284 / 288 / 295 ms. Decoding gains because the int8 cross-attention is faster than the float32 one, and the cache reads
+a quarter of the bytes. The time to the first token pays for the quantisation: the encoder's queries, keys, values
+and mHC inputs, 8 M values for 30 s, and the memory's 2.7 M. The first version, with the Go kernels, decoded at 902
+against 1029 tok/s.
+
+### Memory
+
+`just mem-probe` (a fresh child per mode, now with int8), two runs, MiB:
+
+| MiB                               | packed        | float32       | int8             |
+| --------------------------------- | ------------- | ------------- | ---------------- |
+| process after `Load`              | 41.6 / 41.5   | 242.7 / 242.6 | 41.6 / 41.5      |
+| peak over a 30 s `Transcribe`     | 107.9 / 107.2 | 495.2 / 494.4 | **103.6 / 99.7** |
+| model (live heap + `.cact` pages) | 35.0 / 34.9   | 230.8 / 231.6 | 34.7 / 34.7      |
+| Go mapped at the end              | 90.4 / 89.9   | 476.1 / 474.8 | 69.1 / 71.8      |
+
+The 30 s cross-attention memory shrinks from 10.25 MiB (8 layers × 375 frames × 896 float32) to 2.75 MiB (codes and
+scales); the 5 beams' self-attention caches by the same factor. The peak falls by 4–8 MiB, less than the memory's
+7.5 MiB, because the encoder's transients and `GOGC` headroom (F-038) set it before the decoder runs.
+
+### Recommendation
+
+Keep the flag off by default for now; turning it on is a separate decision. For it: it mirrors the engine's numerics
+where the engine applies them (ρ near 1 at the mHC and in the attention kernel); the word probabilities, the word times,
+the median encoder frame and the depth, stream and LibriSpeech counts move toward the engine; decoding is 6–9 % faster
+and the 30 s peak 4–8 MiB lower. Against it: TTFT is 5–9 % slower, `Embed`'s clip means fall (one fragile frame), one
+more corpus clip differs, and two float32-calibrated floors (`TestTranscribeMatchesEngine` at 95 %, the word times at
+97 %) fail by one clip and 0.3 points. If the default changes, those floors need int8 values, and `whistle-bench` a
+column for it.
+
+### Open
+
+- **The engine's other activations.** It does not quantise the CQ products' inputs per row, per group or in the rotated
+  domain, nor round them to bfloat16; float16 (a lever of 5.6e-8) is too small to read with these instruments.
+- **The cross-attention, the engram and the head** are below the instruments' resolution (except the head and the
+  cross-attention projections, which the engine does not quantise). The flag quantises the cross-attention's queries,
+  keys and values by analogy with the self-attention.
+- **Faster quantisation.** `QuantizeRow` is Go (0.83 ns per value); a NEON/AVX2 version would recover most of the TTFT
+  cost. An `SDOT` dot kernel (FEAT_DotProd) would replace 4 instructions per 16 bytes by one.

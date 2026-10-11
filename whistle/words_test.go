@@ -157,6 +157,7 @@ func checkWords(t *testing.T, id string, res Result, samples int) {
 // wordFloors are the shares (%) TestTranscribeWordsMatchEngine requires on
 // the corpus, just below the measured values (docs/FINDINGS.md F-033):
 // start and end within 80 ms, and probability within 0.01.
+// Under WHISTLE_TEST_INT8=1 the test holds int8WordFloors instead.
 var wordFloors = struct{ both, prob float64 }{both: 97, prob: 88}
 
 // Accept (PLAN.md Phase 7): through Transcribe with word timestamps, the
@@ -168,6 +169,11 @@ var wordFloors = struct{ both, prob float64 }{both: 97, prob: 88}
 func TestTranscribeWordsMatchEngine(t *testing.T) {
 	m := loadModel(t)
 	clips := corpus(t)
+
+	floors := wordFloors
+	if int8Mode(t) {
+		floors = int8WordFloors
+	}
 
 	var (
 		all            wordScore
@@ -217,13 +223,13 @@ func TestTranscribeWordsMatchEngine(t *testing.T) {
 		float64(plain.Microseconds())/1000/float64(len(clips)), float64(timed.Microseconds())/1000/float64(len(clips)),
 		100*(timed.Seconds()/plain.Seconds()-1))
 
-	if all.share(all.both1) < 90 || all.share(all.both1) < wordFloors.both {
-		t.Errorf("start and end within 80 ms on %.1f %% of the engine's words, want ≥ 90 %% and ≥ %.0f %%",
-			all.share(all.both1), wordFloors.both)
+	if all.share(all.both1) < 90 || all.share(all.both1) < floors.both {
+		t.Errorf("start and end within 80 ms on %.1f %% of the engine's words, want ≥ 90 %% and ≥ %.1f %%",
+			all.share(all.both1), floors.both)
 	}
 
-	if all.share(all.prob01) < wordFloors.prob {
-		t.Errorf("probability within 0.01 on %.1f %%, want ≥ %.0f %%", all.share(all.prob01), wordFloors.prob)
+	if all.share(all.prob01) < floors.prob {
+		t.Errorf("probability within 0.01 on %.1f %%, want ≥ %.1f %%", all.share(all.prob01), floors.prob)
 	}
 }
 

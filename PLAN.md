@@ -1067,8 +1067,21 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       (2026-10-10) — 9.5 runs the stem in chunks of 8 output frames: a 30 s `Transcribe` peaks at 106.4–108.1 MiB
       process RSS packed (was 126.8–127.6), 97.5–97.7 MiB on one core; the model stays at 34.7–34.9 MiB. The rest is
       `GOGC` headroom over a 29–40 MiB live heap during the decode. `docs/FINDINGS.md` F-038.
-- [ ] 9.3 Optional int8 activations and an int8 KV cache (`act_bits 8`, `kv_bits 8`) to mirror the engine's numerics,
+- [x] 9.3 Optional int8 activations and an int8 KV cache (`act_bits 8`, `kv_bits 8`) to mirror the engine's numerics,
       behind a flag.
+      (2026-10-11) — `whistle.WithInt8()`, off by default; with it off, the `Embed` rows and the `Transcribe` texts,
+      word times and probabilities hash as on `main`. Upstream's `fake_quant` (s = max|x| / 127 per row, round half to
+      even) was tried at every site and scored against the engine's continuous outputs (`needle_embed`, 7383 word
+      probabilities): the engine applies it to the mHC heads' input and to the attention's queries, keys and values
+      per head (share of our int8 step it takes too ≈ 1), but not to the other CQ products' inputs (≈ 0; per group,
+      rotated and bfloat16 variants too). So the flag quantises exactly those, and the decoder's self-attention cache and
+      the cross-attention memory hold int8 codes with a scale per head and row (`needle.Int8Rows`), attended with exact
+      int32 dot products (`needle.AttendInt8`, NEON/AVX2 kernels with Go fallbacks). Flag on against off: word
+      probabilities' gap to the engine −8 %, depth ladder 174 against 161/192, stream 812 against 797/930 decisions,
+      WER 5.33 % against 5.35 % (engine 5.30 %), keywords 46/53 both; but 30 against 31/32 clips equal and `Embed`
+      0.999719 against 0.999827 (one fragile frame). Speed: decode 6–9 % faster, TTFT 5–9 % slower; the 30 s peak
+      99.7–103.6 against 107.2–107.9 MiB. The flag stays off by default. The memory's k and v projections now share one
+      rotation (`ApplyShared`, bit for bit). `docs/FINDINGS.md` F-041.
 - [x] 9.4 Plan 9 assembly (NEON/AVX2) for the LUT GEMV, the FWHT, the Monarch Kronecker products and the
       softmax/Sinkhorn hot loops, with pure-Go fallbacks and equivalence tests (see `go-plan9-assembly`).
       (2026-10-10) — the `internal/needle` half. Profiled `Transcribe` over the 32 clips first. The Monarch

@@ -29,6 +29,7 @@ type cross struct {
 	gateProj, outProj   needle.Linear // [heads·v, dim], [dim, heads·v]
 	resid               float32       // the residual factor from cross_gate
 	noNorm              bool
+	int8                needle.Int8 // setInt8
 }
 
 // loadCross loads the cross-attention with the names prefix+"norm_in", …
@@ -124,6 +125,12 @@ func (l *loader) matrix(name string, in int) needle.Linear {
 	return w
 }
 
+// setInt8 switches the cross-attention to the engine's int8 numerics
+// (docs/FINDINGS.md F-041), as needle.Attention.SetInt8: with q.Act, the
+// queries are quantised per head; with q.KV, the memory holds its keys and
+// values in int8 per head and frame.
+func (c *cross) setInt8(q needle.Int8) { c.int8 = q }
+
 // setQKNorm builds the q/k norms of the QKNorm axis.
 func (c *cross) setQKNorm(q, k []float32) {
 	switch c.h.QKNorm {
@@ -158,19 +165,23 @@ func (c *cross) setResidual(g float32) {
 }
 
 // memory is a cross-attention's keys (normed, maybe rotated) and values
-// for one encoder output of frames rows, projected once per clip.
+// for one encoder output of frames rows, projected once per clip: float32,
+// or int8 per head and frame with needle.Int8.KV (docs/FINDINGS.md F-041).
 type memory struct {
-	k, v   []float32 // [frames, heads·qk], [frames, heads·v]
+	k, v   []float32 // [frames, heads·qk], [frames, heads·v]; nil in int8
+	k8, v8 needle.Int8Rows
 	frames int
 }
 
 // project computes the memory keys and values of enc, frames rows of dim
-// values. rope rotates frame f at position f when set.
+// values. rope rotates frame f at position f when set. Both projections
+// read enc, so packed ones share its rotation and tables
+// (needle.ApplyShared), with the same bits as one Apply each
+// (docs/FINDINGS.md F-038, F-041).
 func (c *cross) project(enc []float32, frames int, rope *needle.Rope) memory {
 	kW, vW := c.heads*c.qk, c.heads*c.v
 	m := memory{k: make([]float32, frames*kW), v: make([]float32, frames*vW), frames: frames}
-	c.kProj.Apply(m.k, enc, frames)
-	c.vProj.Apply(m.v, enc, frames)
+	needle.ApplyShared([][]float32{m.k, m.v}, enc, frames, c.kProj, c.vProj)
 
 	if !c.noNorm {
 		c.kNorm.Apply(m.k, m.k)
@@ -182,6 +193,11 @@ func (c *cross) project(enc []float32, frames int, rope *needle.Rope) memory {
 				rope.Apply(m.k[(f*c.heads+hd)*c.qk:(f*c.heads+hd+1)*c.qk], f)
 			}
 		}
+	}
+
+	if c.int8.KV {
+		m.k8, m.v8 = needle.QuantizeRows(m.k, kW, c.qk), needle.QuantizeRows(m.v, vW, c.v)
+		m.k, m.v = nil, nil
 	}
 
 	return m
@@ -251,16 +267,34 @@ func (c *cross) branch(h []float32, t, off int, m memory, rope *needle.Rope, kee
 }
 
 // attend is softmax(q kᵀ / √qk) v per head over every memory frame. A
-// non-nil keep receives the probabilities, [t, heads, frames].
+// non-nil keep receives the probabilities, [t, heads, frames]. An int8
+// memory runs needle.AttendInt8, which quantises the queries per head with
+// needle.Int8.Act (docs/FINDINGS.md F-041).
 func (c *cross) attend(q []float32, t int, m memory, keep *Attention) []float32 {
 	qW, vW := c.heads*c.qk, c.heads*c.v
-	out := make([]float32, t*vW)
-	scores := make([]float32, m.frames)
 	scale := float32(math.Sqrt(float64(c.qk)))
 
 	if keep != nil {
 		keep.Probs = make([]float32, t*c.heads*m.frames)
 	}
+
+	if c.int8.KV {
+		var probs []float32
+		if keep != nil {
+			probs = keep.Probs
+		}
+
+		all := func(int) int { return m.frames }
+
+		return needle.AttendInt8(q, t, c.heads, m.k8, m.v8, all, scale, c.int8.Act, probs)
+	}
+
+	if c.int8.Act {
+		needle.FakeQuant(q, c.qk)
+	}
+
+	out := make([]float32, t*vW)
+	scores := make([]float32, m.frames)
 
 	for hd := range c.heads {
 		for i := range t {
