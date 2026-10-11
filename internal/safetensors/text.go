@@ -1,6 +1,9 @@
 package safetensors
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // TextConfig is the Needle 3 text model config (needle3.safetensors @
 // 93e88ede, PLAN.md Phase 11), stored as JSON in the checkpoint's
@@ -53,6 +56,10 @@ type TextConfig struct {
 const (
 	textDefaultRope  = 100000.0
 	textEngramSubDim = 128 // architecture.py ENGRAM_SUB_DIM
+
+	// maxTextDim bounds d_model: far above any Needle model (768), far below
+	// where HadaN's power of two overflows.
+	maxTextDim = 1 << 20
 )
 
 // Orders returns the engram n-gram orders, TransformerConfig's default (2, 3):
@@ -118,8 +125,17 @@ func (s *Store) TextConfig() (TextConfig, error) {
 	var cfg TextConfig
 
 	err := s.decodeMetadataJSON(metaConfig, &cfg)
+	if err != nil {
+		return cfg, err
+	}
 
-	return cfg, err
+	// HadaN rounds d_model up to a power of two; a width past maxTextDim
+	// would overflow it, so a malformed config fails here instead.
+	if cfg.Dim < 1 || cfg.Dim > maxTextDim {
+		return cfg, fmt.Errorf("safetensors: text config d_model %d outside [1, %d]", cfg.Dim, maxTextDim)
+	}
+
+	return cfg, nil
 }
 
 // TextRun decodes the __metadata__ "run" entry of a Needle 3 text

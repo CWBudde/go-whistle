@@ -1,9 +1,12 @@
 package safetensors
 
 import (
+	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -62,6 +65,36 @@ func TestTextConfigStrict(t *testing.T) {
 	_, err = store.TextConfig()
 	if err == nil {
 		t.Fatal("TextConfig accepted Whistle's key text")
+	}
+}
+
+// TestTextConfigDim rejects a d_model HadaN cannot round up to a power of two (PR #44 review).
+func TestTextConfigDim(t *testing.T) {
+	for _, dim := range []int{0, -1, maxTextDim + 1, math.MaxInt} {
+		cfg := wantNeedle3Config()
+		cfg.Dim = dim
+
+		raw, err := json.Marshal(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		store := storeWithMetadata(t, map[string]string{"config": string(raw)})
+
+		_, err = store.TextConfig()
+		if err == nil || !strings.Contains(err.Error(), "d_model") {
+			t.Errorf("d_model %d: err = %v, want one mentioning d_model", dim, err)
+		}
+	}
+
+	raw, err := json.Marshal(wantNeedle3Config())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := storeWithMetadata(t, map[string]string{"config": string(raw)}).TextConfig()
+	if err != nil || got.Dim != 768 {
+		t.Errorf("needle3 config: Dim %d, err %v", got.Dim, err)
 	}
 }
 
