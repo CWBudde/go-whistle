@@ -258,12 +258,24 @@ $("transcribe").addEventListener("click", () =>
   }),
 );
 
+// passes is the line on a stream's passes; the stop runs none, so after it
+// the line still shows the last real pass.
+function passes(u) {
+  if (u.passes === 0) {
+    return "no pass yet";
+  }
+  return (
+    `${u.passes} ${u.passes === 1 ? "pass" : "passes"}, the last ${u.passMs.toFixed(0)} ms, ` +
+    `${(u.totalMs / 1000).toFixed(2)} s in all`
+  );
+}
+
 function streamView(title) {
   return (u) =>
     showResult(title, {
       committed: u.committed,
       pending: u.pending,
-      meta: `language ${u.language || "–"} · ${u.received.toFixed(2)} s received · last pass ${u.passMs.toFixed(0)} ms`,
+      meta: `language ${u.language || "–"} · ${u.received.toFixed(2)} s received · ${passes(u)}`,
       words: u.words,
       json: u.last.json,
     });

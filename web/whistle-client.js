@@ -280,8 +280,11 @@ async function decodeInBrowser(buffer) {
 // streamProcess takes at most; a longer backlog goes in several calls. With
 // paced false, every call takes exactly chunk samples (the last one fewer),
 // as `whistle stream --chunk`.
-// onUpdate gets {committed, pending, language, received, passMs, words,
-// last} after every call.
+// onUpdate gets {committed, pending, language, received, passes, passMs,
+// totalMs, words, last} after every call: passes counts the streamProcess
+// calls, each of which runs a pass, passMs is the last one's time (0
+// before the first) and totalMs their sum; the stop runs no pass, so its
+// pass_ms of 0 counts in neither.
 export class StreamSession {
   constructor(
     client,
@@ -297,6 +300,9 @@ export class StreamSession {
     this.committed = [];
     this.words = [];
     this.calls = [];
+    this.passes = 0;
+    this.passMs = 0;
+    this.totalMs = 0;
     this.error = null;
   }
 
@@ -349,8 +355,13 @@ export class StreamSession {
     return out;
   }
 
-  update(r) {
+  update(r, pass = true) {
     this.calls.push(r);
+    if (pass) {
+      this.passes++;
+      this.passMs = r.pass_ms;
+      this.totalMs += r.pass_ms;
+    }
     if (r.text) {
       this.committed.push(r.text);
     }
@@ -360,7 +371,9 @@ export class StreamSession {
       pending: r.pending,
       language: r.language,
       received: r.received,
-      passMs: r.pass_ms,
+      passes: this.passes,
+      passMs: this.passMs,
+      totalMs: this.totalMs,
       words: this.words,
       last: r,
     });
@@ -389,7 +402,7 @@ export class StreamSession {
     }
 
     const r = await this.client.streamStop();
-    this.update(r);
+    this.update(r, false);
     if (this.error) {
       throw this.error;
     }
