@@ -38,6 +38,16 @@ type Encoder struct {
 // returns an error wrapping ErrRuledOut when the tensors' shapes exclude
 // h.
 func Load(src weights.Source, h Hypothesis) (*Encoder, error) {
+	return LoadInt8(src, h, needle.Int8{})
+}
+
+// LoadInt8 is Load with the engine's int8 numerics q (docs/FINDINGS.md
+// F-041): with q.Act, the mHC heads quantise their input rows to int8 and
+// the attentions their queries per head; with q.KV, the attentions' keys
+// and values are quantised per head and frame. The other products (the
+// stem, the projections, the conv module) keep float32 inputs, as the
+// engine's outputs show. The zero q is Load.
+func LoadInt8(src weights.Source, h Hypothesis, q needle.Int8) (*Encoder, error) {
 	err := h.Validate()
 	if err != nil {
 		return nil, err
@@ -65,6 +75,10 @@ func Load(src weights.Source, h Hypothesis) (*Encoder, error) {
 	err = e.loadStack(withPerms(src, h.HadaPerms), src.Config())
 	if err != nil {
 		return nil, err
+	}
+
+	if q != (needle.Int8{}) {
+		e.setInt8(q)
 	}
 
 	gate, _, err := src.Tensor("pe_gate")
@@ -247,6 +261,14 @@ func (e *Encoder) loadStack(src weights.Source, cfg weights.Config) error {
 	}
 
 	return nil
+}
+
+// setInt8 switches the attentions and the mHC heads to q (LoadInt8).
+func (e *Encoder) setInt8(q needle.Int8) {
+	for l, b := range e.blocks {
+		b.attn.SetInt8(q)
+		e.mhc[l].SetInt8(q)
+	}
 }
 
 // rope builds the attention's rotation tables for t frames, nil for none.
