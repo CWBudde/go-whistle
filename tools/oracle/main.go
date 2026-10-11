@@ -12,6 +12,7 @@
 //	go run -tags oracle ./tools/oracle librispeech-audio  # the LibriSpeech subset into models/corpus/librispeech
 //	go run -tags oracle ./tools/oracle librispeech        # its transcripts into testdata/oracle/librispeech
 //	go run -tags oracle ./tools/oracle stream             # stream API calls into testdata/oracle/stream
+//	go run -tags oracle ./tools/oracle bench              # engine timings of the clips into bench/results/engine.json
 //
 // It loads the closed-source Needle 3 engine (the needle CLI and libneedle3 through purego), so it lives behind the
 // oracle build tag and never ships with the library or the whistle CLI.
@@ -27,6 +28,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+
+	"github.com/cwbudde/go-whistle/bench"
 )
 
 // Subcommand names.
@@ -41,11 +44,14 @@ const (
 	cmdNameLSAudio     = "librispeech-audio"
 	cmdNameLibriSpeech = "librispeech"
 	cmdNameStream      = "stream"
+	cmdNameBench       = "bench"
 )
 
 const usage = "usage: oracle clips [-audio dir] | oracle run|probes|depth|keywords|silence|limits|librispeech|stream " +
 	"[-audio dir] [-out dir] [-oracle dir] [-corpus dir] [-models dir] [-engine dir] | " +
-	"oracle librispeech-audio [-corpus dir] [-out dir]"
+	"oracle librispeech-audio [-corpus dir] [-out dir] | " +
+	"oracle bench [-audio dir] [-oracle dir] [-models dir] [-engine dir] [-out file] [-warmup n] [-runs n] [-long n] " +
+	"[-loads n]"
 
 // engineCmds run the engine and write into testdata/oracle/<subdir>.
 var engineCmds = map[string]struct {
@@ -106,6 +112,8 @@ func dispatch(ctx context.Context, args []string, log io.Writer) error {
 		_, err = ensureLibriSpeech(ctx, *corpusDir, *out, log)
 
 		return err
+	case cmdNameBench:
+		return dispatchBench(ctx, fs, args[1:], audio, oracleDir, log)
 	}
 
 	sub, ok := engineCmds[args[0]]
@@ -131,4 +139,40 @@ func dispatch(ctx context.Context, args []string, log io.Writer) error {
 	return sub.run(ctx, runConfig{
 		audioDir: *audio, outDir: *out, oracleDir: *oracleFlag, corpusDir: *corpusDir, modelDir: *models, engineDir: *eng,
 	}, log)
+}
+
+// dispatchBench parses the bench flags and runs cmdBench.
+func dispatchBench(ctx context.Context, fs *flag.FlagSet, args []string, audio *string, oracleDir string,
+	log io.Writer,
+) error {
+	plat, err := platformDir()
+	if err != nil {
+		return err
+	}
+
+	cfg := benchConfig{}
+	fs.StringVar(&cfg.out, "out", bench.EngineResultsPath, "results JSON")
+	fs.StringVar(&cfg.goResults, "go", bench.GoResultsPath, "the Go results (JSON) the report pairs with -out")
+	fs.StringVar(&cfg.report, "report", bench.ReportPath, "the report rendered from -go and -out")
+	fs.StringVar(&cfg.oracleDir, "oracle", oracleDir, "directory holding the committed clip fixtures")
+	fs.StringVar(&cfg.modelDir, "models", filepath.Join("models", "whistle"), "directory holding whistle.cact")
+	fs.StringVar(&cfg.engineDir, "engine", filepath.Join("engine", plat), "directory holding needle and libneedle3")
+	fs.IntVar(&cfg.warmUp, "warmup", 1, "untimed runs per clip, and of the 30 s clip, per mode")
+	fs.IntVar(&cfg.runs, "runs", 5, "timed passes over the clips per mode")
+	fs.IntVar(&cfg.long, "long", 10, "timed runs of the 30 s clip per mode")
+	fs.IntVar(&cfg.loads, "loads", 5, "timed needle_load calls")
+
+	err = fs.Parse(args)
+	if err != nil {
+		return fmt.Errorf("%s: %w", cmdNameBench, err)
+	}
+
+	err = cfg.check()
+	if err != nil {
+		return fmt.Errorf("%s: %w", cmdNameBench, err)
+	}
+
+	cfg.audioDir = *audio
+
+	return cmdBench(ctx, cfg, log)
 }

@@ -3354,3 +3354,191 @@ depth and keyword regressions pass, `just eval-librispeech` WER 223/4167 = 5.35 
   of the peak.
 - **The log-mel front end** (6 ms of the 30 s TTFT) is single-threaded.
 - **The 3–5 % decode cost after a parallel encoder** (above).
+
+## F-040 — Benchmarks against the engine on the same machine, and the packed WER (9.6, Phase 9 Accept) (2026-10-10)
+
+**Question.** How fast is go-whistle against the Needle 3 engine on the same machine: TTFT, decode rate, real-time
+factor, model load and peak RSS (PLAN.md 9.6)? Does the packed default keep the float path's WER within 0.1 (the
+Phase 9 **Accept**)? And what exactly do the engine's `ttft_ms` and `decode_tps` time, so that the comparison is like
+with like?
+
+### Harness
+
+- **Go side**, `just bench` (`bench/cmd/whistle-bench run`), public `whistle` API only:
+  - Both modes are loaded in one process: packed (`whistle.Load` on `whistle.cact`, the default since F-037) and float
+    (`WithFloatWeights()`). Five `Load`s per mode, alternating, give the load time.
+  - The 32 fixture clips of `TestTranscribeMatchesEngine`, each checked against its SHA-256: one untimed warm-up pass,
+    then five timed passes. Per clip the mode that goes first alternates with clip and pass, so both modes see the same
+    machine load. The warm-up pass gives the transcripts, compared with the committed engine fixtures.
+  - The 30 s clip, the first corpus clip tiled to 480,000 samples (F-027, F-035, F-037): one warm-up and ten timed runs
+    per mode, alternating.
+  - Peak RSS: a fresh child process per mode (`whistle-bench child`) runs `Load` and one 30 s `Transcribe` and reports
+    `ru_maxrss` after each, as `just mem-probe` does. `ru_maxrss` is a high-water mark, so the child loads the model
+    before it reads any audio and builds the 30 s clip from the first clip alone (PR #33 review: decoding all 32 clips
+    first had put 40.6 MiB after `Load`). The committed memory values are the median of three fresh children per mode
+    after that fix: after `Load` 37.9 MiB packed and 238.9 float, the 30 s peak 125.7 and 489.3 (the full run's
+    children had given 125.3 and 489.4). A platform without `ru_maxrss` reports 0, which the report shows as missing.
+  - WER: the 200 LibriSpeech utterances of F-025, digests checked, both modes per utterance in alternating order. The
+    manifest's `wer_rule` goes through `internal/eval` as in `TestEvalLibriSpeech`. The run fails unless the rule
+    reproduces `manifest.json`'s count for every engine transcript and its totals.
+- **Engine side**, `just oracle-bench` (`tools/oracle bench`, tag `oracle`, `NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1`):
+  - The CLI: one `needle` process per transcription, `--threads 4` (`cliThreads`), no word timestamps, the same passes
+    and runs. It records `ttft_ms`, `decode_tps`, the process's wall time and its `ru_maxrss`, and checks the warm-up
+    pass's text and language against the committed fixtures.
+  - The library: `libneedle3` through purego in the oracle process, on its default threads (the fast cores, at most 4,
+    so 4 here). Five more `needle_load` calls on the file's bytes in memory, then `needle_transcribe` without word
+    timestamps on the same PCM, in the same passes.
+  - The 30 s clip is written as a 32-bit float WAV of the tiled samples, so the CLI reads exactly the samples that the
+    Go side and the library transcribe.
+- **Statistics.** All transcriptions of a set are pooled over the passes. The median of an even count is the mean of
+  the middle two; the p90 is the nearest rank. The real-time factor is Σ wall / Σ audio per pass, median over the
+  passes.
+- **Report.** Both sides write JSON (`bench/results/go.json`, `engine.json`); `whistle-bench report` renders
+  `bench/RESULTS.md` from them. Its tables are padded the way prettier pads them, so the generated file and the JSON
+  pass `treefmt --fail-on-change` unchanged. Each run records its machine (CPU, cores, core types, OS, architecture)
+  and its inputs (the model's SHA-256 and a SHA-256 over the clip manifest's ids and WAV digests). The report divides
+  the Go side by the engine's only when both match; otherwise it names each side's CPU, leaves the ratios empty and
+  says that the results are not comparable (PR #33 review).
+
+### What the engine's clock measures
+
+| first run, 32 clips, median                                      | ms              |
+| ---------------------------------------------------------------- | --------------- |
+| CLI `ttft_ms`                                                    | 7.6             |
+| library `ttft_ms`                                                | 7.5             |
+| CLI process, wall                                                | 39.4            |
+| library `needle_transcribe` call, wall                           | 29.8            |
+| `needle_load` on the bytes in memory                             | 2.7             |
+| call − `ttft_ms` − (n − 1) / `decode_tps`, n = the call's return | 1.35 (p90 2.20) |
+
+- The CLI's and the library's `ttft_ms` agree within 0.1 ms, while the CLI process takes 9.6 ms longer than the
+  library call. So `ttft_ms` leaves out the process start, the model load and the WAV reading; it is the same clock in
+  both.
+- `needle_transcribe` returns the number of tokens generated, n. The call's wall time is `ttft_ms` + (n − 1) /
+  `decode_tps` + 1.35 ms at the median. At about 1400 tok/s one decode step takes 0.7 ms, so the engine's two numbers
+  account for the whole call but about two steps.
+- A throwaway per-call log (one pass) shows that remainder in whole steps: near 0.7 or 1.4 ms (0.64–0.89 and
+  1.35–2.07 ms) on 30 of the 32 clips, and 5.0 and 9.2 ms on the two Polish clips, the second F-026's search miss.
+  That fits steps that the search runs beyond the n returned tokens: after the winner's EOS until 5 hypotheses have
+  finished, as ours does (F-031). It does not fit set-up work outside the clock.
+- So the engine's clock starts when the call has the PCM and stops at the first token after the language token (TTFT)
+  and at the last search step (decode). That is F-027's reading, and `Result.TTFT` and `Result.DecodeTPS` are defined
+  the same way: the clock starts in `Transcribe` after the length check, before the silence gate.
+- **Like with like** is therefore `Transcribe` against the library call: both in-process, the model loaded, PCM in
+  memory, no word timestamps, after a warm-up. The CLI's process time is reported for completeness only.
+
+### Results before 9.5
+
+Apple M5 Pro (5 Super + 10 Performance cores, 48 GiB), macOS 27.0.1, Go 1.27.1, engine 3.2.0, commit `fe5884e4e6`.
+Go ran with GOMAXPROCS 15, the engine with 4 threads. Other sessions kept the load average at 5.2–8.4 during the Go
+run and 5.2–5.5 during the engine's (`bench/RESULTS.md` has every row).
+
+| median                        | Go packed | Go float | engine library | packed / engine |
+| ----------------------------- | --------- | -------- | -------------- | --------------- |
+| TTFT, 32 clips (ms)           | 60.4      | 57.5     | 7.5            | 8.1×            |
+| TTFT p90, 32 clips (ms)       | 76.1      | 71.1     | 10.3           | 7.4×            |
+| decode, 32 clips (tok/s)      | 1013      | 604      | 1383           | 0.73×           |
+| RTF, 32 clips                 | 0.0156    | 0.0188   | 0.0056         | 2.8×            |
+| TTFT, 30 s clip (ms)          | 310.4     | 290.1    | 36.3           | 8.6×            |
+| decode, 30 s clip (tok/s)     | 620       | 408      | 1082           | 0.57×           |
+| RTF, 30 s clip                | 0.0165    | 0.0192   | 0.0048         | 3.4×            |
+| model load (ms)               | 7.0       | 138.7    | 2.7            | 2.6×            |
+| peak RSS, load + 30 s (MiB)   | 125.7     | 489.3    | 70.0 (CLI)     | 1.8×            |
+| equal to the engine, 32 clips | 31/32     | 31/32    | 32/32 (CLI)    | —               |
+
+- **TTFT** is 8× the engine's on the clips and 8.6× on the 30 s clip. Both grow with the audio: the 30 s clip takes
+  5.1× the clips' median for us and 4.8× for the engine, so the gap scales with the audio and is not a fixed overhead
+  (F-027, F-035). 9.5's parallelism over time blocks and heads is the lever. Packed is 5–7 % slower than float
+  there: the batched products (F-037).
+- **Decode**: packed runs at 0.73× the engine's rate, float at 0.44×. Packed is 1.7× float, more than F-037's 1.56–1.59×
+  under a different load.
+- **Real-time factor**: 0.016–0.017, about 60× faster than real time, against the engine's 0.005 (2.8–3.4×).
+- **Load**: 7.0 ms packed against `needle_load`'s 2.7 ms, which gets the bytes already in memory; float takes 139 ms.
+- **Memory**: a 30 s run peaks at 125.7 MiB packed against the engine CLI's 70.0 MiB (model load included in both;
+  ours includes the Go runtime), and 37.9 MiB after `Load`. F-037's open levers (the stem's activation spike, `GOGC`
+  headroom) are the difference.
+- **Against the published figures**: the engine here gives 7.5 ms and 1383 tok/s, the published M4 Pro figures 11.1 ms
+  and 1319 tok/s on another clip set. This machine is faster in TTFT and about equal in decode, so the engine on the
+  same machine, not the published figure, is the yardstick.
+
+**Spread.** A first full run on the same code before it was committed (load average 4.1–6.9) gave packed 69.2 ms /
+796 tok/s, float 66.3 ms / 528 tok/s, and engine library 7.6 ms / 1339 tok/s. The Go numbers move by up to 27 %
+between runs under the shared load, the engine's by a few percent. Packed / engine: TTFT 8.1–9.1×, decode 0.59–0.73×.
+
+**Workers.** A throwaway run with `-procs 4` (the engine's thread count, no WER, load average 7.9–8.0) gave packed
+68.1 ms / 504 tok/s and float 65.4 ms / 295 tok/s, and a 30 s TTFT of 336 / 317 ms. TTFT barely depends on the workers,
+because the encoder runs on one goroutine today. Decode does: the search fans the beam expansion out over goroutines
+(F-035). At the engine's 4 threads, packed decodes at 0.36× its rate.
+
+### Results after 9.5 (2026-10-11)
+
+`just bench` on the merge of `main` with 9.5 (F-038, commit `cd6111f0e3`) and `just oracle-bench` right after it
+(`513d7f19bf`, the same code), on a quieter machine: load average 2.2–5.7 during the Go run, 3.7–3.8 during the
+engine's. These are the numbers in `bench/RESULTS.md`.
+
+| median                        | Go packed | Go float | engine library | packed / engine |
+| ----------------------------- | --------- | -------- | -------------- | --------------- |
+| TTFT, 32 clips (ms)           | 19.3      | 21.6     | 6.9            | 2.8×            |
+| TTFT p90, 32 clips (ms)       | 21.9      | 24.8     | 8.5            | 2.6×            |
+| decode, 32 clips (tok/s)      | 1071      | 597      | 1499           | 0.71×           |
+| RTF, 32 clips                 | 0.0084    | 0.0130   | 0.0048         | 1.75×           |
+| TTFT, 30 s clip (ms)          | 59.9      | 66.9     | 34.7           | 1.73×           |
+| decode, 30 s clip (tok/s)     | 639       | 414      | 1164           | 0.55×           |
+| RTF, 30 s clip                | 0.0081    | 0.0116   | 0.0045         | 1.8×            |
+| model load (ms)               | 6.7       | 136.2    | 2.4            | 2.8×            |
+| peak RSS, load + 30 s (MiB)   | 105.7     | 493.0    | 69.9 (CLI)     | 1.51×           |
+| equal to the engine, 32 clips | 31/32     | 31/32    | 32/32 (CLI)    | —               |
+
+- **TTFT** fell from 60.4 to 19.3 ms on the clips (3.1×) and from 310 to 60 ms on the 30 s clip (5.2×). The gap to the
+  engine is now 2.8× on the clips and 1.7× on the 30 s clip, so what remains is mostly a fixed cost per call, not one
+  that grows with the audio. Packed is now 11 % faster than float in TTFT, where it was 5 % slower: the shared rotations
+  and the parallel lut GEMM (F-038).
+- **Decode** barely moved (1013 → 1071 tok/s packed): the beams were parallel before 9.5. The engine's rate also came
+  out higher on the quieter machine (1383 → 1499), so the ratio stays at 0.71–0.73×.
+- **Real-time factor**: 0.008, about 120× faster than real time, against the engine's 0.0045–0.0048.
+- **Memory**: the 30 s peak fell from 125.7 to 105.7 MiB with the stem in chunks, 1.5× the engine CLI's. One fresh
+  child per mode this time, not the median of three.
+- The **Workers** paragraph above describes the code before 9.5, whose encoder ran on one goroutine.
+
+### WER (Phase 9 Accept)
+
+| LibriSpeech test-clean subset, 200 utterances | packed (default) | float (`WithFloatWeights()`) | engine   |
+| --------------------------------------------- | ---------------- | ---------------------------- | -------- |
+| errors / reference words                      | 223/4167         | 223/4167                     | 221/4167 |
+| WER                                           | 5.35 %           | 5.35 %                       | 5.30 %   |
+| text equal to the engine's                    | 181/200          | 181/200                      | —        |
+| real-time factor, before 9.5                  | 0.0163           | 0.0187                       | —        |
+| real-time factor, after 9.5                   | 0.0077           | 0.0113                       | —        |
+
+The error counts are the same before and after 9.5, whose outputs are bit for bit the same (F-038). Packed minus float
+is **0.00 percentage points**, and all 200 transcripts are equal in text and language, as F-037
+found. The Accept's 0.1 holds. Packed minus the engine is +0.05 points, F-031's figure.
+
+### Tests
+
+Without `models/` and without the engine:
+
+- `bench`: `Summarise` (median and nearest-rank p90), `Samples.Set` (the per-pass real-time factor), the table layout,
+  `Render` with and without results, including the Accept's verdict at +0.00 and at +0.12 points, and the JSON round
+  trip.
+- `bench/cmd/whistle-bench`: the 32 committed clips with their digests and transcripts, the 30 s tiling, and the
+  LibriSpeech fixtures under the rule, every utterance reproducing `manifest.json`'s count. Also the command's errors
+  and a report without results.
+- `BenchmarkTranscribe` (packed and float, median TTFT and tok/s as metrics) skips without the model.
+
+### Re-running
+
+`just bench` re-measures the Go side and re-renders `bench/RESULTS.md` with the committed `engine.json`; that is the
+one command after a change to the Go side. `just oracle-bench` is only needed when the engine, the machine or the clips
+change; it was re-run after 9.5 only because the machine was quieter.
+
+### Open
+
+- **TTFT**, 2.8× the engine's on the clips after 9.5: F-038's open items (the decoder's cross-attention memory, the
+  allocations per block, the single-threaded log-mel front end).
+- **Decode**, 0.71× the engine's rate.
+- **Peak RSS** of a 30 s run, 1.5× the engine CLI's after 9.5: F-037's remaining levers (the int8 cross-attention
+  memory of 9.3, `GOMEMLIMIT`, the lut copy).
+- **Noise.** The harness alternates the modes within a run, but the Go and the engine runs follow each other, so their
+  ratio carries the load difference between those minutes. The run after 9.5 was on a quieter machine (load 2–6) than
+  the first (5–8).

@@ -1105,9 +1105,29 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       21.2–21.3 ms packed, 60.7–62.9 → 23.4–24.0 ms float; the 30 s clip 332–337 → 66–67 ms and 311–314 → 72–75 ms;
       decode 819–947 → 960–961 tok/s packed. Parity unchanged: 31/32, `Embed` 0.999827, WER 5.35 %, stream 797/930.
       `docs/FINDINGS.md` F-038.
-- [ ] 9.6 Benchmarks (`bench/`): TTFT and decode tok/s against the engine on the same machine. The engine publishes
+- [x] 9.6 Benchmarks (`bench/`): TTFT and decode tok/s against the engine on the same machine. The engine publishes
       11.1 ms TTFT and 1319 tok/s on an M4 Pro with 5 beams. Also the real-time factor for 30 s clips.
-- [ ] **Accept:** WER unchanged within 0.1 against the float path, with numbers recorded in `bench/RESULTS.md`.
+      (2026-10-10) — `just bench` (`bench/cmd/whistle-bench`, public `whistle` API) times packed and float alternately
+      in one process over the 32 fixture clips (1 warm-up + 5 passes) and the first clip tiled to 30 s (1 + 10 runs):
+      `Load`, TTFT and decode rate (median, p90), wall time, real-time factor, plus peak RSS from a fresh child per mode
+      and the LibriSpeech WER. `just oracle-bench` (`tools/oracle bench`) times the engine on the same samples, the CLI
+      (`--threads 4`, one process per run) and `libneedle3` in process. Both write `bench/results/*.json`, and
+      `bench/RESULTS.md` is rendered from them. The engine's `ttft_ms` is the same clock in the CLI and the library and
+      leaves out process start, model load and WAV reading; a library call is `ttft_ms` + (n − 1) / `decode_tps` plus
+      about two decode steps. So like with like is `Transcribe` against `needle_transcribe`. M5 Pro, commit
+      `fe5884e4e6`, load average 5–8 from other sessions, medians: TTFT 60.4 ms packed / 57.5 ms float against the
+      engine's 7.5 ms (8.1×); decode 1013 / 604 against 1383 tok/s (0.73×); 30 s clip TTFT 310 / 290 against 36 ms,
+      real-time factor 0.0165 / 0.0192 against 0.0048; `Load` 7.0 / 139 ms against `needle_load`'s 2.7 ms; peak RSS of
+      `Load` + 30 s 125 / 489 MiB against the CLI's 70 MiB. The engine here beats its published M4 Pro TTFT (7.5 against
+      11.1 ms) at about its published decode rate. (2026-10-11) — re-run after 9.5 (both sides, load average 2–6):
+      TTFT 19.3 ms packed / 21.6 ms float against the engine's 6.9 ms (2.8×); decode 1071 / 597 against 1499 tok/s
+      (0.71×); 30 s clip TTFT 60 / 67 against 35 ms, real-time factor 0.0081 / 0.0116 against 0.0045; `Load` 6.7 / 136
+      ms against 2.4 ms; peak RSS 106 / 493 MiB against 70 MiB; WER unchanged. `docs/FINDINGS.md` F-040.
+- [x] **Accept:** WER unchanged within 0.1 against the float path, with numbers recorded in `bench/RESULTS.md`.
+      (2026-10-10) — the float path is `whistle.Load` with `WithFloatWeights()`, packed its default on `whistle.cact`.
+      LibriSpeech test-clean subset (200 utterances, 4167 words, `just bench`): packed 223/4167 = 5.35 %, float
+      223/4167 = 5.35 %, difference 0.00 points; all 200 transcripts equal. Engine 5.30 %. Recorded in
+      `bench/RESULTS.md`; F-040.
 
 ## Phase 10 — Distribution & extras
 
