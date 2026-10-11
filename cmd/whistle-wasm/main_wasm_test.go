@@ -3,6 +3,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
@@ -95,6 +97,8 @@ func TestAPIRejects(t *testing.T) {
 		{"transcribe of an Array", w.Call("transcribe", js.ValueOf([]any{0.1})), "Float32Array"},
 		{"transcribe without samples", w.Call("transcribe"), "Float32Array"},
 		{"load of a string", w.Call("load", "whistle.cact"), "Uint8Array"},
+		{"sha256 of a string", w.Call("sha256", "whistle.cact"), "Uint8Array"},
+		{"sha256 without bytes", w.Call("sha256"), "Uint8Array"},
 		{"load of garbage", w.Call("load", js.Global().Get("Uint8Array").New(16)), "whistle: "},
 		{"decodeWAV of garbage", w.Call("decodeWAV", js.Global().Get("ArrayBuffer").New(16)), "whistle: "},
 		{"streamStart before load", w.Call("streamStart"), "call load first"},
@@ -109,6 +113,41 @@ func TestAPIRejects(t *testing.T) {
 
 	if w.Get("sampleRate").Int() != whistle.SampleRate || w.Get("maxSamples").Int() != whistle.MaxSamples {
 		t.Errorf("sampleRate %v, maxSamples %v", w.Get("sampleRate"), w.Get("maxSamples"))
+	}
+}
+
+// sha256 hashes an ArrayBuffer or a Uint8Array, a view into a larger buffer
+// included, as crypto/sha256 does, across its block boundaries too.
+func TestAPISHA256(t *testing.T) {
+	w := api(t)
+
+	data := make([]byte, 2*sha256Block+3)
+	for i := range data {
+		data[i] = byte(i * 7)
+	}
+
+	u8 := js.Global().Get("Uint8Array").New(len(data))
+	js.CopyBytesToJS(u8, data)
+
+	for _, c := range []struct {
+		name string
+		v    js.Value
+		want []byte
+	}{
+		{"an empty ArrayBuffer", js.Global().Get("ArrayBuffer").New(0), nil},
+		{"an ArrayBuffer of 2 blocks and 3 bytes", u8.Get("buffer"), data},
+		{"a Uint8Array of one block", u8.Call("subarray", 0, sha256Block), data[:sha256Block]},
+		{"a Uint8Array view at an offset", u8.Call("subarray", 5, sha256Block+9), data[5 : sha256Block+9]},
+	} {
+		got, err := await(w.Call("sha256", c.v))
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+
+		sum := sha256.Sum256(c.want)
+		if want := hex.EncodeToString(sum[:]); got.String() != want {
+			t.Errorf("%s: %s, want %s", c.name, got.String(), want)
+		}
 	}
 }
 
