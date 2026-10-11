@@ -13,11 +13,14 @@ import (
 // straight from its packed indices (internal/cq, docs/FINDINGS.md F-037).
 // Both give the same products up to the order of the float32 sums and the
 // lut kernel's table rounding (1 − cos ≤ 7.8e-8 on Whistle's tensors,
-// F-034). The zero Linear has no rows. It is safe for concurrent use.
+// F-034). With WithInt8Input its products quantise each input row to int8
+// first (F-041). The zero Linear has no rows. It is safe for concurrent
+// use.
 type Linear struct {
 	out, in int
 	w       []float32  // [out, in]; nil when packed
 	q       *cq.Matrix // nil for float32
+	act8    bool       // quantise the input rows to int8 (Int8.Act)
 }
 
 // NewLinear wraps float32 values w, out rows of in, without copying them.
@@ -49,9 +52,28 @@ func (l Linear) In() int { return l.in }
 // Packed reports whether the matrix multiplies from packed CQ indices.
 func (l Linear) Packed() bool { return l.q != nil }
 
+// WithInt8Input returns l with on deciding whether Apply and ApplyShared
+// quantise each input row to int8 (QuantizeRow) before the product,
+// upstream's fake_quant_act. The engine does that for the mHC φ, which use
+// it (MHC.SetInt8), but not for the other CQ products (docs/FINDINGS.md
+// F-041). Row is not affected, Rows keeps the setting, and l is not
+// changed.
+func (l Linear) WithInt8Input(on bool) Linear {
+	l.act8 = on
+
+	return l
+}
+
+// Int8Input reports whether the products quantise their input to int8.
+func (l Linear) Int8Input() bool { return l.act8 }
+
 // Apply sets dst = x · Wᵀ for each of the rows of x: x holds rows × In
 // values and dst rows × Out, both row-major.
 func (l Linear) Apply(dst, x []float32, rows int) {
+	if l.act8 {
+		x = quantInput(x[:rows*l.in], l.in)
+	}
+
 	if l.q != nil {
 		l.q.GEMM(dst[:rows*l.out], x[:rows*l.in], rows)
 
@@ -64,30 +86,51 @@ func (l Linear) Apply(dst, x []float32, rows int) {
 // ApplyShared sets dsts[k] = x · ls[k]ᵀ for linears that read the same x,
 // rows × In: Apply for each, except that the packed ones run through
 // cq.GEMMs together, which rotates and tabulates each row of x once for
-// all of them instead of once per matrix (docs/FINDINGS.md F-038). Every
-// dsts[k] equals ls[k].Apply's result bit for bit.
+// all of them instead of once per matrix (docs/FINDINGS.md F-038). The
+// linears that quantise their input share one quantised copy of x
+// (F-041). Every dsts[k] equals ls[k].Apply's result bit for bit.
 func ApplyShared(dsts [][]float32, x []float32, rows int, ls ...Linear) {
 	if len(dsts) != len(ls) {
 		panic(fmt.Sprintf("needle: ApplyShared of %d linears into %d outputs", len(ls), len(dsts)))
 	}
 
-	var (
-		ms []*cq.Matrix
-		ds [][]float32
-	)
+	var xq []float32
 
-	for k, l := range ls {
-		if l.q == nil {
-			l.Apply(dsts[k], x, rows)
-
-			continue
+	for _, l := range ls {
+		if l.act8 && xq == nil {
+			xq = quantInput(x[:rows*l.in], l.in)
 		}
-
-		ms, ds = append(ms, l.q), append(ds, dsts[k][:rows*l.out])
 	}
 
-	if len(ms) > 0 {
-		cq.GEMMs(ms, ds, x[:rows*ls[0].in], rows)
+	// Packed matrices with the same input go through one cq.GEMMs.
+	for _, quant := range []bool{false, true} {
+		in := x
+		if quant {
+			in = xq
+		}
+
+		var (
+			ms []*cq.Matrix
+			ds [][]float32
+		)
+
+		for k, l := range ls {
+			if l.act8 != quant {
+				continue
+			}
+
+			if l.q == nil {
+				l.WithInt8Input(false).Apply(dsts[k], in, rows)
+
+				continue
+			}
+
+			ms, ds = append(ms, l.q), append(ds, dsts[k][:rows*l.out])
+		}
+
+		if len(ms) > 0 {
+			cq.GEMMs(ms, ds, in[:rows*ls[0].in], rows)
+		}
 	}
 }
 
@@ -112,10 +155,10 @@ func (l Linear) Rows(lo, hi int) Linear {
 	}
 
 	if l.q != nil {
-		return Linear{out: hi - lo, in: l.in, q: l.q.Rows(lo, hi)}
+		return Linear{out: hi - lo, in: l.in, q: l.q.Rows(lo, hi), act8: l.act8}
 	}
 
-	return Linear{out: hi - lo, in: l.in, w: l.w[lo*l.in : hi*l.in : hi*l.in]}
+	return Linear{out: hi - lo, in: l.in, w: l.w[lo*l.in : hi*l.in : hi*l.in], act8: l.act8}
 }
 
 // linear reads a rank-2 tensor as a Linear with the shape checks of
