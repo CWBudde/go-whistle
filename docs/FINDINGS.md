@@ -3983,8 +3983,9 @@ readers built for Whistle, what differs from Whistle's files, and does a forward
   `confidence_probes`/`confidence_queries` 4/4, and seven `image_*` keys at 0. The run's `tokenizer_hash` is the MD5 of
   the pinned `tokenizer.model`; `merged_heads` names the confidence head merged at step 10,000.
 - **Tensors that Whistle's checkpoint does not have:** `engrams_2…4` (five sites instead of two), the
-  `confidence_head/*` (probes (21, 4, 768), gain, query, row*bias, proj (3072, 1) with bias), and no
-  `encoder/*`, `stem/*`, `cross*\*`or`pe_gate`. Shapes that change with the width: `q_proj`768 → 576 (12 heads),`gate_proj`and`out_proj`768 × 768, the HadamardMLP diagonals and`cond_u`at 1024,`cond_v` (768, 8), the Kronecker
+  `confidence_head/*` (probes (21, 4, 768), gain, query, `row_bias`, proj (3072, 1) with bias), and no
+  `encoder/*`, `stem/*`, `cross*` or `pe_gate`. Shapes that change with the width: `q_proj` 768 → 576 (12 heads),
+  `gate_proj` and `out_proj` 768 × 768, the HadamardMLP diagonals and `cond_u` at 1024, `cond_v` (768, 8), the Kronecker
   factors 32 × 32 for both a and b (Whistle 16 × 16 and 32 × 32), the engram tables (6, 18432, 128).
 - **.cact.** `cact.Open` reads it unchanged: same tag, 196-byte header, the same 28 codebook floats. Header fields
   Whistle leaves at 0 are set: `kv_window` 256, `out_vocab` 8192, `max_seq_len` 8192, `sliding_window` 1024, the
@@ -4071,7 +4072,7 @@ fallback on.
 ## F-047 — The engine on the text model: the envelope, determinism, threads, depth and audio (PLAN.md 11.4) (2026-10-11)
 
 **Question.** Does the local engine 3.2.0 (`engine/macos-arm64`, HF revision `2ae11323`) load the pinned
-`needle3.cact`, and what does it answer? `tools/textoracle` records it into `testdata/text/engine/` (`just oracle-text`).
+`needle3.cact`, and what does it answer? `tools/oracle/text` records it into `testdata/text/engine/` (`just oracle-text`).
 
 - **Loading.** It loads `needle3.cact` alone and together with `whistle.cact` (`needle_models` 3); the `.cact` tag is
   generation 3, and `ENGINE_VERSIONS[3]` is 3.2.0. `config.json` names engine 3.1.0; nothing newer was needed.
