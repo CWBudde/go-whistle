@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cwbudde/algo-tensor/tensor"
 	"github.com/cwbudde/go-whistle/internal/frontend"
-	"github.com/cwbudde/go-whistle/internal/tensor"
 	"github.com/cwbudde/go-whistle/whistle"
 )
 

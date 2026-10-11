@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cwbudde/go-whistle/internal/tensor"
+	"github.com/cwbudde/algo-tensor/tensor"
 )
 
 // withWorkers runs fn with tensor.SetWorkers(n) and restores the count.

@@ -3,7 +3,7 @@ package needle
 import (
 	"fmt"
 
-	"github.com/cwbudde/go-whistle/internal/tensor"
+	"github.com/cwbudde/algo-tensor/tensor"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
 

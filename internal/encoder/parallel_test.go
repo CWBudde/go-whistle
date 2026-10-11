@@ -8,10 +8,10 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/cwbudde/algo-tensor/tensor"
 	"github.com/cwbudde/go-whistle/internal/cact"
 	"github.com/cwbudde/go-whistle/internal/cq"
 	"github.com/cwbudde/go-whistle/internal/frontend"
-	"github.com/cwbudde/go-whistle/internal/tensor"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
 

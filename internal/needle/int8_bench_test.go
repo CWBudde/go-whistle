@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/cwbudde/go-whistle/internal/tensor"
+	"github.com/cwbudde/algo-tensor/tensor"
 )
 
 // The int8 benchmarks (docs/FINDINGS.md F-041): one row's quantisation at

@@ -8,7 +8,7 @@
 //
 // Go 1.25's arm64 assembler lacks the vector float instructions and SHRN,
 // so they are WORD-encoded with the instruction in the comment, as in
-// internal/tensor:
+// algo-tensor's tensor package:
 //   FADD   Vd.4S, Vn.4S, Vm.4S     0x4E20D400 | m<<16 | n<<5 | d
 //   FSUB   Vd.4S, Vn.4S, Vm.4S     0x4EA0D400 | m<<16 | n<<5 | d
 //   FMUL   Vd.4S, Vn.4S, Vm.4S     0x6E20DC00 | m<<16 | n<<5 | d

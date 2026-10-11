@@ -166,7 +166,7 @@ wasm-test flags="-short": wasm
     # This go comes first: /usr/bin may hold an older one (the CI runner's is 1.24).
     env -i PATH="$(go env GOROOT)/bin:$(dirname "$(command -v node)"):/usr/bin:/bin" HOME="$HOME" \
         GOPATH="$(go env GOPATH)" GOMODCACHE="$(go env GOMODCACHE)" GOCACHE="$(go env GOCACHE)" \
-        GOTOOLCHAIN="$(go env GOTOOLCHAIN)" GOOS=js GOARCH=wasm \
+        GOTOOLCHAIN="$(go env GOTOOLCHAIN)" GOPRIVATE="$(go env GOPRIVATE)" GOOS=js GOARCH=wasm \
         go test {{flags}} -timeout 60m -exec "$(go env GOROOT)/lib/wasm/go_js_wasm_exec" \
         $(go list ./... | grep -v -e /cmd/whistle$ -e /internal/server$ -e /cmd/whistle-wasm/serve$)
     if [ -f models/whistle/whistle.cact ]; then

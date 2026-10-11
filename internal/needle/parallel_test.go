@@ -7,9 +7,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/cwbudde/algo-tensor/tensor"
 	"github.com/cwbudde/go-whistle/internal/cact"
 	"github.com/cwbudde/go-whistle/internal/cq"
-	"github.com/cwbudde/go-whistle/internal/tensor"
 )
 
 // The tests of docs/FINDINGS.md F-038: the parallel paths give the same

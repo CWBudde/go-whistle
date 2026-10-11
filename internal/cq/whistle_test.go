@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/cwbudde/algo-tensor/tensor"
 	"github.com/cwbudde/go-whistle/internal/cact"
-	"github.com/cwbudde/go-whistle/internal/tensor"
 )
 
 const whistleCactPath = "../../models/whistle/whistle.cact"
@@ -61,7 +61,7 @@ var whistleTensors = []string{
 
 // TestWhistleGEMM is the 9.1 Accept: on real .cact tensors every kernel
 // equals cact.CQ's dequantisation followed by the float GEMM of
-// internal/tensor at cosine ≥ 0.99999. The activations are Gaussian rows
+// algo-tensor's tensor package at cosine ≥ 0.99999. The activations are Gaussian rows
 // and one heavy-tailed row (Gaussian cubed), five rows per GEMM: one block
 // of four and one leftover row.
 func TestWhistleGEMM(t *testing.T) {
