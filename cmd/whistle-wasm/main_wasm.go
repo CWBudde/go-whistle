@@ -3,7 +3,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,6 +32,8 @@ type work func() (any, error)
 // promise and rejects it with an Error carrying the Go error's text.
 //
 //	load(bytes: Uint8Array | ArrayBuffer) → {languages, bytes}
+//	sha256(bytes) → the SHA-256 as 64 lowercase hex digits, for pages
+//	  without Web Crypto (crypto.subtle exists only in secure contexts)
 //	decodeWAV(bytes) → Float32Array, 16 kHz mono, as `whistle transcribe` reads the file
 //	transcribe(pcm: Float32Array, opts?) → the engine's JSON string
 //	  opts: {language, keywords: string[], word_timestamps, depth}
@@ -55,6 +59,14 @@ func register(target js.Value, e *engine) {
 
 				return jsonValue(info)
 			}, nil
+		}),
+		"sha256": async(func(args []js.Value) (work, error) {
+			sum, err := sha256Arg(args, 0)
+			if err != nil {
+				return nil, err
+			}
+
+			return func() (any, error) { return sum, nil }, nil
 		}),
 		"decodeWAV": async(func(args []js.Value) (work, error) {
 			data, err := bytesArg(args, 0)
@@ -156,8 +168,21 @@ func guard[T any](f func() (T, error)) (v T, err error) {
 
 // bytesArg copies args[i], a Uint8Array or an ArrayBuffer, into Go memory.
 func bytesArg(args []js.Value, i int) ([]byte, error) {
+	v, err := uint8ArrayArg(args, i)
+	if err != nil {
+		return nil, err
+	}
+
+	data := make([]byte, v.Get("byteLength").Int())
+	js.CopyBytesToGo(data, v)
+
+	return data, nil
+}
+
+// uint8ArrayArg is args[i], a Uint8Array or an ArrayBuffer, as a Uint8Array.
+func uint8ArrayArg(args []js.Value, i int) (js.Value, error) {
 	if i >= len(args) {
-		return nil, fmt.Errorf("argument %d: want a Uint8Array or an ArrayBuffer", i+1)
+		return js.Undefined(), fmt.Errorf("argument %d: want a Uint8Array or an ArrayBuffer", i+1)
 	}
 
 	v := args[i]
@@ -166,13 +191,33 @@ func bytesArg(args []js.Value, i int) ([]byte, error) {
 	}
 
 	if !v.InstanceOf(js.Global().Get("Uint8Array")) {
-		return nil, fmt.Errorf("argument %d: want a Uint8Array or an ArrayBuffer", i+1)
+		return js.Undefined(), fmt.Errorf("argument %d: want a Uint8Array or an ArrayBuffer", i+1)
 	}
 
-	data := make([]byte, v.Get("byteLength").Int())
-	js.CopyBytesToGo(data, v)
+	return v, nil
+}
 
-	return data, nil
+// sha256Block is how much of the bytes sha256Arg copies into Go at a time.
+const sha256Block = 1 << 20
+
+// sha256Arg hashes args[i], a Uint8Array or an ArrayBuffer, in blocks, so
+// that a model (17 MB) is never copied into Go memory whole, and returns
+// the hex digest.
+func sha256Arg(args []js.Value, i int) (string, error) {
+	v, err := uint8ArrayArg(args, i)
+	if err != nil {
+		return "", err
+	}
+
+	h := sha256.New()
+	buf := make([]byte, sha256Block)
+
+	for off, n := 0, v.Get("byteLength").Int(); off < n; off += sha256Block {
+		k := js.CopyBytesToGo(buf, v.Call("subarray", off, min(off+sha256Block, n)))
+		h.Write(buf[:k])
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // float32sArg copies args[i], a Float32Array, into Go memory.
