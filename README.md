@@ -12,10 +12,11 @@ en, de, fr, es, it, nl, pl).
 ## Quickstart
 
 The tensor kernels come from the private module `github.com/cwbudde/algo-tensor`, so tell Go not to look for it on the
-public proxy (append to an existing `GOPRIVATE` list) and make sure git can read `github.com/CWBudde/algo-tensor`:
+public proxy (the command keeps an existing `GOPRIVATE` list) and make sure git can read
+`github.com/CWBudde/algo-tensor`:
 
 ```bash
-go env -w GOPRIVATE=github.com/cwbudde/algo-tensor
+p=$(go env GOPRIVATE); go env -w GOPRIVATE="${p:+$p,}github.com/cwbudde/algo-tensor"
 ```
 
 Install the CLI from a clone (Go 1.25 or later; pure Go, no cgo; the repository is not public yet) and fetch the
