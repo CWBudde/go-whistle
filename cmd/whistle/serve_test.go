@@ -59,6 +59,8 @@ func TestServeCmdUsage(t *testing.T) {
 		{[]string{"serve", "--read-timeout", "-1s"}, "read timeout -1s"},
 		{[]string{"serve", "--max-body-mib", "0"}, "max body 0 bytes"},
 		{[]string{"serve", "--max-body-mib", "2000000"}, "--max-body-mib 2000000"},
+		{[]string{"serve", "--shutdown-timeout", "0s"}, "--shutdown-timeout 0s"},
+		{[]string{"serve", "--shutdown-timeout", "-1s"}, "--shutdown-timeout -1s"},
 		{[]string{"serve", "--addr"}, "flag needs an argument"},
 	} {
 		_, err := runCmd(t, c.args...)

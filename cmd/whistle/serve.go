@@ -55,6 +55,12 @@ func newServeCmd() *cobra.Command {
 				return usageError{fmt.Errorf("--max-body-mib %d: want at most %d", bodyMiB, maxBodyMiB)}
 			}
 
+			// An expired shutdown clock can only fail the shutdown, so it is
+			// refused before the model loads (PR #35 review).
+			if shutdown <= 0 {
+				return usageError{fmt.Errorf("--shutdown-timeout %v: want a positive duration", shutdown)}
+			}
+
 			cfg.MaxBody = bodyMiB << 20
 
 			err := cfg.Check()
