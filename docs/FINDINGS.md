@@ -3771,3 +3771,132 @@ column for it.
   keys and values by analogy with the self-attention.
 - **Faster quantisation.** `QuantizeRow` is Go (0.83 ns per value); a NEON/AVX2 version would recover most of the TTFT
   cost. An `SDOT` dot kernel (FEAT_DotProd) would replace 4 instructions per 16 bytes by one.
+
+## F-042 — `de-paare-missed`: no finished-slot rule, the keyword bonus is too strong (PLAN.md Phase 10) (2026-10-11)
+
+**Question.** F-029's one keyword search miss: with the keyword `Paare` on `fleurs-de_de-10308608197319017935` the
+engine writes "Diese Paare können sich für einen **Adduktionsplan** für ihr Baby entscheiden.", ours "… Adoptionsplan
+…", although the engine's text ranks 0.0688 nats per text token higher under our model and `DefaultBias`. Which rule of
+the engine's finished-hypothesis bookkeeping keeps the right hypothesis, without losing anything elsewhere?
+
+### The step trace
+
+`Default()` with `DefaultBias()`: every live hypothesis carries the +7 of `Paare` (3 tokens × 2 + 1) from text token 6
+on. At step 35 the five finished slots fill in one step, one step before the leader ends:
+
+| finished at step 35                                          | L   | Σ log p  | ranking score |
+| ------------------------------------------------------------ | --- | -------- | ------------- |
+| "… Adoptionsplan … entscheiden." (`▁Ad op tions plan`)       | 35  | −9.1950  | **−0.0627**   |
+| "… Adoptionsplan … entscheiden." (`▁A do ptions plan`)       | 35  | −9.1960  | −0.0627       |
+| "… Adduptionsplan … entscheiden."                            | 35  | −9.2659  | −0.0647       |
+| "… Adduktionsplan … entscheiden" (EOS without the full stop) | 35  | −15.1254 | −0.2322       |
+| "… Aduktionsplan … entscheiden" (EOS without the full stop)  | 35  | −16.1916 | −0.2626       |
+
+The live leader, "… Adduktionsplan … entscheiden." (Σ log p −6.7803, score +0.0061 before its EOS), never finishes. Two
+of the five are the same text in two spellings, and two are weak endings without the full stop that Whisper's rule
+admits because they rank above the last live hypothesis.
+
+### Finished-slot rules (`finRule`, a test-only switch in `Options`)
+
+`TestProbeFinish` (`internal/search/finish_probe_test.go`, tag `oracle`) runs the real search with each rule on every
+oracle set the search answers for: the 53 keyword cases and the 32 keyword sets below under `DefaultBias`, the 32
+fixture clips, and the 192 clips × depths 2–7. Won and lost are against Whisper's rule.
+
+| rule                                          | `de-paare-missed` | keyword cases | keyword sets | clips | depths 2–7 | lost (besides sets)                      |
+| --------------------------------------------- | ----------------- | ------------- | ------------ | ----- | ---------- | ---------------------------------------- |
+| **Whisper: 5 slots** (`Default`)              | differs           | **46/53**     | 17/32        | 31/32 | 161/192    | —                                        |
+| a finished text takes one slot                | equal             | 46/53         | 18/32        | 31/32 | 161/192    | `de-diese-paare-phrase`                  |
+| one live hypothesis per text                  | differs           | 45/53         | 9/32         | 31/32 | 161/192    | `de-diese-paare-phrase`                  |
+| both                                          | differs           | 45/53         | 9/32         | 31/32 | 161/192    | `de-diese-paare-phrase`                  |
+| 6 slots (patience 1.2)                        | equal             | 44/53         | 18/32        | 30/32 | 158/192    | 3 keyword cases, 1 clip, 6 depth cases   |
+| 7 slots (patience 1.4)                        | equal             | 44/53         | 18/32        | 30/32 | 153/192    | 3 keyword cases, 1 clip, 11 depth cases  |
+| 10 slots (patience 2)                         | equal             | 44/53         | 18/32        | 29/32 | 153/192    | 3 keyword cases, 2 clips, 11 depth cases |
+| the final pick weighs the live ones too       | equal             | 44/53         | 18/32        | 29/32 | 153/192    | 3 keyword cases, 2 clips, 11 depth cases |
+| only EOS among the step's best 5 count        | equal             | 44/53         | 18/32        | 30/32 | 158/192    | 3 keyword cases, 1 clip, 6 depth cases   |
+| 5 slots and the best finished ≥ the best live | equal             | 44/53         | 18/32        | 29/32 | 153/192    | 3 keyword cases, 2 clips, 11 depth cases |
+
+Every rule that makes `de-paare-missed` equal loses its mirror, `de-diese-paare-phrase`, where the engine writes the
+early "Adoptionsplan". Under our search the two cases have the same beam from the plan word on: the same hypotheses
+with the same Σ log p, the bonus +7 against +13 for all of them. A rule that ranks within a step cannot tell a bonus
+that every hypothesis shares; the final pick by Σ / L could, but "Adoptionsplan" (L 35) beats the leader (L 36) only
+from a shared bonus of 93 nats on. So no finished-slot rule separates the two cases; the engine's beam differs from
+ours earlier.
+
+### More engine evidence: 32 keyword sets on the clip
+
+`oracle kwsets` (`tools/oracle/kwsets.go`, `testdata/oracle/kwsets/manifest.json`) records the engine's text on the
+clip with 32 keyword files that vary the shared bonus. The engine's choice follows the strength of the bonus on `Paare`
+against `Bare`, not its size:
+
+| keywords                                                                                                            | engine                     |
+| ------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| none, `Baby`, `können`, `Diese`, `einen`, `Paar`, `Adduktionsplan`, `für ihr Baby`, `Baby entscheiden`              | Bare … **Adduktionsplan**  |
+| `Paare`, `paare`, `PAARE`, `Paare`+`Paare`, `Paare` with `Baby`, `entscheiden`, `können`, `Diese` or `für ihr Baby` | Paare … **Adduktionsplan** |
+| `Diese Paare`, `diese Paare`, `Paare können`, `Paare können sich`, `Diese Paare können`, `Diese Paare`+`Baby`       | Paare … **Adoptionsplan**  |
+| `Bare`, `Diese Bare`, `Paare`+`Bare`, `Bare`+`Paare`                                                                | Bare … **Adoptionsplan**   |
+| `Pare`                                                                                                              | Pare … Adoptionsplan       |
+
+Our trace says why: "Diese Paare" sits 4.47 nats below "Diese Bare" under the model. Our +7 puts the `Paare`
+hypotheses 2.5 nats ahead, so by the plan word (step 20) they fill the beam, and the "Adoptionsplan" spellings live in
+the room the pruned `Bare` hypotheses leave. In the engine, the single word `Paare` wins the text but leaves the `Bare`
+hypotheses in the beam ("Adduktionsplan"), while a phrase, whose extra words only the `Paare` hypotheses earn, or a bonus
+on `Bare` itself prunes the other spelling ("Adoptionsplan"). The engine's per-word bonus on `Paare` is weaker than ours
+relative to the 4.47-nat gap. `DefaultBias` reproduces only 17 of the 32 sets.
+
+### Bias variants (`TestProbeKeywordSets`)
+
+273 biases on the memo of F-029's probe (exact for biased searches), scored on the 53 cases and the 32 sets: per-token
+weight 1.5 … 2.5 × completion 0 … 2 × revocation ½ or 1, per-character weight 0.375 … 1.5, fewer spellings, and three
+completion structures added for this probe as test-only `Bias` fields:
+
+- _transient_: the completion bonus lasts one token, the next token (EOS included) takes it back;
+- _transient + echo_: the completion also earns the keyword's own token bonus for that token, then loses it, as
+  icefall's / sherpa-onnx's `ContextGraph` adds `output_score`;
+- _once_: a keyword earns its bonus once per text; a repeat's tokens are taken back when it completes.
+
+| family (variants)            | make `de-paare-missed` equal | best that does (cases, sets, lost)                                                                     | best overall (cases, sets, lost)          |
+| ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| per token, revocation 1 (71) | 31                           | w 2.1, completion 0.25: **47/53**, 26/32, `pl-francja-present`                                         | w 1.8, completion 1.5: 47/53, 18/32, none |
+| per token, revocation ½ (63) | 28                           | w 1.5, completion 2: 44/53, 29/32, 4 cases                                                             | 45/53, 16/32, 2 cases                     |
+| per character (21)           | 0                            | —                                                                                                      | w 1.25: 42/53, 17/32, 4 cases             |
+| fewer spellings (18)         | 9                            | without lower case, w 2.1, completion 0.25: 46/53, 27/32, `de-fast-jeder-phrase`, `pl-francja-present` | 45/53, 18/32, 1 case                      |
+| transient completion (40)    | 32                           | w 2, completion 0: 46/53, 26/32, `it-accomunano-missed`, `pl-francja-present`                          | the same                                  |
+| transient + echo (40)        | 32                           | w 2: 46/53, 26/32, the same two                                                                        | the same                                  |
+| once per keyword (20)        | 10                           | w 2, completion 0: 46/53, 26/32, the same two                                                          | w 2, completion 1: 46/53, 17/32, none     |
+
+142 of the 273 biases make `de-paare-missed` equal; none loses no keyword case. The best,
+`w=2.1 revoke=1 complete=0.25`, wins `de-paare-missed` and `it-montagne-distractor` (F-029's 0.0036 near-tie) and loses
+`pl-francja-present`, where the engine changes "wspomnieżone" to "wspierzone" before the keyword: under that bias our
+text ranks above the engine's by 0.0033 nats per token, a near-tie. `de-paare-missed` itself is a search miss of 0.0688
+per token under `DefaultBias`. It also reproduces 26 of the 32 sets (`DefaultBias` 17). By the rule of this item (a
+winner must lose nothing) it is not kept; whether a 0.0033 near-tie may be traded for a 0.0688 search miss and nine
+engine sets is the user's call.
+
+The sets fit best at **w 1.5 per token** (sherpa-onnx's default hotword score): completion 0.75 … 2 reproduces 31 of
+32 sets, all but `PAARE`, and makes `de-paare-missed` equal, but loses `en-cowleys-missed`, `en-cowleys-lower-missed`,
+`es-luchadoras-distractor` and `it-accomunano-missed` (44/53). The English, Spanish and Italian cases want a stronger
+bonus than the German clip, so a single per-token weight does not describe the engine; the per-character weights fit
+worse still.
+
+### Verdict
+
+Negative. The miss is not in the finished-hypothesis bookkeeping: no rule there separates `de-paare-missed` from
+`de-diese-paare-phrase`, and Whisper's 5 slots stay. It is in the bias: the engine's bonus for a single keyword word is
+weaker relative to the competing spelling than our 2 nats per token + 1, while its phrases and its other clips need
+ours. `Default()` and `DefaultBias()` are unchanged, so every guard number is unchanged (PLAN.md Phase 10, the PR).
+
+**Open.**
+
+- **Case-insensitive matching.** `Paare`, `paare` and `PAARE` give the engine the same text; we match the first
+  letter's two cases only (`FormCapital`, `FormLower`), so `PAARE` matches nothing. A matcher over case-folded
+  characters would also decide how a bonus is shared across the tokens of a word, which may be what the English and
+  Romance cases want differently from the German one.
+- **Loops.** With `Diese Paare können` our search repeats the phrase nine times; the engine does not. _once_ does not
+  stop it at w 2 (the partial match of each repeat still earns its tokens' bonus until it completes); w 1.5 does.
+- **The capitalised bare spelling.** With `für ihr Baby` our search skips the first half of the clip to start with
+  "Für ihr Baby" at w 2; the engine does not, nor do we at w 1.5.
+- **A gain without `de-paare-missed`.** `w=1.8 revoke=1 complete=1.5` wins `it-montagne-distractor` and loses nothing
+  (47/53, 18/32 sets). It is outside this item and was not run on the guard set.
+
+**Kept for the probes.** `Options.fin` (`finRule`) and the `Bias` fields `transient`, `echo` and `once` are
+unexported; their zero values are today's rules, and `TestFinRules` and `TestKeywordProbeAxes` pin them.
