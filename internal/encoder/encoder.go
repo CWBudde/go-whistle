@@ -126,7 +126,7 @@ func (e *Encoder) Stem(mel frontend.Features) ([]float32, int, error) {
 		addSinusoid(in, mel.Frames, frontend.Mels, e.peGate, e.h.PE.interleaved())
 	}
 
-	x, t, err := e.stem.forward(in, mel.Frames, frontend.Mels)
+	x, t, err := e.stem.forward(in, mel.Frames)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -270,10 +270,16 @@ func (e *Encoder) rope(t int) *needle.Rope {
 // values: frequency 10000^(−2i/dim) for pair i, laid out [sin | cos] or
 // interleaved.
 func addSinusoid(x []float32, t, dim int, g float32, interleaved bool) {
+	addSinusoidFrom(x, 0, t, dim, g, interleaved)
+}
+
+// addSinusoidFrom is addSinusoid for the t rows at positions p0 … p0+t−1.
+func addSinusoidFrom(x []float32, p0, t, dim int, g float32, interleaved bool) {
 	half := dim / 2
 
-	for p := range t {
-		row := x[p*dim : (p+1)*dim]
+	for i := range t {
+		p := p0 + i
+		row := x[i*dim : (i+1)*dim]
 
 		for i := range half {
 			a := float64(p) * math.Pow(10000, -float64(2*i)/float64(dim))

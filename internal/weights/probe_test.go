@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/cwbudde/go-whistle/internal/frontend"
+	"github.com/cwbudde/go-whistle/internal/tensor"
 	"github.com/cwbudde/go-whistle/whistle"
 )
 
@@ -31,6 +32,7 @@ const (
 	memProbeEnv   = "WHISTLE_MEM_PROBE"       // 1: run TestMemProbe (`just mem-probe`)
 	memChildEnv   = "WHISTLE_MEM_PROBE_CHILD" // set by TestMemProbe: packed or float
 	speedProbeEnv = "WHISTLE_SPEED_PROBE"     // 1: run TestSpeedProbe
+	speedWorkers  = "WHISTLE_SPEED_WORKERS"   // n: TestSpeedProbe on tensor.SetWorkers(n) (F-038)
 
 	probeCact    = "../../models/whistle/whistle.cact"
 	probeClips   = "../../testdata/audio"
@@ -404,12 +406,29 @@ func tiled30s(t *testing.T) []float32 {
 // alternates them over the corpus, three passes after a warm-up, and over
 // the 30 s clip, six runs each: median TTFT and decode rate per mode, and
 // how many transcripts equal the engine's and each other's.
+// WHISTLE_SPEED_WORKERS=n runs it on n tensor workers instead of the
+// default, GOMAXPROCS; 1 is the single-core kernels (docs/FINDINGS.md
+// F-038), with the decoder's beams still on their own goroutines.
 func TestSpeedProbe(t *testing.T) {
 	if os.Getenv(speedProbeEnv) == "" {
 		t.Skipf("set %s=1 to run the packed vs float speed probe", speedProbeEnv)
 	}
 
 	requireProbeInputs(t)
+
+	if s := os.Getenv(speedWorkers); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			t.Fatalf("%s=%q: %v", speedWorkers, s, err)
+		}
+
+		prev := tensor.Workers()
+
+		tensor.SetWorkers(n)
+		t.Cleanup(func() { tensor.SetWorkers(prev) })
+	}
+
+	t.Logf("%d tensor workers, GOMAXPROCS %d", tensor.Workers(), runtime.GOMAXPROCS(0))
 
 	clips := loadProbeClips(t, 0)
 	modes := []string{"packed", "float"}
