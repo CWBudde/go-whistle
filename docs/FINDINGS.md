@@ -3815,6 +3815,11 @@ fixture clips, and the 192 clips × depths 2–7. Won and lost are against Whisp
 | only EOS among the step's best 5 count        | equal             | 44/53         | 18/32        | 30/32 | 158/192    | 3 keyword cases, 1 clip, 6 depth cases   |
 | 5 slots and the best finished ≥ the best live | equal             | 44/53         | 18/32        | 29/32 | 153/192    | 3 keyword cases, 2 clips, 11 depth cases |
 
+_One live hypothesis per text_ draws 4 × (5 + 1) candidates per parent, EOS still only among a parent's best 6.
+Whisper's 6 hold 5 live texts unless two tokens of one parent spell the same text (such as byte pieces that decode to
+U+FFFD). Such pairs occur, 1842 over the 10 036 steps of the runs, but the beam never fell short of 5. The first version
+drew 6 (PR #39 review), and its rows are the same.
+
 Every rule that makes `de-paare-missed` equal loses its mirror, `de-diese-paare-phrase`, where the engine writes the
 early "Adoptionsplan". Under our search the two cases have the same beam from the plan word on: the same hypotheses
 with the same Σ log p, the bonus +7 against +13 for all of them. A rule that ranks within a step cannot tell a bonus

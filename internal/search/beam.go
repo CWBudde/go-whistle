@@ -252,21 +252,10 @@ func (s *beam) child(h *hyp, c cand) *hyp {
 func (s *beam) step(ex expander, alive []*hyp) ([]*hyp, bool, error) {
 	k := s.opt.Beams
 
-	cs, err := ex.expand(alive, k+1, nil, s.opt.Adjust)
+	kids, err := s.kids(ex, alive)
 	if err != nil {
 		return nil, false, err
 	}
-
-	var kids []*hyp
-
-	for i, h := range alive {
-		for _, c := range cs[i] {
-			kids = append(kids, s.child(h, c))
-		}
-	}
-
-	// Stable: ties keep the parent's rank, then the candidate's.
-	slices.SortStableFunc(kids, func(a, b *hyp) int { return cmp.Compare(b.adj, a.adj) })
 
 	if s.opt.Stop == StopAll {
 		pool := append(slices.Clone(s.fin), kids...)
@@ -316,6 +305,47 @@ func (s *beam) step(ex expander, alive []*hyp) ([]*hyp, bool, error) {
 
 	return alive, s.done(alive), nil
 }
+
+// kids is the step's candidates of the live hypotheses, best first.
+// Whisper's k+1 per parent hold k live ones. Under fin.dedupLive two
+// tokens of one parent can spell the same text (such as byte pieces that
+// decode to U+FFFD), so the step draws a wider pool to keep the best of k
+// distinct texts; EOS still counts only among a parent's best k+1
+// (docs/FINDINGS.md F-042).
+func (s *beam) kids(ex expander, alive []*hyp) ([]*hyp, error) {
+	k := s.opt.Beams
+
+	n := k + 1
+	if s.opt.fin.dedupLive {
+		n = dedupPool * (k + 1)
+	}
+
+	cs, err := ex.expand(alive, n, nil, s.opt.Adjust)
+	if err != nil {
+		return nil, err
+	}
+
+	var kids []*hyp
+
+	for i, h := range alive {
+		for j, c := range cs[i] {
+			if j > k && c.tok == s.eos {
+				continue
+			}
+
+			kids = append(kids, s.child(h, c))
+		}
+	}
+
+	// Stable: ties keep the parent's rank, then the candidate's.
+	slices.SortStableFunc(kids, func(a, b *hyp) int { return cmp.Compare(b.adj, a.adj) })
+
+	return kids, nil
+}
+
+// dedupPool is how many times Whisper's k+1 candidates per parent a step
+// draws under fin.dedupLive.
+const dedupPool = 4
 
 // finish records a finished hypothesis of the step's rank under the
 // stopping rule's limits.

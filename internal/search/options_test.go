@@ -289,7 +289,7 @@ func TestFinRules(t *testing.T) {
 	spell := func(ids []int) (string, error) {
 		var b strings.Builder
 		for _, id := range ids {
-			b.WriteString(map[int]string{10: "a", 11: "a", 12: "b", 13: "c"}[id])
+			b.WriteString(map[int]string{10: "a", 11: "a", 12: "b", 13: "c", 14: "a"}[id])
 		}
 
 		return b.String(), nil
@@ -329,6 +329,16 @@ func TestFinRules(t *testing.T) {
 	alive, _, err := s.step(byLast{9: {c(10, -0.1), c(11, -0.2), c(12, -0.3)}}, []*hyp{{seq: []int{2, 9}, text: 2}})
 	if err != nil || len(alive) != 2 || alive[1].seq[2] != 12 {
 		t.Errorf("dedupLive: %d alive, err %v; want a and b", len(alive), err)
+	}
+
+	// Three tokens spell a, so b lies beyond Whisper's k+1 = 3 candidates:
+	// the wider pool still finds it, and EOS, fourth, does not finish.
+	s = &beam{opt: o, eos: eos, spell: spell}
+
+	alive, _, err = s.step(byLast{9: {c(10, -0.1), c(11, -0.15), c(14, -0.2), c(eos, -0.25), c(12, -0.3)}},
+		[]*hyp{{seq: []int{2, 9}, text: 2}})
+	if err != nil || len(alive) != 2 || alive[1].seq[2] != 12 || len(s.fin) != 0 {
+		t.Errorf("dedupLive, a wide pool: %d alive, %d finished, err %v; want a and b, none", len(alive), len(s.fin), err)
 	}
 
 	// Only EOS among the step's best Beams count: a (−0.1) and EOS (−0.5)
