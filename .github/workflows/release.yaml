@@ -1,0 +1,65 @@
+name: release
+
+# A pushed tag v* becomes a GitHub release: the notes from docs/releases/<tag>.md and the whistle CLI for four
+# platforms. One Linux job cross-compiles them all: the code is pure Go (CGO_ENABLED=0) with build-tagged assembly,
+# so no macOS or Windows runner (2–10x the minutes) is needed.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Check the release notes
+        run: |
+          notes="docs/releases/${TAG}.md"
+          if [[ ! -s "$notes" ]]; then
+            echo "::error file=${notes}::release notes ${notes} are missing or empty; add them and tag again"
+            exit 1
+          fi
+
+      - name: Build and archive the CLI
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/arm64 windows/amd64; do
+            goos="${target%/*}"
+            goarch="${target#*/}"
+            name="go-whistle_${TAG}_${goos}_${goarch}"
+            exe=whistle
+            [[ "$goos" == windows ]] && exe=whistle.exe
+
+            mkdir -p "build/${name}"
+            GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 \
+              go build -trimpath -ldflags="-s -w" -o "build/${name}/${exe}" ./cmd/whistle
+            cp LICENSE README.md "build/${name}/"
+
+            if [[ "$goos" == windows ]]; then
+              (cd build && zip -qr "../dist/${name}.zip" "$name")
+            else
+              tar -C build -czf "dist/${name}.tar.gz" "$name"
+            fi
+          done
+          (cd dist && sha256sum -- * > SHA256SUMS)
+          cat dist/SHA256SUMS
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" --title "$TAG" --notes-file "docs/releases/${TAG}.md" dist/*
