@@ -25,7 +25,9 @@ var (
 
 // engine is the state behind the JS API: one model and at most one stream.
 // The JS calls of one page are serialised by its worker; the mutex keeps the
-// goroutines of overlapping promises apart all the same.
+// goroutines of overlapping promises apart all the same, and every call that
+// uses the model holds it throughout, so that load never closes a model in
+// use.
 type engine struct {
 	mu     sync.Mutex
 	model  *whistle.Model
@@ -105,12 +107,16 @@ func (e *engine) transcribe(pcm []float32, js string) ([]byte, error) {
 		return nil, err
 	}
 
-	m, err := e.loaded()
-	if err != nil {
-		return nil, err
+	// The lock holds through the call: load closes the model it replaces,
+	// and Close must not overlap a call (whistle.Model.Close).
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.model == nil {
+		return nil, errNoModel
 	}
 
-	res, err := m.Transcribe(pcm, whistle.TranscribeOptions{
+	res, err := e.model.Transcribe(pcm, whistle.TranscribeOptions{
 		Language: o.Language, Keywords: o.Keywords, WordTimestamps: o.WordTimestamps, Depth: o.Depth,
 	})
 	if err != nil {
@@ -198,15 +204,4 @@ func (e *engine) streamStop() ([]byte, error) {
 	e.stream = nil
 
 	return res.MarshalJSON()
-}
-
-func (e *engine) loaded() (*whistle.Model, error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	if e.model == nil {
-		return nil, errNoModel
-	}
-
-	return e.model, nil
 }

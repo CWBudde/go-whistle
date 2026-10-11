@@ -261,6 +261,64 @@ func TestEngineTranscribe(t *testing.T) {
 	}
 }
 
+// A load while a transcribe runs (two promises on globalThis.whistle) must
+// not close the model under the call: every transcribe still gives the
+// engine's text.
+func TestEngineLoadDuringTranscribe(t *testing.T) {
+	var e engine
+
+	data := modelBytes(t)
+
+	_, err := e.load(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id := equalClips[0]
+
+	wav, err := os.ReadFile(filepath.Join(clipDir, id+".wav"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pcm, err := decodeWAV(wav)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const runs = 3
+
+	type call struct {
+		out []byte
+		err error
+	}
+
+	done := make(chan call, runs)
+
+	for range runs {
+		go func() {
+			out, err := e.transcribe(pcm, `{"word_timestamps":true}`)
+			done <- call{out, err}
+		}()
+	}
+
+	for range runs {
+		_, err := e.load(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for range runs {
+		c := <-done
+		if c.err != nil {
+			t.Fatalf("transcribe with a load beside it: %v", c.err)
+		}
+
+		checkResult(t, id, c.out)
+	}
+}
+
 // streamRun is the engine stream ls-clean-6930-75918-0000.c1: the clip in
 // 1 s calls, then the stop (testdata/oracle/stream).
 const (
