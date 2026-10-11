@@ -313,6 +313,32 @@ func TestRenderUnknownRSS(t *testing.T) {
 	}
 }
 
+// TestRenderClipCount labels the tables with the measured clip count, so
+// a run on another clip manifest does not claim the 32 fixture clips.
+func TestRenderClipCount(t *testing.T) {
+	set := sampleSet(60, 800)
+	set.Clips = 7
+	g := &GoResults{Modes: []GoMode{{Mode: "packed", Clips: set}, {Mode: "float", Clips: set}}}
+
+	var b bytes.Buffer
+
+	err := Render(&b, g, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := b.String()
+	for _, want := range []string{"## Speed: the 7 fixture clips", "| median of the 7 clips ", "| largest over the 7 clips,"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("report lacks %q:\n%s", want, out)
+		}
+	}
+
+	if strings.Contains(out, "32") {
+		t.Errorf("report names 32 clips for a run of 7:\n%s", out)
+	}
+}
+
 func TestRenderWithoutResults(t *testing.T) {
 	var b bytes.Buffer
 

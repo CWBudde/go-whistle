@@ -179,13 +179,38 @@ func speedRows(t *table, sets [4]*Set) {
 	add("transcriptions timed (clips × passes)", func(s *Set) string { return fmt.Sprintf("%d × %d", s.Clips, s.Passes) })
 }
 
+// clipCount is the number of fixture clips the runs measured and a space,
+// for the labels: the Go side's, else the engine's; without either it is
+// empty.
+func clipCount(g *GoResults, e *EngineResults) string {
+	var sets []*Set
+
+	if g != nil {
+		for i := range g.Modes {
+			sets = append(sets, &g.Modes[i].Clips)
+		}
+	}
+
+	if e != nil {
+		sets = append(sets, &e.Library.Clips, &e.CLI.Clips)
+	}
+
+	for _, s := range sets {
+		if s.Clips > 0 {
+			return strconv.Itoa(s.Clips) + " "
+		}
+	}
+
+	return ""
+}
+
 func renderSpeed(b *strings.Builder, g *GoResults, e *EngineResults, same bool) {
 	var pk, fl *GoMode
 	if g != nil {
 		pk, fl = g.mode("packed"), g.mode("float")
 	}
 
-	for k, title := range []string{"the 32 fixture clips", "the 30 s clip (the first clip tiled)"} {
+	for k, title := range []string{"the " + clipCount(g, e) + "fixture clips", "the 30 s clip (the first clip tiled)"} {
 		var sets [4]*Set
 
 		if pk != nil && fl != nil {
@@ -228,7 +253,7 @@ func renderSpeed(b *strings.Builder, g *GoResults, e *EngineResults, same bool) 
 }
 
 func renderPublished(b *strings.Builder, g *GoResults, e *EngineResults, same bool) {
-	t := newTable("median of the 32 clips", "TTFT (ms)", "decode (tok/s)", "TTFT / engine here",
+	t := newTable("median of the "+clipCount(g, e)+"clips", "TTFT (ms)", "decode (tok/s)", "TTFT / engine here",
 		"decode / engine here")
 	t.row("engine, "+PublishedMachine+", 5 beams (published)", ms(PublishedTTFTMS), tps(PublishedTPS), missing, missing)
 
@@ -312,7 +337,7 @@ func renderMemory(b *strings.Builder, g *GoResults, e *EngineResults) {
 	t := newTable("peak RSS (MiB, ru_maxrss of a fresh process)", "Go packed", "Go float", "engine CLI")
 	t.row("after the model load", rss(pk, true), rss(fl, true), missing)
 	t.row("one 30 s transcription, load included", rss(pk, false), rss(fl, false), cli(long))
-	t.row("largest over the 32 clips, load included", missing, missing, cli(clips))
+	t.row("largest over the "+clipCount(g, e)+"clips, load included", missing, missing, cli(clips))
 
 	fmt.Fprintf(b, "## Memory\n\n%s\nThe Go figures come from a fresh `whistle-bench` child per mode (`Load`, then "+
 		"one `Transcribe` of the 30 s clip, as `just mem-probe`); the engine's from the CLI processes of the speed "+
