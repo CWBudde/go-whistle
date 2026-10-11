@@ -59,3 +59,8 @@ jobs:
       # Model-dependent tests skip themselves when models/ is absent, which is always the case here.
       - name: just ci
         run: just ci
+
+      # js/wasm: builds web/whistle.wasm (cmd/whistle-wasm and the library), runs the package tests under Node
+      # (go_js_wasm_exec; the model-gated ones skip) and the page's headless check (the resampler; no model).
+      - name: just wasm-test
+        run: just wasm-test
