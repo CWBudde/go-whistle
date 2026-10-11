@@ -317,8 +317,22 @@ func newGate(concurrency, queue int) *gate {
 }
 
 // enter takes a slot, waiting until ctx ends. A queued caller fails with
-// errBusy when the queue is full; the others wait without a bound.
+// errBusy when the queue is full; the others wait without a bound. A caller
+// whose ctx has ended never gets a slot, even when one is free or comes
+// free as ctx ends, so a client that left takes no pass (PR #37 review).
 func (g *gate) enter(ctx context.Context, queued bool) error {
+	err := g.take(ctx, queued)
+	if err == nil && ctx.Err() != nil {
+		g.leave()
+
+		return ctx.Err()
+	}
+
+	return err
+}
+
+// take is enter without the final check of ctx.
+func (g *gate) take(ctx context.Context, queued bool) error {
 	select {
 	case g.slots <- struct{}{}:
 		return nil
