@@ -121,24 +121,33 @@ export async function sha256Hex(buffer) {
 // downloads and caches them. With sha256 set, the bytes must hash to it,
 // cached or not: a cached copy that does not is dropped and fetched again,
 // and a download that does not is rejected and not cached. onProgress gets
-// (loaded, total) bytes during a download.
+// (loaded, total) bytes during a download. The cache is optional: one
+// that cannot be opened, read or written (storage disabled or denied, the
+// quota full) counts as a miss and the download goes ahead.
 export async function fetchModel(
   url,
   { sha256 = "", onProgress = () => {}, fetchFn = fetch } = {},
 ) {
-  const cache = globalThis.caches
-    ? await globalThis.caches.open(CACHE_NAME)
-    : null;
+  let cache = null;
+  try {
+    cache = globalThis.caches ? await globalThis.caches.open(CACHE_NAME) : null;
+  } catch {
+    // no cache
+  }
 
   if (cache) {
-    const hit = await cache.match(url);
-    if (hit) {
-      const buffer = await hit.arrayBuffer();
-      const hash = await sha256Hex(buffer);
-      if (!sha256 || hash === sha256) {
-        return { buffer, sha256: hash, cached: true };
+    try {
+      const hit = await cache.match(url);
+      if (hit) {
+        const buffer = await hit.arrayBuffer();
+        const hash = await sha256Hex(buffer);
+        if (!sha256 || hash === sha256) {
+          return { buffer, sha256: hash, cached: true };
+        }
+        await cache.delete(url);
       }
-      await cache.delete(url);
+    } catch {
+      // a miss
     }
   }
 
@@ -174,8 +183,6 @@ export async function fetchModel(
     throw new Error(`${url}: SHA-256 ${hash}, want ${sha256}`);
   }
 
-  // The cache only saves the next download: a write that fails, say over
-  // the origin's quota, does not fail the load.
   if (cache) {
     try {
       await cache.put(

@@ -93,8 +93,8 @@ function checkResampler() {
 // --- the client without a model ----------------------------------------
 
 // checkClient runs whistle-client.js against fakes: a paced stream's backlog
-// goes in calls of at most MAX_SAMPLES, and a cache write that fails does
-// not fail fetchModel.
+// goes in calls of at most MAX_SAMPLES, a failed call stops the pumping,
+// and a cache that fails to open, read or write does not fail fetchModel.
 async function checkClient() {
   const { StreamSession, MAX_SAMPLES, fetchModel, sha256Hex } = await import(
     pathToFileURL(resolve(web, "whistle-client.js")).href
@@ -192,9 +192,43 @@ async function checkClient() {
     }
   } catch (err) {
     fail(`client: fetchModel with a failing cache write: ${err.message}`);
-  } finally {
-    globalThis.caches = caches;
   }
+
+  // Cache Storage that cannot be opened (storage disabled or denied), and
+  // one that cannot be read.
+  const broken = {
+    "cannot be opened": {
+      open: async () => {
+        throw new DOMException("denied", "SecurityError");
+      },
+    },
+    "cannot be read": {
+      open: async () => ({
+        match: async () => {
+          throw new DOMException("denied", "SecurityError");
+        },
+        put: async () => undefined,
+      }),
+    },
+  };
+  for (const [what, stub] of Object.entries(broken)) {
+    globalThis.caches = stub;
+    try {
+      const got = await fetchModel("https://example.invalid/whistle.cact", {
+        sha256,
+        fetchFn: async () => new Response(bytes),
+      });
+      console.log(
+        `client: fetchModel with a cache that ${what}: ${got.buffer.byteLength} bytes`,
+      );
+      if (got.buffer.byteLength !== bytes.length || got.cached) {
+        fail(`client: fetchModel with a cache that ${what}`);
+      }
+    } catch (err) {
+      fail(`client: fetchModel with a cache that ${what}: ${err.message}`);
+    }
+  }
+  globalThis.caches = caches;
 }
 
 // --- the worker in this process ------------------------------------------
