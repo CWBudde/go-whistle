@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -147,6 +148,14 @@ func (s *Server) readAudio(w http.ResponseWriter, r *http.Request, format string
 		}
 	} else {
 		width, _ := pcm.Width(format) // transcribeQuery checked it
+
+		// The length is known from the body, so audio over 30 s gets its
+		// 422 before Decode allocates its samples (PR #35 review); a body
+		// that ends inside a sample gets Decode's 400 first.
+		if n := len(data) / width; len(data)%width == 0 && n > whistle.MaxSamples {
+			return nil, http.StatusUnprocessableEntity, errors.New(tooLong(n))
+		}
+
 		x, err = pcm.Decode(data, width)
 	}
 
@@ -181,9 +190,7 @@ func decodeWAV(data []byte) ([]float32, int, error) {
 		x = append(x, chunk...)
 
 		if len(x) > whistle.MaxSamples {
-			n := frames * whistle.SampleRate / int64(st.SampleRate)
-
-			return nil, http.StatusUnprocessableEntity, errors.New(tooLong(int(n)))
+			return nil, http.StatusUnprocessableEntity, errors.New(tooLong(wavSamples(frames, st.SampleRate)))
 		}
 
 		if errors.Is(err, io.EOF) {
@@ -194,6 +201,18 @@ func decodeWAV(data []byte) ([]float32, int, error) {
 			return nil, 0, err
 		}
 	}
+}
+
+// wavSamples is the number of 16 kHz samples frames at rate decode to: the
+// resampled length rounds, as in frontend.OpenWAV, so the 422 names the
+// count the whole file gives, not the part decodeWAV read before it stopped
+// (PR #35 review).
+func wavSamples(frames int64, rate int) int {
+	if rate == whistle.SampleRate {
+		return int(frames)
+	}
+
+	return int(math.Round(float64(frames) * whistle.SampleRate / float64(rate)))
 }
 
 // transcribeQuery reads the options and the body format of /transcribe.

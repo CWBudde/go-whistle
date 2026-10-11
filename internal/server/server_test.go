@@ -265,10 +265,11 @@ func TestTranscribe(t *testing.T) {
 
 func TestTranscribeErrors(t *testing.T) {
 	cfg := testConfig()
-	cfg.MaxBody = 2*whistle.MaxSamples + 64
+	cfg.MaxBody = 4*whistle.MaxSamples + 64
 	_, hs := newTestServer(t, &fakeModel{}, cfg)
 
 	tooLong := make([]byte, 2*(whistle.MaxSamples+1))
+	oddTooLong := make([]byte, 4*(whistle.MaxSamples+1)+1)
 	floatWAV := wav([]int16{1, 2})
 	floatWAV[20] = 3 // IEEE float
 
@@ -291,9 +292,13 @@ func TestTranscribeErrors(t *testing.T) {
 		{"empty PCM", "?format=s16le", nil, 400, `"the body holds no audio"`},
 		{"odd PCM", "?format=f32le", []byte{1, 2, 3, 4, 5}, 400, "ends inside a sample"},
 		{"over 30 s", "?format=s16le", tooLong, 422, "audio limit is 30 s: 480001 samples, at most 480000"},
+		{"over 30 s f32le", "?format=f32le", oddTooLong[1:], 422, "480001 samples, at most 480000"},
+		{"odd PCM over 30 s", "?format=f32le", oddTooLong, 400, "ends inside a sample"},
 		{"over 30 s WAV", "", wav(make([]int16, whistle.MaxSamples+1)), 422, "/stream takes longer audio"},
 		// 40 s at 1 kHz: 40 kB under the body limit, 640,000 samples at 16 kHz.
 		{"over 30 s at 1 kHz", "", wav8(1000, 40000), 422, "640000 samples, at most 480000"},
+		// 1,323,002 frames at 44.1 kHz resample to 480,000.7, rounded to 480,001.
+		{"over 30 s at 44.1 kHz", "", wav8(44100, 1323002), 422, "480001 samples, at most 480000"},
 	} {
 		status, body, _ := post(t, hs.URL+"/transcribe"+c.query, bytes.NewReader(c.body))
 		if status != c.status || !strings.HasPrefix(body, `{`) || !strings.Contains(body, c.want) {
