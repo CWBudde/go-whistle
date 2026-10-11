@@ -24,9 +24,14 @@ func TestCaseSpellings(t *testing.T) {
 	}{
 		{"PAARE", FormSpace | FormBare | FormCapital | FormLower, []string{" paare", "paare", " Paare", "Paare"}},
 		{"PAARE", FormSpace, []string{" paare", " Paare"}},
-		{"Paare", FormSpace | FormBare | FormCapital | FormLower, nil},
-		{"cOWLEY'S", FormSpace | FormBare, []string{" cowley's", "cowley's", " Cowley's", "Cowley's"}},
+		{"Paare", FormSpace | FormBare | FormCapital | FormLower, []string{" PAARE", "PAARE"}},
+		{"cOWLEY'S", FormSpace | FormBare, []string{
+			" cowley's", "cowley's", " Cowley's", "Cowley's", " COWLEY'S", "COWLEY'S",
+		}},
 		{"ÉCRIT", FormSpace, []string{" écrit", " Écrit"}},
+		// PR #45 review: casings beyond the first letter.
+		{"NEW YORK", FormSpace, []string{" new york", " New york", " New York"}},
+		{"foia", FormSpace, []string{" Foia", " FOIA"}},
 	} {
 		if got := caseSpellings(tc.kw, tc.forms); !slices.Equal(got, tc.want) {
 			t.Errorf("caseSpellings(%q, %s) = %q, want %q", tc.kw, tc.forms, got, tc.want)

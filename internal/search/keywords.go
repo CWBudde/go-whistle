@@ -421,24 +421,47 @@ func spellings(kw string, forms Form) []string {
 	return out
 }
 
-// caseSpellings is the spellings foldCases adds: the keyword lower-cased,
-// and lower-cased with its first letter upper-cased, under forms, without
-// those spellings already has.
+// caseSpellings is the spellings foldCases adds, under forms and without
+// those spellings already has: the keyword lower-cased, lower-cased with its
+// first letter upper-cased, each word capitalised ("New York" for "NEW YORK")
+// and upper-cased ("FOIA" for "foia"). The engine ignores a keyword's case
+// (docs/FINDINGS.md F-044) and matches token ids, so each casing the text may
+// take is a spelling of its own.
 func caseSpellings(kw string, forms Form) []string {
 	lower := strings.ToLower(kw)
-	r, size := utf8.DecodeRuneInString(lower)
 	have := spellings(kw, forms)
+	forms &= FormSpace | FormBare
 
 	var out []string
 
-	for _, s := range append(spellings(lower, forms&(FormSpace|FormBare)),
-		spellings(string(unicode.ToUpper(r))+lower[size:], forms&(FormSpace|FormBare))...) {
-		if !slices.Contains(have, s) && !slices.Contains(out, s) {
-			out = append(out, s)
+	for _, c := range []string{lower, capitalise(lower), titleWords(lower), strings.ToUpper(kw)} {
+		for _, s := range spellings(c, forms) {
+			if !slices.Contains(have, s) && !slices.Contains(out, s) {
+				out = append(out, s)
+			}
 		}
 	}
 
 	return out
+}
+
+// capitalise upper-cases the first letter of s.
+func capitalise(s string) string {
+	r, size := utf8.DecodeRuneInString(s)
+
+	return string(unicode.ToUpper(r)) + s[size:]
+}
+
+// titleWords capitalises every space-separated word of s.
+func titleWords(s string) string {
+	words := strings.Split(s, " ")
+	for i, w := range words {
+		if w != "" {
+			words[i] = capitalise(w)
+		}
+	}
+
+	return strings.Join(words, " ")
 }
 
 func hasNext(m map[int]int, id int) bool {
