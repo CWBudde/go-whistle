@@ -8,8 +8,8 @@ and `bench/results/engine.json` (`just oracle-bench`); do not edit it by hand. M
 
 | run                 | Go (`just bench`)                 | engine (`just oracle-bench`)                               |
 | ------------------- | --------------------------------- | ---------------------------------------------------------- |
-| date                | 2026-10-10T20:01:45+02:00         | 2026-10-10T20:01:27+02:00                                  |
-| commit              | fe5884e4e6                        | fe5884e4e6                                                 |
+| date                | 2026-10-11T03:15:54+02:00         | 2026-10-11T03:17:10+02:00                                  |
+| commit              | cd6111f0e3                        | cd6111f0e3-dirty                                           |
 | CPU                 | Apple M5 Pro                      | Apple M5 Pro                                               |
 | cores               | 15 (5 Super + 10 Performance)     | 15 (5 Super + 10 Performance)                              |
 | memory              | 48 GiB                            | 48 GiB                                                     |
@@ -20,9 +20,9 @@ and `bench/results/engine.json` (`just oracle-bench`); do not edit it by hand. M
 | engine              | —                                 | 3.2.0 (2ae11323dc)                                         |
 | workers             | GOMAXPROCS 15                     | CLI `--threads 4`, library default (fast cores, at most 4) |
 | passes per clip     | 1 warm-up + 5 timed; 30 s: 1 + 10 | 1 warm-up + 5 timed; 30 s: 1 + 10                          |
-| load average, start | 5.24 5.02 3.89                    | 5.45 5.03 3.86                                             |
-| load average, end   | 8.43 6.12 4.44                    | 5.24 5.02 3.89                                             |
-| run time            | 106 s                             | 19 s                                                       |
+| load average, start | 2.19 1.75 1.41                    | 5.01 2.78 1.83                                             |
+| load average, end   | 5.69 2.79 1.82                    | 4.94 2.88 1.88                                             |
+| run time            | 61 s                              | 17 s                                                       |
 
 ## WER: packed against float (Phase 9 Accept)
 
@@ -31,7 +31,7 @@ and `bench/results/engine.json` (`just oracle-bench`); do not edit it by hand. M
 | errors / reference words                  |  223/4167 | 223/4167 | 221/4167 |
 | WER                                       |    5.35 % |   5.35 % |   5.30 % |
 | text equal to the engine's                |   181/200 |  181/200 |        — |
-| real-time factor (Σ Transcribe / Σ audio) |    0.0163 |   0.0187 |        — |
+| real-time factor (Σ Transcribe / Σ audio) |    0.0077 |   0.0113 |        — |
 
 "The float path" is `whistle.Load` with `WithFloatWeights()`; packed is `whistle.Load`'s default on `whistle.cact` (F-037). 200 utterances, 4167 reference words, 1549.4 s of audio, the manifest's `wer_rule` on all three. The engine's transcripts are the committed `testdata/oracle/librispeech`.
 
@@ -43,37 +43,37 @@ and `bench/results/engine.json` (`just oracle-bench`); do not edit it by hand. M
 
 | the 32 fixture clips                             | Go packed | Go float | engine library | engine CLI (process) |
 | ------------------------------------------------ | --------: | -------: | -------------: | -------------------: |
-| TTFT, median (ms)                                |      60.4 |     57.5 |            7.5 |                  7.6 |
-| TTFT, p90 (ms)                                   |      76.1 |     71.1 |           10.3 |                 10.0 |
-| decode, median (tok/s)                           |      1013 |      604 |           1383 |                 1362 |
-| decode, p90 (tok/s)                              |      1150 |      660 |           1457 |                 1420 |
-| wall per transcription, median (ms)              |      86.9 |    102.4 |           29.8 |                 39.4 |
-| wall per transcription, p90 (ms)                 |     125.3 |    156.0 |           56.4 |                 65.9 |
-| real-time factor, median over passes             |    0.0156 |   0.0188 |         0.0056 |               0.0073 |
+| TTFT, median (ms)                                |      19.3 |     21.6 |            7.0 |                  7.6 |
+| TTFT, p90 (ms)                                   |      21.9 |     24.8 |            9.0 |                  9.0 |
+| decode, median (tok/s)                           |      1071 |      597 |           1471 |                 1402 |
+| decode, p90 (tok/s)                              |      1229 |      642 |           1547 |                 1432 |
+| wall per transcription, median (ms)              |      43.9 |     68.5 |           26.3 |                 38.9 |
+| wall per transcription, p90 (ms)                 |      68.3 |    106.6 |           48.7 |                 62.4 |
+| real-time factor, median over passes             |    0.0084 |   0.0130 |         0.0050 |               0.0072 |
 | transcriptions timed (clips × passes)            |    32 × 5 |   32 × 5 |         32 × 5 |               32 × 5 |
 | text and language equal to the engine's fixtures |     31/32 |    31/32 |              — |                32/32 |
 
-A `needle_transcribe` call takes its `ttft_ms` plus (n − 1) / `decode_tps` for the n tokens it returns, plus a median 1.35 ms (p90 2.20 ms) that its own clock does not explain.
+A `needle_transcribe` call takes its `ttft_ms` plus (n − 1) / `decode_tps` for the n tokens it returns, plus a median 1.19 ms (p90 1.90 ms) that its own clock does not explain.
 
 ## Speed: the 30 s clip (the first clip tiled)
 
 | the 30 s clip (the first clip tiled)  | Go packed | Go float | engine library | engine CLI (process) |
 | ------------------------------------- | --------: | -------: | -------------: | -------------------: |
-| TTFT, median (ms)                     |     310.4 |    290.1 |           36.3 |                 37.1 |
-| TTFT, p90 (ms)                        |     331.1 |    311.9 |           44.2 |                 39.7 |
-| decode, median (tok/s)                |       620 |      408 |           1082 |                 1113 |
-| decode, p90 (tok/s)                   |       633 |      420 |           1110 |                 1126 |
-| wall per transcription, median (ms)   |     495.5 |    575.0 |          144.7 |                154.5 |
-| wall per transcription, p90 (ms)      |     558.7 |    617.3 |          177.2 |                158.7 |
-| real-time factor, median over passes  |    0.0165 |   0.0192 |         0.0048 |               0.0052 |
+| TTFT, median (ms)                     |      59.9 |     66.9 |           35.0 |                 34.0 |
+| TTFT, p90 (ms)                        |      61.5 |     69.9 |           36.6 |                 36.2 |
+| decode, median (tok/s)                |       639 |      414 |           1161 |                 1170 |
+| decode, p90 (tok/s)                   |       644 |      423 |           1182 |                 1182 |
+| wall per transcription, median (ms)   |     243.4 |    349.3 |          136.6 |                146.9 |
+| wall per transcription, p90 (ms)      |     248.3 |    358.2 |          145.1 |                152.7 |
+| real-time factor, median over passes  |    0.0081 |   0.0116 |         0.0046 |               0.0049 |
 | transcriptions timed (clips × passes) |    1 × 10 |   1 × 10 |         1 × 10 |               1 × 10 |
 
 ## Speed: model load
 
 | model load (ms) | Go packed | Go float | engine library |
 | --------------- | --------: | -------: | -------------: |
-| median          |       7.0 |    138.7 |            2.7 |
-| p90             |       8.8 |    152.1 |            2.8 |
+| median          |       6.7 |    136.2 |            2.7 |
+| p90             |       8.7 |    144.3 |            2.7 |
 
 `whistle.Load` maps `whistle.cact` and builds the model; `needle_load` takes the file's bytes already read into memory. The CLI's load is inside its process wall time.
 
@@ -82,9 +82,9 @@ A `needle_transcribe` call takes its `ttft_ms` plus (n − 1) / `decode_tps` for
 | median of the 32 clips                    | TTFT (ms) | decode (tok/s) | TTFT / engine here | decode / engine here |
 | ----------------------------------------- | --------: | -------------: | -----------------: | -------------------: |
 | engine, Apple M4 Pro, 5 beams (published) |      11.1 |           1319 |                  — |                    — |
-| engine library, this machine              |       7.5 |           1383 |              1.00× |                1.00× |
-| Go packed, this machine                   |      60.4 |           1013 |              8.06× |                0.73× |
-| Go float, this machine                    |      57.5 |            604 |              7.67× |                0.44× |
+| engine library, this machine              |       7.0 |           1471 |              1.00× |                1.00× |
+| Go packed, this machine                   |      19.3 |           1071 |              2.75× |                0.73× |
+| Go float, this machine                    |      21.6 |            597 |              3.09× |                0.41× |
 
 The published figures come from another machine and clip set; the engine on the same machine is the yardstick. A TTFT ratio above 1 is slower than the engine, a decode ratio below 1 too.
 
@@ -92,9 +92,9 @@ The published figures come from another machine and clip set; the engine on the 
 
 | peak RSS (MiB, ru_maxrss of a fresh process) | Go packed | Go float | engine CLI |
 | -------------------------------------------- | --------: | -------: | ---------: |
-| after the model load                         |      37.9 |    238.9 |          — |
-| one 30 s transcription, load included        |     125.7 |    489.3 |       70.0 |
-| largest over the 32 clips, load included     |         — |        — |       54.5 |
+| after the model load                         |      37.8 |    238.8 |          — |
+| one 30 s transcription, load included        |     105.7 |    493.0 |       70.2 |
+| largest over the 32 clips, load included     |         — |        — |       53.9 |
 
 The Go figures come from a fresh `whistle-bench` child per mode (`Load`, then one `Transcribe` of the 30 s clip, as `just mem-probe`); the engine's from the CLI processes of the speed runs.
 
