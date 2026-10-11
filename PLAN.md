@@ -1119,7 +1119,10 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       engine's 7.5 ms (8.1×); decode 1013 / 604 against 1383 tok/s (0.73×); 30 s clip TTFT 310 / 290 against 36 ms,
       real-time factor 0.0165 / 0.0192 against 0.0048; `Load` 7.0 / 139 ms against `needle_load`'s 2.7 ms; peak RSS of
       `Load` + 30 s 125 / 489 MiB against the CLI's 70 MiB. The engine here beats its published M4 Pro TTFT (7.5 against
-      11.1 ms) at about its published decode rate. Re-running after 9.5 is `just bench`. `docs/FINDINGS.md` F-040.
+      11.1 ms) at about its published decode rate. (2026-10-11) — re-run after 9.5 (both sides, load average 2–6):
+      TTFT 19.3 ms packed / 21.6 ms float against the engine's 6.9 ms (2.8×); decode 1071 / 597 against 1499 tok/s
+      (0.71×); 30 s clip TTFT 60 / 67 against 35 ms, real-time factor 0.0081 / 0.0116 against 0.0045; `Load` 6.7 / 136
+      ms against 2.4 ms; peak RSS 106 / 493 MiB against 70 MiB; WER unchanged. `docs/FINDINGS.md` F-040.
 - [x] **Accept:** WER unchanged within 0.1 against the float path, with numbers recorded in `bench/RESULTS.md`.
       (2026-10-10) — the float path is `whistle.Load` with `WithFloatWeights()`, packed its default on `whistle.cact`.
       LibriSpeech test-clean subset (200 utterances, 4167 words, `just bench`): packed 223/4167 = 5.35 %, float

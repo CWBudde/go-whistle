@@ -3402,7 +3402,7 @@ with like?
 
 ### What the engine's clock measures
 
-| this run, 32 clips, median                                       | ms              |
+| first run, 32 clips, median                                      | ms              |
 | ---------------------------------------------------------------- | --------------- |
 | CLI `ttft_ms`                                                    | 7.6             |
 | library `ttft_ms`                                                | 7.5             |
@@ -3427,7 +3427,7 @@ with like?
 - **Like with like** is therefore `Transcribe` against the library call: both in-process, the model loaded, PCM in
   memory, no word timestamps, after a warm-up. The CLI's process time is reported for completeness only.
 
-### Results
+### Results before 9.5
 
 Apple M5 Pro (5 Super + 10 Performance cores, 48 GiB), macOS 27.0.1, Go 1.27.1, engine 3.2.0, commit `fe5884e4e6`.
 Go ran with GOMAXPROCS 15, the engine with 4 threads. Other sessions kept the load average at 5.2–8.4 during the Go
@@ -3470,6 +3470,36 @@ between runs under the shared load, the engine's by a few percent. Packed / engi
 because the encoder runs on one goroutine today. Decode does: the search fans the beam expansion out over goroutines
 (F-035). At the engine's 4 threads, packed decodes at 0.36× its rate.
 
+### Results after 9.5 (2026-10-11)
+
+`just bench` on the merge of `main` with 9.5 (F-038, commit `cd6111f0e3`) and `just oracle-bench` right after it
+(`513d7f19bf`, the same code), on a quieter machine: load average 2.2–5.7 during the Go run, 3.7–3.8 during the
+engine's. These are the numbers in `bench/RESULTS.md`.
+
+| median                        | Go packed | Go float | engine library | packed / engine |
+| ----------------------------- | --------- | -------- | -------------- | --------------- |
+| TTFT, 32 clips (ms)           | 19.3      | 21.6     | 6.9            | 2.8×            |
+| TTFT p90, 32 clips (ms)       | 21.9      | 24.8     | 8.5            | 2.6×            |
+| decode, 32 clips (tok/s)      | 1071      | 597      | 1499           | 0.71×           |
+| RTF, 32 clips                 | 0.0084    | 0.0130   | 0.0048         | 1.75×           |
+| TTFT, 30 s clip (ms)          | 59.9      | 66.9     | 34.7           | 1.73×           |
+| decode, 30 s clip (tok/s)     | 639       | 414      | 1164           | 0.55×           |
+| RTF, 30 s clip                | 0.0081    | 0.0116   | 0.0045         | 1.8×            |
+| model load (ms)               | 6.7       | 136.2    | 2.4            | 2.8×            |
+| peak RSS, load + 30 s (MiB)   | 105.7     | 493.0    | 69.9 (CLI)     | 1.51×           |
+| equal to the engine, 32 clips | 31/32     | 31/32    | 32/32 (CLI)    | —               |
+
+- **TTFT** fell from 60.4 to 19.3 ms on the clips (3.1×) and from 310 to 60 ms on the 30 s clip (5.2×). The gap to the
+  engine is now 2.8× on the clips and 1.7× on the 30 s clip, so what remains is mostly a fixed cost per call, not one
+  that grows with the audio. Packed is now 11 % faster than float in TTFT, where it was 5 % slower: the shared rotations
+  and the parallel lut GEMM (F-038).
+- **Decode** barely moved (1013 → 1071 tok/s packed): the beams were parallel before 9.5. The engine's rate also came
+  out higher on the quieter machine (1383 → 1499), so the ratio stays at 0.71–0.73×.
+- **Real-time factor**: 0.008, about 120× faster than real time, against the engine's 0.0045–0.0048.
+- **Memory**: the 30 s peak fell from 125.7 to 105.7 MiB with the stem in chunks, 1.5× the engine CLI's. One fresh
+  child per mode this time, not the median of three.
+- The **Workers** paragraph above describes the code before 9.5, whose encoder ran on one goroutine.
+
 ### WER (Phase 9 Accept)
 
 | LibriSpeech test-clean subset, 200 utterances | packed (default) | float (`WithFloatWeights()`) | engine   |
@@ -3477,9 +3507,11 @@ because the encoder runs on one goroutine today. Decode does: the search fans th
 | errors / reference words                      | 223/4167         | 223/4167                     | 221/4167 |
 | WER                                           | 5.35 %           | 5.35 %                       | 5.30 %   |
 | text equal to the engine's                    | 181/200          | 181/200                      | —        |
-| real-time factor                              | 0.0163           | 0.0187                       | —        |
+| real-time factor, before 9.5                  | 0.0163           | 0.0187                       | —        |
+| real-time factor, after 9.5                   | 0.0077           | 0.0113                       | —        |
 
-Packed minus float is **0.00 percentage points**, and all 200 transcripts are equal in text and language, as F-037
+The error counts are the same before and after 9.5, whose outputs are bit for bit the same (F-038). Packed minus float
+is **0.00 percentage points**, and all 200 transcripts are equal in text and language, as F-037
 found. The Accept's 0.1 holds. Packed minus the engine is +0.05 points, F-031's figure.
 
 ### Tests
@@ -3497,11 +3529,16 @@ Without `models/` and without the engine:
 ### Re-running
 
 `just bench` re-measures the Go side and re-renders `bench/RESULTS.md` with the committed `engine.json`; that is the
-one command after 9.5 merges. `just oracle-bench` is only needed when the engine, the machine or the clips change.
+one command after a change to the Go side. `just oracle-bench` is only needed when the engine, the machine or the clips
+change; it was re-run after 9.5 only because the machine was quieter.
 
 ### Open
 
-- **TTFT**, 8× the engine's: the encoder (9.5).
-- **Peak RSS** of a 30 s run, 1.8× the engine CLI's: F-037's levers.
+- **TTFT**, 2.8× the engine's on the clips after 9.5: F-038's open items (the decoder's cross-attention memory, the
+  allocations per block, the single-threaded log-mel front end).
+- **Decode**, 0.71× the engine's rate.
+- **Peak RSS** of a 30 s run, 1.5× the engine CLI's after 9.5: F-037's remaining levers (the int8 cross-attention
+  memory of 9.3, `GOMEMLIMIT`, the lut copy).
 - **Noise.** The harness alternates the modes within a run, but the Go and the engine runs follow each other, so their
-  ratio carries the load difference between those minutes. A run on an idle machine would tighten the spread above.
+  ratio carries the load difference between those minutes. The run after 9.5 was on a quieter machine (load 2–6) than
+  the first (5–8).
