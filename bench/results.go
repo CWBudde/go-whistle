@@ -62,6 +62,9 @@ type GoMode struct {
 // under the manifest's wer_rule, packed against float, with the engine's
 // recorded transcripts.
 type WER struct {
+	// Subset is SubsetSHA256 of the fixtures the run scored; only
+	// AcceptSubset gives the Phase 9 Accept's verdict.
+	Subset       string  `json:"subset_sha256"`
 	Utterances   int     `json:"utterances"`
 	Words        int     `json:"words"` // reference words
 	AudioSeconds float64 `json:"audio_seconds"`
@@ -201,6 +204,11 @@ func WriteReport(goPath, enginePath, reportPath string) error {
 	err = Render(&b, g, e)
 	if err != nil {
 		return err
+	}
+
+	err = os.MkdirAll(filepath.Dir(reportPath), 0o750)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", filepath.Dir(reportPath), err)
 	}
 
 	err = os.WriteFile(reportPath, b.Bytes(), 0o600) // #nosec G306 G703 -- a flag or the default path.

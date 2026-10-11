@@ -33,7 +33,7 @@ and `bench/results/engine.json` (`just oracle-bench`); do not edit it by hand. M
 | text equal to the engine's                |   181/200 |  181/200 |        — |
 | real-time factor (Σ Transcribe / Σ audio) |    0.0077 |   0.0113 |        — |
 
-"The float path" is `whistle.Load` with `WithFloatWeights()`; packed is `whistle.Load`'s default on `whistle.cact` (F-037). 200 utterances, 4167 reference words, 1549.4 s of audio, the manifest's `wer_rule` on all three. The engine's transcripts are the committed `testdata/oracle/librispeech`.
+"The float path" is `whistle.Load` with `WithFloatWeights()`; packed is `whistle.Load`'s default on `whistle.cact` (F-037). 200 utterances, 4167 reference words, 1549.4 s of audio, the manifest's `wer_rule` on all three. The engine's transcripts come from the fixtures' `manifest.json`.
 
 - Packed − float: **+0.00** percentage points; the Accept allows 0.1, so it **holds**.
 - Packed and float transcripts equal (text and language): 200/200.

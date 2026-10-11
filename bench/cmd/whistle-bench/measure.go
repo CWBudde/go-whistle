@@ -263,7 +263,12 @@ func checkInputs(cfg config, res *bench.GoResults) (*librispeech, error) {
 // alternating which goes first, and scores both and the engine's
 // transcripts under the manifest's rule.
 func measureWER(cfg config, models [2]*whistle.Model, ls *librispeech) (*bench.WER, error) {
-	w := &bench.WER{Utterances: len(ls.utterances)}
+	subset, err := bench.SubsetSHA256(cfg.lsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	w := &bench.WER{Subset: subset, Utterances: len(ls.utterances)}
 
 	var wall [2]float64
 

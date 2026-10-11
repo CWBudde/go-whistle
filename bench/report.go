@@ -130,19 +130,23 @@ func renderAccept(b *strings.Builder, g *GoResults) {
 	t.row("real-time factor (Σ Transcribe / Σ audio)", rtf(r.PackedRTF), rtf(r.FloatRTF), missing)
 
 	diff := r.Percent(r.PackedErrors) - r.Percent(r.FloatErrors)
-	verdict := "holds"
+	verdict := fmt.Sprintf("the Accept allows %.1f, so it **holds**", AcceptBoundPP)
 
-	if math.Abs(diff) > AcceptBoundPP {
-		verdict = "fails"
+	switch {
+	case r.Subset != AcceptSubset:
+		verdict = fmt.Sprintf("no verdict: the run scored the fixtures with SHA-256 `%s`, not the committed "+
+			"`testdata/oracle/librispeech` (`%s`) that the Accept is measured on", or(short(r.Subset)), short(AcceptSubset))
+	case math.Abs(diff) > AcceptBoundPP:
+		verdict = fmt.Sprintf("the Accept allows %.1f, so it **fails**", AcceptBoundPP)
 	}
 
 	fmt.Fprintf(b, "%s\n\"The float path\" is `whistle.Load` with `WithFloatWeights()`; packed is `whistle.Load`'s "+
 		"default on `whistle.cact` (F-037). %d utterances, %d reference words, %.1f s of audio, the manifest's "+
-		"`wer_rule` on all three. The engine's transcripts are the committed `testdata/oracle/librispeech`.\n\n"+
-		"- Packed − float: **%+.2f** percentage points; the Accept allows %.1f, so it **%s**.\n"+
+		"`wer_rule` on all three. The engine's transcripts come from the fixtures' `manifest.json`.\n\n"+
+		"- Packed − float: **%+.2f** percentage points; %s.\n"+
 		"- Packed and float transcripts equal (text and language): %s.\n"+
 		"- Packed − engine: %+.2f percentage points.\n\n",
-		t, r.Utterances, r.Words, r.AudioSeconds, diff, AcceptBoundPP, verdict,
+		t, r.Utterances, r.Words, r.AudioSeconds, diff, verdict,
 		frac(r.PackedEqualsFloat, r.Utterances), r.Percent(r.PackedErrors)-r.Percent(r.EngineErrors))
 }
 

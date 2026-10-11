@@ -183,6 +183,7 @@
   ],
   "packed_equals_float": 32,
   "wer": {
+    "subset_sha256": "4f632cce6313e93954d74dcce04e4d41fddf1bfec2f89d0e975210733fef00a7",
     "utterances": 200,
     "words": 4167,
     "audio_seconds": 1549.4099374999994,

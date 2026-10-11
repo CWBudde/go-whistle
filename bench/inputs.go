@@ -62,6 +62,29 @@ func fileSHA256(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// AcceptSubset is SubsetSHA256 of the committed testdata/oracle/librispeech:
+// the 200 test-clean utterances of F-025 that the Phase 9 Accept is
+// measured on. TestAcceptSubset fails when those fixtures change.
+const AcceptSubset = "4f632cce6313e93954d74dcce04e4d41fddf1bfec2f89d0e975210733fef00a7"
+
+// SubsetSHA256 fingerprints a LibriSpeech fixture set: the SHA-256 over
+// dir/subset.json (ids, references, WAV digests) followed by
+// dir/manifest.json (the engine's transcripts and error counts).
+func SubsetSHA256(dir string) (string, error) {
+	h := sha256.New()
+
+	for _, name := range []string{"subset.json", "manifest.json"} {
+		raw, err := os.ReadFile(filepath.Join(dir, name)) // #nosec G304 -- the fixture dir is the tool's flag.
+		if err != nil {
+			return "", fmt.Errorf("fingerprint: %w", err)
+		}
+
+		h.Write(raw)
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 func clipsSHA256(manifest string) (string, error) {
 	raw, err := os.ReadFile(manifest) // #nosec G304 -- the audio dir is the tool's flag.
 	if err != nil {

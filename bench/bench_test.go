@@ -98,7 +98,9 @@ func TestRender(t *testing.T) {
 			{Mode: "packed", Clips: sampleSet(60, 800), Long: sampleSet(300, 500), EqualEngine: 31},
 			{Mode: "float", Clips: sampleSet(58, 500), Long: sampleSet(290, 400), EqualEngine: 31},
 		},
-		WER: &WER{Utterances: 200, Words: 4167, PackedErrors: 223, FloatErrors: 223, EngineErrors: 221},
+		WER: &WER{
+			Subset: AcceptSubset, Utterances: 200, Words: 4167, PackedErrors: 223, FloatErrors: 223, EngineErrors: 221,
+		},
 	}
 	e := &EngineResults{
 		Run: Run{Machine: Machine{CPU: "CPU X", Cores: 8}, Inputs: sampleInputs}, Version: "3.2.0", Threads: "4",
@@ -135,6 +137,32 @@ func TestRender(t *testing.T) {
 
 	if !strings.Contains(b.String(), "so it **fails**") {
 		t.Errorf("a 0.12 point difference does not fail the Accept:\n%s", b.String())
+	}
+
+	g.WER.PackedErrors, g.WER.Subset = 223, "0123456789abcdef" // another fixture set
+
+	b.Reset()
+
+	err = Render(&b, g, e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if out := b.String(); !strings.Contains(out, "no verdict: the run scored the fixtures with SHA-256 `0123456789`") ||
+		strings.Contains(out, "**holds**") {
+		t.Errorf("another subset gives the Accept's verdict:\n%s", out)
+	}
+}
+
+// TestAcceptSubset pins AcceptSubset to the committed LibriSpeech fixtures.
+func TestAcceptSubset(t *testing.T) {
+	got, err := SubsetSHA256("../testdata/oracle/librispeech")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got != AcceptSubset {
+		t.Errorf("SubsetSHA256 = %s, AcceptSubset = %s; update it with the fixtures", got, AcceptSubset)
 	}
 }
 
@@ -302,7 +330,7 @@ func TestRenderWithoutResults(t *testing.T) {
 // engine file included, and leaves out a side whose file is missing.
 func TestWriteReport(t *testing.T) {
 	dir := t.TempDir()
-	enginePath, reportPath := filepath.Join(dir, "run.json"), filepath.Join(dir, "RESULTS.md")
+	enginePath, reportPath := filepath.Join(dir, "run.json"), filepath.Join(dir, "new", "dir", "RESULTS.md")
 
 	err := WriteJSON(enginePath, EngineResults{Version: "9.9.9", Revision: "abcdef1234567"})
 	if err != nil {
