@@ -143,6 +143,36 @@ func TestLoadLibriSpeech(t *testing.T) {
 	}
 }
 
+// TestLoadLibriSpeechEmpty rejects a subset without utterances or words,
+// whose real-time factor would be 0/0 and fail only when go.json is written.
+func TestLoadLibriSpeechEmpty(t *testing.T) {
+	for name, manifest := range map[string]string{
+		"no utterances": `{"words": 0, "errors": 0, "utterances": []}`,
+		"no words":      `{"words": 0, "errors": 0, "utterances": [{"id": "a", "text": "", "errors": 0}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			subset := `{"utterances": []}`
+
+			if name == "no words" {
+				subset = `{"utterances": [{"id": "a"}]}`
+			}
+
+			for file, body := range map[string]string{"subset.json": subset, "manifest.json": manifest} {
+				err := os.WriteFile(filepath.Join(dir, file), []byte(body), 0o600)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			_, err := loadLibriSpeech(dir, "unused")
+			if err == nil || !strings.Contains(err.Error(), "the WER needs both") {
+				t.Fatalf("err = %v, want a refusal", err)
+			}
+		})
+	}
+}
+
 func TestDispatchErrors(t *testing.T) {
 	var log bytes.Buffer
 

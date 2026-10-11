@@ -183,6 +183,11 @@ func loadLibriSpeech(dir, audioDir string) (*librispeech, error) {
 		return nil, err
 	}
 
+	if len(subset.Utterances) == 0 || manifest.Words <= 0 {
+		return nil, fmt.Errorf("%s: %d utterances, %d reference words; the WER needs both", dir, len(subset.Utterances),
+			manifest.Words)
+	}
+
 	if len(subset.Utterances) != len(manifest.Utterances) {
 		return nil, fmt.Errorf("%s: %d utterances in subset.json, %d in manifest.json", dir, len(subset.Utterances),
 			len(manifest.Utterances))

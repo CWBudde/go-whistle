@@ -49,18 +49,7 @@ func measure(ctx context.Context, cfg config) (*bench.GoResults, error) {
 		return nil, err
 	}
 
-	res.Run.Inputs, err = bench.InputsOf(cfg.model, cfg.audio)
-	if err != nil {
-		return nil, fmt.Errorf("inputs: %w", err)
-	}
-
-	// The clips' and the LibriSpeech subset's engine transcripts give the
-	// equality counts and the engine's WER; they must be of this model.
-	err = checkFixtureModel(cfg.oracle, res.Run.Inputs.Model)
-	if err == nil && cfg.wer {
-		err = checkFixtureModel(cfg.lsDir, res.Run.Inputs.Model)
-	}
-
+	ls, err := checkInputs(cfg, res)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +91,7 @@ func measure(ctx context.Context, cfg config) (*bench.GoResults, error) {
 	}
 
 	if cfg.wer {
-		res.WER, err = measureWER(cfg, models)
+		res.WER, err = measureWER(cfg, models, ls)
 		if err != nil {
 			return nil, err
 		}
@@ -244,15 +233,36 @@ func timeLong(cfg config, res *bench.GoResults, models [2]*whistle.Model, pcm []
 	return nil
 }
 
-// measureWER transcribes the LibriSpeech subset with both models,
-// alternating which goes first, and scores both and the engine's
-// transcripts under the manifest's rule.
-func measureWER(cfg config, models [2]*whistle.Model) (*bench.WER, error) {
-	ls, err := loadLibriSpeech(cfg.lsDir, cfg.lsAudio)
+// checkInputs records the run's inputs and checks the fixtures against
+// them before any timing, so a broken set fails at once rather than after
+// the speed runs. It returns the LibriSpeech subset when cfg.wer is set.
+func checkInputs(cfg config, res *bench.GoResults) (*librispeech, error) {
+	var err error
+
+	res.Run.Inputs, err = bench.InputsOf(cfg.model, cfg.audio)
+	if err != nil {
+		return nil, fmt.Errorf("inputs: %w", err)
+	}
+
+	// The clips' and the LibriSpeech subset's engine transcripts give the
+	// equality counts and the engine's WER; they must be of this model.
+	err = checkFixtureModel(cfg.oracle, res.Run.Inputs.Model)
+	if err != nil || !cfg.wer {
+		return nil, err
+	}
+
+	err = checkFixtureModel(cfg.lsDir, res.Run.Inputs.Model)
 	if err != nil {
 		return nil, err
 	}
 
+	return loadLibriSpeech(cfg.lsDir, cfg.lsAudio)
+}
+
+// measureWER transcribes the LibriSpeech subset with both models,
+// alternating which goes first, and scores both and the engine's
+// transcripts under the manifest's rule.
+func measureWER(cfg config, models [2]*whistle.Model, ls *librispeech) (*bench.WER, error) {
 	w := &bench.WER{Utterances: len(ls.utterances)}
 
 	var wall [2]float64
@@ -261,6 +271,11 @@ func measureWER(cfg config, models [2]*whistle.Model) (*bench.WER, error) {
 		pcm, err := readWAV(filepath.Join(ls.audioDir, u.ID+".wav"), u.SHA256)
 		if err != nil {
 			return nil, fmt.Errorf("%w (run `just oracle-librispeech-audio`)", err)
+		}
+
+		// A real-time factor needs audio; JSON cannot carry the NaN of 0/0.
+		if len(pcm) == 0 {
+			return nil, fmt.Errorf("%s: no samples", u.ID)
 		}
 
 		var out [2]whistle.Result
