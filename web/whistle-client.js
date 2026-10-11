@@ -12,6 +12,9 @@ export const PINNED_MODEL = {
 
 export const SAMPLE_RATE = 16000;
 
+// MAX_SAMPLES is whistle.MaxSamples, the most one call takes (30 s).
+export const MAX_SAMPLES = 30 * SAMPLE_RATE;
+
 const CACHE_NAME = "whistle-models-v1";
 
 // WhistleClient talks to a worker running worker.js.
@@ -171,13 +174,19 @@ export async function fetchModel(
     throw new Error(`${url}: SHA-256 ${hash}, want ${sha256}`);
   }
 
+  // The cache only saves the next download: a write that fails, say over
+  // the origin's quota, does not fail the load.
   if (cache) {
-    await cache.put(
-      url,
-      new Response(bytes.slice(), {
-        headers: { "content-type": "application/octet-stream" },
-      }),
-    );
+    try {
+      await cache.put(
+        url,
+        new Response(bytes.slice(), {
+          headers: { "content-type": "application/octet-stream" },
+        }),
+      );
+    } catch {
+      // not cached
+    }
   }
 
   return { buffer: bytes.buffer, sha256: hash, cached: false };
@@ -234,8 +243,10 @@ async function decodeInBrowser(buffer) {
 // StreamSession runs one stream: feed appends samples, and one
 // streamProcess call at a time takes all the samples queued so far once
 // there are at least chunk of them, so a slow pass makes the next call
-// longer rather than the queue longer. With paced false, every call takes
-// exactly chunk samples (the last one fewer), as `whistle stream --chunk`.
+// longer rather than the queue longer, up to MAX_SAMPLES, which
+// streamProcess takes at most; a longer backlog goes in several calls. With
+// paced false, every call takes exactly chunk samples (the last one fewer),
+// as `whistle stream --chunk`.
 // onUpdate gets {committed, pending, language, received, passMs, words,
 // last} after every call.
 export class StreamSession {
@@ -271,7 +282,7 @@ export class StreamSession {
       return this.busy;
     }
 
-    const n = this.paced ? this.queued : this.chunk;
+    const n = this.paced ? Math.min(this.queued, MAX_SAMPLES) : this.chunk;
     this.busy = this.client
       .streamProcess(this.take(n))
       .then((r) => this.update(r))
@@ -321,9 +332,9 @@ export class StreamSession {
     return r;
   }
 
-  // stop feeds what is left (in chunks unless paced), waits for the
-  // passes and ends the stream with streamStop, which commits the pending
-  // words. It resolves to the committed text.
+  // stop feeds what is left (in chunks, of at most MAX_SAMPLES if paced),
+  // waits for the passes and ends the stream with streamStop, which commits
+  // the pending words. It resolves to the committed text.
   async stop() {
     for (;;) {
       await this.busy;
@@ -333,7 +344,7 @@ export class StreamSession {
       if (this.queued === 0) {
         break;
       }
-      const n = this.paced ? this.queued : Math.min(this.chunk, this.queued);
+      const n = Math.min(this.paced ? MAX_SAMPLES : this.chunk, this.queued);
       await this.client
         .streamProcess(this.take(n))
         .then((r) => this.update(r))

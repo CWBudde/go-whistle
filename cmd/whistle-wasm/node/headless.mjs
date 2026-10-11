@@ -6,8 +6,8 @@
 //
 //   node headless.mjs --web web [--model models/whistle/whistle.cact --cli bin/whistle --audio testdata/audio CLIP...]
 //
-// Without --model, or when the model file is missing, only the resampler is
-// checked.
+// Without --model, or when the model file is missing, only the resampler and
+// the client's model-free parts are checked.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -87,6 +87,85 @@ function checkResampler() {
     ) {
       fail(`resampler ${rate} Hz`);
     }
+  }
+}
+
+// --- the client without a model ----------------------------------------
+
+// checkClient runs whistle-client.js against fakes: a paced stream's backlog
+// goes in calls of at most MAX_SAMPLES, and a cache write that fails does
+// not fail fetchModel.
+async function checkClient() {
+  const { StreamSession, MAX_SAMPLES, fetchModel, sha256Hex } = await import(
+    pathToFileURL(resolve(web, "whistle-client.js")).href
+  );
+
+  // A slow first pass lets 70 s pile up behind it.
+  const sizes = [];
+  let release;
+  const first = new Promise((r) => (release = r));
+  const fake = {
+    streamStart: async () => undefined,
+    async streamProcess(pcm) {
+      sizes.push(pcm.length);
+      if (pcm.length > MAX_SAMPLES) {
+        throw new Error(`${pcm.length} samples, over ${MAX_SAMPLES}`);
+      }
+      if (sizes.length === 1) {
+        await first;
+      }
+      return { text: "", words: [], pending: "" };
+    },
+    streamStop: async () => ({ text: "", words: [], pending: "" }),
+  };
+  const s = new StreamSession(fake);
+  await s.start({});
+  s.feed(new Float32Array(16000));
+  for (let k = 0; k < 70; k++) {
+    s.feed(new Float32Array(16000));
+  }
+  release();
+  try {
+    await s.stop();
+  } catch (err) {
+    fail(`client: paced stream: ${err.message}`);
+  }
+  const total = sizes.reduce((a, b) => a + b, 0);
+  console.log(
+    `client: paced backlog of 70 s in calls of ${sizes.join(", ")} samples`,
+  );
+  if (total !== 71 * 16000 || sizes.some((n) => n > MAX_SAMPLES)) {
+    fail(`client: paced calls ${sizes.join(", ")}`);
+  }
+
+  // A cache whose writes fail, as over the origin's quota.
+  const bytes = new Uint8Array([1, 2, 3, 4]);
+  const sha256 = await sha256Hex(bytes.slice().buffer);
+  const caches = globalThis.caches;
+  globalThis.caches = {
+    open: async () => ({
+      match: async () => undefined,
+      delete: async () => false,
+      put: async () => {
+        throw new DOMException("quota", "QuotaExceededError");
+      },
+    }),
+  };
+  try {
+    const got = await fetchModel("https://example.invalid/whistle.cact", {
+      sha256,
+      fetchFn: async () => new Response(bytes),
+    });
+    console.log(
+      `client: fetchModel with a failing cache write: ${got.buffer.byteLength} bytes`,
+    );
+    if (got.buffer.byteLength !== bytes.length || got.cached) {
+      fail("client: fetchModel with a failing cache write");
+    }
+  } catch (err) {
+    fail(`client: fetchModel with a failing cache write: ${err.message}`);
+  } finally {
+    globalThis.caches = caches;
   }
 }
 
@@ -242,6 +321,7 @@ async function checkModel() {
 }
 
 checkResampler();
+await checkClient();
 
 if (opts.model && existsSync(opts.model)) {
   await checkModel();
