@@ -3,20 +3,19 @@
 A pure-Go port of **Whistle**, Cactus Compute's 16.9 MB on-device speech-to-text model (55M parameters, 7 languages:
 en, de, fr, es, it, nl, pl).
 
-> **Status: working, not yet tuned.** Transcription with language detection, keyword biasing, the depth ladder and
-> word timestamps, live streaming and embeddings all run in pure Go and match the reference engine closely (see
-> [Parity](#parity-with-the-engine)). The model runs straight from the packed 2/4-bit `whistle.cact`. Performance work
-> (Phase 9) is under way; the engine is still faster, several times so to the first token. See [PLAN.md](PLAN.md)
-> for the roadmap.
+> **Status: working.** Transcription with language detection, keyword biasing, the depth ladder and word timestamps,
+> live streaming and embeddings all run in pure Go and match the reference engine closely (see
+> [Parity](#parity-with-the-engine)). The model runs straight from the packed 2/4-bit `whistle.cact`. The engine is
+> still faster: on an Apple M5 Pro, a median 18.8 ms to the first token against its 6.9 ms and 1085 against 1499
+> tok/s ([bench/RESULTS.md](bench/RESULTS.md)). On amd64 the float products still run in pure Go (PLAN.md 12.3). See
+> [PLAN.md](PLAN.md) for the roadmap.
 
 ## Quickstart
 
-Install the CLI from a clone (Go 1.25 or later; pure Go, no cgo; the repository is not public yet) and fetch the
-pinned model files:
+Install the CLI (Go 1.25 or later; pure Go, no cgo) and fetch the pinned model files:
 
 ```bash
-git clone https://github.com/CWBudde/go-whistle && cd go-whistle
-go install ./cmd/whistle
+go install github.com/cwbudde/go-whistle/cmd/whistle@latest
 whistle download
 ```
 
@@ -29,7 +28,14 @@ whistle b358ddad ready in models/whistle
 
 `download` verifies each file by size and SHA-256 and resumes interrupted downloads. The commands below use
 `models/whistle/whistle.cact` by default (`--model` picks another, also `whistle.safetensors`) and the fixture clips
-in `testdata/audio`.
+in [`testdata/audio`](testdata/audio). A clone has all 32; without one, fetch the two the examples start with:
+
+```bash
+mkdir -p testdata/audio
+for c in ls-other-3080-5040-0018 ls-other-3080-5040-0011; do
+	curl -sSfLo testdata/audio/$c.wav https://raw.githubusercontent.com/cwbudde/go-whistle/main/testdata/audio/$c.wav
+done
+```
 
 ### Check the install
 
@@ -295,13 +301,10 @@ PASS
 
 ## Go API
 
-The library is the package `github.com/cwbudde/go-whistle/whistle`. The repository is not public yet, so `go get`
-cannot fetch it; point your module at a clone instead:
+The library is the package `github.com/cwbudde/go-whistle/whistle`:
 
 ```bash
-go mod edit -replace github.com/cwbudde/go-whistle=../go-whistle
-go get github.com/cwbudde/go-whistle
-go mod tidy
+go get github.com/cwbudde/go-whistle/whistle
 ```
 
 ```go
@@ -365,7 +368,8 @@ func main() {
 }
 ```
 
-Built that way and run from the clone's root after `whistle download`, it prints:
+Run from a directory with `models/whistle` (`whistle download`) and the clip (see [Quickstart](#quickstart)), it
+prints:
 
 ```text
 [en] Here are some verses of Cowley's. Tell me how you like them.
@@ -410,9 +414,8 @@ Every remaining difference is a near tie under our model, explained in the linke
 - **WAV input** is integer PCM (8/16/24/32-bit, any channels and rate), as upstream's `whistle.py` reads it. IEEE
   float WAVs are rejected; convert them, or pipe raw `f32le` into `whistle stream`.
 - **Speed:** slower than the engine, which is hand-tuned C++ with W2A8 kernels; see
-  [F-035](docs/FINDINGS.md#f-035--internalneedle-hot-loops-gemms-a-float64-sinkhorn-and-a-vector-exp-2026-10-10) and
-  [F-037](docs/FINDINGS.md#f-037--the-packed-path-cq-matrices-straight-from-whistlecact-in-every-linear-layer-92-2026-10-10)
-  for the current numbers and PLAN.md Phase 9 for the work under way.
+  [bench/RESULTS.md](bench/RESULTS.md) for the numbers on the same machine (median TTFT 2.72× the engine's, decode
+  0.72×) and PLAN.md 12.3 for the GEMM on amd64, which still runs in pure Go.
 
 ## Why this is a re-implementation, not a translation
 
