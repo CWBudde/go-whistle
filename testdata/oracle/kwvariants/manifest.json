@@ -1,0 +1,266 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "model": {
+    "repo": "Cactus-Compute/whistle",
+    "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    "file": "whistle.cact",
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "command": "needle --audio-word-timestamps --audio-keywords \u003cset\u003e",
+  "threads": "4",
+  "sets": [
+    {
+      "clip": "ls-other-3080-5040-0011",
+      "keywords": [
+        "COWLEY'S"
+      ],
+      "language": "en",
+      "text": "Here are some verses of Cowley's. Tell me how you like them."
+    },
+    {
+      "clip": "ls-other-3080-5040-0011",
+      "keywords": [
+        "cOWLEY'S"
+      ],
+      "language": "en",
+      "text": "Here are some verses of Cowley's. Tell me how you like them."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "ADOPTIONSPLAN"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "adoptionsplan"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "fleurs-nl_nl-1004717084892689357",
+      "keywords": [
+        "VARKENS"
+      ],
+      "language": "nl",
+      "text": "Varkensdragelen ziet erbij, zich aandragen het via mugen overal mensen."
+    },
+    {
+      "clip": "fleurs-nl_nl-1004717084892689357",
+      "keywords": [
+        "varkens"
+      ],
+      "language": "nl",
+      "text": "Varkensdragelen ziet erbij, zich aandragen het via mugen overal mensen."
+    },
+    {
+      "clip": "fleurs-nl_nl-1004717084892689357",
+      "keywords": [
+        "MUGGEN"
+      ],
+      "language": "nl",
+      "text": "Vanke strafreziekte bij zich en dragen het via muggen overal mensen."
+    },
+    {
+      "clip": "fleurs-es_419-10236991702517253859",
+      "keywords": [
+        "ALIVIAR"
+      ],
+      "language": "es",
+      "text": "No ha podido tomarse medicamentos para aliviar el dolor porque está prohibido su uso en los juegos."
+    },
+    {
+      "clip": "fleurs-es_419-10236991702517253859",
+      "keywords": [
+        "Aliviar"
+      ],
+      "language": "es",
+      "text": "No ha podido tomarse medicamentos para aliviar el dolor porque está prohibido su uso en los juegos."
+    },
+    {
+      "clip": "fleurs-it_it-10210638754804006465",
+      "keywords": [
+        "ACCOMUNANO"
+      ],
+      "language": "it",
+      "text": "Eppure gli uccelli hanno molte caratteristiche che vi accomunano ai dinosauri."
+    },
+    {
+      "clip": "fleurs-fr_fr-10385751433252343757",
+      "keywords": [
+        "CRISTAUX"
+      ],
+      "language": "fr",
+      "text": "Les deux composés réagissent là avec l'autre pour former des cristaux qui peuvent bloquer la fonction régionale en déclarer des chercheurs de l'université."
+    },
+    {
+      "clip": "fleurs-pl_pl-10013271501230525766",
+      "keywords": [
+        "WYSP"
+      ],
+      "language": "pl",
+      "text": "W większość mniejszych wysp to narody niezależne lub wspomnieżone z Francją, micłynące ekologiczowe nadwalskie miejscowości wypoczynkowe."
+    },
+    {
+      "clip": "ls-clean-1320-122617-0012",
+      "keywords": [
+        "UNCAS"
+      ],
+      "language": "en",
+      "text": "Four or five of the latter only lingered about the door of the prison of Uncas, wary but close observers of the manner of their captive."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "aare"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "optionsplan"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "doptionsplan"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "ls-other-3080-5040-0011",
+      "keywords": [
+        "owley's"
+      ],
+      "language": "en",
+      "text": "Here are some verses of colonies. Tell me how you like them."
+    },
+    {
+      "clip": "fleurs-nl_nl-1004717084892689357",
+      "keywords": [
+        "arkens"
+      ],
+      "language": "nl",
+      "text": "Vanke strafreziekte bij zich en dragen het via mugen overal mensen."
+    },
+    {
+      "clip": "fleurs-it_it-10210638754804006465",
+      "keywords": [
+        "comunano"
+      ],
+      "language": "it",
+      "text": "Eppure gli uccelli hanno molte caratteristiche che vi accumulano ai dinosauri."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "Adoptions"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "Adop"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "Paa"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "ls-other-3080-5040-0011",
+      "keywords": [
+        "Cowley"
+      ],
+      "language": "en",
+      "text": "Here are some verses of Cowley's. Tell me how you like them."
+    },
+    {
+      "clip": "fleurs-nl_nl-1004717084892689357",
+      "keywords": [
+        "Varken"
+      ],
+      "language": "nl",
+      "text": "Varkenstragelen ziet erbij, zich aandragen het via mugen overal mensen."
+    },
+    {
+      "clip": "fleurs-es_419-10236991702517253859",
+      "keywords": [
+        "alivi"
+      ],
+      "language": "es",
+      "text": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos."
+    },
+    {
+      "clip": "fleurs-it_it-10210638754804006465",
+      "keywords": [
+        "accomun"
+      ],
+      "language": "it",
+      "text": "Eppure gli uccelli hanno molte caratteristiche che vi accomunano ai dinosauri."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "können sich"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "für einen"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "fleurs-de_de-10308608197319017935",
+      "keywords": [
+        "Paare können sich für"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "clip": "ls-other-3080-5040-0011",
+      "keywords": [
+        "some verses"
+      ],
+      "language": "en",
+      "text": "Here are some verses of colonies. Tell me how you like them."
+    },
+    {
+      "clip": "fleurs-es_419-10236991702517253859",
+      "keywords": [
+        "el dolor"
+      ],
+      "language": "es",
+      "text": "No ha podido tomarse medicamentos para lidiar el dolor porque está prohibido su uso en los juegos."
+    }
+  ]
+}
