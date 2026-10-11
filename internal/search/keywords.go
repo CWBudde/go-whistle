@@ -59,7 +59,8 @@ type Bias struct {
 	echo      bool // with transient, a completion also earns the keyword's own token bonus for that token (icefall)
 	once      bool // a keyword earns its bonus once per text: a repeat's tokens are taken back when it completes
 
-	// Probe axes of docs/FINDINGS.md F-044, off in DefaultBias.
+	// Probe axes of docs/FINDINGS.md F-044; DefaultBias sets fold to
+	// foldCases, the others are off.
 	fold    foldMode  // how a keyword's case is matched: Forms on token ids, more cases, or folded bytes
 	share   foldShare // under foldBytes: how a keyword's bonus is spread over the tokens of the text
 	wordEnd bool      // under foldBytes: a keyword completes only before a non-letter or EOS
@@ -69,13 +70,16 @@ type Bias struct {
 }
 
 // DefaultBias is the bias the keyword fixtures picked (docs/FINDINGS.md
-// F-029): 2 nats per matched token, all of it taken back when a partial
-// match fails, 1 more on completion, the keyword after a space and bare,
-// as written and with its first letter upper- and lower-cased. With
-// Default it reproduces the engine's text with the keywords on 45 of 53
-// fixture cases.
+// F-029, F-044): 1.8 nats per matched token, all of it taken back when a
+// partial match fails, 1.5 more on completion, the keyword after a space
+// and bare, as written, with its first letter upper- and lower-cased, all
+// in lower case, and in lower case but for a capital first letter (the
+// engine ignores the keyword's case). With Default it reproduces the
+// engine's text with the keywords on 47 of 53 fixture cases.
 func DefaultBias() Bias {
-	return Bias{Weight: 2, Revoke: 1, Complete: 1, Forms: FormSpace | FormBare | FormCapital | FormLower}
+	return Bias{
+		Weight: 1.8, Revoke: 1, Complete: 1.5, Forms: FormSpace | FormBare | FormCapital | FormLower, fold: foldCases,
+	}
 }
 
 // String names the bias, e.g. "w=1.5 revoke=1 complete=0

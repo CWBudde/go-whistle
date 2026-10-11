@@ -52,7 +52,7 @@ func foldGrid() []Bias {
 
 // foldGrid4 is the summary of docs/FINDINGS.md F-044 (11 biases): F-029's
 // bias, with the case spellings, the spent rule and both, F-042's gain
-// alone, with the case spellings and with both, the window
+// alone, with the case spellings (DefaultBias) and with both, the window
 // that makes de-paare-missed equal, the bias that reproduces every
 // keyword set, and the best byte matchers.
 func foldGrid4() []Bias {
@@ -69,6 +69,10 @@ func foldGrid4() []Bias {
 	add(func(b *Bias) { ext(b); b.Weight, b.Complete = 1.5, 2 })
 	add(func(b *Bias) { b.fold, b.Weight, b.Complete = foldBytes, 1.8, 0 })
 	add(func(b *Bias) { b.fold, b.share, b.Weight, b.Complete = foldBytes, shareToken, 2.2, 0 })
+
+	if (*out)[5] != DefaultBias() {
+		panic("foldGrid4: row 5 is not DefaultBias")
+	}
 
 	return *out
 }
