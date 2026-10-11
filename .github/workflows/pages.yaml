@@ -1,0 +1,58 @@
+name: pages
+
+# Publishes the web demo (web/ with the js/wasm build) to GitHub Pages: https://cwbudde.github.io/go-whistle/
+# The page fetches the model from Hugging Face at run time; nothing but the page and whistle.wasm is deployed.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer push waits instead of cancelling a deployment in progress.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test-wasm:
+    uses: ./.github/workflows/test-wasm.yaml
+
+  build:
+    needs: test-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Setup just
+        uses: extractions/setup-just@v4
+
+      - name: Build the web demo
+        run: just wasm
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
