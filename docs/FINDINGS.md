@@ -3963,3 +3963,146 @@ packed.
   blocks in parallel, at 17 MB a copy.
 - **SIMD.** Go's wasm back end has no SIMD (`GOWASM` knows only `satconv` and `signext`) and no assembly; the LUT
   kernels would need a hand-written wasm module through JS, outside pure Go.
+
+## F-045 — The Needle 3 text model: its files against Whistle's, the `.cact` map, and a float forward pass equal to JAX (PLAN.md 11.1, 11.2) (2026-10-11)
+
+**Question.** Do `needle3.safetensors` and `needle3.cact` (HF `Cactus-Compute/needle3` @ `93e88ede`) load through the
+readers built for Whistle, what differs from Whistle's files, and does a forward pass on the shared blocks of
+`internal/needle` reproduce upstream's `SimpleAttentionNetwork`?
+
+### The files against Whistle's
+
+- **safetensors.** 64 tensors, all **F16** (Whistle: 116, F32), 121,019,861 parameters; `config.json`'s
+  `total_parameters` 121,021,910 is 2049 more, exactly the derived `.cact` records `hada_p1`, `hada_p2` (1024 each)
+  and `heads.manifest` (1). The reader handles F16 unchanged. `__metadata__["config"]` uses upstream's
+  `TransformerConfig` names (`vocab_size`, `d_model`, `num_layers`, …), not Whistle's (`text`, `dim`, `dec_layers`,
+  …), so Whistle's strict `Config()` rejects it; `TextConfig()`/`TextRun()` decode it strictly instead. The config
+  omits what `from_saved` defaults: `engram_orders` (2, 3), `engram_heads` (0 → 768 / (2 · 128) = 3 hashes per order,
+  6 tables), `rope_theta` (1e5); `out_vocab` is 8192 = the vocab. New keys: `sliding_window` 1024, `global_layers`
+  [4, 9, 14, 19], `kv_window` 256, `kv_bits`/`act_bits`/`weight_bits` (in the run for Whistle), the confidence head's
+  `confidence_probes`/`confidence_queries` 4/4, and seven `image_*` keys at 0. The run's `tokenizer_hash` is the MD5 of
+  the pinned `tokenizer.model`; `merged_heads` names the confidence head merged at step 10,000.
+- **Tensors that Whistle's checkpoint does not have:** `engrams_2…4` (five sites instead of two), the
+  `confidence_head/*` (probes (21, 4, 768), gain, query, row*bias, proj (3072, 1) with bias), and no
+  `encoder/*`, `stem/*`, `cross*\*`or`pe_gate`. Shapes that change with the width: `q_proj`768 → 576 (12 heads),`gate_proj`and`out_proj`768 × 768, the HadamardMLP diagonals and`cond_u`at 1024,`cond_v` (768, 8), the Kronecker
+  factors 32 × 32 for both a and b (Whistle 16 × 16 and 32 × 32), the engram tables (6, 18432, 128).
+- **.cact.** `cact.Open` reads it unchanged: same tag, 196-byte header, the same 28 codebook floats. Header fields
+  Whistle leaves at 0 are set: `kv_window` 256, `out_vocab` 8192, `max_seq_len` 8192, `sliding_window` 1024, the
+  global mask 0x84210 (layers 4, 9, 14, 19). 581 records: FP16 456, FP32 2, CQ2 115, CQ4 7, RAW 1. The first blob sits
+  at 25,920, the directory's end (25,872) rounded up to 64 bytes (Whistle's directory ends on a boundary). After
+  `final_norm` comes no audio manifest but `heads.manifest` FP16 `[2]` and the confidence head's six records, laid out
+  as `export.py` `_head_tensors` writes them: the matrices CQ4 although `weight_bits` says `default=2`, because
+  `quantize.py` `HEAD_BITS` = 4 overrides the plan for heads. The upstream Python finds the head the same way
+  (`needle/__init__.py` `_confidence_head_present`: index `num_tensors − 2 − 6·heads`).
+
+### The map
+
+`cact.TextNames` derives the map from the header and the manifest (`TextNamesFor` from a header and head shapes, which
+the safetensors side uses). With the F-006 checks all 581 records pass: 456 FP16 records equal their F16 source exactly
+(cosine 1), 2 FP32 records are numpy's `RandomState(11/13).permutation(1024)`, and each of the 122 CQ records is what
+the CQ quantiser makes of its source, except 29 indices at float32 near-ties (margin ≤ 3.2e-8) and 31 FP16 norms 1 ulp
+apart. Minimum cosines: CQ2 0.933338362129 (`layer17.out_proj`; 115 CQ2 between 0.9333 and 0.9402), CQ4
+0.994432977749 (`confidence_head.proj`). Whistle's decoder trunk gets the same names from `TextNamesFor`, entry for
+entry, so `internal/needle`'s loaders read both models.
+
+### The forward pass
+
+`text.Model` is `SimpleAttentionNetwork.__call__` with `quant=False` on `needle.Block`, `MHC`, `Engram` and the RoPE of
+Phase 2. One change in `internal/needle` was needed: the HadamardMLP of a 768-wide model mixes 1024 values. Upstream
+pads the input with zeros to 1024 and cuts the output back (`HadamardMLP.__call__`, `pad = n − d_model`); Whistle's
+width is a power of two, so F-011's port had taken the model width from `d1`. `LoadHadamardMLP` now takes n from `d1`
+and the width from `cond_v` and runs a narrower row zero-padded; at width = n the old path runs unchanged. The SHA-256
+of Whistle's `Transcribe` JSON (packed and float weights, word timestamps, depth 4) and `Embed` rows on all 32 clips
+equal the base commit's, natively and with `-tags purego`.
+
+The JAX reference (`scripts/text_forward_fixtures.py`) runs upstream's module in float32 on three `render_example`
+prompts and their 32-token greedy completions, and keeps every position's top-1, final state and margin. Against it,
+from `needle3.safetensors`:
+
+| case               | positions | final cos (worst row) | logits / hidden cos | top-1 equal | smallest JAX margin |
+| ------------------ | --------- | --------------------- | ------------------- | ----------- | ------------------- |
+| `timer_en`         | 120       | 0.999999974           | 1.000000000         | 120/120     | 0.0146              |
+| `message_de`       | 188       | 0.999999975           | 1.000000000         | 188/188     | 0.0826              |
+| `lights_two_calls` | 188       | 0.999999975           | 1.000000000         | 188/188     | 0.0016              |
+
+The 6-token plain text agrees at every layer and position at cosine 1.000000000, though the pre-norm stream grows to
+1.7e7 at the last block (the per-layer lane means reach 1e4 at layer 0). The F16 rounding of the stored final states
+caps their cosine near 1 − 3e-8.
+
+Two findings on the way: the float model writes `"label":"pasta"` where the engine writes `"Pasta"` for the same
+request (11.4: engine numerics, or post-processing); and the fixture script first stored `hidden[:, -1]`, a strided
+numpy view, which `safetensors.numpy.save_file` writes as the underlying buffer rather than the view's elements, so
+every layer past 0 compared at cosine 0.19–0.58. The script now makes every tensor contiguous.
+
+**The dequantised weights alone.** The same prompts on the dequantised `needle3.cact` with float32 activations: final
+cosine 0.939–0.946 (worst row 0.79) and the reference's top-1 on 440/496 positions, 93/99 on the completions. The CQ
+weights are no stand-in for the float model; the engine's numerics are 11.5's business.
+
+### Open
+
+The banded mask of the local layers past 1024 positions (`Forward` refuses longer input with `ErrWindow`), and the
+incremental path with KV and engram caches (PLAN.md 11.2).
+
+## F-046 — The Needle 3 text tokenizer is sentencepiece, and `RefTokenizer` agrees on valid text (PLAN.md 11.1) (2026-10-11)
+
+**Hypothesis.** The text model tokenizes with sentencepiece over `tokenizer.model` (sha256 `97dfd566…`), as upstream
+`SANTokenizer.encode` does: `[BOS] + encode(prompt)` (`run.py`), prompt and target encoded separately
+(`finetune._encode`). **Alternatives:** `export.py` `RefTokenizer` over the `.cact` RAW blob (record 580), which the
+closed engine might implement; a normaliser other than identity.
+
+**Measured.** The model is BPE with byte fallback and the identity normaliser: no charsmap, no dummy prefix, no
+whitespace squeezing, only U+0020 escaped to `▁`; 8192 pieces (7908 NORMAL scored 0, −1, … in id order, 256 BYTE at
+ids 28–283, 24 USER_DEFINED at 4–27, 3 CONTROL, 1 UNKNOWN). The 24 markers are upstream's 16 `CHAT_MARKERS` plus
+`<image>`, `<speech>`, `<tts>`, `<imagen>` and their closing tags. The `.cact` blob holds the same pieces, bit-equal
+scores (−0 included) and types. `internal/spm`, a port of sentencepiece 0.2.2 (whole-piece user-defined symbols,
+score-ordered merges leftmost on ties, CONTROL/UNKNOWN/BYTE never merged, UNUSED re-split, byte fallback, one U+FFFD
+per invalid byte, `" ⁇ "` for unk; 0.2.2 orders equal scores by bit pattern, so +0 ranks above −0), equals Python
+sentencepiece on 117/117 fixture texts and 80/80 decode sequences (6,668 ids) and on the decode of every single id.
+`RefTokenizer`, upstream's Python and the `internal/tokenizer` port, equals sentencepiece on all 109 valid fixture
+texts, on 30,000 random texts (Python, not committed) and 20,000 (Go): no CONTROL, UNKNOWN or BYTE piece is the join
+of two pieces and there are no UNUSED ones, so its merge-into-any-piece rule never fires. It differs only on invalid
+UTF-8 (sentencepiece encodes U+FFFD, the port the raw bytes; 8/8) and on decoding `<unk>` (`" ⁇ "` against nothing;
+5/80).
+
+**Winner.** `internal/spm` with sentencepiece's semantics. For valid UTF-8 both candidates give the same ids, so the
+engine's choice cannot change its input; callers pass valid UTF-8, and `<unk>` never comes out of `Encode` with byte
+fallback on.
+
+## F-047 — The engine on the text model: the envelope, determinism, threads, depth and audio (PLAN.md 11.4) (2026-10-11)
+
+**Question.** Does the local engine 3.2.0 (`engine/macos-arm64`, HF revision `2ae11323`) load the pinned
+`needle3.cact`, and what does it answer? `tools/textoracle` records it into `testdata/text/engine/` (`just oracle-text`).
+
+- **Loading.** It loads `needle3.cact` alone and together with `whistle.cact` (`needle_models` 3); the `.cact` tag is
+  generation 3, and `ENGINE_VERSIONS[3]` is 3.2.0. `config.json` names engine 3.1.0; nothing newer was needed.
+- **The envelope.** Every answer has `type, success, error, error_code, reason, function_calls, suppressed_calls,
+reasoning, confidence`, `validation{ungrounded, negation}` when a call was produced, `audio_text, audio_language`
+  for speech, and the timings `prefill_tps, decode_tps, peak_ram_mb, audio_ttft_ms, audio_decode_tps`, which the
+  fixtures drop. Over 19 cases and 20 turns: `call` 19, `respond` 1 (only after a tool result); a refusal is `call`
+  with no calls; 2 calls suppressed below confidence 0.1 (0.092, 0.0315, the second with `negation: true` and
+  "unlock" turned into `lock_door`); "don't turn off the bedroom lights" still dispatches `on:false` with
+  `negation: true`; `--max 8` gives `success:false, error_code:truncated, reason:runtime_failure`. Confidence ranges
+  0.0315–0.9595. The engine reports `invoice.total` ungrounded for `$1,200.00` → 1200.0, with the tool name lowercased.
+- **Determinism and threads.** Without the timings, two full runs are byte-identical, `needle_complete` through
+  purego equals the CLI, a second pass in the same process too, and `--serve` equals `--prompt`. Unlike Whistle
+  (F-025), the text answers depend on `--threads`: at 1, 2, 3 or 8 threads 18–19 of 19 answers differ from 4 threads
+  in `confidence` (2nd–4th decimal) and in 3 cases in `reasoning`; the calls never changed. No flag equals 4 on this
+  machine. The fixtures pin `--threads 4`.
+- **Dates.** `--system` takes a file path; a literal string is silently ignored, as if absent. Neither the CLI nor the
+  library adds a date: upstream's `_with_date_fact` runs in the Python client. Without a date fact both relative-date
+  cases end `truncated`; every case passes `date: 2026-10-11 Sun 09:30`. A trailing newline in the system file keeps
+  the call and moves confidence (0.3399 → 0.297).
+- **Depth.** `--depth 2…20` loads (20 equals the default), 0 and 1 are refused (`--depth takes a layer count of 2 or
+more`), 21 fails to load. Depth 19 already moves the confidence; low depths change the calls.
+- **Counts.** `needle_init` returns the static prefix's token count (314, 243 and 91 for the three tool sets; a
+  `; locale: xx-XX` suffix adds 6), and `needle_complete` returns the number of generated tokens (8 under `--max 8`).
+- **Text embeddings.** `needle_embed` of text returns 3072 L2-normalised floats, the same after `needle_init`. 3072 =
+  4 × 768 is the shape of a probe head's pooled output (`probe_pool`, q · d), although `needle3.cact` carries only the
+  confidence head (PLAN.md 11.9).
+- **Audio in, tool calls out.** On three English clips the fused answer equals the `--prompt` answer to its own
+  `audio_text`, plus `audio_text` and `audio_language`; none dispatched a call (two suppressed at 0.0059 and 0.0146,
+  one empty at 0.5247).
+
+**Consequences for the port.** Decoding parity (11.4) is measured at 4 threads, on calls and arguments first; the
+confidence and the reasoning get tolerances, since the engine itself moves them with the thread count. The static
+prefix counts pin the prompt rendering (11.3) without seeing the engine's tokens.
