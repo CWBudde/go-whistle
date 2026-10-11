@@ -1233,8 +1233,8 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       where both have one, golden hashes equal on arm64, amd64 and js/wasm; its `MIGRATION.md` lists every identifier
       either project uses. go-whistle imports it and `internal/tensor`, `internal/ops` are gone: `Embed` and
       `Transcribe` (32 clips packed with word timestamps, 3 clips float, at depth 4 and float `Embed`) give the same
-      bytes as before, with and without `-tags purego`. Open, in its own repository: go-pocket-tts switches too (its
-      default worker count becomes GOMAXPROCS, and two edge cases become errors, see `MIGRATION.md`).
+      bytes as before, with and without `-tags purego`. go-pocket-tts switched too
+      (CWBudde/go-pocket-tts#46): it keeps one worker by default, and its WAVs are byte-identical to before at 1 and 4 workers.
 
 ## Phase 11 — Needle 3 text model (tool calling)
 
