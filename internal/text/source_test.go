@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cwbudde/go-whistle/internal/cact"
@@ -176,5 +177,15 @@ func TestSourceBothFormats(t *testing.T) {
 	_, _, err = c.Tensor("final_norm")
 	if !errors.Is(err, weights.ErrClosed) {
 		t.Errorf("Tensor after Close: %v", err)
+	}
+}
+
+// TestLoadRejectsGlobalLayers: duplicate or out-of-range global_layers fail before any weight is read (PR #44 review).
+func TestLoadRejectsGlobalLayers(t *testing.T) {
+	for _, global := range [][]int{{0, 0}, {-1}, {2}, {1, 0, 1}} {
+		_, err := Load(nil, Config{Vocab: 8, OutVocab: 8, Layers: 2, GlobalLayers: global})
+		if err == nil || !strings.Contains(err.Error(), "global_layers") {
+			t.Errorf("GlobalLayers %v: err = %v, want a global_layers error", global, err)
+		}
 	}
 }

@@ -43,20 +43,41 @@ type Model struct {
 	final   needle.ZCRMSNorm
 }
 
+// checkConfig requires OutVocab in [1, Vocab] and cfg.GlobalLayers to be
+// distinct layers in [0, Layers): Forward takes "as many global layers as
+// layers" to mean that no layer is windowed, which duplicates would fake
+// (PR #44 review).
+func checkConfig(cfg Config) error {
+	if cfg.OutVocab < 1 || cfg.OutVocab > cfg.Vocab {
+		return fmt.Errorf("text: out_vocab %d for %d embedding rows", cfg.OutVocab, cfg.Vocab)
+	}
+
+	seen := make(map[int]bool, len(cfg.GlobalLayers))
+
+	for _, l := range cfg.GlobalLayers {
+		if l < 0 || l >= cfg.Layers || seen[l] {
+			return fmt.Errorf("text: global_layers %v: want distinct layers in [0, %d)", cfg.GlobalLayers, cfg.Layers)
+		}
+
+		seen[l] = true
+	}
+
+	return nil
+}
+
 // Load builds the model from src, which serves the cact.TextNames names
 // (Source does), with the geometry cfg.
 func Load(src weights.Source, cfg Config) (*Model, error) {
-	m := &Model{cfg: cfg, scale: float32(math.Sqrt(float64(cfg.Dim))), site: map[int]int{}}
+	err := checkConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
 
-	var err error
+	m := &Model{cfg: cfg, scale: float32(math.Sqrt(float64(cfg.Dim))), site: map[int]int{}}
 
 	m.emb, err = needle.LoadLinear(src, "embedding", cfg.Vocab, cfg.Dim)
 	if err != nil {
 		return nil, fmt.Errorf("text: %w", err)
-	}
-
-	if cfg.OutVocab < 1 || cfg.OutVocab > cfg.Vocab {
-		return nil, fmt.Errorf("text: out_vocab %d for %d embedding rows", cfg.OutVocab, cfg.Vocab)
 	}
 
 	m.head = m.emb.Rows(0, cfg.OutVocab)
