@@ -1,7 +1,9 @@
 // The Web Worker that runs whistle.wasm, so that a transcription does not
 // block the page. It takes {id, op, args} messages, runs them one at a time
 // on globalThis.whistle (cmd/whistle-wasm) and answers {id, result} or
-// {id, error}. Once the module runs it posts {type: "ready", version}, or
+// {id, error}. sha256 gives its buffer back along with the digest, as
+// {id, result: {sha256, buffer}}, so that the page need not copy the bytes
+// it hashes. Once the module runs it posts {type: "ready", version}, or
 // {type: "fatal", error} when it cannot start.
 /* global Go */
 "use strict";
@@ -10,6 +12,7 @@ importScripts("wasm_exec.js");
 
 const ops = new Set([
   "load",
+  "sha256",
   "decodeWAV",
   "transcribe",
   "streamStart",
@@ -76,6 +79,13 @@ self.onmessage = (event) => {
       }
 
       const api = await booted;
+      if (op === "sha256") {
+        const [buffer] = args;
+        const sha256 = await api.sha256(buffer);
+        self.postMessage({ id, result: { sha256, buffer } }, [buffer]);
+        return;
+      }
+
       const result = await api[op](...args);
       const transfer = result instanceof Float32Array ? [result.buffer] : [];
       self.postMessage({ id, result }, transfer);

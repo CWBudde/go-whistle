@@ -8,7 +8,7 @@ import {
   WhistleClient,
   decodeAudio,
   fetchModel,
-  sha256Hex,
+  sha256Of,
 } from "./whistle-client.js";
 
 const $ = (id) => document.getElementById(id);
@@ -19,6 +19,7 @@ let modelReady = false;
 let audio = null; // {name, buffer} of the picked file
 let busy = false;
 let mic = null; // the running microphone stream
+const noMic = micUnavailable();
 
 $("model-url").value = PINNED_MODEL.url;
 $("model-sha").value = PINNED_MODEL.sha256;
@@ -47,7 +48,7 @@ function mib(n) {
 function refresh() {
   $("transcribe").disabled = !modelReady || !audio || busy;
   $("stream-file").disabled = !modelReady || !audio || busy;
-  $("mic").disabled = !modelReady || (busy && !mic);
+  $("mic").disabled = Boolean(noMic) || !modelReady || (busy && !mic);
   $("model-fetch").disabled = busy;
   $("model-file").disabled = busy;
 }
@@ -64,6 +65,20 @@ async function withBusy(fn) {
 }
 
 // --- model ---------------------------------------------------------------
+
+// Over plain http (other than localhost) the page is no secure context:
+// there is no Web Crypto, so Go hashes the model (sha256Of), and no Cache
+// Storage, so the model is fetched on every load.
+if (!window.isSecureContext) {
+  status(
+    "model-status",
+    "This page is served over plain http, so the browser keeps no copy of the model (no Cache Storage) and Go checks its SHA-256 (no Web Crypto).",
+  );
+}
+
+function checked(got) {
+  return got.hashedIn === "Go" ? "SHA-256 checked in Go" : "SHA-256 checked";
+}
 
 async function loadModel(buffer, origin) {
   const size = buffer.byteLength;
@@ -102,6 +117,7 @@ $("model-fetch").addEventListener("click", () =>
       status("model-status", `Fetching ${url} …`);
       const got = await fetchModel(url, {
         sha256,
+        client,
         onProgress: (loaded, total) => {
           bar.value = total ? loaded / total : 0;
           status(
@@ -111,7 +127,7 @@ $("model-fetch").addEventListener("click", () =>
         },
       });
       bar.value = 1;
-      const check = sha256 ? "SHA-256 checked" : `SHA-256 ${got.sha256}`;
+      const check = sha256 ? checked(got) : `SHA-256 ${got.sha256}`;
       await loadModel(
         got.buffer,
         `${got.cached ? "the cached copy" : "the download"}, ${check}`,
@@ -131,13 +147,12 @@ $("model-file").addEventListener("change", (event) =>
       return;
     }
     try {
-      const buffer = await file.arrayBuffer();
-      const hash = await sha256Hex(buffer);
+      const got = await sha256Of(await file.arrayBuffer(), client);
       const pinned =
-        hash === PINNED_MODEL.sha256
-          ? "the pinned file"
-          : `not the pinned file, SHA-256 ${hash}`;
-      await loadModel(buffer, `${file.name} (${pinned})`);
+        got.sha256 === PINNED_MODEL.sha256
+          ? `the pinned file, ${checked(got)}`
+          : `not the pinned file, SHA-256 ${got.sha256}`;
+      await loadModel(got.buffer, `${file.name} (${pinned})`);
     } catch (err) {
       status("model-status", err.message, true);
     }
@@ -282,7 +297,39 @@ $("stream-file").addEventListener("click", () =>
 
 // --- microphone ----------------------------------------------------------
 
+// micUnavailable says why the microphone cannot work here, or "" if it can:
+// getUserMedia and AudioWorklet exist only in secure contexts.
+function micUnavailable() {
+  const missing = [];
+  if (!navigator.mediaDevices?.getUserMedia) {
+    missing.push("microphone access (navigator.mediaDevices)");
+  }
+  // Over plain http Chrome still has AudioWorkletNode, but no audioWorklet
+  // on the context to load the worklet with.
+  if (
+    typeof AudioContext === "undefined" ||
+    !("audioWorklet" in AudioContext.prototype)
+  ) {
+    missing.push("AudioWorklet");
+  }
+  if (missing.length === 0) {
+    return "";
+  }
+  if (!window.isSecureContext) {
+    return `The microphone needs a secure context: open this page over https or on localhost. Over plain http the browser offers no ${missing.join(" and no ")}.`;
+  }
+  return `This browser offers no ${missing.join(" and no ")}, so the microphone cannot be used.`;
+}
+
+if (noMic) {
+  status("mic-status", noMic, true);
+}
+
 async function startMic() {
+  if (noMic) {
+    throw new Error(noMic);
+  }
+
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
       channelCount: 1,
