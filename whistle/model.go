@@ -71,11 +71,15 @@ func WithFloatWeights() Option {
 }
 
 // WithInt8 runs the model with the engine's int8 numerics, the act_bits 8
-// and kv_bits 8 that whistle.cact was trained for: every CQ product
-// quantises its input rows to int8, the attention's queries, keys and
-// values are int8 per head, and the decoder keeps its self-attention cache
-// and the cross-attention memory in int8 (docs/FINDINGS.md F-041). It is
-// off by default, which keeps float32 activations.
+// and kv_bits 8 that whistle.cact was trained for, at the sites where the
+// engine applies them: the mHC projections quantise their input rows to
+// int8, every attention (the encoder's, the decoder's and the
+// cross-attention) quantises its queries, keys and values per head, and
+// the decoder keeps its self-attention cache and the cross-attention
+// memory in int8. The other CQ products (the stem, the attention, conv and
+// cross-attention projections, the engram and the head) keep float32
+// inputs, as the engine does (docs/FINDINGS.md F-041). It is off by
+// default, which keeps float32 activations.
 func WithInt8() Option {
 	return func(o *loadOptions) { o.int8 = needle.Int8{Act: true, KV: true} }
 }
