@@ -410,7 +410,7 @@ requantisation, because the `_cq_pack` port lives in `internal/cact`'s test file
 Nothing here is reverse-engineered. This entry records the copy source, what was kept and dropped, the fallback build
 tag and the tolerances, so later kernel work can tell copied behaviour from go-whistle decisions.
 
-Since 2026-10-11 both packages live in the private module `github.com/cwbudde/algo-tensor` (v0.1.0, the union of
+Since 2026-10-11 both packages live in the module `github.com/cwbudde/algo-tensor` (v0.1.0, the union of
 go-whistle's and go-pocket-tts' copies; its comments keep these F-numbers). Paths such as `internal/tensor/asm_test.go`
 below name the files as they were here; the module has them under `tensor/` and `ops/`.
 
