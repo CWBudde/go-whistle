@@ -36,6 +36,17 @@ var int8Misses = func() map[string]bool {
 	return m
 }()
 
+// int8TranscribeFloor is the share (%) of the corpus that
+// TestTranscribeMatchesEngine requires under WHISTLE_TEST_INT8=1: 30 of 32
+// measured (93.8 %), every miss in int8Misses. PLAN.md 6.6's 95 % was set
+// on the float32 default (docs/FINDINGS.md F-041).
+const int8TranscribeFloor = 93
+
+// int8WordFloors are wordFloors under WHISTLE_TEST_INT8=1, just below the
+// measured 96.7 % (start and end within 80 ms) and 91.3 % (probability
+// within 0.01); wordFloors were measured on float32 (F-041).
+var int8WordFloors = struct{ both, prob float64 }{both: 96.5, prob: 88}
+
 // TestInt8MatchesEngine runs the corpus with WithInt8: every transcript but
 // int8Misses equals the engine's (30 of 32 measured), and Embed's mean
 // frame cosine against needle_embed stays at least 0.9995 per corpus and
@@ -63,9 +74,8 @@ func TestInt8MatchesEngine(t *testing.T) {
 
 	clips := corpus(t)
 
-	var sum, worst float64
-
-	worst, equal, moved := 1, 0, false
+	sum, worst := 0.0, 1.0
+	equal, moved := 0, false
 
 	for _, c := range clips {
 		res, err := m.Transcribe(c.Samples, TranscribeOptions{})

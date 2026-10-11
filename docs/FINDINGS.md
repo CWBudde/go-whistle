@@ -3709,7 +3709,10 @@ makes their `loadModel` pass `WithInt8()`.
 The new miss on the 32 clips is `fleurs-pl_pl-10013271501230525766`, the corpus' second Polish clip: "W większości
 mniejszych wyzwań" against the engine's "W większość mniejszych wyzptów". Its depth-ladder transcripts differ from the
 engine's at depths 2–5 and 7 in float32 already. Under int8 the 30/32 falls below `TestTranscribeMatchesEngine`'s 95 %
-floor, and the word times miss their 97 % floor by 0.3 points; both floors were set on float32. The keyword cases that differ are not the same: int8 gains
+floor (PLAN.md 6.6), and the word times miss their 97 % floor by 0.3 points; both floors were set on float32. So under
+`WHISTLE_TEST_INT8=1` the two tests hold int8 expectations instead (PR #36 review): the misses `int8Misses` (the two
+Polish clips) and at least 93 % of the clips, and the word times at least 96.5 %. The default run keeps the float32
+floors. The keyword cases that differ are not the same: int8 gains
 `fr-cristaux-renale-declare-list` and `pl-wysp-missed` and loses `pl-luksusowe-missed` and `pl-francja-present`. On
 linux/amd64 (AVX2, emulated) `TestInt8MatchesEngine` gives the same 30/32 and `Embed` 0.999706 / 0.994307.
 

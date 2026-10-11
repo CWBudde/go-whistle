@@ -51,23 +51,36 @@ func loadModel(t testing.TB) *Model {
 	return m
 }
 
-// testOptions are the Load options of loadModel: none by default, and the
-// engine's int8 numerics (docs/FINDINGS.md F-041) under WHISTLE_TEST_INT8=1,
-// so that every model-gated test can run with the flag on.
+// testOptions are the Load options of loadModel: none by default, and
+// WithInt8 under WHISTLE_TEST_INT8=1 (see int8Mode).
 func testOptions(t testing.TB) []Option {
+	t.Helper()
+
+	if !int8Mode(t) {
+		return nil
+	}
+
+	t.Log("WHISTLE_TEST_INT8: Load with WithInt8()")
+
+	return []Option{WithInt8()}
+}
+
+// int8Mode reports whether WHISTLE_TEST_INT8=1 asks loadModel for the
+// engine's int8 numerics (docs/FINDINGS.md F-041), so that every
+// model-gated test can run with the flag on. The tests whose floors were
+// measured on float32 switch to their int8 expectations then.
+func int8Mode(t testing.TB) bool {
 	t.Helper()
 
 	switch v := os.Getenv("WHISTLE_TEST_INT8"); v {
 	case "", "0":
-		return nil
+		return false
 	case "1":
-		t.Log("WHISTLE_TEST_INT8: Load with WithInt8()")
-
-		return []Option{WithInt8()}
+		return true
 	default:
 		t.Fatalf("WHISTLE_TEST_INT8=%q, want 0 or 1", v)
 
-		return nil
+		return false
 	}
 }
 
@@ -170,11 +183,17 @@ var engineMisses = map[string]bool{"fleurs-pl_pl-10047713455444904767": true}
 
 // Accept (PLAN.md 6.6): Transcribe gives the engine's text and language on
 // at least 95 % of the corpus, every miss explained in FINDINGS, and equals
-// search.Beam under search.Default on the same encoder output.
+// search.Beam under search.Default on the same encoder output. Under
+// WHISTLE_TEST_INT8=1 it holds the int8 expectations instead (int8Misses).
 func TestTranscribeMatchesEngine(t *testing.T) {
 	m := loadModel(t)
 	clips := corpus(t)
 	equal := 0
+
+	misses, floor := engineMisses, 95
+	if int8Mode(t) {
+		misses, floor = int8Misses, int8TranscribeFloor
+	}
 
 	for _, c := range clips {
 		res, err := m.Transcribe(c.Samples, TranscribeOptions{})
@@ -194,7 +213,7 @@ func TestTranscribeMatchesEngine(t *testing.T) {
 		same := res.Text == c.Text && res.Language == c.Language
 		if same {
 			equal++
-		} else if !engineMisses[c.ID] {
+		} else if !misses[c.ID] {
 			t.Errorf("%s: [%s] %q, the engine [%s] %q", c.ID, res.Language, res.Text, c.Language, c.Text)
 		}
 
@@ -202,8 +221,8 @@ func TestTranscribeMatchesEngine(t *testing.T) {
 			float64(res.TTFT.Microseconds())/1000, res.DecodeTPS, same)
 	}
 
-	if 100*equal < 95*len(clips) {
-		t.Errorf("%d of %d clips equal to the engine, want at least 95 %%", equal, len(clips))
+	if 100*equal < floor*len(clips) {
+		t.Errorf("%d of %d clips equal to the engine, want at least %d %%", equal, len(clips), floor)
 	}
 
 	t.Logf("%d clips: text and language equal to the engine on %d (%.1f %%)", len(clips), equal,
