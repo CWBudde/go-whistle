@@ -1227,13 +1227,12 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       the CQ lookup kernels (F-043).
 - [ ] Optional: the Needle 3 text model (tool calling) on top of `internal/needle` and `.cact`, which reuses most of the work
 - [x] Optional: extract `internal/tensor`/`ops` into a shared module once go-whistle and go-pocket-tts have stabilised
-      (2026-10-11) — `github.com/cwbudde/algo-tensor` (private, v0.1.0): the union of both copies, go-whistle's version
+      (2026-10-11) — `github.com/cwbudde/algo-tensor` (v0.1.0, public): the union of both copies, go-whistle's version
       where both have one, golden hashes equal on arm64, amd64 and js/wasm; its `MIGRATION.md` lists every identifier
       either project uses. go-whistle imports it and `internal/tensor`, `internal/ops` are gone: `Embed` and
       `Transcribe` (32 clips packed with word timestamps, 3 clips float, at depth 4 and float `Embed`) give the same
-      bytes as before, with and without `-tags purego`. CI reads the module with a read-only deploy key; locally it needs
-      `GOPRIVATE` (README). Open, in its own repository: go-pocket-tts switches too (its default worker count becomes
-      GOMAXPROCS, and two edge cases become errors, see `MIGRATION.md`).
+      bytes as before, with and without `-tags purego`. Open, in its own repository: go-pocket-tts switches too (its
+      default worker count becomes GOMAXPROCS, and two edge cases become errors, see `MIGRATION.md`).
 
 ---
 

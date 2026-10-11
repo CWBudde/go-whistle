@@ -18,21 +18,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # github.com/cwbudde/algo-tensor (the tensor and ops packages) is a private module: GOPRIVATE skips the proxy and
-      # the checksum database, and git fetches it over SSH with a read-only deploy key. The host key is GitHub's published
-      # ed25519 key.
-      - name: Access algo-tensor
-        env:
-          DEPLOY_KEY: ${{ secrets.ALGO_TENSOR_DEPLOY_KEY }}
-        run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/algo_tensor
-          chmod 600 ~/.ssh/algo_tensor
-          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
-          git config --global url."git@github.com:CWBudde/algo-tensor".insteadOf https://github.com/cwbudde/algo-tensor
-          git config --global core.sshCommand "ssh -i ~/.ssh/algo_tensor -o IdentitiesOnly=yes"
-          echo GOPRIVATE=github.com/cwbudde/algo-tensor >> "$GITHUB_ENV"
-
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
