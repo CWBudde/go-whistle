@@ -99,6 +99,8 @@ func TestKeywordAdjust(t *testing.T) {
 		{Weight: 1, Revoke: 1, Forms: FormSpace},
 		{Weight: 1, Revoke: 0.3, Complete: 2, Forms: FormSpace},
 		{Weight: 1, Revoke: 0, Complete: 1, Forms: FormSpace},
+		{Weight: 1, Revoke: 1, Complete: 0.5, Forms: FormSpace, transient: true, echo: true},
+		{Weight: 1, Revoke: 1, Complete: 1, Forms: FormSpace, once: true},
 	} {
 		k := build([][]int{{1, 2, 3}, {2, 3}, {1, 2}, {3, 1, 4}, {5}, {1, 2, 3, 6}}, weight, b)
 
@@ -330,5 +332,75 @@ func TestKeywordLongPrefixLinear(t *testing.T) {
 
 	if d := time.Since(start); d > 50*time.Millisecond {
 		t.Errorf("following %d tokens took %v", n-1, d)
+	}
+}
+
+// TestKeywordProbeAxes pins the completion variants of the F-042 probe on
+// "1 2" with unit weights and a completion bonus of 0.5: a transient
+// completion lasts one token, the icefall echo adds the keyword's own
+// bonus for that token, and once a repeat earns nothing.
+func TestKeywordProbeAxes(t *testing.T) {
+	const eos = 99
+
+	for _, tc := range []struct {
+		name string
+		b    Bias
+		text []int
+		eos  bool
+		want float64
+	}{
+		{"lasting", Bias{}, []int{1, 2, 7}, false, 2.5},
+		{"transient, at the completion", Bias{transient: true}, []int{1, 2}, false, 2.5},
+		{"transient, after it", Bias{transient: true}, []int{1, 2, 7}, false, 2},
+		{"transient, at EOS", Bias{transient: true}, []int{1, 2}, true, 2},
+		{"echo, at the completion", Bias{transient: true, echo: true}, []int{1, 2}, false, 4.5},
+		{"echo, after it", Bias{transient: true, echo: true}, []int{1, 2, 7}, false, 2},
+		{"repeated", Bias{}, []int{1, 2, 1, 2}, false, 5},
+		{"once, repeated", Bias{once: true}, []int{1, 2, 1, 2}, false, 2.5},
+		{"once, a repeat in progress", Bias{once: true}, []int{1, 2, 1}, false, 3.5},
+		{"once, a repeat broken", Bias{once: true}, []int{1, 2, 1, 7}, false, 2.5},
+	} {
+		b := tc.b
+		b.Weight, b.Revoke, b.Complete, b.Forms = 1, 1, 0.5, FormSpace
+		k := build([][]int{{1, 2}}, unit, b)
+
+		e := -1
+		if tc.eos {
+			e = eos
+		}
+
+		if got := k.Bonus(tc.text, e); math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("%s: Bonus(%v, eos %v) = %g, want %g", tc.name, tc.text, tc.eos, got, tc.want)
+		}
+	}
+}
+
+// TestKeywordOnceAcrossForms pins that Bias.once counts a keyword once
+// whatever its form: "1 2" and "3 2" spell one keyword, "5 6" another,
+// under unit weights and a completion bonus of 0.5.
+func TestKeywordOnceAcrossForms(t *testing.T) {
+	ids := [][]int{{1, 2}, {3, 2}, {5, 6}}
+
+	for _, tc := range []struct {
+		name     string
+		identify bool
+		text     []int
+		want     float64
+	}{
+		{"one form, then the other", true, []int{1, 2, 3, 2}, 2.5},
+		{"the same form twice", true, []int{3, 2, 3, 2}, 2.5},
+		{"two keywords", true, []int{1, 2, 5, 6}, 5},
+		{"forms of their own without identify", false, []int{1, 2, 3, 2}, 5},
+	} {
+		b := Bias{Weight: 1, Revoke: 1, Complete: 0.5, Forms: FormSpace, once: true}
+		k := build(ids, unit, b)
+
+		if tc.identify {
+			k.identify(ids, []int{0, 0, 1})
+		}
+
+		if got := k.Bonus(tc.text, -1); math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("%s: Bonus(%v) = %g, want %g", tc.name, tc.text, got, tc.want)
+		}
 	}
 }

@@ -1177,6 +1177,19 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 - [ ] Follow-up from 6.3: `de-paare-missed`, the one keyword search miss. Weaker hypotheses with the shared keyword
       bonus end one token earlier and fill Whisper's 5 finished slots (F-029); find the engine's rule that keeps the
       right one.
+      (2026-10-11) — partial: no finished-slot rule is the engine's. Nine variants behind a test-only switch
+      (`finRule`: a finished text takes one slot, one live hypothesis per text, 6/7/10 slots, the final pick with the
+      live ones, only the step's best 5 EOS count, a stop only when no live one outscores the best finished) on the 53
+      keyword cases, 32 clips and 192 depth cases: every one that makes `de-paare-missed` equal loses its mirror
+      `de-diese-paare-phrase` (44–46/53, the slot variants also 29–30/32 clips and 153–158/192). Both cases have the same
+      beam and differ only by a bonus all hypotheses share, which no rank-based finished rule can tell apart.
+      `oracle kwsets` records the engine on the clip with 32 keyword files (`testdata/oracle/kwsets`): the miss is in
+      the bias, whose single-word bonus prunes the competing "Bare" spelling in our search but not in the engine's.
+      273 biases (weights, completion, revocation, spellings, transient, icefall-style and once-per-keyword
+      completions): 142 make the case equal, none without losing a keyword case. The best, w 2.1 + completion 0.25,
+      gives 47/53 and 26/32 sets (`DefaultBias` 17/32) but loses `pl-francja-present`, a 0.0033-nat near-tie; w 1.5
+      fits 31/32 sets but 44/53 cases. Defaults unchanged, so the guard set is unchanged. Open: case-insensitive
+      matching (`PAARE` = `Paare` in the engine), phrase loops, the capitalised bare spelling (F-042).
 - [x] Optional: an HTTP server (`/transcribe`, `/stream` over WebSocket)
       (2026-10-11) — `whistle serve` (`internal/server`) loads the model once. `POST /transcribe` takes a WAV body
       or raw 16 kHz mono PCM (`?format=s16le|f32le`) with the options as query parameters (`language`, repeatable
