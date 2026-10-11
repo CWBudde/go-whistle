@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -261,5 +262,113 @@ func TestPickAtTokenLimit(t *testing.T) {
 
 	if got := (&beam{opt: o}).pick([]*hyp{worse, good}, false); got != good {
 		t.Errorf("none finished: picked adj %v, want −1", got.adj)
+	}
+}
+
+// byLast is an expander that serves candidates by a hypothesis' last
+// token.
+type byLast map[int][]cand
+
+func (e byLast) expand(hs []*hyp, n int, _ []int, _ Adjust) ([][]cand, error) {
+	out := make([][]cand, len(hs))
+	for i, h := range hs {
+		cs := e[h.seq[len(h.seq)-1]]
+		out[i] = cs[:min(n, len(cs))]
+	}
+
+	return out, nil
+}
+
+// TestFinRules pins the finished-hypothesis variants of the F-042 probe
+// against Whisper's rule (the zero finRule) with 2 beams. Tokens 10 and 11
+// spell the same text "a", 12 spells "b".
+func TestFinRules(t *testing.T) {
+	const eos = 1
+
+	c := func(tok int, lp float64) cand { return cand{tok: tok, lp: lp, adj: lp} }
+	spell := func(ids []int) (string, error) {
+		var b strings.Builder
+		for _, id := range ids {
+			b.WriteString(map[int]string{10: "a", 11: "a", 12: "b", 13: "c", 14: "a"}[id])
+		}
+
+		return b.String(), nil
+	}
+
+	twin := func() []*hyp {
+		return []*hyp{{seq: []int{2, 9, 10}, text: 2}, {seq: []int{2, 9, 11}, text: 2, adj: -0.2}}
+	}
+	ends := byLast{10: {c(eos, -0.1), c(12, -3)}, 11: {c(eos, -0.1), c(13, -3)}}
+
+	for _, tc := range []struct {
+		name     string
+		rule     finRule
+		finished int
+		done     bool
+	}{
+		{"Whisper: two finished fill 2 slots", finRule{}, 2, true},
+		{"one text takes one slot", finRule{dedupFin: true}, 1, false},
+		{"3 slots", finRule{slots: 3}, 2, false},
+	} {
+		o := Default()
+		o.Beams, o.Norm, o.fin = 2, NormNone, tc.rule
+		s := &beam{opt: o, eos: eos, spell: spell}
+
+		_, done, err := s.step(ends, twin())
+		if err != nil || len(s.fin) != tc.finished || done != tc.done {
+			t.Errorf("%s: finished %d, done %v, err %v; want %d, %v", tc.name, len(s.fin), done, err, tc.finished,
+				tc.done)
+		}
+	}
+
+	// Live hypotheses with the same text: only the best is kept.
+	o := Default()
+	o.Beams, o.Norm, o.fin = 2, NormNone, finRule{dedupLive: true}
+	s := &beam{opt: o, eos: eos, spell: spell}
+
+	alive, _, err := s.step(byLast{9: {c(10, -0.1), c(11, -0.2), c(12, -0.3)}}, []*hyp{{seq: []int{2, 9}, text: 2}})
+	if err != nil || len(alive) != 2 || alive[1].seq[2] != 12 {
+		t.Errorf("dedupLive: %d alive, err %v; want a and b", len(alive), err)
+	}
+
+	// Three tokens spell a, so b lies beyond Whisper's k+1 = 3 candidates:
+	// the wider pool still finds it, and EOS, fourth, does not finish.
+	s = &beam{opt: o, eos: eos, spell: spell}
+
+	alive, _, err = s.step(byLast{9: {c(10, -0.1), c(11, -0.15), c(14, -0.2), c(eos, -0.25), c(12, -0.3)}},
+		[]*hyp{{seq: []int{2, 9}, text: 2}})
+	if err != nil || len(alive) != 2 || alive[1].seq[2] != 12 || len(s.fin) != 0 {
+		t.Errorf("dedupLive, a wide pool: %d alive, %d finished, err %v; want a and b, none", len(alive), len(s.fin), err)
+	}
+
+	// Only EOS among the step's best Beams count: a (−0.1) and EOS (−0.5)
+	// are the best two, the second EOS (−0.6) is admitted above b but
+	// does not count.
+	o.fin = finRule{countTopK: true}
+	s = &beam{opt: o, eos: eos, spell: spell}
+	two := []*hyp{{seq: []int{2, 9, 12}, text: 2}, {seq: []int{2, 9, 13}, text: 2}}
+
+	_, done, err := s.step(byLast{12: {c(10, -0.1), c(eos, -0.5)}, 13: {c(eos, -0.6), c(11, -2)}}, two)
+	if err != nil || len(s.fin) != 2 || s.counted != 1 || done {
+		t.Errorf("countTopK: finished %d, counted %d, done %v, err %v; want 2, 1, false", len(s.fin), s.counted, done,
+			err)
+	}
+
+	// Slots full, but a live hypothesis outscores the best finished one.
+	o.fin = finRule{stopLive: true}
+	s = &beam{opt: o, eos: eos, spell: spell}
+
+	_, done, err = s.step(byLast{12: {c(10, -0.1), c(eos, -0.5)}, 13: {c(eos, -0.6), c(11, -2)}}, two)
+	if err != nil || len(s.fin) != 2 || done {
+		t.Errorf("stopLive: finished %d, done %v, err %v; want 2, false", len(s.fin), done, err)
+	}
+
+	// The final pick weighs the live hypotheses even after the stop.
+	short := &hyp{seq: []int{2, 9}, text: 2, adj: -5, sum: -5, eos: true}
+	good := &hyp{seq: []int{2, 9, 10}, text: 2, adj: -1, sum: -1}
+
+	o.fin = finRule{pickLive: true}
+	if got := (&beam{opt: o, fin: []*hyp{short, short}}).pick([]*hyp{good}, true); got != good {
+		t.Errorf("pickLive: picked adj %v, want the live −1", got.adj)
 	}
 }

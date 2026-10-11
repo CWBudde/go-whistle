@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -52,6 +53,11 @@ type Bias struct {
 	Forms    Form    // the spellings matched
 	Split    bool    // match each word of a phrase as a keyword of its own
 	Renorm   bool    // add the automaton tokens' bonus to the logits and renormalise
+
+	// Probe axes of docs/FINDINGS.md F-042, off in DefaultBias.
+	transient bool // the completion bonus lasts one token: the next token (EOS included) takes it back
+	echo      bool // with transient, a completion also earns the keyword's own token bonus for that token (icefall)
+	once      bool // a keyword earns its bonus once per text: a repeat's tokens are taken back when it completes
 }
 
 // DefaultBias is the bias the keyword fixtures picked (docs/FINDINGS.md
@@ -125,6 +131,7 @@ type Keywords struct {
 	depth []int         // the node's path length in tokens
 	out   [][]int       // the token lengths of the keywords that end at the node, suffixes included
 	end   []bool        // a keyword ends here
+	key   []int         // the keyword a spelling that ends at the node spells, shared by its forms (Bias.once)
 	start kwState       // the state at the start of the text
 	bias  Bias
 }
@@ -133,8 +140,10 @@ type Keywords struct {
 // text suffix that is a keyword prefix, and which of that suffix' tokens
 // belong to a completed keyword (bit i for the path's token i).
 type kwState struct {
-	n   int
-	cov bitset
+	n    int
+	cov  bitset
+	held float64 // the transient bonus the next token takes back
+	done []int   // the keywords completed so far, by key (Bias.once)
 }
 
 // textStart is the token in front of every text that anchors the bare
@@ -202,24 +211,35 @@ func NewKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) (*Keywords
 		return nil, fmt.Errorf("%w: forms %b match neither after a space nor bare", ErrKeywords, b.Forms)
 	}
 
-	ids := encodeKeywords(tok, keywords, b)
+	ids, keys := encodeKeywords(tok, keywords, b)
 
-	if !b.PerChar {
-		return build(ids, func(int) float64 { return b.Weight }, b), nil
+	var k *Keywords
+
+	if b.PerChar {
+		ws := make([][]float64, len(ids))
+		for i, s := range ids {
+			ws[i] = charWeights(tok, s, b.Weight)
+		}
+
+		k = buildWeighted(ids, ws, b)
+	} else {
+		k = build(ids, func(int) float64 { return b.Weight }, b)
 	}
 
-	ws := make([][]float64, len(ids))
-	for i, s := range ids {
-		ws[i] = charWeights(tok, s, b.Weight)
-	}
+	k.identify(ids, keys)
 
-	return buildWeighted(ids, ws, b), nil
+	return k, nil
 }
 
 // encodeKeywords tokenises the spellings of the keywords under b, a bare
-// one behind textStart.
-func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) [][]int {
-	var ids [][]int
+// one behind textStart, and gives each spelling the index of the keyword
+// (under Split: of the word) it spells, shared by all its forms.
+func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) ([][]int, []int) {
+	var (
+		ids  [][]int
+		keys []int
+		key  int
+	)
 
 	for _, kw := range keywords {
 		words := []string{kw}
@@ -235,11 +255,14 @@ func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) [][]int
 				}
 
 				ids = append(ids, e)
+				keys = append(keys, key)
 			}
+
+			key++
 		}
 	}
 
-	return ids
+	return ids, keys
 }
 
 // charWeights is the PerChar bonus of each token of a spelling: weight
@@ -309,7 +332,7 @@ func build(ids [][]int, weight func(id int) float64, b Bias) *Keywords {
 // ws[i][j]. A node's bonus comes from the first spelling through it; the
 // spellings through a node share its prefix, so their bonuses agree.
 func buildWeighted(ids [][]int, ws [][]float64, b Bias) *Keywords {
-	k := &Keywords{next: []map[int]int{{}}, fail: []int{0}, up: []int{0}, w: []float64{0}, depth: []int{0}, end: []bool{false}, bias: b}
+	k := &Keywords{next: []map[int]int{{}}, fail: []int{0}, up: []int{0}, w: []float64{0}, depth: []int{0}, end: []bool{false}, key: []int{0}, bias: b}
 
 	for i, s := range ids {
 		k.add(s, ws[i])
@@ -421,6 +444,7 @@ func (k *Keywords) add(ids []int, ws []float64) {
 			k.w = append(k.w, ws[i])
 			k.depth = append(k.depth, k.depth[n]+1)
 			k.end = append(k.end, false)
+			k.key = append(k.key, -1-c) // a spelling of its own until identify
 			k.next[n][id] = c
 		}
 
@@ -428,6 +452,25 @@ func (k *Keywords) add(ids []int, ws []float64) {
 	}
 
 	k.end[n] = true
+}
+
+// identify gives the node each spelling of ids ends at the key of its
+// keyword, keys[i] for spelling i, so that Bias.once counts a keyword once
+// whatever its form. A node two keywords' spellings share keeps the
+// first's key. Without identify each spelling is a keyword of its own.
+func (k *Keywords) identify(ids [][]int, keys []int) {
+	set := make([]bool, len(k.key))
+
+	for i, s := range ids {
+		n := 0
+		for _, id := range s {
+			n = k.next[n][id]
+		}
+
+		if n != 0 && !set[n] {
+			k.key[n], set[n] = keys[i], true
+		}
+	}
 }
 
 // link sets the failure links breadth first, and with them the keywords
@@ -488,22 +531,67 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 	}
 
 	drop := k.depth[n] - k.depth[f]
-	d := k.revoke(n, drop, st.cov)
+	d := k.revoke(n, drop, st.cov) - st.held
 
 	if !ok {
-		return kwState{}, d
+		return kwState{done: st.done}, d
 	}
 
 	depth := k.depth[c]
 	cov := st.cov.shift(drop)
 	d += k.w[c]
+	next := kwState{n: c, done: st.done}
 
 	for _, l := range k.out[c] {
-		d += k.bias.Complete
+		kn := k.suffix(c, l)
+
+		if k.bias.once {
+			if slices.Contains(next.done, k.key[kn]) {
+				d -= k.pathBonus(kn) // a repeat, in any form: its tokens earn nothing
+				cov = cov.with(depth-l, depth)
+
+				continue
+			}
+
+			next.done = append(slices.Clip(next.done), k.key[kn])
+		}
+
+		bonus := k.bias.Complete
+		if k.bias.transient && k.bias.echo {
+			bonus += k.pathBonus(kn)
+		}
+
+		if k.bias.transient {
+			next.held += bonus
+		}
+
+		d += bonus
 		cov = cov.with(depth-l, depth)
 	}
 
-	return kwState{n: c, cov: cov}, d
+	next.cov = cov
+
+	return next, d
+}
+
+// suffix is the node of the last l tokens of the match at c: c or one of
+// its failure links.
+func (k *Keywords) suffix(c, l int) int {
+	for k.depth[c] > l {
+		c = k.fail[c]
+	}
+
+	return c
+}
+
+// pathBonus is the token bonus along the path to node n.
+func (k *Keywords) pathBonus(n int) float64 {
+	sum := 0.0
+	for ; k.depth[n] > 0; n = k.up[n] {
+		sum += k.w[n]
+	}
+
+	return sum
 }
 
 // revoke is the bonus taken back when the match at node n drops its
