@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -138,7 +139,12 @@ func (s *Server) readAudio(w http.ResponseWriter, r *http.Request, format string
 	var x []float32
 
 	if format == formatWAV {
-		x, err = frontend.DecodeWAV(data)
+		var status int
+
+		x, status, err = decodeWAV(data)
+		if status != 0 {
+			return nil, status, err
+		}
 	} else {
 		width, _ := pcm.Width(format) // transcribeQuery checked it
 		x, err = pcm.Decode(data, width)
@@ -153,6 +159,41 @@ func (s *Server) readAudio(w http.ResponseWriter, r *http.Request, format string
 	}
 
 	return x, 0, nil
+}
+
+// decodeWAV decodes a WAV body to 16 kHz mono a second at a time, which
+// gives frontend.DecodeWAV's samples, and stops with 422 once the audio is
+// over whistle.MaxSamples. A long file at a low rate (16 MiB of 1 kHz 8-bit
+// is 268 million samples at 16 kHz) is thus refused before it is resampled
+// whole (PR #35 review). A format error returns status 0 and the error.
+func decodeWAV(data []byte) ([]float32, int, error) {
+	st, err := frontend.OpenWAV(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	frames := st.Frames() // before Read, which consumes them
+
+	var x []float32
+
+	for {
+		chunk, err := st.Read(whistle.SampleRate)
+		x = append(x, chunk...)
+
+		if len(x) > whistle.MaxSamples {
+			n := frames * whistle.SampleRate / int64(st.SampleRate)
+
+			return nil, http.StatusUnprocessableEntity, errors.New(tooLong(int(n)))
+		}
+
+		if errors.Is(err, io.EOF) {
+			return x, 0, nil
+		}
+
+		if err != nil {
+			return nil, 0, err
+		}
+	}
 }
 
 // transcribeQuery reads the options and the body format of /transcribe.

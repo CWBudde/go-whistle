@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/cwbudde/go-whistle/internal/frontend"
 	"github.com/cwbudde/go-whistle/whistle"
 )
 
@@ -151,6 +152,27 @@ func wav(x []int16) []byte {
 	return b
 }
 
+// wav8 is an 8-bit mono WAV of n frames at rate, a ramp.
+func wav8(rate, n int) []byte {
+	size := uint32(n) // #nosec G115 -- a test clip.
+	b := []byte("RIFF")
+	b = binary.LittleEndian.AppendUint32(b, 36+size)
+	b = append(b, "WAVEfmt "...)
+
+	for _, v := range []int{16, 1 | 1<<16, rate, rate, 1 | 8<<16} {
+		b = binary.LittleEndian.AppendUint32(b, uint32(v)) // #nosec G115 -- a test clip.
+	}
+
+	b = append(b, "data"...)
+	b = binary.LittleEndian.AppendUint32(b, size)
+
+	for i := range n {
+		b = append(b, byte(i))
+	}
+
+	return b
+}
+
 func post(t *testing.T, url string, body io.Reader) (int, string, http.Header) {
 	t.Helper()
 
@@ -270,10 +292,33 @@ func TestTranscribeErrors(t *testing.T) {
 		{"odd PCM", "?format=f32le", []byte{1, 2, 3, 4, 5}, 400, "ends inside a sample"},
 		{"over 30 s", "?format=s16le", tooLong, 422, "audio limit is 30 s: 480001 samples, at most 480000"},
 		{"over 30 s WAV", "", wav(make([]int16, whistle.MaxSamples+1)), 422, "/stream takes longer audio"},
+		// 40 s at 1 kHz: 40 kB under the body limit, 640,000 samples at 16 kHz.
+		{"over 30 s at 1 kHz", "", wav8(1000, 40000), 422, "640000 samples, at most 480000"},
 	} {
 		status, body, _ := post(t, hs.URL+"/transcribe"+c.query, bytes.NewReader(c.body))
 		if status != c.status || !strings.HasPrefix(body, `{`) || !strings.Contains(body, c.want) {
 			t.Errorf("%s: %d %s; want %d with %s", c.name, status, body, c.status, c.want)
+		}
+	}
+}
+
+// TestTranscribeLowRateWAV resamples a WAV under 30 s as DecodeWAV does,
+// though the server decodes it a second at a time.
+func TestTranscribeLowRateWAV(t *testing.T) {
+	_, hs := newTestServer(t, &fakeModel{}, testConfig())
+
+	for _, rate := range []int{1000, 8000, 44100} {
+		data := wav8(rate, 2*rate+7)
+
+		want, err := frontend.DecodeWAV(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		status, body, _ := post(t, hs.URL+"/transcribe", bytes.NewReader(data))
+		if prefix := fmt.Sprintf(`{"text":"%d samples, first %.4f"`, len(want), want[0]); status != http.StatusOK ||
+			!strings.HasPrefix(body, prefix) {
+			t.Errorf("%d Hz: %d %s, want 200 %s", rate, status, body, prefix)
 		}
 	}
 }
