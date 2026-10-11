@@ -246,7 +246,9 @@ All commands exit with 0 on success, 1 when they fail and 2 for a wrong command 
 ### Web demo
 
 `web/` is a static page that runs the library in the browser: `cmd/whistle-wasm`, built with `GOOS=js GOARCH=wasm`,
-runs in a Web Worker, so the page stays responsive during a pass. Nothing leaves the tab. Build and serve it:
+runs in a Web Worker, so the page stays responsive during a pass. Nothing leaves the tab. It is published at
+**https://cwbudde.github.io/go-whistle/** from every push to `main` (`.github/workflows/pages.yaml`). Build and serve
+it locally:
 
 ```bash
 just wasm          # web/whistle.wasm and Go's web/wasm_exec.js, both git-ignored

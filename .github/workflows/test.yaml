@@ -1,0 +1,29 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Linux only: macOS minutes bill at 10x, and the arm64 assembly is exercised in go-pocket-tts.
+# Model-dependent tests skip themselves when models/ is absent, which is always the case here.
+jobs:
+  test-format:
+    uses: ./.github/workflows/test-format.yaml
+
+  test-lint:
+    uses: ./.github/workflows/test-lint.yaml
+
+  test-unit:
+    uses: ./.github/workflows/test-unit.yaml
+
+  test-wasm:
+    uses: ./.github/workflows/test-wasm.yaml
