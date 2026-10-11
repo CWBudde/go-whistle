@@ -9,7 +9,7 @@
 // TestProbeFinish scores variants of the finished-hypothesis bookkeeping
 // (finRule) with the real search on every oracle set the search answers
 // for: the 53 keyword cases and the 32 keyword sets of
-// testdata/oracle/kwsets (`oracle kwsets`) under DefaultBias, the 32
+// testdata/oracle/kwsets (`oracle kwsets`) under F-029's bias, the 32
 // fixture clips and the 192 clips × depths 2–7, and lists every case a
 // variant wins or loses against Whisper's rule.
 //
@@ -17,7 +17,8 @@
 // or per character, completion bonus, revocation, spellings, and the
 // transient, icefall-style and once-per-keyword completions) on the memo
 // of keywords_probe_test.go against the 53 cases and the 32 sets, ranked
-// by the fixture cases lost against DefaultBias, then by the cases equal.
+// by the fixture cases lost against F-029's bias (DefaultBias until
+// F-044), then by the cases equal.
 //
 //	go test -tags oracle -count=1 -v -timeout 60m -run 'TestProbe(Finish|KeywordSets)$' ./internal/search/
 //
@@ -118,7 +119,7 @@ func TestProbeFinish(t *testing.T) {
 
 	for set, cases := range map[string][]keywordCase{"keywords": keywordCases(t), "sets": kwSetCases(t)} {
 		for _, kc := range cases {
-			kw, err := NewKeywords(d.Tokenizer(), kc.Keywords, DefaultBias())
+			kw, err := NewKeywords(d.Tokenizer(), kc.Keywords, f029Bias())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -255,11 +256,12 @@ func biasName(b Bias) string {
 	return name
 }
 
-// kwSetGrid is the biases TestProbeKeywordSets scores, DefaultBias first.
+// kwSetGrid is the biases TestProbeKeywordSets scores, F-029's bias (then
+// DefaultBias) first.
 func kwSetGrid() []Bias {
-	out := []Bias{DefaultBias()}
+	out := []Bias{f029Bias()}
 	add := func(f func(*Bias)) {
-		b := DefaultBias()
+		b := f029Bias()
 		f(&b)
 
 		if !slices.Contains(out, b) {
@@ -370,7 +372,7 @@ func TestProbeKeywordSets(t *testing.T) {
 			strings.Join(r.won, ", "), strings.Join(r.lost, ", "), strings.Join(r.setMiss, "; "))
 	}
 
-	t.Logf("── %d biases × %d cases; DefaultBias:", len(grid), len(cases))
+	t.Logf("── %d biases × %d cases; F-029's bias:", len(grid), len(cases))
 	t.Logf("%s", format(rows[0]))
 
 	slices.SortStableFunc(rows, func(a, b row) int {

@@ -3964,6 +3964,130 @@ packed.
 - **SIMD.** Go's wasm back end has no SIMD (`GOWASM` knows only `satconv` and `signext`) and no assembly; the LUT
   kernels would need a hand-written wasm module through JS, outside pure Go.
 
+## F-044 — `de-paare-missed`, second round: the engine folds case on tokens, a bonus no token count explains (PLAN.md Phase 10) (2026-10-11)
+
+**Question.** F-042's open list for the one keyword search miss: does the engine match case-insensitively, and how is a
+word's bonus shared across its tokens; which rule stops our phrase loops; why does the engine not jump to the
+capitalised bare spelling ("Für ihr Baby"); and does F-042's gain `w=1.8 revoke=1 complete=1.5` hold on the guard
+set. The goal is unchanged: `de-paare-missed` equal to the engine without losing anything.
+
+### More engine evidence: 31 keyword variants on 8 clips
+
+`oracle kwvariants` (`tools/oracle/kwvariants.go`, `testdata/oracle/kwvariants/manifest.json`) records the engine
+on clips whose keyword cases it already answers, with the keyword written differently:
+
+| variant                                                                                                                                                             | engine                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| capitals: `COWLEY'S`, `cOWLEY'S`, `ADOPTIONSPLAN`, `adoptionsplan`, `VARKENS`, `varkens`, `MUGGEN`, `ALIVIAR`, `Aliviar`, `ACCOMUNANO`, `CRISTAUX`, `WYSP`, `UNCAS` | 13 of 13 the text of the keyword as the case has it           |
+| a piece from inside a word: `aare`, `optionsplan`, `doptionsplan`, `owley's`, `arkens`, `comunano`                                                                  | 6 of 6 the text without keywords                              |
+| a word start that is a token prefix: `Adop` (`▁Ad op`), `Adoptions` (`▁A do ptions`), `Cowley`, `Varken`, `accomun` (`▁ac com un`)                                  | 5 of 5 change the text, 4 to the full keyword's text          |
+| a word start that is no token prefix: `Paa` (`▁P a a` against `▁P a are`), `alivi` (`▁al iv i` against `▁al iv iar`)                                                | 2 of 2 the text without keywords                              |
+| short phrases: `können sich`, `für einen`, `some verses`, `el dolor`; `Paare können sich für`                                                                       | the text without keywords; the phrase sets' "… Adoptionsplan" |
+
+So the engine ignores the keyword's case, needs a word start, needs no word end, and matches **token ids**: `Adop`
+matches the model's own spelling `▁Ad op tions plan` of "Adoptionsplan" (not `RefTokenizer`'s `▁A do ptions plan`),
+while `Paa` and `alivi`, whose characters start the word but whose tokens do not, do nothing. A matcher over characters
+would reward them. The open-source sibling engine (`cactus-compute/cactus`, `utils.h`) biases vocabularies by a
+context-free logit bias of 5 on every keyword token and a case-insensitive Levenshtein spelling correction; that
+would write the keyword's own spelling (`PAARE`, `paare`) into the text, where the engine writes "Paare", so it is
+not needle3's mechanism.
+
+### Hypotheses (`TestProbeFold`)
+
+`internal/search/fold_probe_test.go` (tag `oracle`) runs the real search with `Default()` and each bias on the 53
+keyword cases, the 32 keyword sets of F-042 and the 31 variants (four grids, 308 biases, `WHISTLE_PROBE_GRID`); won
+and lost are against F-029's bias (`DefaultBias` until now). Every axis is an unexported `Bias` field whose zero value
+is the old rule:
+
+- `fold=cases`: the spellings also include the keyword lower-cased, and lower-cased with its first letter
+  upper-cased, still on token ids (`caseSpellings`);
+- `fold=bytes`: an Aho-Corasick automaton over the case-folded bytes of the text, so every tokenisation matches
+  (`fold.go`), the bonus of the keyword's own tokens on their last byte (`share=canon`, a token that is only the space
+  on the next one) or `Weight` per token of the text (`share=token`) or per character (`share=char`), and with
+  `word-end` a completion only before a non-letter;
+- `spent`: once a keyword completed, its tokens and its completion earn nothing more;
+- `bare-as-written`: the bare spellings only as written.
+
+The summary (grid 4):
+
+| bias                                                    | keyword cases | sets      | variants  | `de-paare-missed` | won / lost                                                                       |
+| ------------------------------------------------------- | ------------- | --------- | --------- | ----------------- | -------------------------------------------------------------------------------- |
+| F-029: `w=2 revoke=1 complete=1`, all forms             | 46/53         | 17/32     | 20/31     | differs           | —                                                                                |
+| + `fold=cases`                                          | 46/53         | 17/32     | 29/31     | differs           | none                                                                             |
+| + `spent`                                               | 46/53         | 18/32     | 19/31     | differs           | none (the loop set won, the variant `Cowley` lost)                               |
+| + `fold=cases spent`                                    | 46/53         | 18/32     | 28/31     | differs           | none                                                                             |
+| `w=1.8 complete=1.5` (F-042's gain)                     | 47/53         | 18/32     | 20/31     | differs           | won `it-montagne-distractor`                                                     |
+| **`w=1.8 complete=1.5 fold=cases`** (`DefaultBias` now) | **47/53**     | **18/32** | **29/31** | differs           | won `it-montagne-distractor`                                                     |
+| `w=1.8 complete=1.5 fold=cases spent`                   | 47/53         | 19/32     | 28/31     | differs           | won `it-montagne-distractor`                                                     |
+| `w=2.15 complete=0 fold=cases spent`                    | 47/53         | 28/32     | 28/31     | **equal**         | won `de-paare-missed`, `it-montagne-distractor`; lost `pl-francja-present`       |
+| `w=1.5 complete=2 fold=cases spent`                     | 44/53         | **32/32** | 25/31     | **equal**         | won the same two; lost both `en-cowleys-*`, `es-luchadoras-…`, `it-accomunano-…` |
+| `fold=bytes share=canon w=1.8 complete=0`               | 42/53         | 22/32     | 23/31     | equal             | won 3, lost 7                                                                    |
+| `fold=bytes share=token w=2.2 complete=0`               | 42/53         | 26/32     | 23/31     | equal             | won 2, lost 6                                                                    |
+
+Per open item:
+
+1. **Case.** `fold=cases` reproduces 9 more variants (all 13 capitals but `WYSP`, which is `pl-wysp-missed`'s text,
+   a 0.0125 near-tie of F-029) and makes `paare` and `PAARE` behave like `Paare` (the engine's three are one text;
+   ours now too, though all three still differ from the engine with `de-paare-missed`), at no cost anywhere. The
+   byte matcher is the wrong unit: 112 rows over three shares, word end or not, 0.375 … 2.5 per token or character,
+   best 42/53, and it misses `Paa` and `alivi` exactly as the engine's token matching predicts. (Grid 1's 80 byte
+   rows, best 40/53, predate two fixes: the bonus sat on a token's first byte, so a lone `▁` piece earned it anywhere,
+   and under `share=token` the start of the text earned a weight; grids 2 and 4 rerun the fixed matcher.) A bonus per
+   character on token ids, with `fold=cases spent` (0.75 … 1.25 × completion 0.5 … 2), is no better: 40–42/53. How
+   a word's bonus is shared across its tokens is thus as before: `Weight` per token of the keyword's spelling.
+2. **Loops.** `spent` stops them: with `Diese Paare können` our text is the engine's ("… Adoptionsplan …") instead of
+   nine repeats, and no keyword case changes. But on the variant `Cowley` it makes the engine's text a search miss
+   (0.0839 per token): without the repeats' bonus the beam holds other hypotheses, and five weaker endings fill
+   Whisper's finished slots one step before "Cowley's. Tell …" ends, the mechanism of F-042. One set won, one
+   variant lost: a trade, so `spent` stays out of `DefaultBias`. F-042's `once` did not stop the loops at w 2.
+3. **The capitalised bare spelling.** It is the weight, not the form: `w=1.5 complete=2` keeps "Für ihr Baby" off
+   the start with every form, and dropping the form costs elsewhere: without `FormCapital` (with `fold=cases`)
+   "für ihr Baby" is equal but `diese Paare` is not, the engine's "Diese Paare" at the start needing that same
+   spelling; `bare-as-written` loses `VARKENS` and `varkens` (the engine's "Varkens…" at the start); without bare
+   forms `de-diese-paare-phrase` and `nl-varkens-missed` are lost (grids 1 and 3).
+4. **F-042's gain.** `w=1.8 complete=1.5` wins `it-montagne-distractor` and loses nothing; with `fold=cases` it is
+   the new `DefaultBias`: 47/53 cases, 18/32 sets, 29/31 variants, at least F-029's bias on every count. The guard
+   set is unchanged: 31/32 clips, 161/192 depth cases, 797/930 stream calls, WER 5.35 %, the word floors (the guard
+   tests other than the keyword fixtures run without keywords). `TestKeywordsMatchEngine`'s score floors are
+   re-measured (0.1270, −0.1575, 0.0711, 0.1830; the same four texts).
+
+### Why no bias reaches `de-paare-missed` without a loss
+
+The step traces split the conflicting cases by mechanism. `de-paare-missed` is decided by the pruning: the `Paare`
+hypotheses carry their whole bonus from text token 6 on, and once it is above about 6.6 nats (3 tokens × 2.2) they
+push the "Bare" spellings out of the beam before the plan word (F-042), so the "Adoptionsplan" spellings fill the
+finished slots. `it-accomunano-missed` and `pl-francja-present` are decided by the final pick: our text and the
+engine's both hold the keyword and differ elsewhere, "gli" against "vi" (2 tokens against 1) and "wspomnieżone"
+against "wspierzone" (7 against 4). Under the ranking (Σ log p + bonus) / L a shared bonus B favours the shorter
+text by B (1/L₁ − 1/L₂), and the engine writes the shorter one, so they want B large: `accomunano` (4 tokens)
+between 8.3 and 8.6, `Francją` (5 tokens) about 11 and more with a completion bonus (kept at w 2/complete 1 = 11,
+lost at w 2.2/complete 0 = 11 and w 2.4/complete 0 = 12, kept at w 2.4/complete 0.1), the chaos of its 0.0033
+near-tie. With B = n·w + c that leaves w ≈ 2.15–2.2 and c ≈ 0: the window above, which gets `accomunano` but not
+`Francją`. The variant `accomun` says the engine's bonus is no
+function of the token count at all: its 3 tokens give the engine the shorter "vi" as `accomunano` does, while the 3
+tokens of `Paare` must stay below 6.6; ours gives `accomun` 3·1.8 + 1.5 = 6.9 and writes "gli". A bonus per
+character would separate them (7 against 5 characters) but fits the cases worse (above).
+
+### Verdict
+
+Negative for `de-paare-missed`, a partial gain elsewhere. The engine folds case and matches token ids; `fold=cases`
+adds that at no cost and joins `DefaultBias` with F-042's `w=1.8 complete=1.5` (47/53, guard set unchanged). No
+bias of the four grids makes `de-paare-missed` equal without losing a keyword case. Two trades are left to the user:
+
+- `w=2.15 complete=0` (with `fold=cases`, and `spent` or not): `de-paare-missed` equal and 28/32 sets, for
+  `pl-francja-present`, F-042's 0.0033 near-tie;
+- `spent`: no phrase loops (the set `Diese Paare können`), for the variant `Cowley`, a finished-slot search miss.
+
+**Open.** What the engine's bonus is a function of, given that `accomun` and `Paare` have 3 tokens each and want
+bonuses on either side of the `Bare` threshold: the model's own probability of the tokens, the characters, or a
+pruning that differs from Whisper's only under a bias. More variants per clip (a keyword's length against its token
+count at fixed text) would narrow it.
+
+**Kept for the probes.** `Bias.fold` (`foldCases` is now on in `DefaultBias`), `share`, `wordEnd`, `spent` and
+`bareWritten` are unexported, their zero values the old rules; `TestCaseSpellings`, `TestKeywordSpent`,
+`TestByteKeywords` and `TestCaseKeywords` pin them. The probes of F-042 and F-044 vary F-029's bias (`f029Bias`), so
+their tables stay reproducible.
+
 ## F-045 — The Needle 3 text model: its files against Whistle's, the `.cact` map, and a float forward pass equal to JAX (PLAN.md 11.1, 11.2) (2026-10-11)
 
 **Question.** Do `needle3.safetensors` and `needle3.cact` (HF `Cactus-Compute/needle3` @ `93e88ede`) load through the

@@ -1191,6 +1191,18 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       gives 47/53 and 26/32 sets (`DefaultBias` 17/32) but loses `pl-francja-present`, a 0.0033-nat near-tie; w 1.5
       fits 31/32 sets but 44/53 cases. Defaults unchanged, so the guard set is unchanged. Open: case-insensitive
       matching (`PAARE` = `Paare` in the engine), phrase loops, the capitalised bare spelling (F-042).
+      (2026-10-11) — partial, second round: `oracle kwvariants` records 31 more keyword files on 8 clips
+      (`testdata/oracle/kwvariants`): the engine ignores case (13 of 13 capitals), needs a word start, no word end,
+      and matches token ids (`Adop` = `▁Ad op` takes effect, `Paa` and `alivi` do not). `TestProbeFold` scores 308
+      biases on the 53 cases, 32 sets and 31 variants: case spellings on token ids (`fold=cases`) cost nothing and add
+      9 variants; a matcher over folded bytes is 42/53 at best, a bonus per character 40–42/53; `spent` stops the
+      loops but turns the variant `Cowley` into a finished-slot search miss; the capitalised bare spelling is the
+      weight, not the form. `DefaultBias` is now `w=1.8 complete=1.5` with the case spellings: 47/53 cases
+      (`it-montagne-distractor` won, nothing lost), 18/32 sets, 29/31 variants, the rest of the guard set unchanged.
+      `de-paare-missed` still differs: no bias makes it equal without a loss. Two trades are left to the user:
+      `w=2.15 complete=0` (`de-paare-missed` equal, 28/32 sets) for `pl-francja-present`, and `spent` for the
+      variant `Cowley`. Open: what the engine's bonus depends on, since `accomun` and `Paare` both have 3 tokens and
+      want bonuses on either side of the threshold that prunes "Bare" (F-044).
 - [x] Optional: an HTTP server (`/transcribe`, `/stream` over WebSocket)
       (2026-10-11) — `whistle serve` (`internal/server`) loads the model once. `POST /transcribe` takes a WAV body
       or raw 16 kHz mono PCM (`?format=s16le|f32le`) with the options as query parameters (`language`, repeatable

@@ -8,6 +8,7 @@
 //	go run -tags oracle ./tools/oracle depth              # transcripts at --audio-depth 2..7 into testdata/oracle/depth
 //	go run -tags oracle ./tools/oracle keywords           # keyword-biasing cases into testdata/oracle/keywords
 //	go run -tags oracle ./tools/oracle kwsets             # keyword sets on one clip into testdata/oracle/kwsets
+//	go run -tags oracle ./tools/oracle kwvariants         # keyword spellings on several clips into testdata/oracle/kwvariants
 //	go run -tags oracle ./tools/oracle silence            # the empty-JSON sweep into testdata/oracle/silence
 //	go run -tags oracle ./tools/oracle limits             # length limits into testdata/oracle/limits
 //	go run -tags oracle ./tools/oracle librispeech-audio  # the LibriSpeech subset into models/corpus/librispeech
@@ -41,6 +42,7 @@ const (
 	cmdNameDepth       = "depth"
 	cmdNameKeywords    = "keywords"
 	cmdNameKWSets      = "kwsets"
+	cmdNameKWVariants  = "kwvariants"
 	cmdNameSilence     = "silence"
 	cmdNameLimits      = "limits"
 	cmdNameLSAudio     = "librispeech-audio"
@@ -50,7 +52,7 @@ const (
 )
 
 const usage = "usage: oracle clips [-audio dir] | " +
-	"oracle run|probes|depth|keywords|kwsets|silence|limits|librispeech|stream " +
+	"oracle run|probes|depth|keywords|kwsets|kwvariants|silence|limits|librispeech|stream " +
 	"[-audio dir] [-out dir] [-oracle dir] [-corpus dir] [-models dir] [-engine dir] | " +
 	"oracle librispeech-audio [-corpus dir] [-out dir] | " +
 	"oracle bench [-audio dir] [-oracle dir] [-models dir] [-engine dir] [-out file] [-warmup n] [-runs n] [-long n] " +
@@ -66,6 +68,7 @@ var engineCmds = map[string]struct {
 	cmdNameDepth:       {"depth", cmdDepth},
 	cmdNameKeywords:    {"keywords", cmdKeywords},
 	cmdNameKWSets:      {"kwsets", cmdKWSets},
+	cmdNameKWVariants:  {"kwvariants", cmdKWVariants},
 	cmdNameSilence:     {"silence", cmdSilence},
 	cmdNameLimits:      {"limits", cmdLimits},
 	cmdNameLibriSpeech: {"librispeech", cmdLibriSpeech},
