@@ -883,6 +883,17 @@ func TestGate(t *testing.T) {
 
 	g.leave()
 
+	// An ended context gets no slot, though one is free, and leaves it free.
+	gone, stop := context.WithCancel(ctx)
+	stop()
+
+	for _, queued := range []bool{true, false} {
+		err = g.enter(gone, queued)
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("ended context, queued %v: %v, want context.Canceled", queued, err)
+		}
+	}
+
 	err = g.enter(ctx, true)
 	if err != nil {
 		t.Errorf("after leave: %v", err)
