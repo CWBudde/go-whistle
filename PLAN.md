@@ -1540,9 +1540,12 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
 - [ ] GEMM in AVX2+FMA: `algo-tensor` has `gemm_arm64.s` but no amd64 GEMM, and `whistle doctor` says so on x86
       ("AVX2: CQ LUT GEMV; AVX2+FMA: dot, axpy, softmax exp; GEMM in Go"). The float products (the Monarch
       Kronecker products, the float path) therefore run in pure Go there. 9.4's note that they run on "the existing
-      NEON/AVX2 GEMM" is only true on arm64; correct it. The kernel belongs in `algo-tensor` (with its pure-Go
-      fallback, equivalence test and golden hashes); then bump the module here. **Accept:** `Embed` and
-      `Transcribe` hashes unchanged on amd64 (outputs may differ from arm64 only where they already do), and a
+      NEON/AVX2 GEMM" is only true on arm64; correct it. The kernel belongs in `algo-tensor`: its PLAN 1.3 (after 1.1,
+      1.2 and v0.2.0) gives `tensor.MatMulTransB` an AVX2 + FMA kernel as a numerics change, released as v0.3.0;
+      then bump the module here. **Accept:** with algo-tensor v0.3.0, the parity numbers on amd64 and arm64 stay at
+      least as good as before (`TestTranscribeMatchesEngine`, the keyword fixtures, the depth ladder, the stream
+      decisions, the LibriSpeech WER and the `Embed` cosine against the engine), the `Embed` and `Transcribe` outputs
+      that change are named with their largest difference and their fixtures regenerated in the same change, and a
       measured TTFT gain on an x86 machine.
 - [ ] Benchmarks on linux/amd64: `bench/RESULTS.md` has only the Apple M5 Pro. Add a `just bench` run on an x86
       machine (with the CPU, cores and governor recorded), and the engine side where a linux/amd64 engine build
