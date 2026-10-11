@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -12,14 +11,15 @@ import (
 	"time"
 
 	"github.com/cwbudde/go-whistle/internal/frontend"
+	"github.com/cwbudde/go-whistle/internal/pcm"
 	"github.com/cwbudde/go-whistle/whistle"
 	"github.com/spf13/cobra"
 )
 
 // PCM formats whistle stream reads from stdin.
 const (
-	formatS16 = "s16le" // signed 16-bit little-endian integers, scaled by 1/32768 as the WAV reader does
-	formatF32 = "f32le" // IEEE float32 little-endian, in [-1, 1]
+	formatS16 = pcm.S16LE
+	formatF32 = pcm.F32LE
 )
 
 // streamConfig is how runStream feeds and prints a stream.
@@ -226,18 +226,7 @@ func (p *pcmSource) next() ([]float32, error) {
 		return nil, fmt.Errorf("read stdin: %w", err)
 	}
 
-	pcm := make([]float32, n/p.width)
-
-	for i := range pcm {
-		b := p.buf[i*p.width:]
-		if p.width == 2 {
-			pcm[i] = float32(int16(binary.LittleEndian.Uint16(b))) / 32768 // #nosec G115 -- reinterprets the bits.
-		} else {
-			pcm[i] = math.Float32frombits(binary.LittleEndian.Uint32(b))
-		}
-	}
-
-	return pcm, nil
+	return pcm.Decode(p.buf[:n], p.width)
 }
 
 // read is one chunk or the error that ends the input.

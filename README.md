@@ -176,6 +176,71 @@ whistle embed --format npy -o clip.npy testdata/audio/ls-other-3080-5040-0018.wa
 
 `numpy.load("clip.npy")` gives a `float32` array of shape `(33, 512)`.
 
+### Server
+
+`whistle serve` loads the model once and serves it over HTTP on `127.0.0.1:8080` (`--addr`), with a log line per
+request on stderr. `POST /transcribe` takes a WAV file as the body, or raw 16 kHz mono PCM with `?format=s16le` or
+`f32le`. Its options are query parameters: `language`, `keywords` (repeatable), `depth` and `word_timestamps`. It
+answers with the JSON `whistle transcribe --json` prints:
+
+```bash
+whistle serve
+curl -s --data-binary @testdata/audio/ls-other-3080-5040-0018.wav 'http://127.0.0.1:8080/transcribe?word_timestamps=true'
+ffmpeg -loglevel error -i testdata/audio/ls-clean-6930-75918-0000.wav -f s16le -ac 1 -ar 16000 talk.raw
+curl -s --data-binary @talk.raw 'http://127.0.0.1:8080/transcribe?format=s16le&language=en'
+```
+
+```json
+{"text":"Directed for your master.","language":"en","words":[{"word":"Directed","start":0.64,"end":1.12,"probability":0.894},{"word":"for","start":1.12,"end":1.52,"probability":0.739},{"word":"your","start":1.52,"end":1.68,"probability":0.980},{"word":"master.","start":1.68,"end":2.08,"probability":0.962}],"ttft_ms":16.1,"decode_tps":947.3}
+{"text":"Concord returned to its place amidst the tents.","language":"en","ttft_ms":14.0,"decode_tps":975.3}
+```
+
+Errors are JSON `{"error":"..."}`: 400 for bad options or audio, 408 for a body slower than `--read-timeout`, 413
+for a body over `--max-body-mib` (16 MiB), 422 for audio over 30 s, 503 when `--concurrency` passes run and `--queue`
+requests wait. `GET /healthz` and `GET /v1/info` (the model's SHA-256, weights mode, languages and the limits) are
+there too.
+
+`GET /stream` is a WebSocket (`?format=s16le|f32le`, `language`, `keywords`). Each binary message is a chunk of
+16 kHz mono PCM for one stream call and gets one text message back, the call's stream JSON as `whistle stream --json`
+prints it. The text message `{"type":"stop"}` commits the rest, sends that result and closes the connection. A Go
+client with [`github.com/coder/websocket`](https://github.com/coder/websocket) (error checks shortened to `check`):
+
+```go
+c, _, err := websocket.Dial(ctx, "ws://127.0.0.1:8080/stream?format=s16le", nil)
+check(err)
+
+for i := 0; i < len(pcm); i += 32000 { // 1 s of s16le per call
+	check(c.Write(ctx, websocket.MessageBinary, pcm[i:min(i+32000, len(pcm))]))
+
+	_, msg, err := c.Read(ctx)
+	check(err)
+	fmt.Println(string(msg))
+}
+
+check(c.Write(ctx, websocket.MessageText, []byte(`{"type":"stop"}`)))
+
+_, msg, err := c.Read(ctx) // the stop's result
+check(err)
+fmt.Println(string(msg))
+
+_, _, err = c.Read(ctx) // then the server closes
+fmt.Println("close:", websocket.CloseStatus(err))
+```
+
+With `pcm` read from `talk.raw`:
+
+```text
+{"text":"","words":[],"pending":"Come and call.","language":"en","received":1.00,"pass_ms":18.5}
+{"text":"","words":[],"pending":"Concord returned to its","language":"en","received":2.00,"pass_ms":21.3}
+{"text":"Concord returned to its","words":[{"word":"Concord","start":0.56,"end":1.20,"probability":0.909},{"word":"returned","start":1.20,"end":1.60,"probability":0.843},{"word":"to","start":1.60,"end":1.84,"probability":0.990},{"word":"its","start":1.84,"end":2.00,"probability":0.998}],"pending":"place amidst the 10.","language":"en","received":3.00,"pass_ms":34.8}
+{"text":"place amidst the","words":[{"word":"place","start":2.00,"end":2.24,"probability":0.998},{"word":"amidst","start":2.24,"end":2.80,"probability":0.977},{"word":"the","start":2.80,"end":2.96,"probability":0.995}],"pending":"tents.","language":"en","received":3.50,"pass_ms":34.0}
+{"text":"tents.","words":[{"word":"tents.","start":2.96,"end":3.28,"probability":0.949}],"pending":"","language":"en","received":3.50,"pass_ms":0.0}
+close: StatusNormalClosure
+```
+
+Ctrl-C (or SIGTERM) shuts the server down: running requests finish, and open streams get their stop result and a
+1001 close. `whistle serve --help` lists the limits; the `internal/server` package doc has the whole protocol.
+
 All commands exit with 0 on success, 1 when they fail and 2 for a wrong command line.
 
 ## Go API

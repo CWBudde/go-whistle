@@ -1,6 +1,7 @@
 // Command whistle is the CLI of the pure-Go Whistle port: download fetches the pinned model files, transcribe turns
 // WAV files of up to 30 s into text, stream transcribes audio of any length live from a WAV file or raw PCM on stdin,
-// embed writes the encoder output, and doctor checks the install.
+// embed writes the encoder output, doctor checks the install, and serve offers transcription and streaming over
+// HTTP and WebSocket.
 //
 // It exits with 0 on success, 1 when a command fails and 2 for a wrong command line.
 package main
