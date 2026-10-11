@@ -6,7 +6,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/cwbudde/go-whistle/internal/tensor"
+	"github.com/cwbudde/algo-tensor/tensor"
 )
 
 // kernel selects the inner product over the packed indices. All three give

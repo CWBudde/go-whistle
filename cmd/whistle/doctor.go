@@ -347,8 +347,8 @@ func weightsMode(format string) string {
 }
 
 // kernels names the assembly kernels this build and CPU run, mirroring the
-// build tags and CPU checks of internal/tensor, internal/cq and
-// internal/needle.
+// build tags and CPU checks of github.com/cwbudde/algo-tensor/tensor,
+// internal/cq and internal/needle.
 func kernels() string {
 	if puregoBuild {
 		return "pure Go (purego build)"

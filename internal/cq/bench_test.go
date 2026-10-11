@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/cwbudde/go-whistle/internal/tensor"
+	"github.com/cwbudde/algo-tensor/tensor"
 )
 
 // benchWorkers sets the tensor workers to GOMAXPROCS, which -cpu sets per

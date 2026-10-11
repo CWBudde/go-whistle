@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cwbudde/go-whistle/internal/tensor"
+	"github.com/cwbudde/algo-tensor/tensor"
 )
 
 // The lut kernel (docs/FINDINGS.md F-034) is the nibble kernel recast for
