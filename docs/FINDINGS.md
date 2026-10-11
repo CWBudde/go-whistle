@@ -3771,3 +3771,55 @@ column for it.
   keys and values by analogy with the self-attention.
 - **Faster quantisation.** `QuantizeRow` is Go (0.83 ns per value); a NEON/AVX2 version would recover most of the TTFT
   cost. An `SDOT` dot kernel (FEAT_DotProd) would replace 4 instructions per 16 bytes by one.
+
+## F-043 — js/wasm: the same transcripts without FMA or threads, and where the time goes (Phase 10) (2026-10-11)
+
+**Question.** The web demo (`cmd/whistle-wasm`, `web/`) runs the library as `GOOS=js GOARCH=wasm`: the pure-Go kernels
+(`*_noasm.go`), one thread, no SIMD, and no fused multiply-add, since WebAssembly 1.0 has none and Go's wasm back end
+emits none. On arm64, Go fuses `x*y + z` even in pure Go, so the wasm float32 sums round differently from every native
+build. Do the transcripts survive that, and how fast is it?
+
+### Parity
+
+- The whole `whistle` package passes under `go_js_wasm_exec` (Node 24.12) without `-short`, in 657 s: the 32-clip
+  engine parity (`TestTranscribeMatchesEngine`, the same single miss as native, F-026), the word-time floors (F-033),
+  the stream parity floors (F-036), `Embed`'s cosines and the depth and keyword tests. So does every other package but
+  `cmd/whistle` and `internal/server`, whose tests need sockets (wasm's `net` is a stub) and run out of wasm32's 4 GB
+  after many model loads; neither ships to the browser.
+- On 4 clips (en ×2, de, fr) the page's path (the worker, `decodeWAV`, `transcribe` with word timestamps) gives
+  `whistle transcribe --json --word-timestamps`'s JSON byte for byte once `ttft_ms` and `decode_tps` are dropped,
+  probabilities included; a 1 s file stream gives `whistle stream --json`'s calls byte for byte without `pass_ms`
+  (`just wasm-test`, `cmd/whistle-wasm/node/headless.mjs`). In Chromium the page gave the same JSON for the German clip.
+- The one visible effect of the missing FMA: in `TestInt8Memory` a projected value fell within float32 rounding of a
+  quantisation tie (x / s = −20.4999…), rounded the other way than natively and landed a hair over the test's
+  "half a step" bound; the bound now allows the float32 rounding of x / s and s · q. Nothing else moved.
+
+### Speed
+
+`TestEngineTranscribe` (the 4 clips, beam search at full depth, word timestamps on), Apple M5 Pro, idle machine:
+
+| build                           | TTFT ms   | decode tok/s |
+| ------------------------------- | --------- | ------------ |
+| arm64, NEON, all cores          | 13 – 21   | 885 – 1121   |
+| arm64, NEON, `GOMAXPROCS=1`     | 24 – 64   | 251 – 292    |
+| arm64, `purego`, all cores      | 48 – 79   | 290 – 307    |
+| arm64, `purego`, `GOMAXPROCS=1` | 101 – 265 | 64 – 68      |
+| js/wasm, Node 24.12 (V8)        | 284 – 770 | 24 – 27      |
+| js/wasm, Chromium 153, the page | 913 (de)  | 20.5 (de)    |
+
+So wasm is about 2.6× slower than pure Go on one core, which is itself 4× slower than NEON on one core; the
+cores are worth another 3.5–4.5×. A 6.9 s clip takes 2.4 s under Node and 3.0 s in the page, faster than real time.
+The model loads from bytes in 15–45 ms.
+
+A V8 profile of two clips (unstripped build): the packed CQ kernels take two thirds of the time
+(`cq.(*Matrix).lookupNibble` 28.5 %, `nibbleTables` 15.1 %, `lookupNibble4` 11.6 %, `nibbleTables4` 4.7 %, `rotate`
+5.8 %), then `tensor.dotF32Generic` 6.0 % and `math.exp` with its helpers 6 %. `WithFloatWeights` is no way
+out: dense float32 decodes at 22–24 against 24–25 tok/s packed and needs 221 MB instead of 17 MB, so the demo stays
+packed.
+
+### Open
+
+- **Threads.** Go's wasm port runs one thread; several workers, each with its own model, could run beams or encoder
+  blocks in parallel, at 17 MB a copy.
+- **SIMD.** Go's wasm back end has no SIMD (`GOWASM` knows only `satconv` and `signext`) and no assembly; the LUT
+  kernels would need a hand-written wasm module through JS, outside pure Go.
