@@ -27,18 +27,19 @@ type stem struct {
 	h        Hypothesis
 	channels int
 
-	w   *tensor.Tensor    // [3, 3, 1, C]
-	dw  [2]*tensor.Tensor // [3, 3, 1, C]
-	pw  [2]needle.Linear  // [C, C] (out, in)
-	out needle.Linear     // [dim, mels'·C]
-	dim int
-	in  int // stem/out's input width
+	w    *tensor.Tensor    // [3, 3, 1, C]
+	dw   [2]*tensor.Tensor // [3, 3, 1, C]
+	pw   [2]needle.Linear  // [C, C] (out, in)
+	out  needle.Linear     // [dim, mels'·C]
+	dim  int
+	in   int // stem/out's input width
+	mels int // the input's mel bins
 
 	peGate float32 // σ(pe_gate), for PEFlatConcat and PEFlatInterleaved
 }
 
 func loadStem(src weights.Source, h Hypothesis, mels int) (*stem, error) {
-	s := &stem{h: h}
+	s := &stem{h: h, mels: mels}
 
 	var err error
 
@@ -178,9 +179,157 @@ func (s *stem) conv(x, k *tensor.Tensor, stage, groups int) (*tensor.Tensor, err
 	})
 }
 
-// forward maps mel (frames rows of mels values) to T rows of dim values.
-func (s *stem) forward(mel []float32, frames, mels int) ([]float32, int, error) {
-	x, err := tensor.New(mel, []int64{1, int64(frames), int64(mels), 1})
+// stemChunk is the number of output frames the stem computes at once
+// (docs/FINDINGS.md F-038). The whole first conv of a 30 s clip is 1500 ×
+// 40 × 128 floats, 29 MiB live at once (F-037); a chunk of 8 frames needs
+// 35 of its 1500 rows, and the chunks run on tensor.Parallel. A multiple
+// of 4 starts every chunk on a 4-row block of the pointwise products.
+const stemChunk = 8
+
+// forward maps mel (frames rows of s.mels values) to T rows of dim values,
+// stemChunk output frames at a time. Each chunk recomputes the few rows
+// its convs share with the next one (one per stride-2 stage). A conv
+// pixel reads the same taps and skips the same padding as in whole, and
+// the activations work value by value. The pointwise products sum some
+// rows in blocks of 4 (the NEON float GEMM; cq's nibble4 kernel, which
+// purego and amd64 without AVX2 run), so the outputs equal whole's bit for
+// bit where every chunk starts on such a block: for Best's mel widths of
+// 20 and 10, not for VALID padding's 19 and 9.
+func (s *stem) forward(mel []float32, frames int) ([]float32, int, error) {
+	t := s.length(frames)
+	if t == 0 || s.length(s.mels)*s.channels != s.in {
+		return s.whole(mel, frames) // reports the error
+	}
+
+	var n [stemStages + 2]int // input length of each conv stage, then T
+
+	n[0] = frames
+
+	for stage := range stemStages + 1 {
+		st := s.stride(stage)
+		lo, hi := s.pad(n[stage], st)
+		n[stage+1] = (n[stage]+lo+hi-3)/st + 1
+	}
+
+	out := make([]float32, t*s.dim)
+	chunks := (t + stemChunk - 1) / stemChunk
+	errs := make([]error, chunks)
+
+	tensor.Parallel(chunks, 1, func(lo, hi int) {
+		for c := lo; c < hi; c++ {
+			o0, o1 := c*stemChunk, min(t, (c+1)*stemChunk)
+			errs[c] = s.chunk(out[o0*s.dim:o1*s.dim], mel, n, o0, o1)
+		}
+	})
+
+	for _, err := range errs {
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	return out, t, nil
+}
+
+// chunk writes output frames [o0, o1) of the stem to dst: the rows each
+// conv stage needs, back from the output, then the stages on those rows.
+func (s *stem) chunk(dst, mel []float32, n [stemStages + 2]int, o0, o1 int) error {
+	var lo, hi [stemStages + 2]int // rows [lo, hi) of each stage's input, then of the output
+
+	lo[stemStages+1], hi[stemStages+1] = o0, o1
+	for stage := stemStages; stage >= 0; stage-- {
+		st := s.stride(stage)
+		pad, _ := s.pad(n[stage], st)
+		lo[stage] = max(0, lo[stage+1]*st-pad)
+		hi[stage] = min(n[stage], (hi[stage+1]-1)*st-pad+3)
+	}
+
+	x, err := tensor.New(mel[lo[0]*s.mels:hi[0]*s.mels], []int64{1, int64(hi[0] - lo[0]), int64(s.mels), 1})
+	if err != nil {
+		return err
+	}
+
+	x, err = s.convRows(x, s.w, 0, 1, n[0], lo[0], lo[1], hi[1])
+	if err != nil {
+		return fmt.Errorf("encoder: stem conv: %w", err)
+	}
+
+	applyAct(x.RawData(), s.h.StemConvAct)
+
+	for k := range stemStages {
+		x, err = s.convRows(x, s.dw[k], k+1, s.channels, n[k+1], lo[k+1], lo[k+2], hi[k+2])
+		if err != nil {
+			return fmt.Errorf("encoder: stem dw_%d: %w", k+1, err)
+		}
+
+		s.pointwise(x.RawData(), k)
+	}
+
+	s.output(dst, x, o0, o1-o0)
+
+	return nil
+}
+
+// convRows is conv for output rows [o0, o1) of stage on x, the input rows
+// from inLo on of an axis of n rows. It pads the chunk where the whole
+// axis is padded and nowhere else, so each output pixel reads the taps
+// that conv reads for it, in the same order.
+func (s *stem) convRows(x, k *tensor.Tensor, stage, groups, n, inLo, o0, o1 int) (*tensor.Tensor, error) {
+	shape := x.Shape()
+	st := s.stride(stage)
+	pad, _ := s.pad(n, st)
+	top := pad + inLo - o0*st
+	bottom := max(0, (o1-o0-1)*st+3-int(shape[1])-top)
+	left, right := s.pad(int(shape[2]), st)
+
+	return ops.Conv2D(x, k, nil, ops.Conv2DParams{
+		StrideH: st, StrideW: st, PadTop: top, PadBottom: bottom, PadLeft: left, PadRight: right, Groups: groups,
+	})
+}
+
+// pointwise runs depthwise stage k's activation, pointwise product and its
+// activation on d, rows of channels values, in place.
+func (s *stem) pointwise(d []float32, k int) {
+	applyAct(d, s.h.StemDWAct)
+
+	y := make([]float32, len(d))
+	s.pw[k].Apply(y, d, len(d)/s.channels)
+	applyAct(y, s.h.StemPWAct)
+	copy(d, y)
+}
+
+// output flattens x, t time rows of the last stage starting at frame p0,
+// adds a flat pe_gate signal and writes stem.out's t rows to dst.
+func (s *stem) output(dst []float32, x *tensor.Tensor, p0, t int) {
+	shape := x.Shape()
+	m, c := int(shape[2]), int(shape[3])
+
+	flat := x.RawData()
+	if s.h.StemFlatten == FlattenChannelMel {
+		nhwc := flat
+		flat = make([]float32, len(nhwc))
+
+		for i := range t {
+			for f := range m {
+				for ch := range c {
+					flat[(i*c+ch)*m+f] = nhwc[(i*m+f)*c+ch]
+				}
+			}
+		}
+	}
+
+	if s.h.PE == PEFlatConcat || s.h.PE == PEFlatInterleaved {
+		addSinusoidFrom(flat, p0, t, s.in, s.peGate, s.h.PE.interleaved())
+	}
+
+	s.out.Apply(dst, flat, t)
+}
+
+// whole is forward on the whole clip at once, as the stem ran before the
+// chunks: the reference of TestStemChunks, and the path that reports a
+// clip or a hypothesis the stem does not fit.
+func (s *stem) whole(mel []float32, frames int) ([]float32, int, error) {
+	x, err := tensor.New(mel, []int64{1, int64(frames), int64(s.mels), 1})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -198,13 +347,7 @@ func (s *stem) forward(mel []float32, frames, mels int) ([]float32, int, error) 
 			return nil, 0, fmt.Errorf("encoder: stem dw_%d: %w", k+1, err)
 		}
 
-		d := x.RawData()
-		applyAct(d, s.h.StemDWAct)
-
-		y := make([]float32, len(d))
-		s.pw[k].Apply(y, d, len(d)/s.channels)
-		applyAct(y, s.h.StemPWAct)
-		copy(d, y)
+		s.pointwise(x.RawData(), k)
 	}
 
 	shape := x.Shape()
@@ -214,26 +357,8 @@ func (s *stem) forward(mel []float32, frames, mels int) ([]float32, int, error) 
 		return nil, 0, fmt.Errorf("%w: stem output %d × %d does not fit stem.out (%d)", ErrRuledOut, m, c, s.in)
 	}
 
-	flat := x.RawData()
-	if s.h.StemFlatten == FlattenChannelMel {
-		nhwc := flat
-		flat = make([]float32, len(nhwc))
-
-		for i := range t {
-			for f := range m {
-				for ch := range c {
-					flat[(i*c+ch)*m+f] = nhwc[(i*m+f)*c+ch]
-				}
-			}
-		}
-	}
-
-	if s.h.PE == PEFlatConcat || s.h.PE == PEFlatInterleaved {
-		addSinusoid(flat, t, s.in, s.peGate, s.h.PE.interleaved())
-	}
-
 	out := make([]float32, t*s.dim)
-	s.out.Apply(out, flat, t)
+	s.output(out, x, 0, t)
 
 	return out, t, nil
 }

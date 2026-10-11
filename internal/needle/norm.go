@@ -50,14 +50,16 @@ func (n ZCRMSNorm) Apply(dst, x []float32) {
 	d := len(n.gain)
 	checkRows("ZCRMSNorm", dst, x, d)
 
-	for r := 0; r < len(x); r += d {
-		row, out := x[r:r+d], dst[r:r+d]
-		rms := rowRMS(row)
+	forRows(len(x)/d, normPieceValues/d, func(lo, hi int) {
+		for r := lo * d; r < hi*d; r += d {
+			row, out := x[r:r+d], dst[r:r+d]
+			rms := rowRMS(row)
 
-		for c, g := range n.gain {
-			out[c] = g * row[c] / rms
+			for c, g := range n.gain {
+				out[c] = g * row[c] / rms
+			}
 		}
-	}
+	})
 }
 
 // RMSUnit is architecture.py _rms_unit: each row of dim values of x
@@ -66,14 +68,16 @@ func (n ZCRMSNorm) Apply(dst, x []float32) {
 func RMSUnit(dst, x []float32, dim int) {
 	checkRows("RMSUnit", dst, x, dim)
 
-	for r := 0; r < len(x); r += dim {
-		row, out := x[r:r+dim], dst[r:r+dim]
-		inv := float32(1 / math.Sqrt(float64(meanSquare(row)+normEps)))
+	forRows(len(x)/dim, normPieceValues/dim, func(lo, hi int) {
+		for r := lo * dim; r < hi*dim; r += dim {
+			row, out := x[r:r+dim], dst[r:r+dim]
+			inv := float32(1 / math.Sqrt(float64(meanSquare(row)+normEps)))
 
-		for c, v := range row {
-			out[c] = v * inv
+			for c, v := range row {
+				out[c] = v * inv
+			}
 		}
-	}
+	})
 }
 
 // rowRMS is sqrt(mean(row²) + eps), rounded like upstream's float32.

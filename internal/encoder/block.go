@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cwbudde/go-whistle/internal/needle"
+	"github.com/cwbudde/go-whistle/internal/tensor"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
 
@@ -218,12 +219,12 @@ func (b *block) conv(x []float32, t int) {
 	switch b.h.ConvNorm {
 	case NormBeforeAct:
 		b.convOut.Apply(c, c)
-		applyAct(c, b.h.ConvAct)
+		applyActRows(c, t, b.h.ConvAct)
 	case NormAfterAct:
-		applyAct(c, b.h.ConvAct)
+		applyActRows(c, t, b.h.ConvAct)
 		b.convOut.Apply(c, c)
 	case NormAfterPW2:
-		applyAct(c, b.h.ConvAct)
+		applyActRows(c, t, b.h.ConvAct)
 	}
 
 	o := make([]float32, t*d)
@@ -238,6 +239,20 @@ func (b *block) conv(x []float32, t int) {
 	}
 }
 
+// blockRows is the fewest rows of one tensor.Parallel piece in the conv
+// module's row-wise loops (the GLU, the depthwise conv, the activation):
+// 16 rows of 512 sigmoids or 9 taps take some 30 µs on one core. Every row
+// is computed on its own, so any split gives the same bits
+// (docs/FINDINGS.md F-038).
+const blockRows = 16
+
+// applyActRows is applyAct on t rows of x, on tensor.Parallel.
+func applyActRows(x []float32, t int, a Act) {
+	w := len(x) / max(t, 1)
+
+	tensor.Parallel(t, blockRows, func(lo, hi int) { applyAct(x[lo*w:hi*w], a) })
+}
+
 // gated applies the GLU to t rows of pw1's output.
 func (b *block) gated(p []float32, t int) []float32 {
 	if b.h.GLU == GLUNone {
@@ -247,23 +262,25 @@ func (b *block) gated(p []float32, t int) []float32 {
 	h := b.half
 	out := make([]float32, t*h)
 
-	for i := range t {
-		a, g := p[i*b.glu:i*b.glu+h], p[i*b.glu+h:(i+1)*b.glu]
-		o := out[i*h : (i+1)*h]
+	tensor.Parallel(t, blockRows, func(lo, hi int) {
+		for i := lo; i < hi; i++ {
+			a, g := p[i*b.glu:i*b.glu+h], p[i*b.glu+h:(i+1)*b.glu]
+			o := out[i*h : (i+1)*h]
 
-		for k := range o {
-			switch b.h.GLU {
-			case GLUValueGate:
-				o[k] = a[k] * sigmoid(g[k])
-			case GLUGateValue:
-				o[k] = sigmoid(a[k]) * g[k]
-			case GLUSwishValue:
-				o[k] = a[k] * sigmoid(a[k]) * g[k]
-			case GLUValueSwish:
-				o[k] = a[k] * g[k] * sigmoid(g[k])
+			for k := range o {
+				switch b.h.GLU {
+				case GLUValueGate:
+					o[k] = a[k] * sigmoid(g[k])
+				case GLUGateValue:
+					o[k] = sigmoid(a[k]) * g[k]
+				case GLUSwishValue:
+					o[k] = a[k] * sigmoid(a[k]) * g[k]
+				case GLUValueSwish:
+					o[k] = a[k] * g[k] * sigmoid(g[k])
+				}
 			}
 		}
-	}
+	})
 
 	return out
 }
@@ -280,21 +297,23 @@ func (b *block) depthwise(x []float32, t int) []float32 {
 
 	out := make([]float32, t*h)
 
-	for i := range t {
-		o := out[i*h : (i+1)*h]
+	tensor.Parallel(t, blockRows, func(lo, hi int) {
+		for i := lo; i < hi; i++ {
+			o := out[i*h : (i+1)*h]
 
-		for j := range k {
-			src := i - pad + j
-			if src < 0 || src >= t {
-				continue
-			}
+			for j := range k {
+				src := i - pad + j
+				if src < 0 || src >= t {
+					continue
+				}
 
-			w, row := b.dw[j*h:(j+1)*h], x[src*h:(src+1)*h]
-			for c := range o {
-				o[c] += w[c] * row[c]
+				w, row := b.dw[j*h:(j+1)*h], x[src*h:(src+1)*h]
+				for c := range o {
+					o[c] += w[c] * row[c]
+				}
 			}
 		}
-	}
+	})
 
 	return out
 }

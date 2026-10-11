@@ -1064,6 +1064,9 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       the 64 MB target holds for the weights, not for a 30 s run. Speed, the same process alternating: decode 1.56–1.59×
       faster, `Load` 10 against 165 ms, but TTFT 2–8 % slower (batched products, the 2048-wide CQ4 φ tables). Open
       levers for the peak and the TTFT: `docs/FINDINGS.md` F-037.
+      (2026-10-10) — 9.5 runs the stem in chunks of 8 output frames: a 30 s `Transcribe` peaks at 106.4–108.1 MiB
+      process RSS packed (was 126.8–127.6), 97.5–97.7 MiB on one core; the model stays at 34.7–34.9 MiB. The rest is
+      `GOGC` headroom over a 29–40 MiB live heap during the decode. `docs/FINDINGS.md` F-038.
 - [ ] 9.3 Optional int8 activations and an int8 KV cache (`act_bits 8`, `kv_bits 8`) to mirror the engine's numerics,
       behind a flag.
 - [x] 9.4 Plan 9 assembly (NEON/AVX2) for the LUT GEMV, the FWHT, the Monarch Kronecker products and the
@@ -1089,7 +1092,19 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       Kronecker products run on `internal/tensor`'s existing NEON/AVX2 GEMM; Sinkhorn stayed in Go (8.6× faster in the
       exp domain, under 1 % of the profile, F-035). Every kernel has a pure-Go fallback and an equivalence test, and the
       amd64 builds pass in linux/amd64 Docker with AVX2.
-- [ ] 9.5 Parallelism: the encoder over time blocks and heads; the decoder over beams.
+- [x] 9.5 Parallelism: the encoder over time blocks and heads; the decoder over beams.
+      (2026-10-10) — `tensor.Parallel` runs pieces on the caller and helpers from one budget for the process
+      (`Workers() − 1`, default GOMAXPROCS), so nested and concurrent callers (beams × kernels) stay bounded. Every
+      split keeps each output's sums in their order, so outputs are bit for bit the same for any worker count and equal
+      to `origin/main`'s (`Embed` of 32 clips and `Transcribe` texts, word times and probabilities hashed in both trees).
+      `MatMulTransB` and the lut GEMM split over rows (aligned to 4) or over the head's blocks of 32 rows; `cq.GEMMs` and
+      `needle.ApplyShared` rotate and tabulate an activation once for q/k/v/gate, the three φ and engram k/v (1.25× and
+      1.77× on one core). The encoder runs over time blocks (the stem in chunks of 8 frames, the row loops) and over
+      (head, row block) pairs in the attention; the decoder runs over beams as before (233–270 tok/s on one core,
+      960–1060 on all). `TestSpeedProbe`, old and new alternating at a load average of 4–7: median TTFT 65.3–67.1 →
+      21.2–21.3 ms packed, 60.7–62.9 → 23.4–24.0 ms float; the 30 s clip 332–337 → 66–67 ms and 311–314 → 72–75 ms;
+      decode 819–947 → 960–961 tok/s packed. Parity unchanged: 31/32, `Embed` 0.999827, WER 5.35 %, stream 797/930.
+      `docs/FINDINGS.md` F-038.
 - [ ] 9.6 Benchmarks (`bench/`): TTFT and decode tok/s against the engine on the same machine. The engine publishes
       11.1 ms TTFT and 1319 tok/s on an M4 Pro with 5 beams. Also the real-time factor for 30 s clips.
 - [ ] **Accept:** WER unchanged within 0.1 against the float path, with numbers recorded in `bench/RESULTS.md`.

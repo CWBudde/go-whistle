@@ -100,6 +100,23 @@ func linear(dst, x []float32, rows int, w []float32, out, in int) {
 	tensor.MatMulTransB(dst, out, x, w, rows, out, in)
 }
 
+// The fewest rows of one tensor.Parallel piece in the row-wise loops,
+// sized so that a piece takes some 20–60 µs on one core, well above the
+// cost of waking a helper (docs/FINDINGS.md F-038). Every row is computed
+// on its own, so any split gives the same bits.
+const (
+	normPieceValues = 1 << 16 // the norms: values per piece
+	gateRows        = 16      // the attention's sigmoid gate, 512 values a row
+	hadamardRows    = 8       // HadamardMLP, about 6 µs a row
+	mhcRows         = 32      // the mHC heads and mix, about 2 µs a row
+)
+
+// forRows runs fn over pieces of [0, t) of at least minRows rows each (the
+// last may be shorter) on tensor.Parallel.
+func forRows(t, minRows int, fn func(lo, hi int)) {
+	tensor.Parallel(t, minRows, fn)
+}
+
 // sigmoid is jax.nn.sigmoid in float32.
 func sigmoid(x float32) float32 {
 	return float32(1 / (1 + math.Exp(-float64(x))))

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"sync"
+
+	"github.com/cwbudde/go-whistle/internal/tensor"
 )
 
 // kernel selects the inner product over the packed indices. All three give
@@ -103,14 +105,60 @@ func (m *Matrix) gemm(k kernel, dst, x []float32, rows int) {
 		return // no block to look up: the assembly lut kernels index y[blocks*32-1]
 	}
 
-	s, _ := m.scratch.Get().(*scratch)
-	defer m.scratch.Put(s)
-
 	if k == kernelLUT {
-		m.gemmLUT(s, dst, x, rows)
+		gemmLUT([]*Matrix{m}, [][]float32{dst}, x, rows)
 		return
 	}
 
+	// The scalar kernels split over the activations in multiples of four,
+	// so that nibble4 sees the same groups of four for any worker count.
+	per := m.out * m.rowBytes
+	grain := ((lutPieceBytes+per-1)/per + 3) &^ 3
+
+	tensor.Parallel(rows, grain, func(lo, hi int) {
+		s, _ := m.scratch.Get().(*scratch)
+		defer m.scratch.Put(s)
+
+		m.gemmScalar(k, s, dst[lo*m.out:hi*m.out], x[lo*m.in:hi*m.in], hi-lo)
+	})
+}
+
+// GEMMs sets dsts[k] to ms[k].GEMM of the same activations x, rows × In,
+// for matrices that read one input: Whistle's q, k, v and gate
+// projections, or the three mHC φ. Where the matrices share the input
+// width, the group, the index width and the codebook, the lut kernel
+// rotates and tabulates each activation once for all of them, which
+// F-037 counted against the batched products. Every dsts[k] equals
+// ms[k].GEMM's result bit for bit (docs/FINDINGS.md F-038).
+func GEMMs(ms []*Matrix, dsts [][]float32, x []float32, rows int) {
+	if len(ms) != len(dsts) {
+		panic(fmt.Sprintf("cq: GEMMs of %d matrices into %d outputs", len(ms), len(dsts)))
+	}
+
+	shared := len(ms) > 0
+
+	for k, m := range ms {
+		if rows < 0 || len(x) != rows*m.in || len(dsts[k]) != rows*m.out {
+			panic(fmt.Sprintf("cq: GEMMs(len %d, len %d, %d rows) on [%d, %d]", len(dsts[k]), len(x), rows, m.out, m.in))
+		}
+
+		shared = shared && m.best() == kernelLUT && m.out > 0 && ms[0].sharesTables(m)
+	}
+
+	if !shared || rows == 0 {
+		for k, m := range ms {
+			m.GEMM(dsts[k], x, rows)
+		}
+
+		return
+	}
+
+	gemmLUT(ms, dsts, x, rows)
+}
+
+// gemmScalar runs a scalar kernel (gather, nibble, nibble4) on rows
+// activations.
+func (m *Matrix) gemmScalar(k kernel, s *scratch, dst, x []float32, rows int) {
 	pad := m.groups * m.group
 	i := 0
 

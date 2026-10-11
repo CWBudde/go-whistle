@@ -20,7 +20,7 @@ const (
 )
 
 // benchHadamard is a random HadamardMLP of Whistle's geometry.
-func benchHadamard(b *testing.B) *HadamardMLP {
+func benchHadamard(b testing.TB) *HadamardMLP {
 	b.Helper()
 
 	r := rand.New(rand.NewPCG(5, 7))
@@ -58,7 +58,7 @@ func benchHadamard(b *testing.B) *HadamardMLP {
 
 // benchAttention is a random attention of Whistle's geometry, with the
 // decoder's causal taps if taps is set.
-func benchAttention(b *testing.B, taps int) *Attention {
+func benchAttention(b testing.TB, taps int) *Attention {
 	b.Helper()
 
 	r := rand.New(rand.NewPCG(3, 4))
