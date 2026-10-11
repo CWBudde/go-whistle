@@ -138,6 +138,34 @@ async function checkClient() {
     fail(`client: paced calls ${sizes.join(", ")}`);
   }
 
+  // After a failed call, more audio starts no further calls, and stop
+  // rejects with the error.
+  let calls = 0;
+  const failing = {
+    ...fake,
+    async streamProcess() {
+      calls++;
+      throw new Error("pass failed");
+    },
+  };
+  const f = new StreamSession(failing);
+  await f.start({});
+  f.feed(new Float32Array(16000));
+  await f.busy;
+  for (let k = 0; k < 5; k++) {
+    f.feed(new Float32Array(16000));
+  }
+  const stopped = await f.stop().then(
+    () => "resolved",
+    (err) => err.message,
+  );
+  console.log(
+    `client: a failed call, 5 s more audio: ${calls} call(s), stop ${stopped}`,
+  );
+  if (calls !== 1 || stopped !== "pass failed") {
+    fail(`client: after a failed call: ${calls} calls, stop ${stopped}`);
+  }
+
   // A cache whose writes fail, as over the origin's quota.
   const bytes = new Uint8Array([1, 2, 3, 4]);
   const sha256 = await sha256Hex(bytes.slice().buffer);

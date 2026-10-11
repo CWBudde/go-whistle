@@ -277,8 +277,10 @@ export class StreamSession {
     this.pump();
   }
 
+  // pump starts the next call if there is none running and enough queued;
+  // after a failed call it starts none, and stop reports the error.
   pump() {
-    if (this.busy || this.queued < this.chunk) {
+    if (this.busy || this.error || this.queued < this.chunk) {
       return this.busy;
     }
 
