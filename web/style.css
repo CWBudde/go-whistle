@@ -1,0 +1,167 @@
+:root {
+  --fg: #1d2125;
+  --muted: #5f6b76;
+  --line: #d9dee3;
+  --accent: #2463eb;
+  --bg: #fbfbfc;
+  --pending: #8a95a1;
+  --error: #b42318;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+body {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  line-height: 1.45;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.75rem;
+}
+
+section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.row > label:first-child,
+.row > .label {
+  flex: 0 0 6rem;
+  color: var(--muted);
+}
+
+.row input[type="url"],
+.row input[type="text"],
+.row textarea,
+.row select {
+  flex: 1;
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.row select {
+  flex: 0 0 auto;
+}
+
+.actions {
+  flex-wrap: wrap;
+}
+
+button,
+.file span {
+  font: inherit;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.file input {
+  display: none;
+}
+
+.file span {
+  display: inline-block;
+  background: #fff;
+  color: var(--accent);
+}
+
+.or,
+.muted {
+  color: var(--muted);
+}
+
+.status {
+  min-height: 1.45em;
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+
+.status.error {
+  color: var(--error);
+}
+
+progress {
+  width: 100%;
+}
+
+.transcript {
+  font-size: 1.2rem;
+}
+
+.pending {
+  color: var(--pending);
+  font-style: italic;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+  margin: 0.75rem 0;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.2rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+td:nth-child(n + 2),
+th:nth-child(n + 2) {
+  text-align: right;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.85rem;
+}
+
+.meter {
+  display: inline-block;
+  width: 8rem;
+  height: 0.5rem;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
