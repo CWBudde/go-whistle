@@ -744,26 +744,69 @@ func TestStreamShutdown(t *testing.T) {
 }
 
 // A client that leaves while its chunk waits for a pass ends its session at
-// once: the session frees its place under MaxStreams and never takes the pass
-// (PR #35 review).
+// once, also with more chunks queued behind it: the session frees its place
+// under MaxStreams and never takes the pass (PR #35, PR #37 review).
 func TestStreamLeaveWhileWaiting(t *testing.T) {
+	for _, chunks := range []int{1, 2, 3} {
+		t.Run(fmt.Sprintf("%d chunks", chunks), func(t *testing.T) {
+			f := &fakeModel{block: make(chan struct{}), run: make(chan struct{})}
+			s, hs := newTestServer(t, f, testConfig()) // one pass, two streams
+
+			a := dial(t, hs, "")
+			write(t, a, websocket.MessageBinary, make([]byte, 2))
+			<-f.run // a holds the pass
+
+			b := dial(t, hs, "")
+			for range chunks {
+				write(t, b, websocket.MessageBinary, make([]byte, 2))
+			}
+
+			time.Sleep(50 * time.Millisecond) // b's first chunk waits for the pass, the rest behind it
+
+			_ = b.CloseNow()
+
+			for deadline := time.Now().Add(5 * time.Second); s.openSessions() > 1; time.Sleep(10 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatalf("%d sessions open after b left, want 1", s.openSessions())
+				}
+			}
+
+			close(f.block)
+
+			if got := readText(t, a); !strings.Contains(got, `"text":"1"`) {
+				t.Errorf("a: %s", got)
+			}
+
+			select {
+			case <-f.run:
+				t.Error("b's chunk took the pass after b left")
+			case <-time.After(100 * time.Millisecond):
+			}
+		})
+	}
+}
+
+// A client more than the backlog ahead of the passes is closed with 1008
+// and its chunks never take the pass (PR #37 review).
+func TestStreamAhead(t *testing.T) {
 	f := &fakeModel{block: make(chan struct{}), run: make(chan struct{})}
-	s, hs := newTestServer(t, f, testConfig()) // one pass, two streams
+	_, hs := newTestServer(t, f, testConfig())
 
 	a := dial(t, hs, "")
 	write(t, a, websocket.MessageBinary, make([]byte, 2))
 	<-f.run // a holds the pass
 
+	// b's first 30 s chunk waits at the gate; the next two fill the 60 s
+	// backlog, the fourth is over it.
 	b := dial(t, hs, "")
-	write(t, b, websocket.MessageBinary, make([]byte, 2))
-	time.Sleep(50 * time.Millisecond) // b's chunk waits for the pass
+	chunk := make([]byte, 2*whistle.MaxSamples)
 
-	_ = b.CloseNow()
+	for range 4 {
+		write(t, b, websocket.MessageBinary, chunk)
+	}
 
-	for deadline := time.Now().Add(5 * time.Second); s.openSessions() > 1; time.Sleep(10 * time.Millisecond) {
-		if time.Now().After(deadline) {
-			t.Fatalf("%d sessions open after b left, want 1", s.openSessions())
-		}
+	if code, reason := readClose(t, b); code != websocket.StatusPolicyViolation || !strings.Contains(reason, "wait for a pass") {
+		t.Errorf("b closed with %v %q, want 1008", code, reason)
 	}
 
 	close(f.block)
@@ -774,7 +817,7 @@ func TestStreamLeaveWhileWaiting(t *testing.T) {
 
 	select {
 	case <-f.run:
-		t.Error("b's chunk took the pass after b left")
+		t.Error("b's chunk took the pass after its close")
 	case <-time.After(100 * time.Millisecond):
 	}
 }

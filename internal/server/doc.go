@@ -27,7 +27,9 @@
 // server ends a session itself, it sends the Stop result first and closes
 // with 1001 on shutdown or 1008 after Config.StreamIdle without a message.
 // A chunk that ends inside a sample closes with 1007, any other text with
-// 1003, a chunk over 30 s with 1009. Before the upgrade the endpoint
+// 1003, a chunk over 30 s with 1009. Chunks may arrive faster than their
+// passes: up to 60 s of audio or 64 chunks wait, and a client further ahead
+// closes with 1008. Before the upgrade the endpoint
 // answers 400 for bad options and 503 when Config.MaxStreams sessions are
 // open.
 //

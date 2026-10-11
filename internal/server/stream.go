@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -15,6 +16,15 @@ import (
 
 // writeTimeout bounds the write of one result to a /stream client.
 const writeTimeout = 10 * time.Second
+
+// Chunks wait for their pass in a queue of at most backlogMessages messages
+// and backlogSeconds of audio; a client further ahead is closed with 1008.
+// The reader never blocks on the queue, so it sees a client leave at once,
+// whatever waits (PR #37 review).
+const (
+	backlogMessages = 64
+	backlogSeconds  = 60
+)
 
 // stream is GET /stream: one whistle.Stream per WebSocket connection.
 func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +112,10 @@ type session struct {
 	width int
 	// cancel ends the session's context.
 	cancel context.CancelFunc
+	// queued is the bytes of the PCM chunks in the queue; ahead is set when
+	// the client got more than the backlog ahead of the passes.
+	queued atomic.Int64
+	ahead  atomic.Bool
 }
 
 // message is one message the client sent, or the error that ended reading.
@@ -122,35 +136,11 @@ type end struct {
 // run reads the messages apart, so that a shutdown or the idle timer can end
 // a session whose client is silent, and handles them until the session ends.
 func (ss *session) run(ctx context.Context) {
-	msgs := make(chan message)
-	done := make(chan struct{})
+	msgs := make(chan message, backlogMessages)
 
-	go func() {
-		for {
-			typ, data, err := ss.c.Read(ctx)
-			if err != nil {
-				// The client left or the connection failed. The handler may
-				// wait for a pass and not take the message for long, so the
-				// context ends here: the wait gives up and the session ends
-				// (PR #35 review).
-				ss.cancel()
-			}
-
-			select {
-			case msgs <- message{typ, data, err}:
-			case <-done:
-				return
-			}
-
-			if err != nil {
-				return
-			}
-		}
-	}()
+	go ss.read(ctx, msgs)
 
 	e := ss.loop(ctx, msgs)
-
-	close(done)
 
 	if e.code == 0 {
 		return
@@ -161,6 +151,57 @@ func (ss *session) run(ctx context.Context) {
 	}
 
 	_ = ss.c.Close(e.code, e.reason)
+}
+
+// read queues the client's messages without ever blocking on msgs, so that
+// it keeps reading while the handler waits for a pass. When the client
+// leaves, the connection fails or the client gets more than the backlog
+// ahead, it ends the session's context: the wait gives up and the session
+// ends (PR #35, PR #37 review).
+func (ss *session) read(ctx context.Context, msgs chan<- message) {
+	budget := int64(backlogSeconds * whistle.SampleRate * ss.width)
+
+	for {
+		typ, data, err := ss.c.Read(ctx)
+		if err != nil {
+			ss.cancel()
+
+			select {
+			case msgs <- message{err: err}:
+			default: // full; the loop sees the context end
+			}
+
+			return
+		}
+
+		n := int64(len(data))
+		if ss.queued.Add(n) > budget {
+			ss.ahead.Store(true)
+			ss.cancel()
+
+			return
+		}
+
+		select {
+		case msgs <- message{typ, data, nil}:
+		default:
+			ss.ahead.Store(true)
+			ss.cancel()
+
+			return
+		}
+	}
+}
+
+// ended is how a session whose context ended goes: closed with 1008 when
+// its client got more than the backlog ahead, else dropped (it left, or the
+// shutdown deadline dropped it).
+func (ss *session) ended() end {
+	if ss.ahead.Load() {
+		return end{code: websocket.StatusPolicyViolation, reason: "more than 60 s of audio or 64 chunks wait for a pass"}
+	}
+
+	return end{}
 }
 
 // loop handles messages until the client stops or leaves, the session
@@ -175,10 +216,14 @@ func (ss *session) loop(ctx context.Context, msgs <-chan message) end {
 			return end{websocket.StatusGoingAway, "the server is shutting down", true}
 		case <-idle.C:
 			return end{websocket.StatusPolicyViolation, "idle for " + ss.s.cfg.StreamIdle.String(), true}
+		case <-ctx.Done():
+			return ss.ended()
 		case m := <-msgs:
 			if m.err != nil {
 				return end{} // the client closed or the connection failed: nobody to send Stop to
 			}
+
+			ss.queued.Add(-int64(len(m.data)))
 
 			e, more := ss.handle(ctx, m)
 			if !more {
@@ -208,7 +253,7 @@ func (ss *session) handle(ctx context.Context, m message) (end, bool) {
 
 	err = ss.s.gate.enter(ctx, false)
 	if err != nil {
-		return end{}, false // the client left, or dropped at the shutdown deadline
+		return ss.ended(), false // the client left or got too far ahead, or dropped at the shutdown deadline
 	}
 
 	res, err := func() (whistle.StreamResult, error) {
