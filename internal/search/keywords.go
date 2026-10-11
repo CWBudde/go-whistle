@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -52,6 +53,11 @@ type Bias struct {
 	Forms    Form    // the spellings matched
 	Split    bool    // match each word of a phrase as a keyword of its own
 	Renorm   bool    // add the automaton tokens' bonus to the logits and renormalise
+
+	// Probe axes of docs/FINDINGS.md F-042, off in DefaultBias.
+	transient bool // the completion bonus lasts one token: the next token (EOS included) takes it back
+	echo      bool // with transient, a completion also earns the keyword's own token bonus for that token (icefall)
+	once      bool // a keyword earns its bonus once per text: a repeat's tokens are taken back when it completes
 }
 
 // DefaultBias is the bias the keyword fixtures picked (docs/FINDINGS.md
@@ -133,8 +139,10 @@ type Keywords struct {
 // text suffix that is a keyword prefix, and which of that suffix' tokens
 // belong to a completed keyword (bit i for the path's token i).
 type kwState struct {
-	n   int
-	cov bitset
+	n    int
+	cov  bitset
+	held float64 // the transient bonus the next token takes back
+	done []int   // the keyword nodes completed so far (Bias.once)
 }
 
 // textStart is the token in front of every text that anchors the bare
@@ -488,22 +496,67 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 	}
 
 	drop := k.depth[n] - k.depth[f]
-	d := k.revoke(n, drop, st.cov)
+	d := k.revoke(n, drop, st.cov) - st.held
 
 	if !ok {
-		return kwState{}, d
+		return kwState{done: st.done}, d
 	}
 
 	depth := k.depth[c]
 	cov := st.cov.shift(drop)
 	d += k.w[c]
+	next := kwState{n: c, done: st.done}
 
 	for _, l := range k.out[c] {
-		d += k.bias.Complete
+		kn := k.suffix(c, l)
+
+		if k.bias.once {
+			if slices.Contains(next.done, kn) {
+				d -= k.pathBonus(kn) // a repeat: its tokens earn nothing
+				cov = cov.with(depth-l, depth)
+
+				continue
+			}
+
+			next.done = append(slices.Clip(next.done), kn)
+		}
+
+		bonus := k.bias.Complete
+		if k.bias.transient && k.bias.echo {
+			bonus += k.pathBonus(kn)
+		}
+
+		if k.bias.transient {
+			next.held += bonus
+		}
+
+		d += bonus
 		cov = cov.with(depth-l, depth)
 	}
 
-	return kwState{n: c, cov: cov}, d
+	next.cov = cov
+
+	return next, d
+}
+
+// suffix is the node of the last l tokens of the match at c: c or one of
+// its failure links.
+func (k *Keywords) suffix(c, l int) int {
+	for k.depth[c] > l {
+		c = k.fail[c]
+	}
+
+	return c
+}
+
+// pathBonus is the token bonus along the path to node n.
+func (k *Keywords) pathBonus(n int) float64 {
+	sum := 0.0
+	for ; k.depth[n] > 0; n = k.up[n] {
+		sum += k.w[n]
+	}
+
+	return sum
 }
 
 // revoke is the bonus taken back when the match at node n drops its

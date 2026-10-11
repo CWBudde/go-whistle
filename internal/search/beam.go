@@ -91,7 +91,7 @@ func run(d *decoder.Decoder, ex expander, root *decoder.State, opt Options) (Res
 		return Result{}, err
 	}
 
-	s := &beam{opt: opt, eos: d.Tokenizer().EOSID()}
+	s := &beam{opt: opt, eos: d.Tokenizer().EOSID(), spell: d.Decode}
 
 	done := false
 	for step := 0; step < maxTok-1 && !done; step++ {
@@ -115,9 +115,9 @@ func run(d *decoder.Decoder, ex expander, root *decoder.State, opt Options) (Res
 func (s *beam) pick(alive []*hyp, done bool) *hyp {
 	pool := slices.Clone(s.fin)
 
-	if !done || len(pool) == 0 {
+	if !done || len(pool) == 0 || s.opt.fin.pickLive {
 		live := alive
-		if s.opt.Stop == StopK {
+		if s.opt.Stop == StopK && !s.opt.fin.pickLive {
 			live = slices.Clone(alive)
 			slices.SortStableFunc(live, func(a, b *hyp) int { return cmp.Compare(b.adj, a.adj) })
 			live = live[:min(len(live), max(s.opt.Beams-len(pool), 0))]
@@ -181,6 +181,28 @@ type beam struct {
 	opt Options
 	eos int
 	fin []*hyp // finished hypotheses (StopAll: those in the beam)
+
+	spell   func([]int) (string, error) // the text of tokens, for the fin rules' dedup
+	counted int                         // finished hypotheses that count toward fin.countTopK's slots
+}
+
+// slots is the number of finished hypotheses that ends StopK.
+func (s *beam) slots() int {
+	if s.opt.fin.slots > 0 {
+		return s.opt.fin.slots
+	}
+
+	return s.opt.Beams
+}
+
+// textOf is h's text, or its token ids where they do not decode.
+func (s *beam) textOf(h *hyp) string {
+	txt, err := s.spell(h.textTokens())
+	if err != nil {
+		return fmt.Sprint(h.textTokens())
+	}
+
+	return txt
 }
 
 // length is L of h under opt.Length.
@@ -264,9 +286,19 @@ func (s *beam) step(ex expander, alive []*hyp) ([]*hyp, bool, error) {
 	}
 
 	alive = nil
+	seen := map[string]bool{}
 
 	for rank, h := range kids {
 		if !h.eos {
+			if s.opt.fin.dedupLive {
+				txt := s.textOf(h)
+				if seen[txt] {
+					continue
+				}
+
+				seen[txt] = true
+			}
+
 			alive = append(alive, h)
 			if len(alive) == k {
 				break
@@ -279,36 +311,74 @@ func (s *beam) step(ex expander, alive []*hyp) ([]*hyp, bool, error) {
 			continue
 		}
 
-		s.finish(h)
+		s.finish(h, rank)
 	}
 
 	return alive, s.done(alive), nil
 }
 
-// finish records a finished hypothesis under the stopping rule's limits.
-func (s *beam) finish(h *hyp) {
+// finish records a finished hypothesis of the step's rank under the
+// stopping rule's limits.
+func (s *beam) finish(h *hyp, rank int) {
 	k := s.opt.Beams
 
 	switch s.opt.Stop {
 	case StopK:
-		if len(s.fin) < k {
-			s.fin = append(s.fin, h)
-		}
+		s.finishK(h, rank)
 	case StopHF:
 		s.fin = append(s.fin, h)
 		if len(s.fin) > k {
-			worst := 0
-			for i, f := range s.fin {
-				if s.score(f) < s.score(s.fin[worst]) {
-					worst = i
-				}
-			}
-
-			s.fin = slices.Delete(s.fin, worst, worst+1)
+			w := s.worst()
+			s.fin = slices.Delete(s.fin, w, w+1)
 		}
 	default:
 		s.fin = append(s.fin, h)
 	}
+}
+
+// finishK records a finished hypothesis under StopK: Whisper's slots, or
+// a variant of opt.fin.
+func (s *beam) finishK(h *hyp, rank int) {
+	if s.opt.fin.dedupFin {
+		txt := s.textOf(h)
+
+		i := slices.IndexFunc(s.fin, func(f *hyp) bool { return s.textOf(f) == txt })
+		if i >= 0 {
+			if s.score(h) > s.score(s.fin[i]) {
+				s.fin[i] = h
+			}
+
+			return
+		}
+	}
+
+	switch {
+	case s.opt.fin.countTopK:
+		s.fin = append(s.fin, h)
+		if rank < s.opt.Beams {
+			s.counted++
+		}
+	case len(s.fin) < s.slots():
+		s.fin = append(s.fin, h)
+	case s.opt.fin.stopLive:
+		// The slots are full but the search goes on: a better hypothesis
+		// replaces the worst.
+		if w := s.worst(); s.score(h) > s.score(s.fin[w]) {
+			s.fin[w] = h
+		}
+	}
+}
+
+// worst is the index of the finished hypothesis with the lowest score.
+func (s *beam) worst() int {
+	worst := 0
+	for i, f := range s.fin {
+		if s.score(f) < s.score(s.fin[worst]) {
+			worst = i
+		}
+	}
+
+	return worst
 }
 
 // done applies the stopping rule after a step.
@@ -328,7 +398,25 @@ func (s *beam) done(alive []*hyp) bool {
 
 	switch s.opt.Stop {
 	case StopK:
-		return len(s.fin) >= s.opt.Beams
+		n := len(s.fin)
+		if s.opt.fin.countTopK {
+			n = s.counted
+		}
+
+		if n < s.slots() {
+			return false
+		}
+
+		if s.opt.fin.stopLive {
+			best := math.Inf(-1)
+			for _, h := range s.fin {
+				best = math.Max(best, s.score(h))
+			}
+
+			return best >= live
+		}
+
+		return true
 	case StopBest:
 		best := math.Inf(-1)
 		for _, h := range s.fin {

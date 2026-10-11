@@ -114,6 +114,22 @@ type Options struct {
 	// instead of the adjusted one: Adjust then steers only the pruning (a
 	// keyword probe axis, docs/FINDINGS.md F-029).
 	rankModel bool
+
+	// fin is the finished-hypothesis bookkeeping under probe
+	// (docs/FINDINGS.md F-042); the zero value is Whisper's.
+	fin finRule
+}
+
+// finRule is a variant of the finished-hypothesis bookkeeping under
+// StopK, a probe axis of F-042 (docs/FINDINGS.md); the zero value is
+// Whisper's.
+type finRule struct {
+	slots     int  // finished hypotheses that end the search; 0 is Beams (Whisper's patience 1)
+	dedupFin  bool // a finished hypothesis whose text equals an earlier finished one's takes no slot
+	dedupLive bool // of the live candidates with the same text only the best is kept
+	pickLive  bool // the final pick always weighs the live hypotheses too
+	countTopK bool // only EOS candidates among the step's best Beams count toward the slots
+	stopLive  bool // end only when no live hypothesis outscores the best finished one, too
 }
 
 // Default is the variant the evidence on the 32 fixture clips picked
