@@ -1,0 +1,256 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "model": {
+    "repo": "Cactus-Compute/whistle",
+    "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    "file": "whistle.cact",
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "command": "needle --audio-word-timestamps --audio-keywords \u003cset\u003e",
+  "threads": "4",
+  "clip": "fleurs-de_de-10308608197319017935",
+  "sets": [
+    {
+      "keywords": [
+        "Paare"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Diese Paare"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Baby"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "können"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Diese"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Bare"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Diese Bare"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare",
+        "Baby"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare",
+        "entscheiden"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare",
+        "können"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Diese",
+        "Paare"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare",
+        "Diese"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare",
+        "Paare"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare",
+        "Bare"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Bare",
+        "Paare"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Diese Paare können"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare können"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare können sich"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Diese Paare",
+        "Baby"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "diese Paare"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "paare"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "PAARE"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Pare"
+      ],
+      "language": "de",
+      "text": "Diese Pare können sich für einen Adoptionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paar"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Adduktionsplan"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare",
+        "Adduktionsplan"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Diese Paare",
+        "Adduktionsplan"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "einen"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "für ihr Baby"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare",
+        "für ihr Baby"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Baby entscheiden"
+      ],
+      "language": "de",
+      "text": "Diese Bare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    },
+    {
+      "keywords": [
+        "Paare",
+        "Baby entscheiden"
+      ],
+      "language": "de",
+      "text": "Diese Paare können sich für einen Adduktionsplan für ihr Baby entscheiden."
+    }
+  ]
+}
