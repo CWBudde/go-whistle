@@ -41,7 +41,7 @@ func loadModel(t testing.TB) *Model {
 
 	requireFile(t, cactPath)
 
-	m, err := Load(cactPath)
+	m, err := Load(cactPath, testOptions(t)...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,6 +49,26 @@ func loadModel(t testing.TB) *Model {
 	t.Cleanup(func() { _ = m.Close() })
 
 	return m
+}
+
+// testOptions are the Load options of loadModel: none by default, and the
+// engine's int8 numerics (docs/FINDINGS.md F-041) under WHISTLE_TEST_INT8=1,
+// so that every model-gated test can run with the flag on.
+func testOptions(t testing.TB) []Option {
+	t.Helper()
+
+	switch v := os.Getenv("WHISTLE_TEST_INT8"); v {
+	case "", "0":
+		return nil
+	case "1":
+		t.Log("WHISTLE_TEST_INT8: Load with WithInt8()")
+
+		return []Option{WithInt8()}
+	default:
+		t.Fatalf("WHISTLE_TEST_INT8=%q, want 0 or 1", v)
+
+		return nil
+	}
 }
 
 // clip is one corpus clip with the engine's transcript.

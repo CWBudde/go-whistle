@@ -10,6 +10,7 @@ import (
 	"github.com/cwbudde/go-whistle/internal/decoder"
 	"github.com/cwbudde/go-whistle/internal/encoder"
 	"github.com/cwbudde/go-whistle/internal/frontend"
+	"github.com/cwbudde/go-whistle/internal/needle"
 	"github.com/cwbudde/go-whistle/internal/search"
 	"github.com/cwbudde/go-whistle/internal/silence"
 	"github.com/cwbudde/go-whistle/internal/tokenizer"
@@ -46,6 +47,7 @@ type loadOptions struct {
 	vocabulary string
 	noMmap     bool
 	float      bool
+	int8       needle.Int8
 }
 
 // WithVocabulary names the .cact file whose tokenizer the model uses. Only
@@ -66,6 +68,16 @@ func WithoutMmap() Option {
 // checkpoint is float32 either way.
 func WithFloatWeights() Option {
 	return func(o *loadOptions) { o.float = true }
+}
+
+// WithInt8 runs the model with the engine's int8 numerics, the act_bits 8
+// and kv_bits 8 that whistle.cact was trained for: every CQ product
+// quantises its input rows to int8, the attention's queries, keys and
+// values are int8 per head, and the decoder keeps its self-attention cache
+// and the cross-attention memory in int8 (docs/FINDINGS.md F-041). It is
+// off by default, which keeps float32 activations.
+func WithInt8() Option {
+	return func(o *loadOptions) { o.int8 = needle.Int8{Act: true, KV: true} }
 }
 
 // vocabularyFile is the .cact Load looks for next to a safetensors file.
@@ -107,12 +119,12 @@ func build(src weights.Source, path string, o loadOptions) (*Model, error) {
 		return nil, err
 	}
 
-	enc, err := encoder.Load(src, encoder.Best())
+	enc, err := encoder.LoadInt8(src, encoder.Best(), o.int8)
 	if err != nil {
 		return nil, wrap(err)
 	}
 
-	dec, err := decoder.Load(src, tok, decoder.Best())
+	dec, err := decoder.LoadInt8(src, tok, decoder.Best(), o.int8)
 	if err != nil {
 		return nil, wrap(err)
 	}
