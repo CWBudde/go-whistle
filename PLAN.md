@@ -1234,6 +1234,67 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       bytes as before, with and without `-tags purego`. Open, in its own repository: go-pocket-tts switches too (its
       default worker count becomes GOMAXPROCS, and two edge cases become errors, see `MIGRATION.md`).
 
+## Phase 12 — Public release & follow-ups from the first write-up
+
+The repository went public on 2026-10-11. Writing the first blog post about it (running the CLI from the module path
+on a Linux/amd64 laptop, an AMD Ryzen 5 4600H, and hosting the web demo under a sub-path) turned up the gaps below.
+The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model is Phase 11.
+
+### 12.1 Docs and release
+
+- [ ] README after going public: drop "the repository is not public yet" (Quickstart, Go API) and the `replace`
+      instructions; install with `go install github.com/cwbudde/go-whistle/cmd/whistle@latest` and use the library
+      with a plain `go get github.com/cwbudde/go-whistle`. The status note and "Limits → Speed" still say Phase 9 is
+      under way. Phase 9 is done, so point them at the numbers in `bench/RESULTS.md` and at 12.3 instead.
+      **Accept:** `go install …@latest` and the README's Go API program work from a clean module without a clone.
+- [ ] A first tagged release (`v0.1.0`) with short release notes (what works, parity, limits), so `@latest` resolves
+      to a version and not to a pseudo-version of `main`. Optional: prebuilt CLI binaries for linux/amd64,
+      linux/arm64, darwin/arm64 and windows/amd64 on the GitHub release.
+- [x] Link the hosted web demo (12.2) from the README's "Web demo" section.
+      (2026-10-11) — done with #43: https://cwbudde.github.io/go-whistle/.
+
+### 12.2 Web demo
+
+- [ ] Insecure contexts: `fetchModel` (`web/whistle-client.js`) always calls `crypto.subtle.digest`, which exists only
+      in secure contexts (https, localhost). Served over plain http (a LAN IP, an http-only host), "Fetch and load"
+      fails with "Cannot read properties of undefined (reading 'digest')", and so does picking a local `.cact`. Fall
+      back to a SHA-256 computed in Go (an exported `whistle.sha256(bytes)` in `cmd/whistle-wasm`, from
+      `crypto/sha256`) when `crypto.subtle` is missing, and treat a missing Cache Storage as "no cache", as
+      `caches === undefined` already is. **Accept:** `just wasm-test` (or a headless run against
+      `http://<lan-ip>:<port>/`, where `isSecureContext` is false) loads the model with the SHA-256 checked and
+      transcribes a clip.
+- [x] A hosted demo: a GitHub Pages workflow that runs `just wasm` and publishes `web/` (the model still comes from
+      Hugging Face, whose CDN sends CORS headers). Serve `.wasm` as `application/wasm` so `instantiateStreaming` is
+      used. The build is 6.8 MiB, or 1.8 MiB gzipped.
+      (2026-10-11) — `.github/workflows/pages.yaml` (#43) runs `test-wasm`, builds with `just wasm` and deploys `web/`
+      on every push to `main`. GitHub Pages serves over https, so the secure-context item above does not bite there.
+- [ ] Stream result line: after `Stop`, the page shows "last pass 0 ms", the stop's `pass_ms`. Show the last real
+      pass (or the total) instead.
+
+### 12.3 Performance on amd64
+
+- [ ] GEMM in AVX2+FMA: `algo-tensor` has `gemm_arm64.s` but no amd64 GEMM, and `whistle doctor` says so on x86
+      ("AVX2: CQ LUT GEMV; AVX2+FMA: dot, axpy, softmax exp; GEMM in Go"). The float products (the Monarch
+      Kronecker products, the float path) therefore run in pure Go there. 9.4's note that they run on "the existing
+      NEON/AVX2 GEMM" is only true on arm64; correct it. The kernel belongs in `algo-tensor` (with its pure-Go
+      fallback, equivalence test and golden hashes); then bump the module here. **Accept:** `Embed` and
+      `Transcribe` hashes unchanged on amd64 (outputs may differ from arm64 only where they already do), and a
+      measured TTFT gain on an x86 machine.
+- [ ] Benchmarks on linux/amd64: `bench/RESULTS.md` has only the Apple M5 Pro. Add a `just bench` run on an x86
+      machine (with the CPU, cores and governor recorded), and the engine side where a linux/amd64 engine build
+      exists. On the 4600H laptop, `transcribe --json` reported a TTFT of 101–108 ms and 150–270 tok/s on five fixture
+      clips, about 5× the M5 Pro's TTFT, under background load and not measured with `just bench`.
+
+### 12.4 Remaining speed gap (optional)
+
+- [ ] TTFT against the engine: 18.8 against 6.9 ms (2.72×), decode 1085 against 1499 tok/s (0.72×), median over the
+      32 clips (F-040). Profile where the TTFT goes (front end, stem, encoder, memory, first decoder steps) and take
+      up the open levers of F-037 and F-041. Engine speed is still not a hard goal (Risks); the aim is a measured
+      breakdown and whichever levers pay off without moving the parity numbers.
+- [ ] js/wasm speed (F-043 "Open"): about 22 tok/s and a TTFT of 0.3–0.8 s on one thread without SIMD. Try several
+      workers, each with its own 17 MB model, to run the beams or the encoder blocks in parallel. A hand-written wasm
+      SIMD module for the LUT kernels would leave pure Go; decide first whether it is worth that.
+
 ---
 
 ## Unknowns to resolve against the oracle
