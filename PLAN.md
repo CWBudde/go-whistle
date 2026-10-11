@@ -1329,7 +1329,7 @@ RAW tokenizer.
       (2026-10-11) — `internal/hub/needle3.lock.json` (embedded, `hub.PinnedNeedle3`) pins `93e88ede867e…` with
       `needle3.cact` (35,335,380 B), `checkpoints/needle3.safetensors` (242,047,978 B), `config.json` (1,273 B) and
       `tokenizer/tokenizer.model` (126,520 B); the LFS digests equal the Hub's. `just fetch-needle3`
-      (`tools/textoracle fetch`, the same resuming, verifying `Client.Download`) lays them out as
+      (`tools/oracle/text fetch`, the same resuming, verifying `Client.Download`) lays them out as
       `models/needle3/{needle3.cact, needle3.safetensors, config.json, tokenizer.model}`. Tests: the pin, both
       manifests disjoint, an offline verify of the local files, and an opt-in live download of the three small files
       (`WHISTLE_HUB_LIVE=1`, all verified).
@@ -1429,7 +1429,7 @@ shows (multi-turn, tool results, retrieval).
 
 Engine-only: fitted against `testdata/text/engine/`.
 
-- [x] Engine corpus (`tools/textoracle`, `testdata/text/engine/`, `just oracle-text`).
+- [x] Engine corpus (`tools/oracle/text`, `testdata/text/engine/`, `just oracle-text`).
       (2026-10-11) — engine 3.2.0 loads the pinned `needle3.cact` alone and with `whistle.cact` (`needle_models` 3).
       19 cases, 20 turns: one and two calls, de/fr/es, dates, decimals, two refusals, a negation, an extraction
       schema, a tool result fed back, `--max 8`; every case passes a fixed `date: 2026-10-11 Sun 09:30` fact, since

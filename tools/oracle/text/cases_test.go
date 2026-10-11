@@ -84,7 +84,7 @@ func TestParseCorpusRejects(t *testing.T) {
 // TestCommittedCorpus checks testdata/text/engine/cases.json: it parses, every case has a fixed date fact, and the
 // cases the date and depth subcommands name exist.
 func TestCommittedCorpus(t *testing.T) {
-	c, err := readCorpus(filepath.Join("..", "..", "testdata", "text", "engine", "cases.json"))
+	c, err := readCorpus(filepath.Join("..", "..", "..", "testdata", "text", "engine", "cases.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

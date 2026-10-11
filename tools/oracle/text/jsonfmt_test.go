@@ -185,13 +185,13 @@ func TestPrettyJSONEscapesNoHTML(t *testing.T) {
 // TestFixturesRoundTrip checks that every committed JSON fixture (cases.json, hand-written, aside) is what the
 // writer gives for its own content, so a regeneration from the same engine answers diffs clean.
 func TestFixturesRoundTrip(t *testing.T) {
-	paths, err := filepath.Glob(filepath.Join("..", "..", "testdata", "text", "engine", "*.json"))
+	paths, err := filepath.Glob(filepath.Join("..", "..", "..", "testdata", "text", "engine", "*.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if len(paths) == 0 {
-		t.Skip("no fixtures in testdata/text/engine (run `go run -tags oracle ./tools/textoracle all`)")
+		t.Skip("no fixtures in testdata/text/engine (run `go run -tags oracle ./tools/oracle/text all`)")
 	}
 
 	for _, p := range paths {

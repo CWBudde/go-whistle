@@ -85,7 +85,7 @@ func openOracle(cfg config, speech bool) (*oracle, error) {
 		return nil, fmt.Errorf("create %s: %w", cfg.outDir, err)
 	}
 
-	o.scratch, err = os.MkdirTemp("", "textoracle-")
+	o.scratch, err = os.MkdirTemp("", "oracle-text-")
 	if err != nil {
 		return nil, fmt.Errorf("scratch dir: %w", err)
 	}

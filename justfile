@@ -51,7 +51,7 @@ fetch-upstream:
 
 # Fetch the pinned Needle 3 text model (needle3.cact, needle3.safetensors, config.json, tokenizer.model) into models/needle3
 fetch-needle3 *args:
-    go run -tags oracle ./tools/textoracle fetch {{args}}
+    go run -tags oracle ./tools/oracle/text fetch {{args}}
 
 # Fetch the oracle clip corpus (LibriSpeech + FLEURS excerpts) into testdata/audio
 oracle-clips:
@@ -95,7 +95,7 @@ oracle-stream:
 
 # Record the Needle 3 engine's answers to the tool-calling cases into testdata/text/engine (cases|date|depth|audio|embed|all)
 oracle-text *args="all":
-    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/textoracle {{args}}
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle/text {{args}}
 
 # Regenerate the sentencepiece fixture for internal/tokenizer (testdata/tokenizer); --needle3 <tokenizer.model> cross-checks
 tokenizer-fixture *args:
