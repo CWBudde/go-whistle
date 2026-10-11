@@ -21,14 +21,15 @@ const AcceptBoundPP = 0.1
 
 const missing = "—"
 
-// Render writes bench/RESULTS.md from the Go and the engine results;
-// either may be nil when that side has not run.
-func Render(w io.Writer, g *GoResults, e *EngineResults) error {
+// Render writes the report (bench/RESULTS.md by default) from the Go and
+// the engine results, read from goPath and enginePath; either may be nil
+// when that side has not run.
+func Render(w io.Writer, g *GoResults, e *EngineResults, goPath, enginePath string) error {
 	var b strings.Builder
 
 	b.WriteString("# Benchmarks: go-whistle against the Needle 3 engine\n\n" +
-		"PLAN.md 9.6 and the Phase 9 **Accept**. This file is generated from `" + GoResultsPath + "` (`just bench`)\n" +
-		"and `" + EngineResultsPath + "` (`just oracle-bench`); do not edit it by hand. Method and reading:\n" +
+		"PLAN.md 9.6 and the Phase 9 **Accept**. This file is generated from `" + goPath + "` (`just bench`)\n" +
+		"and `" + enginePath + "` (`just oracle-bench`); do not edit it by hand. Method and reading:\n" +
 		"`docs/FINDINGS.md` F-040.\n\n")
 
 	// The sides are compared only when they measured the same model and
@@ -66,6 +67,11 @@ func renderRuns(b *strings.Builder, g *GoResults, e *EngineResults, same bool) {
 	t.row("commit", or(gr.Commit), or(er.Commit))
 	t.row("CPU", or(gr.Machine.CPU), or(er.Machine.CPU))
 	t.row("cores", cores(gr.Machine), cores(er.Machine))
+
+	if gr.Machine.Governor != "" || er.Machine.Governor != "" {
+		t.row("governor", or(gr.Machine.Governor), or(er.Machine.Governor))
+	}
+
 	t.row("memory", gibString(gr.Machine.MemoryGiB), gibString(er.Machine.MemoryGiB))
 	t.row("OS", or(gr.Machine.OS), or(er.Machine.OS))
 	t.row("Go", or(gr.Machine.GoVersion), or(er.Machine.GoVersion))

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -109,7 +110,7 @@ func TestRender(t *testing.T) {
 
 	var b bytes.Buffer
 
-	err := Render(&b, g, e)
+	err := Render(&b, g, e, GoResultsPath, EngineResultsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +131,7 @@ func TestRender(t *testing.T) {
 
 	b.Reset()
 
-	err = Render(&b, g, e)
+	err = Render(&b, g, e, GoResultsPath, EngineResultsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +144,7 @@ func TestRender(t *testing.T) {
 
 	b.Reset()
 
-	err = Render(&b, g, e)
+	err = Render(&b, g, e, GoResultsPath, EngineResultsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +197,7 @@ func TestRenderNotComparable(t *testing.T) {
 
 			var b bytes.Buffer
 
-			err := Render(&b, g, e)
+			err := Render(&b, g, e, GoResultsPath, EngineResultsPath)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -296,7 +297,7 @@ func TestRenderUnknownRSS(t *testing.T) {
 
 	var b bytes.Buffer
 
-	err := Render(&b, g, e)
+	err := Render(&b, g, e, GoResultsPath, EngineResultsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +323,7 @@ func TestRenderClipCount(t *testing.T) {
 
 	var b bytes.Buffer
 
-	err := Render(&b, g, nil)
+	err := Render(&b, g, nil, GoResultsPath, EngineResultsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +343,7 @@ func TestRenderClipCount(t *testing.T) {
 func TestRenderWithoutResults(t *testing.T) {
 	var b bytes.Buffer
 
-	err := Render(&b, nil, nil)
+	err := Render(&b, nil, nil, GoResultsPath, EngineResultsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,6 +402,42 @@ func TestJSONRoundTrip(t *testing.T) {
 	ok, err = ReadJSON(filepath.Join(t.TempDir(), "missing.json"), &out)
 	if ok || err != nil {
 		t.Errorf("missing file: %v, %v", ok, err)
+	}
+}
+
+// TestRenderGovernorAndPaths checks that the report names the results it
+// was rendered from and shows the governor row only when a side has one.
+func TestRenderGovernorAndPaths(t *testing.T) {
+	g := &GoResults{Run: Run{Machine: Machine{CPU: "CPU X", Cores: 8}, Inputs: sampleInputs}}
+	e := &EngineResults{Run: Run{Machine: Machine{CPU: "CPU X", Cores: 8}, Inputs: sampleInputs}, Version: "3.2.0"}
+
+	var b bytes.Buffer
+
+	err := Render(&b, g, e, "bench/results/x/go.json", "bench/results/x/engine.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := b.String()
+	if !strings.Contains(out, "generated from `bench/results/x/go.json` (`just bench`)\nand `bench/results/x/engine.json`") {
+		t.Errorf("report does not name its sources:\n%s", out)
+	}
+
+	if strings.Contains(out, "| governor") {
+		t.Errorf("governor row without a governor:\n%s", out)
+	}
+
+	g.Run.Machine.Governor = "none (no cpufreq; kvm guest)"
+
+	b.Reset()
+
+	err = Render(&b, g, e, GoResultsPath, EngineResultsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !regexp.MustCompile(`\| governor +\| none \(no cpufreq; kvm guest\) +\| — +\|`).MatchString(b.String()) {
+		t.Errorf("report lacks the governor row:\n%s", b.String())
 	}
 }
 

@@ -201,7 +201,7 @@ func WriteReport(goPath, enginePath, reportPath string) error {
 
 	var b bytes.Buffer
 
-	err = Render(&b, g, e)
+	err = Render(&b, g, e, goPath, enginePath)
 	if err != nil {
 		return err
 	}
