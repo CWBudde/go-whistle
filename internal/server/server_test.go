@@ -620,7 +620,10 @@ func TestStreamProtocolErrors(t *testing.T) {
 		{"other text", "", websocket.MessageText, []byte(`{"type":"start"}`), websocket.StatusUnsupportedData},
 		{"odd bytes", "", websocket.MessageBinary, []byte{1, 2, 3}, websocket.StatusInvalidFramePayloadData},
 		{"f32 inside a sample", "?format=f32le", websocket.MessageBinary, []byte{1, 2}, websocket.StatusInvalidFramePayloadData},
+		{"30 s and a byte", "", websocket.MessageBinary, make([]byte, 2*whistle.MaxSamples+1), websocket.StatusInvalidFramePayloadData},
+		{"f32 30 s and 3 bytes", "?format=f32le", websocket.MessageBinary, make([]byte, 4*whistle.MaxSamples+3), websocket.StatusInvalidFramePayloadData},
 		{"over 30 s", "", websocket.MessageBinary, make([]byte, 2*whistle.MaxSamples+2), websocket.StatusMessageTooBig},
+		{"f32 over 30 s", "?format=f32le", websocket.MessageBinary, make([]byte, 4*whistle.MaxSamples+4), websocket.StatusMessageTooBig},
 	} {
 		ws := dial(t, hs, c.query)
 
@@ -738,6 +741,50 @@ func TestStreamShutdown(t *testing.T) {
 	if err == nil || resp == nil || resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("stream after shutdown: %v, %v; want 503", err, resp)
 	}
+}
+
+// A client that leaves while its chunk waits for a pass ends its session at
+// once: the session frees its place under MaxStreams and never takes the pass
+// (PR #35 review).
+func TestStreamLeaveWhileWaiting(t *testing.T) {
+	f := &fakeModel{block: make(chan struct{}), run: make(chan struct{})}
+	s, hs := newTestServer(t, f, testConfig()) // one pass, two streams
+
+	a := dial(t, hs, "")
+	write(t, a, websocket.MessageBinary, make([]byte, 2))
+	<-f.run // a holds the pass
+
+	b := dial(t, hs, "")
+	write(t, b, websocket.MessageBinary, make([]byte, 2))
+	time.Sleep(50 * time.Millisecond) // b's chunk waits for the pass
+
+	_ = b.CloseNow()
+
+	for deadline := time.Now().Add(5 * time.Second); s.openSessions() > 1; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("%d sessions open after b left, want 1", s.openSessions())
+		}
+	}
+
+	close(f.block)
+
+	if got := readText(t, a); !strings.Contains(got, `"text":"1"`) {
+		t.Errorf("a: %s", got)
+	}
+
+	select {
+	case <-f.run:
+		t.Error("b's chunk took the pass after b left")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// openSessions is the number of open /stream sessions.
+func (s *Server) openSessions() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.sessions
 }
 
 // A session still in a pass at Shutdown's deadline is dropped, and Shutdown

@@ -49,9 +49,11 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 
 	defer func() { _ = c.CloseNow() }()
 
-	// One message is one Process call, at most 30 s; a longer one closes
-	// the connection with 1009.
-	c.SetReadLimit(int64(whistle.MaxSamples * width))
+	// One message is one Process call, at most 30 s; one more whole sample
+	// closes the connection with 1009. The limit admits a partial sample
+	// after the 30 s, so that it gets the 1007 of any partial sample (PR #35
+	// review).
+	c.SetReadLimit(int64(whistle.MaxSamples*width + width - 1))
 
 	// The session's context ends with the session, or when Shutdown's
 	// deadline drops it; the request's own ends with the upgrade.
@@ -68,7 +70,7 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	ss := &session{s: s, c: c, st: st, width: width}
+	ss := &session{s: s, c: c, st: st, width: width, cancel: cancel}
 	ss.run(ctx)
 }
 
@@ -98,6 +100,8 @@ type session struct {
 	c     *websocket.Conn
 	st    Stream
 	width int
+	// cancel ends the session's context.
+	cancel context.CancelFunc
 }
 
 // message is one message the client sent, or the error that ended reading.
@@ -124,6 +128,13 @@ func (ss *session) run(ctx context.Context) {
 	go func() {
 		for {
 			typ, data, err := ss.c.Read(ctx)
+			if err != nil {
+				// The client left or the connection failed. The handler may
+				// wait for a pass and not take the message for long, so the
+				// context ends here: the wait gives up and the session ends
+				// (PR #35 review).
+				ss.cancel()
+			}
 
 			select {
 			case msgs <- message{typ, data, err}:
@@ -197,7 +208,7 @@ func (ss *session) handle(ctx context.Context, m message) (end, bool) {
 
 	err = ss.s.gate.enter(ctx, false)
 	if err != nil {
-		return end{}, false // dropped at the shutdown deadline
+		return end{}, false // the client left, or dropped at the shutdown deadline
 	}
 
 	res, err := func() (whistle.StreamResult, error) {
