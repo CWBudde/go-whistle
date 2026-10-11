@@ -1026,7 +1026,7 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       `Transcribe` alike; the engine's own stream also gives 18 of 32 (24 normalised, 19 word errors), 13 of the 14
       misses shared (`TestStreamAccept`, F-036). The embedding half holds since 8.2 (F-027: every clip ≥ 0.999033).
 
-## Phase 9 — Native quantised path & performance
+## Phase 9 — Native quantised path & performance — ✅ DONE (2026-10-11)
 
 - [x] 9.1 CQ LUT GEMV kernel (`internal/cq`, plus an additive raw-blob accessor in `internal/cact`): a 2/4-bit LUT GEMV
       in the rotated (Hadamard) domain. Apply FWHT-128 to the activation groups once and multiply by the codebook
@@ -1135,7 +1135,9 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       11.1 ms) at about its published decode rate. (2026-10-11) — re-run after 9.5 (both sides, load average 2–6):
       TTFT 19.3 ms packed / 21.6 ms float against the engine's 6.9 ms (2.8×); decode 1071 / 597 against 1499 tok/s
       (0.71×); 30 s clip TTFT 60 / 67 against 35 ms, real-time factor 0.0081 / 0.0116 against 0.0045; `Load` 6.7 / 136
-      ms against 2.4 ms; peak RSS 106 / 493 MiB against 70 MiB; WER unchanged. `docs/FINDINGS.md` F-040.
+      ms against 2.4 ms; peak RSS 106 / 493 MiB against 70 MiB; WER unchanged. (2026-10-11) — `just bench` after 9.3
+      (int8 off, the memory's k and v sharing one rotation): TTFT 18.8 / 21.3 ms, decode 1085 / 610 tok/s, 30 s clip
+      TTFT 61 / 69 ms, peak RSS 108 / 495 MiB, WER 5.35 / 5.35 %; the engine side unchanged. `docs/FINDINGS.md` F-040.
 - [x] **Accept:** WER unchanged within 0.1 against the float path, with numbers recorded in `bench/RESULTS.md`.
       (2026-10-10) — the float path is `whistle.Load` with `WithFloatWeights()`, packed its default on `whistle.cact`.
       LibriSpeech test-clean subset (200 utterances, 4167 words, `just bench`): packed 223/4167 = 5.35 %, float
