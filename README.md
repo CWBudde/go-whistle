@@ -243,6 +243,54 @@ Ctrl-C (or SIGTERM) shuts the server down: running requests finish, and open str
 
 All commands exit with 0 on success, 1 when they fail and 2 for a wrong command line.
 
+### Web demo
+
+`web/` is a static page that runs the library in the browser: `cmd/whistle-wasm`, built with `GOOS=js GOARCH=wasm`,
+runs in a Web Worker, so the page stays responsive during a pass. Nothing leaves the tab. Build and serve it:
+
+```bash
+just wasm          # web/whistle.wasm and Go's web/wasm_exec.js, both git-ignored
+just wasm-serve    # http://127.0.0.1:8080/; just wasm-serve <addr> for another address
+```
+
+On the page:
+
+- **Model:** fetch it from a URL, by default the pinned Hugging Face file `whistle download` uses (16.1 MiB), checked
+  against its SHA-256 and kept in the browser's Cache Storage for the next visit; or pick a local `whistle.cact`.
+- **Options:** language (detect or force), keywords (one per line), depth and word timestamps.
+- **File:** _Transcribe_ shows the text, the language, TTFT, tok/s, a table of the timed words and the engine JSON. A
+  WAV of integer PCM is read by the CLI's own reader in Go, so the JSON is `whistle transcribe --json`'s except for
+  the timings; anything else (float WAV, MP3, …) the browser decodes and resamples to 16 kHz. _Stream it in 1 s
+  chunks_ runs the same file through the stream API, as `whistle stream` does.
+- **Microphone:** an AudioWorklet resamples the input to 16 kHz mono and the stream API commits words live, with the
+  pending ones in grey; a slow pass makes the next call longer rather than the queue.
+
+The worker calls `globalThis.whistle`: `load(bytes)`, `decodeWAV(bytes)`, `transcribe(pcm, {language, keywords,
+word_timestamps, depth})` with the engine JSON as its result, and `streamStart({language, keywords})`,
+`streamProcess(pcm)` and `streamStop()` with the stream JSON; every call returns a promise, and an error rejects it.
+The Go side loads the model with `whistle.LoadBytes`.
+
+WebAssembly runs on one thread without SIMD: about 25 tok/s and a TTFT of 0.3–0.8 s under Node, a 7 s clip in about
+3 s in Chromium; see
+[F-043](docs/FINDINGS.md#f-043--jswasm-the-same-transcripts-without-fma-or-threads-and-where-the-time-goes-phase-10-2026-10-11).
+`just wasm-test` runs the package tests under Node (`go_js_wasm_exec`; `-short`, `just wasm-test ""` for the full
+corpus), then drives the worker headlessly against the CLI:
+
+```text
+resampler 16000 Hz: 64000 samples (0 held back), 440 Hz error 1.4e-8, 12 kHz peak 5.0e-1, 1.4 ms per second of audio
+resampler 22050 Hz: 63982 samples (18 held back), 440 Hz error 2.6e-6, 12 kHz peak 1.3e-5, 5.1 ms per second of audio
+resampler 44100 Hz: 63982 samples (18 held back), 440 Hz error 2.4e-6, 12 kHz peak 6.1e-6, 7.2 ms per second of audio
+resampler 48000 Hz: 63982 samples (18 held back), 440 Hz error 3.6e-6, 12 kHz peak 5.2e-6, 7.1 ms per second of audio
+resampler 96000 Hz: 63983 samples (17 held back), 440 Hz error 4.4e-6, 12 kHz peak 3.6e-6, 12.8 ms per second of audio
+whistle.wasm 0.1.0-wasm: model 16919407 bytes, SHA-256 checked, loaded in 53 ms; languages en de fr es it nl pl
+ls-other-3080-5040-0018: [en] 2.64 s, go decoder, wasm ttft 328.7 ms, 22.4 tok/s, 823 ms in all; native ttft 19.2 ms, 735.8 tok/s; equal to whistle transcribe: true, JSON without timings true
+ls-clean-5639-40744-0011: [en] 2.67 s, go decoder, wasm ttft 317.2 ms, 22.4 tok/s, 973 ms in all; native ttft 18.9 ms, 746 tok/s; equal to whistle transcribe: true, JSON without timings true
+fleurs-de_de-10308608197319017935: [de] 6.90 s, go decoder, wasm ttft 805.4 ms, 22.4 tok/s, 2653 ms in all; native ttft 27.3 ms, 726.3 tok/s; equal to whistle transcribe: true, JSON without timings true
+fleurs-fr_fr-10174413140250646001: [fr] 7.20 s, go decoder, wasm ttft 771 ms, 23.4 tok/s, 2856 ms in all; native ttft 26.6 ms, 784 tok/s; equal to whistle transcribe: true, JSON without timings true
+ls-clean-6930-75918-0000 stream: 5 calls with the stop, "Concord returned to its place amidst the tents."; equal to whistle stream --json: true
+PASS
+```
+
 ## Go API
 
 The library is the package `github.com/cwbudde/go-whistle/whistle`. The repository is not public yet, so `go get`

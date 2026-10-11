@@ -34,6 +34,8 @@ excludes = [
     "dist/**",
     "coverage.out",
     "coverage.html",
+    # Go's wasm_exec.js, copied by just wasm
+    "web/wasm_exec.js",
 ]
 
 # Go formatter - simple and strict
@@ -61,7 +63,7 @@ options = ["-s", "-w"]
 includes = ["*.sh"]
 priority = 1
 
-# Markdown, YAML, JSON formatter
+# Markdown, YAML, JSON and the web demo's HTML, CSS and JavaScript formatter
 [formatter.prettier]
 command = "prettier"
 options = ["-w"]
@@ -70,6 +72,10 @@ includes = [
     "*.yaml",
     "*.yml",
     "*.json",
+    "*.html",
+    "*.css",
+    "*.js",
+    "*.mjs",
 ]
 excludes = [
     # Exclude potentially sensitive or auto-generated files

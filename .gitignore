@@ -17,3 +17,7 @@ coverage.html
 
 # uv virtualenvs (scripts/)
 .venv/
+
+# The web demo's build output (just wasm)
+web/whistle.wasm
+web/wasm_exec.js

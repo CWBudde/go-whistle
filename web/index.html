@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>go-whistle · speech to text in the browser</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="main.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>go-whistle</h1>
+      <p>
+        Whistle speech-to-text, the pure-Go port compiled to WebAssembly.
+        Everything runs in this tab, in a Web Worker; no audio leaves the
+        browser.
+      </p>
+      <p id="runtime" class="muted">Starting the WebAssembly module …</p>
+    </header>
+
+    <main>
+      <section id="model-section">
+        <h2>1 · Model</h2>
+        <div class="row">
+          <label for="model-url">URL</label>
+          <input id="model-url" type="url" spellcheck="false" />
+        </div>
+        <div class="row">
+          <label for="model-sha">SHA-256</label>
+          <input
+            id="model-sha"
+            type="text"
+            spellcheck="false"
+            placeholder="empty: do not check"
+          />
+        </div>
+        <div class="row actions">
+          <button id="model-fetch" type="button">Fetch and load</button>
+          <span class="or">or</span>
+          <label class="file">
+            <input id="model-file" type="file" accept=".cact" />
+            <span>Pick whistle.cact …</span>
+          </label>
+        </div>
+        <progress id="model-progress" max="1" value="0" hidden></progress>
+        <p id="model-status" class="status" role="status"></p>
+      </section>
+
+      <section id="options-section">
+        <h2>2 · Options</h2>
+        <div class="row">
+          <label for="language">Language</label>
+          <select id="language">
+            <option value="">detect</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="keywords">Keywords</label>
+          <textarea
+            id="keywords"
+            rows="2"
+            placeholder="one word or phrase per line"
+          ></textarea>
+        </div>
+        <div class="row">
+          <label for="depth">Depth</label>
+          <select id="depth">
+            <option value="0">full (8 layers)</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="label"></span>
+          <label class="check"
+            ><input id="word-timestamps" type="checkbox" checked /> word
+            timestamps</label
+          >
+        </div>
+      </section>
+
+      <section id="file-section">
+        <h2>3 · Transcribe a file</h2>
+        <div class="row actions">
+          <label class="file">
+            <input id="audio-file" type="file" accept=".wav,audio/*" />
+            <span>Pick a WAV …</span>
+          </label>
+          <span id="audio-name" class="muted"></span>
+        </div>
+        <div class="row actions">
+          <button id="transcribe" type="button" disabled>Transcribe</button>
+          <button id="stream-file" type="button" disabled>
+            Stream it in 1 s chunks
+          </button>
+        </div>
+        <p id="file-status" class="status" role="status"></p>
+      </section>
+
+      <section id="mic-section">
+        <h2>4 · Microphone</h2>
+        <div class="row actions">
+          <button id="mic" type="button" disabled>Start microphone</button>
+          <span id="mic-level" class="meter" aria-hidden="true"
+            ><span></span
+          ></span>
+        </div>
+        <p id="mic-status" class="status" role="status"></p>
+      </section>
+
+      <section id="result-section" hidden>
+        <h2 id="result-title">Result</h2>
+        <p id="result-text" class="transcript">
+          <span class="committed"></span> <span class="pending"></span>
+        </p>
+        <p id="result-meta" class="muted"></p>
+        <table id="words" hidden>
+          <thead>
+            <tr>
+              <th>word</th>
+              <th>start</th>
+              <th>end</th>
+              <th>probability</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <details>
+          <summary>JSON</summary>
+          <pre id="result-json"></pre>
+        </details>
+      </section>
+    </main>
+
+    <footer class="muted">
+      Model:
+      <a href="https://huggingface.co/Cactus-Compute/whistle"
+        >Cactus-Compute/whistle</a
+      >. WebAssembly runs on one thread without SIMD, so a pass is far slower
+      than the native CLI.
+    </footer>
+  </body>
+</html>

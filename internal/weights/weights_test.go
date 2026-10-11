@@ -559,8 +559,9 @@ func TestOpenErrors(t *testing.T) {
 		{"empty file", func() error { return openEmpty(t) }, "short"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			// Lower case: under js/wasm, Node spells the errno text "No such file".
 			err := tc.open()
-			if err == nil || !strings.Contains(err.Error(), tc.match) {
+			if err == nil || !strings.Contains(strings.ToLower(err.Error()), tc.match) {
 				t.Errorf("error %v, want one mentioning %q", err, tc.match)
 			}
 		})

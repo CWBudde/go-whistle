@@ -149,6 +149,35 @@ bench *args:
 oracle-bench *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle bench {{args}}
 
+# Build the web demo into web/: whistle.wasm (cmd/whistle-wasm) and Go's wasm_exec.js, both git-ignored
+wasm:
+    GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" -o web/whistle.wasm ./cmd/whistle-wasm
+    cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/wasm_exec.js
+
+# Serve the web demo (web/) on addr with a small Go file server
+wasm-serve addr="127.0.0.1:8080": wasm
+    go run ./cmd/whistle-wasm/serve -addr {{addr}} -dir web
+
+# Run the tests under js/wasm in Node (all but the servers and cmd/whistle: sockets, 4 GB), then the page headless against the CLI; flags="" for the full corpus
+wasm-test flags="-short": wasm
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Go's wasm runtime caps the command line plus environment at 8 KiB, so the tests run in a minimal one.
+    # This go comes first: /usr/bin may hold an older one (the CI runner's is 1.24).
+    env -i PATH="$(go env GOROOT)/bin:$(dirname "$(command -v node)"):/usr/bin:/bin" HOME="$HOME" \
+        GOPATH="$(go env GOPATH)" GOMODCACHE="$(go env GOMODCACHE)" GOCACHE="$(go env GOCACHE)" \
+        GOTOOLCHAIN="$(go env GOTOOLCHAIN)" GOOS=js GOARCH=wasm \
+        go test {{flags}} -timeout 60m -exec "$(go env GOROOT)/lib/wasm/go_js_wasm_exec" \
+        $(go list ./... | grep -v -e /cmd/whistle$ -e /internal/server$ -e /cmd/whistle-wasm/serve$)
+    if [ -f models/whistle/whistle.cact ]; then
+        go build -o bin/whistle ./cmd/whistle
+        node cmd/whistle-wasm/node/headless.mjs --web web --model models/whistle/whistle.cact --cli bin/whistle \
+            --audio testdata/audio ls-other-3080-5040-0018 ls-clean-5639-40744-0011 \
+            fleurs-de_de-10308608197319017935 fleurs-fr_fr-10174413140250646001
+    else
+        node cmd/whistle-wasm/node/headless.mjs --web web
+    fi
+
 # Clean build artifacts
 clean:
     rm -rf bin coverage.out coverage.html

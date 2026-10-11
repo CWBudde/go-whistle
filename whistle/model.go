@@ -1,12 +1,14 @@
 package whistle
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/cwbudde/go-whistle/internal/cact"
 	"github.com/cwbudde/go-whistle/internal/decoder"
 	"github.com/cwbudde/go-whistle/internal/encoder"
 	"github.com/cwbudde/go-whistle/internal/frontend"
@@ -115,6 +117,45 @@ func Load(path string, opts ...Option) (*Model, error) {
 	return m, nil
 }
 
+// LoadBytes is Load on the bytes of a weight file, for platforms without a
+// file system such as js/wasm: a .cact file (recognised by its tag) or a
+// safetensors checkpoint, which needs WithVocabulary since there is no file
+// to find whistle.cact next to. WithoutMmap has no effect. The model reads
+// the packed CQ tensors straight from data, so data must not change until
+// Close.
+func LoadBytes(data []byte, opts ...Option) (*Model, error) {
+	var o loadOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	wo := weights.Options{Packed: !o.float}
+
+	var (
+		src weights.Source
+		err error
+	)
+
+	if len(data) >= 4 && binary.LittleEndian.Uint32(data) == cact.Tag {
+		src, err = weights.ParseCact(data, wo)
+	} else {
+		src, err = weights.ParseSafetensors(data, wo)
+	}
+
+	if err != nil {
+		return nil, wrap(err)
+	}
+
+	m, err := build(src, "", o)
+	if err != nil {
+		_ = src.Close()
+
+		return nil, err
+	}
+
+	return m, nil
+}
+
 // build loads the vocabulary, the encoder and the decoder from src and sets
 // up the silence gate and the beam search.
 func build(src weights.Source, path string, o loadOptions) (*Model, error) {
@@ -165,6 +206,10 @@ func vocabulary(src weights.Source, path string, o loadOptions) (*tokenizer.Toke
 		tok, err := decoder.LoadTokenizer(src)
 		if !errors.Is(err, weights.ErrUnavailable) {
 			return tok, wrap(err)
+		}
+
+		if path == "" { // LoadBytes: no file to look next to
+			return nil, errors.New("whistle: the weights hold no tokenizer; pass WithVocabulary")
 		}
 
 		o.vocabulary = filepath.Join(filepath.Dir(path), vocabularyFile)

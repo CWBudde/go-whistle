@@ -169,8 +169,12 @@ func TestInt8Memory(t *testing.T) {
 	}{{"k", m.k8, ref.k, xQK}, {"v", m.v8, ref.v, xV}} {
 		got := c.rows.Floats()
 
+		// Half a step, plus the float32 rounding of x / s and of s · q: a
+		// value near a tie may round either way and land a hair over half
+		// a step away (seen under js/wasm, whose sums round without FMA).
 		for i, want := range c.want {
-			if d := math.Abs(float64(got[i] - want)); d > float64(c.rows.S[i/c.headWidth])*0.5000001 {
+			s := float64(c.rows.S[i/c.headWidth])
+			if d := math.Abs(float64(got[i]) - float64(want)); d > s*0.5+1e-6*math.Abs(float64(want)) {
 				t.Fatalf("%s[%d]: %v stands for %v", c.name, i, got[i], want)
 			}
 		}
