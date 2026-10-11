@@ -1506,14 +1506,26 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
 
 ### 12.1 Docs and release
 
-- [ ] README after going public: drop "the repository is not public yet" (Quickstart, Go API) and the `replace`
+- [x] README after going public: drop "the repository is not public yet" (Quickstart, Go API) and the `replace`
       instructions; install with `go install github.com/cwbudde/go-whistle/cmd/whistle@latest` and use the library
       with a plain `go get github.com/cwbudde/go-whistle`. The status note and "Limits → Speed" still say Phase 9 is
       under way. Phase 9 is done, so point them at the numbers in `bench/RESULTS.md` and at 12.3 instead.
       **Accept:** `go install …@latest` and the README's Go API program work from a clean module without a clone.
+      (2026-10-11) — Quickstart installs with `go install …@latest` and fetches the two example clips with `curl`
+      when there is no clone; the Go API section is one `go get github.com/cwbudde/go-whistle/whistle`. The package
+      path, not the module root: with the default `-mod=readonly`, `go get` of the root leaves go.sum without the
+      dependencies of `whistle` and `go run` fails. The status note and "Limits → Speed" cite `bench/RESULTS.md` and
+      12.3. Checked in a temporary `GOPATH`, `GOMODCACHE` and `GOCACHE` outside the repository: `@latest`
+      (`v0.0.0-20261011164734-4aafa14c5ca7`, main before this change) installs, `whistle download`, `doctor` and
+      the README's `transcribe` lines give the README's output, and the Go API program in a new module prints the
+      README's output, with `GOFLAGS=-mod=mod` and without.
 - [ ] A first tagged release (`v0.1.0`) with short release notes (what works, parity, limits), so `@latest` resolves
       to a version and not to a pseudo-version of `main`. Optional: prebuilt CLI binaries for linux/amd64,
       linux/arm64, darwin/arm64 and windows/amd64 on the GitHub release.
+      (2026-10-11) — partial: the notes are in `docs/releases/v0.1.0.md`, and `.github/workflows/release.yaml` turns
+      a pushed `v*` tag into a release with them and the CLI for the four platforms (cross-compiled on one Linux
+      runner, `.tar.gz`/`.zip` with LICENSE and README.md, `SHA256SUMS`); built locally, the darwin/arm64
+      `whistle doctor` passes. The tag follows the merge.
 - [x] Link the hosted web demo (12.2) from the README's "Web demo" section.
       (2026-10-11) — done with #43: https://cwbudde.github.io/go-whistle/.
 
