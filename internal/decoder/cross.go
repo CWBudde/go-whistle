@@ -165,12 +165,14 @@ type memory struct {
 }
 
 // project computes the memory keys and values of enc, frames rows of dim
-// values. rope rotates frame f at position f when set.
+// values. rope rotates frame f at position f when set. Both projections
+// read enc, so packed ones share its rotation and tables
+// (needle.ApplyShared), with the same bits as one Apply each
+// (docs/FINDINGS.md F-038, F-041).
 func (c *cross) project(enc []float32, frames int, rope *needle.Rope) memory {
 	kW, vW := c.heads*c.qk, c.heads*c.v
 	m := memory{k: make([]float32, frames*kW), v: make([]float32, frames*vW), frames: frames}
-	c.kProj.Apply(m.k, enc, frames)
-	c.vProj.Apply(m.v, enc, frames)
+	needle.ApplyShared([][]float32{m.k, m.v}, enc, frames, c.kProj, c.vProj)
 
 	if !c.noNorm {
 		c.kNorm.Apply(m.k, m.k)
