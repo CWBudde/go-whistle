@@ -18,10 +18,13 @@ import (
 //	out  = d4 · kron(d3 · z2; w3a, w3b)
 //
 // Whistle's model width is n, so upstream's zero padding to the next power
-// of two never applies; LoadHadamardMLP takes the width from d1
-// (docs/FINDINGS.md F-011).
+// of two never applies there (docs/FINDINGS.md F-011). The Needle 3 text
+// model's width 768 runs at n = 1024: the input is zero-padded to n and the
+// output cut back to the model width, as upstream does; LoadHadamardMLP
+// takes n from d1 and the model width from cond_v (docs/FINDINGS.md F-045).
 type HadamardMLP struct {
 	n, na, nb, rank int
+	dim             int // model width, at most n; n for Whistle
 
 	d1, d2, b2, d3, d4 []float32       // (n)
 	w                  [3][2][]float32 // stage s: a (na, na), b (nb, nb)
@@ -48,13 +51,17 @@ func LoadHadamardMLP(src weights.Source, prefix string) (*HadamardMLP, error) {
 	h.d4 = l.vector("d4", h.n)
 	h.loadFactors(l)
 
-	condV, _, rank := l.matrix("cond_v", h.n, 0)
-	h.rank = rank
+	condV, dim, rank := l.matrix("cond_v", 0, 0)
+	if l.err == nil && (dim < 1 || dim > h.n) {
+		l.failf("%scond_v has %d rows, want a model width in [1, %d]", prefix, dim, h.n)
+	}
+
+	h.dim, h.rank = dim, rank
 	h.condVT = make([]float32, len(condV))
 
 	for i := range len(condV) / max(rank, 1) {
 		for k := range rank {
-			h.condVT[k*h.n+i] = condV[i*rank+k]
+			h.condVT[k*dim+i] = condV[i*rank+k]
 		}
 	}
 
@@ -74,7 +81,11 @@ func LoadHadamardMLP(src weights.Source, prefix string) (*HadamardMLP, error) {
 }
 
 // Dim is the model width of the input and the output.
-func (h *HadamardMLP) Dim() int { return h.n }
+func (h *HadamardMLP) Dim() int { return h.dim }
+
+// Width is n, the power-of-two width the Kronecker factors mix: Dim
+// rounded up to a power of two.
+func (h *HadamardMLP) Width() int { return h.n }
 
 // Forward runs the block on x, t rows of Dim values, and returns t rows of
 // Dim values.
@@ -159,19 +170,18 @@ type hadaTrace struct {
 }
 
 func (h *HadamardMLP) forward(x []float32, t int, tr *hadaTrace) ([]float32, error) {
-	if t < 0 || len(x) != t*h.n {
-		return nil, fmt.Errorf("needle: HadamardMLP input has %d values, want %d rows of %d", len(x), t, h.n)
+	if t < 0 || len(x) != t*h.dim {
+		return nil, fmt.Errorf("needle: HadamardMLP input has %d values, want %d rows of %d", len(x), t, h.dim)
 	}
 
-	n := h.n
 	logits := make([]float32, t*h.rank)
-	linear(logits, x, t, h.condVT, h.rank, n)
+	linear(logits, x, t, h.condVT, h.rank, h.dim)
 
 	if tr != nil {
 		tr.condLogits = append([]float32(nil), logits...)
 	}
 
-	out := make([]float32, t*n)
+	out := make([]float32, t*h.dim)
 
 	// Rows are independent: the trace collects them in order, so only an
 	// untraced run splits them (docs/FINDINGS.md F-038).
@@ -186,12 +196,23 @@ func (h *HadamardMLP) forward(x []float32, t int, tr *hadaTrace) ([]float32, err
 
 // rows runs forward's rows [lo, hi) of x into out, with the conditional
 // logits of all rows in logits.
+// Below width n the row is zero-padded: z1 reads d1 · x over the model
+// width only, and the row runs in pad, of which the first Dim values are
+// the output.
 func (h *HadamardMLP) rows(x, out, logits []float32, lo, hi int, tr *hadaTrace) {
-	n := h.n
+	n, dim := h.n, h.dim
 	cond, z, y, k := make([]float32, n), make([]float32, n), make([]float32, n), make([]float32, n)
 
+	var pad []float32
+	if dim < n {
+		pad = make([]float32, n)
+	}
+
 	for i := lo; i < hi; i++ {
-		xi, oi := x[i*n:(i+1)*n], out[i*n:(i+1)*n]
+		xi, oi := x[i*dim:(i+1)*dim], out[i*dim:(i+1)*dim]
+		if pad != nil {
+			oi = pad
+		}
 
 		// cond = 1 + softmax(x @ cond_v) @ cond_u
 		s := logits[i*h.rank : (i+1)*h.rank]
@@ -206,10 +227,12 @@ func (h *HadamardMLP) rows(x, out, logits []float32, lo, hi int, tr *hadaTrace) 
 			cond[c]++
 		}
 
-		// z1 = kron(d1 · x; w1a, w1b)[p1]
-		for c, d := range h.d1 {
+		// z1 = kron(d1 · x; w1a, w1b)[p1], x zero-padded to n
+		for c, d := range h.d1[:dim] {
 			z[c] = d * xi[c]
 		}
+
+		clear(z[dim:])
 
 		h.mix(oi, z, 0, y, k)
 
@@ -247,6 +270,10 @@ func (h *HadamardMLP) rows(x, out, logits []float32, lo, hi int, tr *hadaTrace) 
 
 		for c, d := range h.d4 {
 			oi[c] *= d
+		}
+
+		if pad != nil {
+			copy(out[i*dim:(i+1)*dim], pad[:dim])
 		}
 	}
 }
