@@ -1195,7 +1195,23 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       without `pass_ms`, line for line, on two manifest runs in s16le and f32le (`TestServeStreamMatchesStreamCmd`).
       Model-free tests cover the status codes, limits, queue, framing, stop, idle, shutdown and its deadline
       against a fake model. WebSocket: `github.com/coder/websocket`, only in `internal/server`.
-- [ ] Optional: a js/wasm build (as in go-pocket-tts) with a small web demo
+- [x] Optional: a js/wasm build (as in go-pocket-tts) with a small web demo
+      (2026-10-11) — `GOOS=js GOARCH=wasm` builds every package (mmap was already build-tagged, the kernels have their
+      `*_noasm.go`). `whistle.LoadBytes` loads a `.cact` (or, with `WithVocabulary`, a safetensors checkpoint) from
+      bytes. `cmd/whistle-wasm` installs `globalThis.whistle` (`load`, `decodeWAV`, `transcribe` → the engine JSON,
+      `streamStart/streamProcess/streamStop` → the stream JSON, errors as rejected promises), which `web/worker.js` runs
+      in a Web Worker. `web/` (plain HTML/JS/CSS): the model from the pinned Hugging Face URL (SHA-256 checked, kept in
+      Cache Storage) or a file picker, language, keywords, depth and word timestamps, a WAV transcribed with the timed
+      words (integer PCM through the CLI's WAV reader in Go, anything else decoded by the browser), the same file
+      streamed in 1 s chunks, and the microphone through an AudioWorklet resampling to 16 kHz, committed and pending
+      text live. `just wasm`, `just wasm-serve` (`cmd/whistle-wasm/serve`), `just wasm-test`; CI runs `wasm-test`
+      without the model. Under Node every package but `cmd/whistle` and `internal/server` (sockets, 4 GB) passes, the
+      whole `whistle` package with the 32-clip parity included; on 4 clips the page's path gives the JSON of
+      `whistle transcribe --json --word-timestamps` byte for byte without the timings, and a 1 s stream the calls of
+      `whistle stream --json` (`cmd/whistle-wasm/node/headless.mjs`); in Chromium the page gave the CLI's JSON, the
+      stream, the cache and SHA-256 check, the browser decoder and the microphone worked. One thread, no SIMD, no FMA:
+      TTFT 0.3–0.8 s and 24–27 tok/s under Node against 13–21 ms and 885–1121 tok/s native; two thirds of the time in
+      the CQ lookup kernels (F-043).
 - [ ] Optional: the Needle 3 text model (tool calling) on top of `internal/needle` and `.cact`, which reuses most of the work
 - [ ] Optional: extract `internal/tensor`/`ops` into a shared module once go-whistle and go-pocket-tts have stabilised
 
