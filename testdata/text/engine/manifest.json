@@ -1,0 +1,182 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "needle --model needle3.cact --tools <toolset> --system <system file> --threads 4 --prompt <query> [--max N]; needle --serve on the same flags for cases with tool results",
+  "speech_model": {
+    "repo": "Cactus-Compute/whistle",
+    "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    "file": "whistle.cact",
+    "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+  },
+  "files": [
+    "cases.json: the case corpus (hand-written)",
+    "responses.json: cases, the CLI's answers per case and turn",
+    "library.json: cases, libneedle3's needle_init and needle_complete results",
+    "manifest.json: cases, this file",
+    "date.json: date, answers with and without the date: fact",
+    "depth.json: depth, the --depth ladder",
+    "audio.json: audio, answers to speech (needle3.cact + whistle.cact)",
+    "embed.json, embed.safetensors: embed, needle_embed of short texts"
+  ],
+  "cases": 19,
+  "turns": 20,
+  "responses": "responses.json",
+  "dropped_fields": ["*_tps", "*_ms", "*_mb"],
+  "types": {
+    "call": 19,
+    "respond": 1
+  },
+  "function_calls": {
+    "0": 6,
+    "1": 11,
+    "2": 3
+  },
+  "min_confidence": 0.0315,
+  "max_confidence": 0.9595,
+  "threads": [
+    {
+      "compared": "the default thread count (no --threads) against --threads 4",
+      "identical": true,
+      "differing": [],
+      "differing_fields": {}
+    },
+    {
+      "compared": "--threads 1 against --threads 4",
+      "identical": false,
+      "differing": [
+        "timer_pasta",
+        "alarm_morning",
+        "message_and_timer",
+        "lights_and_lock",
+        "thermostat_decimal",
+        "weather_friday",
+        "event_tomorrow",
+        "event_explicit",
+        "event_no_year",
+        "offtopic_capital",
+        "no_tool_pizza",
+        "negation_door",
+        "negation_only",
+        "german_timer",
+        "french_message",
+        "spanish_lights_music",
+        "timer_then_result",
+        "timer_budget"
+      ],
+      "differing_fields": {
+        "confidence": 18,
+        "reasoning": 3
+      }
+    },
+    {
+      "compared": "--threads 2 against --threads 4",
+      "identical": false,
+      "differing": [
+        "timer_pasta",
+        "alarm_morning",
+        "message_and_timer",
+        "lights_and_lock",
+        "thermostat_decimal",
+        "weather_friday",
+        "event_tomorrow",
+        "event_explicit",
+        "event_no_year",
+        "offtopic_capital",
+        "no_tool_pizza",
+        "negation_door",
+        "negation_only",
+        "german_timer",
+        "french_message",
+        "spanish_lights_music",
+        "extract_invoice",
+        "timer_then_result",
+        "timer_budget"
+      ],
+      "differing_fields": {
+        "confidence": 19,
+        "reasoning": 3
+      }
+    },
+    {
+      "compared": "--threads 3 against --threads 4",
+      "identical": false,
+      "differing": [
+        "timer_pasta",
+        "alarm_morning",
+        "message_and_timer",
+        "lights_and_lock",
+        "thermostat_decimal",
+        "weather_friday",
+        "event_tomorrow",
+        "event_explicit",
+        "event_no_year",
+        "offtopic_capital",
+        "no_tool_pizza",
+        "negation_door",
+        "negation_only",
+        "german_timer",
+        "french_message",
+        "spanish_lights_music",
+        "extract_invoice",
+        "timer_then_result",
+        "timer_budget"
+      ],
+      "differing_fields": {
+        "confidence": 19,
+        "reasoning": 3
+      }
+    },
+    {
+      "compared": "--threads 8 against --threads 4",
+      "identical": false,
+      "differing": [
+        "timer_pasta",
+        "alarm_morning",
+        "message_and_timer",
+        "lights_and_lock",
+        "thermostat_decimal",
+        "weather_friday",
+        "event_tomorrow",
+        "event_explicit",
+        "event_no_year",
+        "offtopic_capital",
+        "no_tool_pizza",
+        "negation_door",
+        "negation_only",
+        "german_timer",
+        "french_message",
+        "spanish_lights_music",
+        "timer_then_result",
+        "timer_budget"
+      ],
+      "differing_fields": {
+        "confidence": 18,
+        "reasoning": 3
+      }
+    }
+  ],
+  "library": {
+    "compared": "libneedle3 needle_complete, twice, against the CLI",
+    "identical": true,
+    "differing": [],
+    "differing_fields": {}
+  },
+  "serve_first_turn": {
+    "compared": "needle --serve's answer to the query against --prompt's, for cases with tool results",
+    "identical": true,
+    "differing": [],
+    "differing_fields": {}
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "libneedle3: needle_init(system, tools, NULL), needle_reset, needle_complete per turn",
+  "cases": {
+    "alarm_morning": {
+      "init": 314,
+      "complete": [60],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "event_explicit": {
+      "init": 314,
+      "complete": [103],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "event_no_year": {
+      "init": 314,
+      "complete": [64],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "event_tomorrow": {
+      "init": 314,
+      "complete": [72],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "extract_invoice": {
+      "init": 91,
+      "complete": [77],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "french_message": {
+      "init": 320,
+      "complete": [62],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "german_timer": {
+      "init": 320,
+      "complete": [44],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "lights_and_lock": {
+      "init": 243,
+      "complete": [69],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "message_and_timer": {
+      "init": 314,
+      "complete": [66],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "negation_door": {
+      "init": 243,
+      "complete": [91],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "negation_only": {
+      "init": 243,
+      "complete": [63],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "no_tool_pizza": {
+      "init": 243,
+      "complete": [16],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "offtopic_capital": {
+      "init": 243,
+      "complete": [30],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "spanish_lights_music": {
+      "init": 249,
+      "complete": [98],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "thermostat_decimal": {
+      "init": 243,
+      "complete": [44],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "timer_budget": {
+      "init": 314,
+      "complete": [8],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "timer_pasta": {
+      "init": 314,
+      "complete": [42],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "timer_then_result": {
+      "init": 314,
+      "complete": [42, 33],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "weather_friday": {
+      "init": 314,
+      "complete": [59],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    }
+  }
+}

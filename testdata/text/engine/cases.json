@@ -1,0 +1,301 @@
+{
+  "system": "date: 2026-10-11 Sun 09:30",
+  "toolsets": {
+    "assistant": [
+      {
+        "name": "set_timer",
+        "description": "Start a countdown timer",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "minutes": {
+              "type": "integer",
+              "description": "Duration in minutes"
+            },
+            "label": {
+              "type": "string",
+              "description": "What the timer is for"
+            }
+          },
+          "required": ["minutes"]
+        }
+      },
+      {
+        "name": "set_alarm",
+        "description": "Set an alarm clock",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "type": "string",
+              "description": "Alarm time as HH:MM, 24-hour"
+            },
+            "label": { "type": "string" }
+          },
+          "required": ["time"]
+        }
+      },
+      {
+        "name": "send_message",
+        "description": "Send a text message to a contact",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "recipient": { "type": "string", "description": "Contact name" },
+            "message": { "type": "string", "description": "Message text" }
+          },
+          "required": ["recipient", "message"]
+        }
+      },
+      {
+        "name": "get_weather",
+        "description": "Get the weather forecast for a place and day",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": { "type": "string", "description": "City name" },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "description": "Day of the forecast"
+            }
+          },
+          "required": ["location"]
+        }
+      },
+      {
+        "name": "create_event",
+        "description": "Add an event to the calendar",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "date": { "type": "string", "format": "date" },
+            "time": {
+              "type": "string",
+              "description": "Start time as HH:MM, 24-hour"
+            },
+            "duration_minutes": { "type": "integer" },
+            "location": { "type": "string" }
+          },
+          "required": ["title", "date"]
+        }
+      }
+    ],
+    "home": [
+      {
+        "name": "set_lights",
+        "description": "Turn a room's lights on or off and set their brightness",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "room": { "type": "string" },
+            "on": { "type": "boolean" },
+            "brightness": { "type": "integer", "minimum": 0, "maximum": 100 }
+          },
+          "required": ["room", "on"]
+        }
+      },
+      {
+        "name": "set_thermostat",
+        "description": "Set the heating or cooling target temperature",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "temperature": { "type": "number" },
+            "unit": { "type": "string", "enum": ["celsius", "fahrenheit"] }
+          },
+          "required": ["temperature"]
+        }
+      },
+      {
+        "name": "lock_door",
+        "description": "Lock a door",
+        "parameters": {
+          "type": "object",
+          "properties": { "door": { "type": "string" } },
+          "required": ["door"]
+        }
+      },
+      {
+        "name": "unlock_door",
+        "description": "Unlock a door",
+        "parameters": {
+          "type": "object",
+          "properties": { "door": { "type": "string" } },
+          "required": ["door"]
+        }
+      },
+      {
+        "name": "play_music",
+        "description": "Play music in a room",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Artist, album, song or genre"
+            },
+            "room": { "type": "string" }
+          },
+          "required": ["query"]
+        }
+      }
+    ],
+    "invoice": [
+      {
+        "name": "Invoice",
+        "description": "The fields of an invoice",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "vendor": { "type": "string" },
+            "invoice_number": { "type": "string" },
+            "total": { "type": "number" },
+            "currency": { "type": "string" },
+            "due_date": { "type": "string", "format": "date" }
+          },
+          "required": ["vendor", "total"]
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "timer_pasta",
+      "covers": "one call",
+      "toolset": "assistant",
+      "query": "set a timer for 10 minutes for the pasta"
+    },
+    {
+      "id": "alarm_morning",
+      "covers": "one call, a time to normalise",
+      "toolset": "assistant",
+      "query": "wake me up at 6:45 tomorrow"
+    },
+    {
+      "id": "message_and_timer",
+      "covers": "two calls",
+      "toolset": "assistant",
+      "query": "text Anna that I'm running late and set a timer for 20 minutes"
+    },
+    {
+      "id": "lights_and_lock",
+      "covers": "two calls",
+      "toolset": "home",
+      "query": "turn off the kitchen lights and lock the front door"
+    },
+    {
+      "id": "thermostat_decimal",
+      "covers": "a decimal number to ground",
+      "toolset": "home",
+      "query": "set the heating to 21.5 degrees celsius"
+    },
+    {
+      "id": "weather_friday",
+      "covers": "a weekday resolved against the date fact",
+      "toolset": "assistant",
+      "query": "what's the weather in Berlin on Friday"
+    },
+    {
+      "id": "event_tomorrow",
+      "covers": "a relative day resolved against the date fact",
+      "toolset": "assistant",
+      "query": "add the dentist tomorrow at 3pm"
+    },
+    {
+      "id": "event_explicit",
+      "covers": "an explicit date, time and duration",
+      "toolset": "assistant",
+      "query": "schedule lunch with Marco on November 3rd 2026 at 12:30 for 90 minutes at Luigi's"
+    },
+    {
+      "id": "event_no_year",
+      "covers": "a date without a year",
+      "toolset": "assistant",
+      "query": "put the quarterly review on March 4th"
+    },
+    {
+      "id": "offtopic_capital",
+      "covers": "refusal: off-topic question",
+      "toolset": "home",
+      "query": "what's the capital of France"
+    },
+    {
+      "id": "no_tool_pizza",
+      "covers": "refusal: no matching tool",
+      "toolset": "home",
+      "query": "order a large pepperoni pizza"
+    },
+    {
+      "id": "negation_door",
+      "covers": "negation of a second action",
+      "toolset": "home",
+      "query": "turn on the living room lights but don't unlock the front door"
+    },
+    {
+      "id": "negation_only",
+      "covers": "negation of the only action",
+      "toolset": "home",
+      "query": "don't turn off the bedroom lights"
+    },
+    {
+      "id": "german_timer",
+      "covers": "German query",
+      "toolset": "assistant",
+      "system": "date: 2026-10-11 Sun 09:30; locale: de-DE",
+      "query": "Stell einen Timer auf 15 Minuten für die Eier"
+    },
+    {
+      "id": "french_message",
+      "covers": "French query, a number word",
+      "toolset": "assistant",
+      "system": "date: 2026-10-11 Sun 09:30; locale: fr-FR",
+      "query": "Envoie un message à Julie pour lui dire que j'arrive dans dix minutes"
+    },
+    {
+      "id": "spanish_lights_music",
+      "covers": "Spanish query, two calls",
+      "toolset": "home",
+      "system": "date: 2026-10-11 Sun 09:30; locale: es-ES",
+      "query": "Apaga las luces del salón y pon música de jazz en la cocina"
+    },
+    {
+      "id": "extract_invoice",
+      "covers": "extraction-style schema with a date and an amount",
+      "toolset": "invoice",
+      "query": "Invoice INV-2041 from Acme Corp: total $1,200.00, due October 30, 2026."
+    },
+    {
+      "id": "timer_then_result",
+      "covers": "a tool result fed back (type respond)",
+      "toolset": "assistant",
+      "query": "set a timer for 10 minutes for the pasta",
+      "results": [[{ "status": "ok", "timer_id": "t1", "ends_at": "09:40" }]]
+    },
+    {
+      "id": "timer_budget",
+      "covers": "token budget exhausted (--max 8)",
+      "toolset": "assistant",
+      "query": "set a timer for 10 minutes for the pasta",
+      "max": 8
+    }
+  ],
+  "audio": [
+    {
+      "id": "door_locked",
+      "clip": "ls-clean-5639-40744-0011",
+      "toolset": "home"
+    },
+    {
+      "id": "verses_message",
+      "clip": "ls-other-3080-5040-0011",
+      "toolset": "assistant"
+    },
+    {
+      "id": "frank_message",
+      "clip": "ls-clean-6930-75918-0007",
+      "toolset": "assistant"
+    }
+  ]
+}

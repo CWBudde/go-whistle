@@ -1,0 +1,385 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "needle --model needle3.cact --tools <toolset> --system <system file> --threads 4 --prompt <query> --depth N",
+  "full_depth": 20,
+  "loads": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+  "refused": {
+    "0": {
+      "exit": 1,
+      "stderr": "needle: --depth takes a layer count of 2 or more, not \"0\""
+    },
+    "1": {
+      "exit": 1,
+      "stderr": "needle: --depth takes a layer count of 2 or more, not \"1\""
+    },
+    "21": {
+      "exit": 1,
+      "stderr": "needle: cannot load models/needle3/needle3.cact: failed to load .cact model"
+    }
+  },
+  "same_as_full": {
+    "lights_and_lock": [20],
+    "offtopic_capital": [20],
+    "timer_pasta": [20]
+  },
+  "full_same_as_default": {
+    "lights_and_lock": true,
+    "offtopic_capital": true,
+    "timer_pasta": true
+  },
+  "answers": {
+    "lights_and_lock.d10": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "lock_door",
+          "arguments": {
+            "door": "front door"
+          }
+        },
+        {
+          "name": "lock_door",
+          "arguments": {
+            "door": "front door, door"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'kitchen lights' -> room 'kitchen', 'off' -> enabled false; 'front door' -> door 'front door', 'front door' -> door 'front door', 'lock' -> door 'front door', 'front door' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door', 'lock' -> door 'front door',",
+      "confidence": 0.1784,
+      "validation": {
+        "ungrounded": ["lock_door.door"],
+        "negation": false
+      }
+    },
+    "lights_and_lock.d15": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "set_lights",
+          "arguments": {
+            "room": "kitchen",
+            "on": false
+          }
+        },
+        {
+          "name": "lock_door",
+          "arguments": {
+            "door": "front door"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'turn off the kitchen lights' -> set_lights room 'kitchen', on false; 'lock the front door' -> lock_door door 'front door'",
+      "confidence": 0.324,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    },
+    "lights_and_lock.d19": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "set_lights",
+          "arguments": {
+            "room": "kitchen",
+            "on": false
+          }
+        },
+        {
+          "name": "lock_door",
+          "arguments": {
+            "door": "front door"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'kitchen lights' -> room 'kitchen', 'turn off' -> on false; 'front door' -> door 'front door', 'lock' -> door 'front door'",
+      "confidence": 0.2629,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    },
+    "lights_and_lock.d2": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [],
+      "suppressed_calls": [
+        {
+          "name": "lock_door",
+          "arguments": {
+            "door": "kitchen lights"
+          }
+        }
+      ],
+      "reasoning": "'turn off the kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room 'kitchen lights' -> room",
+      "confidence": 0.0325,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    },
+    "lights_and_lock.d5": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "lock_door",
+          "arguments": {
+            "door": "front door"
+          }
+        },
+        {
+          "name": "lock_door",
+          "arguments": {
+            "door": "front door's door"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'turn off the kitchen lights' -> control_lights room 'kitchen'; 'lock the front door' -> door 'front door'",
+      "confidence": 0.1821,
+      "validation": {
+        "ungrounded": ["lock_door.door"],
+        "negation": false
+      }
+    },
+    "offtopic_capital.d10": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [],
+      "suppressed_calls": [],
+      "reasoning": "No tool provides a lookup or search. The toolset has no lookup tool. The only tool is play_music. The query is about a country, not a specific country.",
+      "confidence": 0.6361
+    },
+    "offtopic_capital.d15": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [],
+      "suppressed_calls": [],
+      "reasoning": "No tool provides a geographic or factual knowledge query. The toolset only has set_lights, unlock, and set_thermostat.",
+      "confidence": 0.794
+    },
+    "offtopic_capital.d19": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "play_music",
+          "arguments": {
+            "query": "capital of France"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "No tool for geographic information. play_music with query 'capital of France' from query.",
+      "confidence": 0.1917,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    },
+    "offtopic_capital.d2": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [],
+      "suppressed_calls": [
+        {
+          "name": "set_lights",
+          "arguments": {
+            "room": "csv",
+            "on": true
+          }
+        }
+      ],
+      "reasoning": "'what's the capital of France' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv' -> room 'csv'",
+      "confidence": 0.0335,
+      "validation": {
+        "ungrounded": ["set_lights.room"],
+        "negation": false
+      }
+    },
+    "offtopic_capital.d5": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [],
+      "suppressed_calls": [
+        {
+          "name": "set_thermostat",
+          "arguments": {
+            "temperature": 18.0,
+            "unit": "fahrenheit"
+          }
+        }
+      ],
+      "reasoning": "'capture' -> room 'capture', 'French' -> room 'French'.",
+      "confidence": 0.1956,
+      "validation": {
+        "ungrounded": ["set_thermostat.temperature"],
+        "negation": false
+      }
+    },
+    "timer_pasta.d10": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "set_timer",
+          "arguments": {
+            "minutes": 10,
+            "label": "Pasta"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'10 minutes' -> minutes 10; label 'pasta' from query.",
+      "confidence": 0.6605,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    },
+    "timer_pasta.d15": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "set_timer",
+          "arguments": {
+            "minutes": 10,
+            "label": "Pasta"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'",
+      "confidence": 0.708,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    },
+    "timer_pasta.d19": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "set_timer",
+          "arguments": {
+            "minutes": 10,
+            "label": "Pasta"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+      "confidence": 0.8964,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    },
+    "timer_pasta.d2": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [],
+      "suppressed_calls": [
+        {
+          "name": "set_alarm",
+          "arguments": {
+            "time": "10 minutes"
+          }
+        }
+      ],
+      "reasoning": "'10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours 10; '10 minutes' -> time_hours",
+      "confidence": 0.0475,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    },
+    "timer_pasta.d5": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "set_timer",
+          "arguments": {
+            "minutes": 10,
+            "label": "Pasta"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'",
+      "confidence": 0.2907,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    }
+  }
+}
