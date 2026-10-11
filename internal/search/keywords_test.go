@@ -374,3 +374,33 @@ func TestKeywordProbeAxes(t *testing.T) {
 		}
 	}
 }
+
+// TestKeywordOnceAcrossForms pins that Bias.once counts a keyword once
+// whatever its form: "1 2" and "3 2" spell one keyword, "5 6" another,
+// under unit weights and a completion bonus of 0.5.
+func TestKeywordOnceAcrossForms(t *testing.T) {
+	ids := [][]int{{1, 2}, {3, 2}, {5, 6}}
+
+	for _, tc := range []struct {
+		name     string
+		identify bool
+		text     []int
+		want     float64
+	}{
+		{"one form, then the other", true, []int{1, 2, 3, 2}, 2.5},
+		{"the same form twice", true, []int{3, 2, 3, 2}, 2.5},
+		{"two keywords", true, []int{1, 2, 5, 6}, 5},
+		{"forms of their own without identify", false, []int{1, 2, 3, 2}, 5},
+	} {
+		b := Bias{Weight: 1, Revoke: 1, Complete: 0.5, Forms: FormSpace, once: true}
+		k := build(ids, unit, b)
+
+		if tc.identify {
+			k.identify(ids, []int{0, 0, 1})
+		}
+
+		if got := k.Bonus(tc.text, -1); math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("%s: Bonus(%v) = %g, want %g", tc.name, tc.text, got, tc.want)
+		}
+	}
+}

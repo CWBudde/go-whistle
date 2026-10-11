@@ -131,6 +131,7 @@ type Keywords struct {
 	depth []int         // the node's path length in tokens
 	out   [][]int       // the token lengths of the keywords that end at the node, suffixes included
 	end   []bool        // a keyword ends here
+	key   []int         // the keyword a spelling that ends at the node spells, shared by its forms (Bias.once)
 	start kwState       // the state at the start of the text
 	bias  Bias
 }
@@ -142,7 +143,7 @@ type kwState struct {
 	n    int
 	cov  bitset
 	held float64 // the transient bonus the next token takes back
-	done []int   // the keyword nodes completed so far (Bias.once)
+	done []int   // the keywords completed so far, by key (Bias.once)
 }
 
 // textStart is the token in front of every text that anchors the bare
@@ -210,24 +211,35 @@ func NewKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) (*Keywords
 		return nil, fmt.Errorf("%w: forms %b match neither after a space nor bare", ErrKeywords, b.Forms)
 	}
 
-	ids := encodeKeywords(tok, keywords, b)
+	ids, keys := encodeKeywords(tok, keywords, b)
 
-	if !b.PerChar {
-		return build(ids, func(int) float64 { return b.Weight }, b), nil
+	var k *Keywords
+
+	if b.PerChar {
+		ws := make([][]float64, len(ids))
+		for i, s := range ids {
+			ws[i] = charWeights(tok, s, b.Weight)
+		}
+
+		k = buildWeighted(ids, ws, b)
+	} else {
+		k = build(ids, func(int) float64 { return b.Weight }, b)
 	}
 
-	ws := make([][]float64, len(ids))
-	for i, s := range ids {
-		ws[i] = charWeights(tok, s, b.Weight)
-	}
+	k.identify(ids, keys)
 
-	return buildWeighted(ids, ws, b), nil
+	return k, nil
 }
 
 // encodeKeywords tokenises the spellings of the keywords under b, a bare
-// one behind textStart.
-func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) [][]int {
-	var ids [][]int
+// one behind textStart, and gives each spelling the index of the keyword
+// (under Split: of the word) it spells, shared by all its forms.
+func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) ([][]int, []int) {
+	var (
+		ids  [][]int
+		keys []int
+		key  int
+	)
 
 	for _, kw := range keywords {
 		words := []string{kw}
@@ -243,11 +255,14 @@ func encodeKeywords(tok *tokenizer.Tokenizer, keywords []string, b Bias) [][]int
 				}
 
 				ids = append(ids, e)
+				keys = append(keys, key)
 			}
+
+			key++
 		}
 	}
 
-	return ids
+	return ids, keys
 }
 
 // charWeights is the PerChar bonus of each token of a spelling: weight
@@ -317,7 +332,7 @@ func build(ids [][]int, weight func(id int) float64, b Bias) *Keywords {
 // ws[i][j]. A node's bonus comes from the first spelling through it; the
 // spellings through a node share its prefix, so their bonuses agree.
 func buildWeighted(ids [][]int, ws [][]float64, b Bias) *Keywords {
-	k := &Keywords{next: []map[int]int{{}}, fail: []int{0}, up: []int{0}, w: []float64{0}, depth: []int{0}, end: []bool{false}, bias: b}
+	k := &Keywords{next: []map[int]int{{}}, fail: []int{0}, up: []int{0}, w: []float64{0}, depth: []int{0}, end: []bool{false}, key: []int{0}, bias: b}
 
 	for i, s := range ids {
 		k.add(s, ws[i])
@@ -429,6 +444,7 @@ func (k *Keywords) add(ids []int, ws []float64) {
 			k.w = append(k.w, ws[i])
 			k.depth = append(k.depth, k.depth[n]+1)
 			k.end = append(k.end, false)
+			k.key = append(k.key, -1-c) // a spelling of its own until identify
 			k.next[n][id] = c
 		}
 
@@ -436,6 +452,25 @@ func (k *Keywords) add(ids []int, ws []float64) {
 	}
 
 	k.end[n] = true
+}
+
+// identify gives the node each spelling of ids ends at the key of its
+// keyword, keys[i] for spelling i, so that Bias.once counts a keyword once
+// whatever its form. A node two keywords' spellings share keeps the
+// first's key. Without identify each spelling is a keyword of its own.
+func (k *Keywords) identify(ids [][]int, keys []int) {
+	set := make([]bool, len(k.key))
+
+	for i, s := range ids {
+		n := 0
+		for _, id := range s {
+			n = k.next[n][id]
+		}
+
+		if n != 0 && !set[n] {
+			k.key[n], set[n] = keys[i], true
+		}
+	}
 }
 
 // link sets the failure links breadth first, and with them the keywords
@@ -511,14 +546,14 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 		kn := k.suffix(c, l)
 
 		if k.bias.once {
-			if slices.Contains(next.done, kn) {
-				d -= k.pathBonus(kn) // a repeat: its tokens earn nothing
+			if slices.Contains(next.done, k.key[kn]) {
+				d -= k.pathBonus(kn) // a repeat, in any form: its tokens earn nothing
 				cov = cov.with(depth-l, depth)
 
 				continue
 			}
 
-			next.done = append(slices.Clip(next.done), kn)
+			next.done = append(slices.Clip(next.done), k.key[kn])
 		}
 
 		bonus := k.bias.Complete

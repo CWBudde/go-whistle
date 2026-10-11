@@ -3852,7 +3852,9 @@ completion structures added for this probe as test-only `Bias` fields:
 - _transient_: the completion bonus lasts one token, the next token (EOS included) takes it back;
 - _transient + echo_: the completion also earns the keyword's own token bonus for that token, then loses it, as
   icefall's / sherpa-onnx's `ContextGraph` adds `output_score`;
-- _once_: a keyword earns its bonus once per text; a repeat's tokens are taken back when it completes.
+- _once_: a keyword earns its bonus once per text, in any of its forms (space or bare, either case); a repeat's tokens
+  are taken back when it completes. The first version counted each spelling on its own (PR #39 review); counting
+  per keyword changes none of the 273 rows below.
 
 | family (variants)            | make `de-paare-missed` equal | best that does (cases, sets, lost)                                                                     | best overall (cases, sets, lost)          |
 | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
