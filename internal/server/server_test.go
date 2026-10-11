@@ -822,6 +822,65 @@ func TestStreamAhead(t *testing.T) {
 	}
 }
 
+// A client that gets too far ahead while its own pass runs gets the 1008
+// once the pass ends, not a dropped connection (PR #37 review).
+func TestStreamAheadDuringPass(t *testing.T) {
+	f := &fakeModel{block: make(chan struct{}), run: make(chan struct{})}
+	_, hs := newTestServer(t, f, testConfig())
+
+	b := dial(t, hs, "")
+	write(t, b, websocket.MessageBinary, make([]byte, 2))
+	<-f.run // b's own pass runs
+
+	chunk := make([]byte, 2*whistle.MaxSamples)
+	for range 3 { // two fill the 60 s backlog, the third is over it
+		write(t, b, websocket.MessageBinary, chunk)
+	}
+
+	time.Sleep(100 * time.Millisecond) // the reader sees the third chunk during the pass
+	close(f.block)
+
+	if code, reason := readClose(t, b); code != websocket.StatusPolicyViolation || !strings.Contains(reason, "wait for a pass") {
+		t.Errorf("b closed with %v %q, want 1008", code, reason)
+	}
+}
+
+// A stop after a full backlog of audio still stops: only PCM counts against
+// the 60 s (PR #37 review).
+func TestStreamStopAfterFullBacklog(t *testing.T) {
+	f := &fakeModel{block: make(chan struct{}), run: make(chan struct{})}
+	_, hs := newTestServer(t, f, testConfig())
+
+	b := dial(t, hs, "")
+	write(t, b, websocket.MessageBinary, make([]byte, 2))
+	<-f.run // b's first pass runs
+
+	chunk := make([]byte, 2*whistle.MaxSamples)
+	for range 2 { // exactly the 60 s backlog
+		write(t, b, websocket.MessageBinary, chunk)
+	}
+
+	write(t, b, websocket.MessageText, []byte(`{"type":"stop"}`))
+	time.Sleep(100 * time.Millisecond) // the reader queues the stop during the pass
+
+	close(f.block)
+
+	go func() {
+		for range f.run { // the two queued passes
+		}
+	}()
+
+	for i := range 4 { // three chunks' results and the stop's
+		if got := readText(t, b); !strings.Contains(got, `"text"`) {
+			t.Errorf("message %d: %s", i, got)
+		}
+	}
+
+	if code, _ := readClose(t, b); code != websocket.StatusNormalClosure {
+		t.Errorf("b closed with %v, want 1000 after the stop", code)
+	}
+}
+
 // openSessions is the number of open /stream sessions.
 func (s *Server) openSessions() int {
 	s.mu.Lock()

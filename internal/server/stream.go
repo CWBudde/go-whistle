@@ -174,8 +174,9 @@ func (ss *session) read(ctx context.Context, msgs chan<- message) {
 			return
 		}
 
-		n := int64(len(data))
-		if ss.queued.Add(n) > budget {
+		// Only PCM counts against the budget: a stop after a full backlog
+		// still stops (PR #37 review).
+		if typ == websocket.MessageBinary && ss.queued.Add(int64(len(data))) > budget {
 			ss.ahead.Store(true)
 			ss.cancel()
 
@@ -223,7 +224,9 @@ func (ss *session) loop(ctx context.Context, msgs <-chan message) end {
 				return end{} // the client closed or the connection failed: nobody to send Stop to
 			}
 
-			ss.queued.Add(-int64(len(m.data)))
+			if m.typ == websocket.MessageBinary {
+				ss.queued.Add(-int64(len(m.data)))
+			}
 
 			e, more := ss.handle(ctx, m)
 			if !more {
@@ -269,8 +272,12 @@ func (ss *session) handle(ctx context.Context, m message) (end, bool) {
 		return end{code: websocket.StatusInternalError, reason: "process failed"}, false
 	}
 
-	if ss.send(ctx, res) != nil {
-		return end{}, false
+	// The context may have ended during the pass, which nothing interrupts:
+	// then the result is not sent, and a client that got too far ahead still
+	// gets its 1008 (PR #37 review). A write that does not block ignores an
+	// ended context, so it is checked here.
+	if ctx.Err() != nil || ss.send(ctx, res) != nil {
+		return ss.ended(), false
 	}
 
 	return end{}, true
