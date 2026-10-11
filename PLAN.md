@@ -1162,7 +1162,24 @@ the engine's word times and probabilities, so this phase needs no new oracle run
 - [ ] Follow-up from 6.3: `de-paare-missed`, the one keyword search miss. Weaker hypotheses with the shared keyword
       bonus end one token earlier and fill Whisper's 5 finished slots (F-029); find the engine's rule that keeps the
       right one.
-- [ ] Optional: an HTTP server (`/transcribe`, `/stream` over WebSocket)
+- [x] Optional: an HTTP server (`/transcribe`, `/stream` over WebSocket)
+      (2026-10-11) — `whistle serve` (`internal/server`) loads the model once. `POST /transcribe` takes a WAV body
+      or raw 16 kHz mono PCM (`?format=s16le|f32le`) with the options as query parameters (`language`, repeatable
+      `keywords`, `depth`, `word_timestamps`) and answers with the engine's JSON; 400 for bad options, unknown
+      parameters or bad audio, 408 for a body slower than `--read-timeout`, 413 over `--max-body-mib` (16), 422 over
+      30 s, 503 (before the body is read) when `--concurrency` (2) passes run and `--queue` (8) wait, 405 for other
+      methods. `GET /stream` is a WebSocket with one `Stream` per
+      connection: a binary message is one `Process` chunk (at most 30 s), answered by its stream JSON; the text
+      message `{"type":"stop"}` sends the `Stop` result and closes with 1000, and the server sends it before its own
+      closes (1001 on shutdown, 1008 after `--stream-idle`). `GET /healthz`, `GET /v1/info` (SHA-256, weights mode,
+      languages, limits), a log line per request, graceful shutdown on SIGINT/SIGTERM within `--shutdown-timeout`.
+      The model is safe for concurrent use (8 concurrent requests at `--concurrency 4` equal the sequential ones
+      under `-race`); the server bounds the passes anyway, since each uses every core.
+      With the model, `/transcribe` equals `whistle transcribe --json` but for the timing on five option sets and an
+      s16le body (`TestServeMatchesTranscribeCmd`), and `/stream` in 1 s chunks equals `whistle stream --json`
+      without `pass_ms`, line for line, on two manifest runs in s16le and f32le (`TestServeStreamMatchesStreamCmd`).
+      Model-free tests cover the status codes, limits, queue, framing, stop, idle, shutdown and its deadline
+      against a fake model. WebSocket: `github.com/coder/websocket`, only in `internal/server`.
 - [ ] Optional: a js/wasm build (as in go-pocket-tts) with a small web demo
 - [ ] Optional: the Needle 3 text model (tool calling) on top of `internal/needle` and `.cact`, which reuses most of the work
 - [ ] Optional: extract `internal/tensor`/`ops` into a shared module once go-whistle and go-pocket-tts have stabilised
