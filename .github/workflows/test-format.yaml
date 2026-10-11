@@ -1,18 +1,13 @@
-name: CI
+name: test-format
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
-  ci:
-    name: just ci
-    # Linux only: macOS minutes bill at 10x, and the arm64 assembly is exercised in go-pocket-tts.
+  test-format:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -50,17 +45,5 @@ jobs:
           curl -fsSL https://github.com/numtide/treefmt/releases/download/v2.6.0/treefmt_2.6.0_linux_amd64.tar.gz \
             | sudo tar -xz -C /usr/local/bin treefmt
 
-      - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.13.2
-          install-only: true
-
-      # Model-dependent tests skip themselves when models/ is absent, which is always the case here.
-      - name: just ci
-        run: just ci
-
-      # js/wasm: builds web/whistle.wasm (cmd/whistle-wasm and the library), runs the package tests under Node
-      # (go_js_wasm_exec; the model-gated ones skip) and the page's headless check (the resampler; no model).
-      - name: just wasm-test
-        run: just wasm-test
+      - name: Check formatting
+        run: just check-formatted
