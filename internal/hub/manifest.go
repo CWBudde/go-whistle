@@ -1,4 +1,5 @@
-// Package hub is a minimal pure-Go Hugging Face Hub downloader for the pinned Whistle weights.
+// Package hub is a minimal pure-Go Hugging Face Hub downloader for the pinned Whistle weights and the pinned
+// Needle 3 text model.
 //
 // It resolves the pinned revision, resumes interrupted downloads, verifies every file against the SHA-256 in the
 // embedded manifest.lock.json and honours HF_TOKEN, HF_HUB_OFFLINE and HF_ENDPOINT.
@@ -15,6 +16,11 @@ import (
 
 //go:embed manifest.lock.json
 var pinnedManifest []byte
+
+// needle3Manifest pins the Needle 3 text model (PLAN.md Phase 11).
+//
+//go:embed needle3.lock.json
+var needle3Manifest []byte
 
 var (
 	commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -38,9 +44,20 @@ type Manifest struct {
 
 // Pinned returns the manifest embedded in the binary: Cactus-Compute/whistle at b358ddad.
 func Pinned() (Manifest, error) {
+	return parseEmbedded(pinnedManifest)
+}
+
+// PinnedNeedle3 returns the embedded manifest of the Needle 3 text model: Cactus-Compute/needle3 at 93e88ede, the
+// deployed needle3.cact, the safetensors checkpoint, config.json and the sentencepiece tokenizer.model, for the
+// local layout models/needle3/{needle3.cact, needle3.safetensors, config.json, tokenizer.model}.
+func PinnedNeedle3() (Manifest, error) {
+	return parseEmbedded(needle3Manifest)
+}
+
+func parseEmbedded(data []byte) (Manifest, error) {
 	var m Manifest
 
-	err := json.Unmarshal(pinnedManifest, &m)
+	err := json.Unmarshal(data, &m)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("parse embedded manifest: %w", err)
 	}

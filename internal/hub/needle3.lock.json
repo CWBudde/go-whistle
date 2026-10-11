@@ -1,0 +1,30 @@
+{
+  "repo": "Cactus-Compute/needle3",
+  "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+  "files": [
+    {
+      "path": "needle3.cact",
+      "local": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38",
+      "size": 35335380
+    },
+    {
+      "path": "checkpoints/needle3.safetensors",
+      "local": "needle3.safetensors",
+      "sha256": "c234c70dccc7a9115e7c41ac2e41d3655fea3b85c245dd898b46179fb90c6c0c",
+      "size": 242047978
+    },
+    {
+      "path": "config.json",
+      "local": "config.json",
+      "sha256": "d65e8e076d42b26ed473313e4890dfd8397274a238fd6c1715fff539b464c04e",
+      "size": 1273
+    },
+    {
+      "path": "tokenizer/tokenizer.model",
+      "local": "tokenizer.model",
+      "sha256": "97dfd5666620b19875deba9e55953d312364e7763bd08bee428b94f1b9491b25",
+      "size": 126520
+    }
+  ]
+}

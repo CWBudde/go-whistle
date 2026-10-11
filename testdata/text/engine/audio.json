@@ -1,0 +1,111 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    },
+    {
+      "repo": "Cactus-Compute/whistle",
+      "revision": "b358ddadd89b7a713b5aa131f23032d3cca1b251",
+      "file": "whistle.cact",
+      "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb"
+    }
+  ],
+  "command": "needle --model needle3.cact --model whistle.cact --tools <toolset> --system <system file> --threads 4 --audio <clip>.wav",
+  "needle_models": 3,
+  "cases": {
+    "door_locked": {
+      "clip": "ls-clean-5639-40744-0011",
+      "clip_sha256": "90d9efe9e9a46498a41ae16318a65c488f18808b88cc97dc06d2be90218db044",
+      "toolset": "home",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "lock_door",
+            "arguments": {
+              "door": "door"
+            }
+          }
+        ],
+        "reasoning": "'locked outside' -> lock_door door 'door' implied by 'she found a door' but no door name given; 'locked outside' -> lock_door door 'door' implied by 'she found a door' but no door name given; using 'door' as placeholder.",
+        "confidence": 0.0059,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        },
+        "audio_text": "She found a door, but it was locked outside.",
+        "audio_language": "en"
+      },
+      "library_complete": 85,
+      "library_same_as_cli": true,
+      "same_as_text_prompt": true
+    },
+    "frank_message": {
+      "clip": "ls-clean-6930-75918-0007",
+      "clip_sha256": "c6c28e12656aff6cec3484ed10cfc625d17d62f63a065b91ad3c510716e2c7e0",
+      "toolset": "assistant",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [],
+        "reasoning": "'You will be frank' is a conversational sign-off. No tool for 'I always am' in list.",
+        "confidence": 0.5247,
+        "audio_text": "\"You will be frank with me? I always am.\"",
+        "audio_language": "en"
+      },
+      "library_complete": 34,
+      "library_same_as_cli": true,
+      "same_as_text_prompt": true
+    },
+    "verses_message": {
+      "clip": "ls-other-3080-5040-0011",
+      "clip_sha256": "7733bc0cf3c3ef4e53eecc5e6eddc9cbe9d3f61731dd6ab038ba7ef6c8748c42",
+      "toolset": "assistant",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "get_weather",
+            "arguments": {
+              "location": "colonies"
+            }
+          }
+        ],
+        "reasoning": "'how you like them' -> get_weather. Location 'Colonies' from query.",
+        "confidence": 0.0146,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        },
+        "audio_text": "Here are some verses of colonies. Tell me how you like them.",
+        "audio_language": "en"
+      },
+      "library_complete": 43,
+      "library_same_as_cli": true,
+      "same_as_text_prompt": true
+    }
+  }
+}

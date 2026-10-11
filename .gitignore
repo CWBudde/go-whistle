@@ -1,6 +1,6 @@
 # Model weights and engine binaries (downloaded, never committed)
 models/
-engine/
+/engine/
 
 # Upstream reference snapshot
 original/

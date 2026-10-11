@@ -49,6 +49,10 @@ fetch-engine *args:
 fetch-upstream:
     scripts/fetch-upstream.sh
 
+# Fetch the pinned Needle 3 text model (needle3.cact, needle3.safetensors, config.json, tokenizer.model) into models/needle3
+fetch-needle3 *args:
+    go run -tags oracle ./tools/oracle/text fetch {{args}}
+
 # Fetch the oracle clip corpus (LibriSpeech + FLEURS excerpts) into testdata/audio
 oracle-clips:
     go run -tags oracle ./tools/oracle clips
@@ -89,9 +93,21 @@ oracle-librispeech:
 oracle-stream:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle stream
 
+# Record the Needle 3 engine's answers to the tool-calling cases into testdata/text/engine (cases|date|depth|audio|embed|all)
+oracle-text *args="all":
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle/text {{args}}
+
 # Regenerate the sentencepiece fixture for internal/tokenizer (testdata/tokenizer); --needle3 <tokenizer.model> cross-checks
 tokenizer-fixture *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/tokenizer_fixture.py {{args}}
+
+# Regenerate the sentencepiece fixture for internal/spm (testdata/text/tokenizer) from models/needle3/tokenizer.model
+text-tokenizer-fixture *args:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/text_tokenizer_fixture.py {{args}}
+
+# Regenerate the Needle 3 text model forward-pass fixture for internal/text (testdata/text/forward) from upstream JAX
+text-forward-fixtures *args:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/text_forward_fixtures.py {{args}}
 
 # Regenerate the shared Needle 3 block fixtures for internal/needle (testdata/needle); --f64-check compares against float64
 needle-fixtures *args:

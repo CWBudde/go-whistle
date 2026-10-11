@@ -1,0 +1,353 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "needle --model needle3.cact --tools <toolset> --threads 4 <variant> --prompt <query>",
+  "variants": [
+    "fixed_file: --system <file holding the case's system text>",
+    "no_system: no --system",
+    "empty_file: --system <empty file>",
+    "trailing_newline: --system <file holding the system text and a newline>",
+    "literal_text: --system '<the system text itself, not a file>'",
+    "library_fixed: needle_init(<the case's system text>, tools, NULL)",
+    "library_empty: needle_init(\"\", tools, NULL)"
+  ],
+  "probes": {
+    "event_tomorrow": {
+      "empty_file": {
+        "run": "--system <empty file>",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": false,
+          "error": "tool call truncated: token budget exhausted",
+          "error_code": "truncated",
+          "reason": "runtime_failure",
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "title 'dentist' from query; date 'tomorrow' -> date 'tomorrow'; time '3pm' -> time '15:00'; duration_minutes and location omitted",
+          "confidence": 0.1811
+        }
+      },
+      "fixed_file": {
+        "run": "--system <file holding the case's system text>",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "create_event",
+              "arguments": {
+                "title": "Dentist",
+                "date": "2026-10-12",
+                "time": "15:00"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "title 'dentist' from query; date 'tomorrow' relative to system date 2026-10-11 -> '2026-10-12'; time '3pm' -> 15:00; duration_minutes and location omitted",
+          "confidence": 0.3399,
+          "validation": {
+            "ungrounded": ["create_event.time"],
+            "negation": false
+          }
+        }
+      },
+      "library_empty": {
+        "run": "needle_init(\"\", tools, NULL)",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": false,
+          "error": "tool call truncated: token budget exhausted",
+          "error_code": "truncated",
+          "reason": "runtime_failure",
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "title 'dentist' from query; date 'tomorrow' -> date 'tomorrow'; time '3pm' -> time '15:00'; duration_minutes and location omitted",
+          "confidence": 0.1811
+        }
+      },
+      "library_fixed": {
+        "run": "needle_init(<the case's system text>, tools, NULL)",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "create_event",
+              "arguments": {
+                "title": "Dentist",
+                "date": "2026-10-12",
+                "time": "15:00"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "title 'dentist' from query; date 'tomorrow' relative to system date 2026-10-11 -> '2026-10-12'; time '3pm' -> 15:00; duration_minutes and location omitted",
+          "confidence": 0.3399,
+          "validation": {
+            "ungrounded": ["create_event.time"],
+            "negation": false
+          }
+        }
+      },
+      "literal_text": {
+        "run": "--system '<the system text itself, not a file>'",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": false,
+          "error": "tool call truncated: token budget exhausted",
+          "error_code": "truncated",
+          "reason": "runtime_failure",
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "title 'dentist' from query; date 'tomorrow' -> date 'tomorrow'; time '3pm' -> time '15:00'; duration_minutes and location omitted",
+          "confidence": 0.1811
+        }
+      },
+      "no_system": {
+        "run": "no --system",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": false,
+          "error": "tool call truncated: token budget exhausted",
+          "error_code": "truncated",
+          "reason": "runtime_failure",
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "title 'dentist' from query; date 'tomorrow' -> date 'tomorrow'; time '3pm' -> time '15:00'; duration_minutes and location omitted",
+          "confidence": 0.1811
+        }
+      },
+      "trailing_newline": {
+        "run": "--system <file holding the system text and a newline>",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "create_event",
+              "arguments": {
+                "title": "Dentist",
+                "date": "2026-10-12",
+                "time": "15:00"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "title 'dentist' from query; date 'tomorrow' relative to system date 2026-10-11 -> '2026-10-12'; time '3pm' -> 15:00; duration_minutes and location omitted",
+          "confidence": 0.297,
+          "validation": {
+            "ungrounded": ["create_event.time"],
+            "negation": false
+          }
+        }
+      }
+    },
+    "weather_friday": {
+      "empty_file": {
+        "run": "--system <empty file>",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": false,
+          "error": "tool call truncated: token budget exhausted",
+          "error_code": "truncated",
+          "reason": "runtime_failure",
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "location 'Berlin' from query; date 'Friday' from query; get_weather tool.",
+          "confidence": 0.068
+        }
+      },
+      "fixed_file": {
+        "run": "--system <file holding the case's system text>",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Berlin",
+                "date": "2026-10-16"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "location 'Berlin' from query; date '2026-10-13' from 'Friday' resolved against system date 2026-10-11",
+          "confidence": 0.222,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        }
+      },
+      "library_empty": {
+        "run": "needle_init(\"\", tools, NULL)",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": false,
+          "error": "tool call truncated: token budget exhausted",
+          "error_code": "truncated",
+          "reason": "runtime_failure",
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "location 'Berlin' from query; date 'Friday' from query; get_weather tool.",
+          "confidence": 0.068
+        }
+      },
+      "library_fixed": {
+        "run": "needle_init(<the case's system text>, tools, NULL)",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Berlin",
+                "date": "2026-10-16"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "location 'Berlin' from query; date '2026-10-13' from 'Friday' resolved against system date 2026-10-11",
+          "confidence": 0.222,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        }
+      },
+      "literal_text": {
+        "run": "--system '<the system text itself, not a file>'",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": false,
+          "error": "tool call truncated: token budget exhausted",
+          "error_code": "truncated",
+          "reason": "runtime_failure",
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "location 'Berlin' from query; date 'Friday' from query; get_weather tool.",
+          "confidence": 0.068
+        }
+      },
+      "no_system": {
+        "run": "no --system",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": false,
+          "error": "tool call truncated: token budget exhausted",
+          "error_code": "truncated",
+          "reason": "runtime_failure",
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "location 'Berlin' from query; date 'Friday' from query; get_weather tool.",
+          "confidence": 0.068
+        }
+      },
+      "trailing_newline": {
+        "run": "--system <file holding the system text and a newline>",
+        "exit": 0,
+        "answer": {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Berlin",
+                "date": "2026-10-16"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "location 'Berlin' from query; date '2026-10-13' from 'Friday' resolved against system date 2026-10-11",
+          "confidence": 0.213,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        }
+      }
+    }
+  },
+  "same_as_no_system": {
+    "event_tomorrow": {
+      "empty_file": true,
+      "fixed_file": false,
+      "library_empty": true,
+      "library_fixed": false,
+      "literal_text": true,
+      "trailing_newline": false
+    },
+    "weather_friday": {
+      "empty_file": true,
+      "fixed_file": false,
+      "library_empty": true,
+      "library_fixed": false,
+      "literal_text": true,
+      "trailing_newline": false
+    }
+  },
+  "same_as_fixed_file": {
+    "event_tomorrow": {
+      "empty_file": false,
+      "library_empty": false,
+      "library_fixed": true,
+      "literal_text": false,
+      "no_system": false,
+      "trailing_newline": false
+    },
+    "weather_friday": {
+      "empty_file": false,
+      "library_empty": false,
+      "library_fixed": true,
+      "literal_text": false,
+      "no_system": false,
+      "trailing_newline": false
+    }
+  }
+}
