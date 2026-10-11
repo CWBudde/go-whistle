@@ -163,7 +163,8 @@ wasm-test flags="-short": wasm
     #!/usr/bin/env bash
     set -euo pipefail
     # Go's wasm runtime caps the command line plus environment at 8 KiB, so the tests run in a minimal one.
-    env -i PATH="$(dirname "$(command -v node)"):/usr/bin:/bin:$(go env GOROOT)/bin" HOME="$HOME" \
+    # This go comes first: /usr/bin may hold an older one (the CI runner's is 1.24).
+    env -i PATH="$(go env GOROOT)/bin:$(dirname "$(command -v node)"):/usr/bin:/bin" HOME="$HOME" \
         GOPATH="$(go env GOPATH)" GOMODCACHE="$(go env GOMODCACHE)" GOCACHE="$(go env GOCACHE)" \
         GOTOOLCHAIN="$(go env GOTOOLCHAIN)" GOOS=js GOARCH=wasm \
         go test {{flags}} -timeout 60m -exec "$(go env GOROOT)/lib/wasm/go_js_wasm_exec" \
