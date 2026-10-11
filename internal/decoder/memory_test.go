@@ -134,3 +134,76 @@ func TestProjectSharesRotation(t *testing.T) {
 		}
 	}
 }
+
+// TestInt8Memory: with needle.Int8.KV the memory holds int8 keys and
+// values, a quarter of the float32 bytes plus a scale per head and frame,
+// standing for the float32 memory within half a step of its grid; the
+// attention on it stays within float32 rounding (2e-6 of the largest
+// output) of the attention on the values it stands for, its
+// probabilities included.
+func TestInt8Memory(t *testing.T) {
+	const frames, rows = 375, 2
+
+	r := rand.New(rand.NewPCG(41, 2))
+	c := testCross(t, r, true)
+	enc := randFloats(r, frames*xDim, 1)
+	ref := c.project(enc, frames, nil)
+
+	c.setInt8(needle.Int8{Act: true, KV: true})
+	m := c.project(enc, frames, nil)
+
+	if m.k != nil || m.v != nil || m.k8.Len() != frames || m.v8.Len() != frames {
+		t.Fatalf("int8 memory: float %d/%d, int8 rows %d/%d", len(m.k), len(m.v), m.k8.Len(), m.v8.Len())
+	}
+
+	float := 4 * frames * xHeads * (xQK + xV)
+	if got, want := m.k8.Bytes()+m.v8.Bytes(), float/4+4*2*frames*xHeads; got != want {
+		t.Errorf("int8 memory takes %d bytes, want %d (float32 %d)", got, want, float)
+	}
+
+	for _, c := range []struct {
+		name      string
+		rows      needle.Int8Rows
+		want      []float32
+		headWidth int
+	}{{"k", m.k8, ref.k, xQK}, {"v", m.v8, ref.v, xV}} {
+		got := c.rows.Floats()
+
+		for i, want := range c.want {
+			if d := math.Abs(float64(got[i] - want)); d > float64(c.rows.S[i/c.headWidth])*0.5000001 {
+				t.Fatalf("%s[%d]: %v stands for %v", c.name, i, got[i], want)
+			}
+		}
+	}
+
+	q := randFloats(r, rows*xHeads*xQK, 1)
+	keep := &Attention{}
+	got := c.attend(slices.Clone(q), rows, m, keep)
+
+	// The same attention in float32 on the values the codes stand for,
+	// with the queries quantised per head.
+	fq := memory{k: m.k8.Floats(), v: m.v8.Floats(), frames: frames}
+	plain := &cross{h: c.h, dim: xDim, heads: xHeads, qk: xQK, v: xV}
+	qq := slices.Clone(q)
+	needle.FakeQuant(qq, xQK)
+
+	wantKeep := &Attention{}
+	want := plain.attend(qq, rows, fq, wantKeep)
+
+	var peak float64
+	for _, v := range want {
+		peak = max(peak, math.Abs(float64(v)))
+	}
+
+	for i := range want {
+		if d := math.Abs(float64(got[i] - want[i])); d > 2e-6*peak {
+			t.Fatalf("out[%d] %v, float32 %v (max |out| %v)", i, got[i], want[i], peak)
+		}
+	}
+
+	for i := range wantKeep.Probs {
+		if d := math.Abs(float64(keep.Probs[i] - wantKeep.Probs[i])); d > 1e-6 {
+			t.Fatalf("probs[%d] %v, float32 %v", i, keep.Probs[i], wantKeep.Probs[i])
+		}
+	}
+}

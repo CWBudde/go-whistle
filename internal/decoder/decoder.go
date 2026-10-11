@@ -45,6 +45,7 @@ type Decoder struct {
 	prompt []int
 	langs  []Language
 	maxTok int
+	int8   needle.Int8 // LoadInt8
 }
 
 // Language is one language token.
@@ -64,6 +65,15 @@ const ropeLen = 512
 // Load builds the decoder for h from src. tok is the vocabulary; nil reads
 // it from src, which only the .cact format holds.
 func Load(src weights.Source, tok *tokenizer.Tokenizer, h Hypothesis) (*Decoder, error) {
+	return LoadInt8(src, tok, h, needle.Int8{})
+}
+
+// LoadInt8 is Load with the engine's int8 numerics q (docs/FINDINGS.md
+// F-041): with q.Act, the mHC heads quantise their input rows to int8 and
+// the self- and cross-attentions their queries per head; with q.KV, the
+// self-attention cache and the cross-attention memory hold their keys and
+// values in int8, per head and position. The zero q is Load.
+func LoadInt8(src weights.Source, tok *tokenizer.Tokenizer, h Hypothesis, q needle.Int8) (*Decoder, error) {
 	err := h.Validate()
 	if err != nil {
 		return nil, err
@@ -77,7 +87,7 @@ func Load(src weights.Source, tok *tokenizer.Tokenizer, h Hypothesis) (*Decoder,
 	}
 
 	cfg := src.Config()
-	d := &Decoder{h: h, tok: tok, maxTok: cfg.MaxTokens, sites: map[int]int{}}
+	d := &Decoder{h: h, tok: tok, maxTok: cfg.MaxTokens, sites: map[int]int{}, int8: q}
 
 	err = d.loadEmbedding(src)
 	if err != nil {
@@ -344,6 +354,10 @@ func (d *Decoder) loadStack(src weights.Source, cfg weights.Config) error {
 		if b.Dim() != d.dim || c.dim != d.dim || m.Dim() != d.dim {
 			return fmt.Errorf("decoder: layer %d widths %d/%d/%d, embedding %d", l, b.Dim(), c.dim, m.Dim(), d.dim)
 		}
+
+		b.SetInt8(d.int8)
+		c.setInt8(d.int8)
+		m.SetInt8(d.int8)
 
 		d.blocks, d.cross, d.mhc = append(d.blocks, b), append(d.cross, c), append(d.mhc, m)
 		d.run, d.runMHC = append(d.run, l), append(d.runMHC, m)
