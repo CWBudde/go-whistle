@@ -1451,7 +1451,7 @@ shows (multi-turn, tool results, retrieval).
       order, a repeated key in its first place with its last value, Python's escapes, integers in full, floats in
       Python's repr, `Infinity` past the range) and `WithDateFact(system, now)`. `scripts/text_prompt_fixtures.py`
       runs upstream's `render_example` and `_with_date_fact` (fixed clock) on the 19 engine cases, the 4 forward
-      prompts, 9 edge cases and 10 date cases (`testdata/text/prompt/render.json`, byte-identical on a re-run): every
+      prompts, 10 edge cases and 10 date cases (`testdata/text/prompt/render.json`, byte-identical on a re-run): every
       prompt, id sequence and date fact equal (`TestRenderMatchesPython`, `TestEncodeMatchesPython`,
       `TestWithDateFactMatchesPython`; F-048).
 - [x] `needle_init` returns the token count of the static prefix (system and tools): match it on the engine corpus to

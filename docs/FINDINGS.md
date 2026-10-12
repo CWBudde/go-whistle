@@ -4342,11 +4342,12 @@ ids (`toolcall.Encode`). `toolcall.ToolsJSON` writes the tool schemas as Python'
 - **Text:** non-ASCII and U+2028 raw; only `"`, `\`, the five named escapes and other control characters (`\u0007`,
   lower case) are escaped. Go's `encoding/json` would also escape `<`, `>`, `&` and U+2028.
 - **Numbers:** integers in full (`-0` is 0); every literal with a `.`, `e` or `E` is a float in Python's repr
-  (`1e2` → `100.0`, `2E-5` → `2e-05`, `1e16` → `1e+16`, `1e400` → `Infinity`).
+  (`1e2` → `100.0`, `2E-5` → `2e-05`, `1e16` → `1e+16`, `1e400` → `Infinity`); like `json.loads` it reads the
+  literals `NaN`, `Infinity` and `-Infinity`, which `encoding/json` rejects, so `ToolsJSON` has its own parser.
 
 `toolcall.WithDateFact` is the Python client's `_with_date_fact` with the clock passed in (the engine adds no date,
 F-047). `scripts/text_prompt_fixtures.py` runs upstream's functions on the 19 engine cases, the forward fixture's 4
-prompts and 9 edge cases (escapes, floats, duplicates, overflow, blank and padded facts, no tools, markers in the
+prompts and 10 edge cases (escapes, floats, duplicates, overflow, non-finite literals, blank and padded facts, no tools, markers in the
 query), plus 10 date cases at a fixed clock (`testdata/text/prompt/render.json`). Go gives every prompt byte for
 byte, every id sequence and every date fact.
 
