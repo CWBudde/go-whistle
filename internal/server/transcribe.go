@@ -125,8 +125,7 @@ func (s *Server) readAudio(w http.ResponseWriter, r *http.Request, format string
 
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, s.cfg.MaxBody))
 	if err != nil {
-		var mb *http.MaxBytesError
-		if errors.As(err, &mb) {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 			return nil, http.StatusRequestEntityTooLarge, tooBig
 		}
 

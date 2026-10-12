@@ -472,9 +472,9 @@ func (s *beam) done(alive []*hyp) bool {
 
 // result turns the best hypothesis into a Result.
 func result(d *decoder.Decoder, h *hyp, score float64) (Result, error) {
-	r := Result{LogProbs: h.lps, LangLogProb: h.langLP, Score: score}
-	r.Tokens = slices.Clone(h.textTokens())
-	r.EOS = h.eos
+	r := Result{
+		LogProbs: h.lps, LangLogProb: h.langLP, Score: score, Tokens: slices.Clone(h.textTokens()), EOS: h.eos,
+	}
 
 	lang := h.seq[h.text-1]
 	for _, l := range d.Languages() {
