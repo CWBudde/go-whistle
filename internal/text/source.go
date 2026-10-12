@@ -178,6 +178,16 @@ func (s *Source) Has(name string) bool {
 	return ok
 }
 
+// HasHead reports whether the model carries the probe head with the given
+// heads.manifest code (cact.HeadEmbedding, HeadConfidence, HeadRouter).
+// The engine retrieves tools per turn only with an embedding head
+// (docs/FINDINGS.md F-049).
+func (s *Source) HasHead(code int) bool {
+	key, ok := headKey[code]
+
+	return ok && s.Has(key+".probes")
+}
+
 // Shape is a name's .cact shape, nil for the tokenizer.
 func (s *Source) Shape(name string) ([]int, error) {
 	i, ok := s.index[name]
