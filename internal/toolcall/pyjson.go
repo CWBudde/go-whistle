@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // ToolsJSON returns the tool schemas raw, a JSON array, as upstream's
@@ -22,6 +23,12 @@ import (
 // ("100.0" for 1e2, "1e-07", "Infinity" past the float range). Like
 // json.loads it also reads NaN, Infinity and -Infinity.
 func ToolsJSON(raw []byte) (string, error) {
+	// json.loads raises on bytes that are not UTF-8, where encoding/json
+	// would put U+FFFD in their place (PR #55 review).
+	if !utf8.Valid(raw) {
+		return "", errors.New("toolcall: tools: not valid UTF-8")
+	}
+
 	p := &pyParser{s: raw}
 
 	v, err := p.value()

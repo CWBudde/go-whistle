@@ -150,10 +150,11 @@ func TestWithDateFactMatchesPython(t *testing.T) {
 	}
 }
 
-// TestToolsJSONErrors: invalid JSON, trailing data and tools that are not
-// an array are rejected.
+// TestToolsJSONErrors: invalid JSON, trailing data, tools that are not an
+// array and invalid UTF-8 (json.loads raises UnicodeDecodeError) are
+// rejected.
 func TestToolsJSONErrors(t *testing.T) {
-	for _, raw := range []string{``, `[`, `{"name":"x"}`, `"tools"`, `[1] [2]`, `[{"a":}]`, `[1,]`, `[01]`, `[NaNx]`} {
+	for _, raw := range []string{``, `[`, `{"name":"x"}`, `"tools"`, `[1] [2]`, `[{"a":}]`, `[1,]`, `[01]`, `[NaNx]`, "[\"\xff\"]"} {
 		_, err := ToolsJSON([]byte(raw))
 		if err == nil {
 			t.Errorf("ToolsJSON(%q) accepted", raw)
