@@ -143,27 +143,35 @@ func toolNames(tools []any) []string {
 		}
 	}
 
+	// A suffixed name that a tool already has as its snake name, or that
+	// another group's suffix took, gets one more (PR #61 review); the
+	// engine's choice is not measured.
+	assigned := map[string]bool{}
+	byCaller := map[string]string{}
+
 	for i, t := range tools {
 		if out[i] == "" {
 			continue
 		}
 
-		names := callers[out[i]]
-		if len(names) < 2 {
+		caller, _ := t.(*object).vals["name"].(string)
+		if m, ok := byCaller[caller]; ok {
+			out[i] = m
+
 			continue
 		}
 
-		caller, _ := t.(*object).vals["name"].(string)
-		for k, c := range names {
-			if c == caller {
-				out[i] += "_" + strconv.Itoa(k+1)
-				// A suffixed name another tool already has gets one more
-				// (PR #61 review); the engine's choice is not measured.
-				for _, ok := callers[out[i]]; ok; _, ok = callers[out[i]] {
-					out[i] += "_" + strconv.Itoa(k+1)
-				}
+		if names := callers[out[i]]; len(names) > 1 {
+			k := strconv.Itoa(slices.Index(names, caller) + 1)
+
+			out[i] += "_" + k
+			for _, natural := callers[out[i]]; natural || assigned[out[i]]; _, natural = callers[out[i]] {
+				out[i] += "_" + k
 			}
 		}
+
+		assigned[out[i]] = true
+		byCaller[caller] = out[i]
 	}
 
 	return out
@@ -425,7 +433,44 @@ func (a *schemaAlias) lookup(k string) (string, *schemaAlias) {
 		return c, sub
 	}
 
-	return k, a.extra
+	return k, a.extraAlias()
+}
+
+// extraAlias is the alias of the schema for keys the properties do not
+// name: the node's additionalProperties, or one in its anyOf, oneOf and
+// allOf branches, nested ones included (PR #61 review).
+func (a *schemaAlias) extraAlias() *schemaAlias {
+	return merged(a, func(s *schemaAlias) *schemaAlias { return s.extra })
+}
+
+// merged is the alias part pick gives on a and, depth first, on its
+// branches: nil without any, the one found, or a node whose branches are
+// all of them, so that a lookup tries each.
+func merged(a *schemaAlias, pick func(*schemaAlias) *schemaAlias) *schemaAlias {
+	var found []*schemaAlias
+
+	var walk func(s *schemaAlias)
+
+	walk = func(s *schemaAlias) {
+		if p := pick(s); p != nil {
+			found = append(found, p)
+		}
+
+		for _, b := range s.branches {
+			walk(b)
+		}
+	}
+
+	walk(a)
+
+	switch len(found) {
+	case 0:
+		return nil
+	case 1:
+		return found[0]
+	default:
+		return &schemaAlias{props: map[string]string{}, sub: map[string]*schemaAlias{}, branches: found}
+	}
 }
 
 // find looks k up in the properties and then, depth first, in the anyOf,
@@ -444,19 +489,9 @@ func (a *schemaAlias) find(k string) (string, *schemaAlias, bool) {
 	return "", nil, false
 }
 
-// itemsAlias is the alias of an array's item schema: its own "items", or
-// that of the first anyOf, oneOf or allOf branch, nested ones included,
-// that has one (PR #61 review).
+// itemsAlias is the alias of an array's item schema: its own "items" and
+// those of its anyOf, oneOf and allOf branches, nested ones included, all
+// of them tried (PR #61 review).
 func (a *schemaAlias) itemsAlias() *schemaAlias {
-	if a.items != nil {
-		return a.items
-	}
-
-	for _, b := range a.branches {
-		if it := b.itemsAlias(); it != nil {
-			return it
-		}
-	}
-
-	return nil
+	return merged(a, func(s *schemaAlias) *schemaAlias { return s.items })
 }
