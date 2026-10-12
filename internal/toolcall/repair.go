@@ -122,14 +122,22 @@ func (r *repairer) property(tool, key string) *object {
 	return member(member(r.n.params[tool], "properties"), key)
 }
 
-// required reports whether key is a required argument of tool.
+// required reports whether key is a required argument of tool: required by
+// the parameters or by one of their allOf, anyOf or oneOf branches, which
+// the grammar may have held the call to (PR #66 review).
 func (r *repairer) required(tool, key string) bool {
-	var req []any
-	if p := r.n.params[tool]; p != nil {
-		req, _ = p.vals["required"].([]any)
+	p := r.n.params[tool]
+	if p == nil {
+		return false
 	}
 
-	return slices.Contains(req, any(key))
+	for _, s := range composed(p) {
+		if req, _ := s.vals["required"].([]any); slices.Contains(req, any(key)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // properties are the names of the tool's top-level properties.

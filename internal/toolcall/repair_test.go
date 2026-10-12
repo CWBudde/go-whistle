@@ -382,6 +382,13 @@ func TestRepairDropArguments(t *testing.T) {
 			"required: kept", lights, "the lights", "", `[{"name":"set_lights","arguments":{"room":"","on":false,"brightness":7}}]`,
 			`[{"name":"set_lights","arguments":{"room":"","on":false}}]`,
 		},
+		{
+			"required in an allOf branch: kept",
+			`[{"name":"set_lights","parameters":{"type":"object","properties":{"room":{"type":"string"},` +
+				`"brightness":{"type":"integer"}},"allOf":[{"required":["room","brightness"]}]}}]`,
+			"the lights", "", `[{"name":"set_lights","arguments":{"room":"","brightness":7}}]`,
+			`[{"name":"set_lights","arguments":{"room":"","brightness":7}}]`,
+		},
 	}
 
 	runRepair(t, cases)
