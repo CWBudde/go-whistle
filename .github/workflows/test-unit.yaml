@@ -23,3 +23,6 @@ jobs:
 
       - name: Run unit tests
         run: just test
+
+      - name: Cross-compile for arm64 and Windows
+        run: just check-cross

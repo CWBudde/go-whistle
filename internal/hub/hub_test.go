@@ -452,10 +452,8 @@ func TestDownloadToken(t *testing.T) {
 	fh.token = "hf_secret"
 	m := fakeManifest(files)
 
-	var denied *AccessDeniedError
-
 	err := testClient(srv).Download(context.Background(), m, t.TempDir())
-	if !errors.As(err, &denied) {
+	if _, ok := errors.AsType[*AccessDeniedError](err); !ok {
 		t.Fatalf("without token: err = %v, want *AccessDeniedError", err)
 	}
 

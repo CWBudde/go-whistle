@@ -1,7 +1,9 @@
 // The page's side of the worker (worker.js): calls as promises, the model
 // download with its cache and SHA-256 check, audio decoding and the stream
-// session. No DOM here, so the headless test (cmd/whistle-wasm/node) runs
-// the same code.
+// session. It works in insecure contexts (a page over plain http other
+// than localhost) too, which have no Web Crypto and no Cache Storage. No
+// DOM here, so the headless test (cmd/whistle-wasm/node) runs the same
+// code.
 
 // The pinned model, as `whistle download` fetches it (internal/hub/manifest.lock.json).
 export const PINNED_MODEL = {
@@ -83,6 +85,13 @@ export class WhistleClient {
     return this.call("load", [buffer], [buffer]);
   }
 
+  // sha256 hands buffer (an ArrayBuffer) to the worker, which hashes it with
+  // Go's crypto/sha256 and gives it back rather than a copy: it resolves to
+  // {sha256, buffer}, and the caller goes on with that buffer.
+  sha256(buffer) {
+    return this.call("sha256", [buffer], [buffer]);
+  }
+
   // decodeWAV reads a WAV file (an ArrayBuffer, given away) as `whistle
   // transcribe` does and resolves to 16 kHz mono samples.
   decodeWAV(buffer) {
@@ -110,23 +119,41 @@ export class WhistleClient {
   }
 }
 
-export async function sha256Hex(buffer) {
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(digest), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
+// sha256Of hashes buffer (an ArrayBuffer) with Web Crypto, or, where there
+// is none, with Go in client's worker: crypto.subtle exists only in secure
+// contexts (https, localhost). It resolves to {sha256, buffer, hashedIn},
+// hashedIn "Web Crypto" or "Go"; buffer is the one to go on with, since
+// the worker takes the bytes and gives them back rather than copying them.
+export async function sha256Of(buffer, client) {
+  if (globalThis.crypto?.subtle) {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", buffer);
+    const sha256 = Array.from(new Uint8Array(digest), (b) =>
+      b.toString(16).padStart(2, "0"),
+    ).join("");
+    return { sha256, buffer, hashedIn: "Web Crypto" };
+  }
+
+  if (!client) {
+    throw new Error(
+      "no SHA-256: Web Crypto needs a secure context (https or localhost), and no worker was given",
+    );
+  }
+  const got = await client.sha256(buffer);
+  return { ...got, hashedIn: "Go" };
 }
 
 // fetchModel returns the bytes behind url from the Cache Storage, or
 // downloads and caches them. With sha256 set, the bytes must hash to it,
 // cached or not: a cached copy that does not is dropped and fetched again,
 // and a download that does not is rejected and not cached. onProgress gets
-// (loaded, total) bytes during a download. The cache is optional: one
-// that cannot be opened, read or written (storage disabled or denied, the
-// quota full) counts as a miss and the download goes ahead.
+// (loaded, total) bytes during a download. The cache is optional: one that
+// is missing (an insecure context) or cannot be opened, read or written
+// (storage disabled or denied, the quota full) counts as a miss and the
+// download goes ahead. client hashes where there is no Web Crypto
+// (sha256Of). It resolves to {buffer, sha256, hashedIn, cached}.
 export async function fetchModel(
   url,
-  { sha256 = "", onProgress = () => {}, fetchFn = fetch } = {},
+  { sha256 = "", client = null, onProgress = () => {}, fetchFn = fetch } = {},
 ) {
   let cache = null;
   try {
@@ -139,10 +166,9 @@ export async function fetchModel(
     try {
       const hit = await cache.match(url);
       if (hit) {
-        const buffer = await hit.arrayBuffer();
-        const hash = await sha256Hex(buffer);
-        if (!sha256 || hash === sha256) {
-          return { buffer, sha256: hash, cached: true };
+        const got = await sha256Of(await hit.arrayBuffer(), client);
+        if (!sha256 || got.sha256 === sha256) {
+          return { ...got, cached: true };
         }
         await cache.delete(url);
       }
@@ -178,16 +204,16 @@ export async function fetchModel(
     at += p.length;
   }
 
-  const hash = await sha256Hex(bytes.buffer);
-  if (sha256 && hash !== sha256) {
-    throw new Error(`${url}: SHA-256 ${hash}, want ${sha256}`);
+  const got = await sha256Of(bytes.buffer, client);
+  if (sha256 && got.sha256 !== sha256) {
+    throw new Error(`${url}: SHA-256 ${got.sha256}, want ${sha256}`);
   }
 
   if (cache) {
     try {
       await cache.put(
         url,
-        new Response(bytes.slice(), {
+        new Response(got.buffer.slice(0), {
           headers: { "content-type": "application/octet-stream" },
         }),
       );
@@ -196,7 +222,7 @@ export async function fetchModel(
     }
   }
 
-  return { buffer: bytes.buffer, sha256: hash, cached: false };
+  return { ...got, cached: false };
 }
 
 // decodeAudio turns an audio file into 16 kHz mono samples. A WAV of
@@ -254,8 +280,11 @@ async function decodeInBrowser(buffer) {
 // streamProcess takes at most; a longer backlog goes in several calls. With
 // paced false, every call takes exactly chunk samples (the last one fewer),
 // as `whistle stream --chunk`.
-// onUpdate gets {committed, pending, language, received, passMs, words,
-// last} after every call.
+// onUpdate gets {committed, pending, language, received, passes, passMs,
+// totalMs, words, last} after every call: passes counts the streamProcess
+// calls, each of which runs a pass, passMs is the last one's time (0
+// before the first) and totalMs their sum; the stop runs no pass, so its
+// pass_ms of 0 counts in neither.
 export class StreamSession {
   constructor(
     client,
@@ -271,6 +300,9 @@ export class StreamSession {
     this.committed = [];
     this.words = [];
     this.calls = [];
+    this.passes = 0;
+    this.passMs = 0;
+    this.totalMs = 0;
     this.error = null;
   }
 
@@ -323,8 +355,13 @@ export class StreamSession {
     return out;
   }
 
-  update(r) {
+  update(r, pass = true) {
     this.calls.push(r);
+    if (pass) {
+      this.passes++;
+      this.passMs = r.pass_ms;
+      this.totalMs += r.pass_ms;
+    }
     if (r.text) {
       this.committed.push(r.text);
     }
@@ -334,7 +371,9 @@ export class StreamSession {
       pending: r.pending,
       language: r.language,
       received: r.received,
-      passMs: r.pass_ms,
+      passes: this.passes,
+      passMs: this.passMs,
+      totalMs: this.totalMs,
       words: this.words,
       last: r,
     });
@@ -363,7 +402,7 @@ export class StreamSession {
     }
 
     const r = await this.client.streamStop();
-    this.update(r);
+    this.update(r, false);
     if (this.error) {
       throw this.error;
     }

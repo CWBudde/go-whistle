@@ -82,8 +82,8 @@ func TestEndsSentence(t *testing.T) {
 func TestStreamBookkeeping(t *testing.T) {
 	w := func(text string, start, end int) streamWord {
 		return streamWord{
-			Word: Word{Text: text, Start: time.Duration(start) * 10 * time.Millisecond, End: time.Duration(end) * 10 * time.Millisecond},
-			end:  float64(end) / 100,
+			Text: text, Start: time.Duration(start) * 10 * time.Millisecond, End: time.Duration(end) * 10 * time.Millisecond,
+			end: float64(end) / 100,
 		}
 	}
 

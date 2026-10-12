@@ -1506,20 +1506,32 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
 
 ### 12.1 Docs and release
 
-- [ ] README after going public: drop "the repository is not public yet" (Quickstart, Go API) and the `replace`
+- [x] README after going public: drop "the repository is not public yet" (Quickstart, Go API) and the `replace`
       instructions; install with `go install github.com/cwbudde/go-whistle/cmd/whistle@latest` and use the library
       with a plain `go get github.com/cwbudde/go-whistle`. The status note and "Limits → Speed" still say Phase 9 is
       under way. Phase 9 is done, so point them at the numbers in `bench/RESULTS.md` and at 12.3 instead.
       **Accept:** `go install …@latest` and the README's Go API program work from a clean module without a clone.
+      (2026-10-11) — Quickstart installs with `go install …@latest` and fetches the two example clips with `curl`
+      when there is no clone; the Go API section is one `go get github.com/cwbudde/go-whistle/whistle`. The package
+      path, not the module root: with the default `-mod=readonly`, `go get` of the root leaves go.sum without the
+      dependencies of `whistle` and `go run` fails. The status note and "Limits → Speed" cite `bench/RESULTS.md` and
+      12.3. Checked in a temporary `GOPATH`, `GOMODCACHE` and `GOCACHE` outside the repository: `@latest`
+      (`v0.0.0-20261011164734-4aafa14c5ca7`, main before this change) installs, `whistle download`, `doctor` and
+      the README's `transcribe` lines give the README's output, and the Go API program in a new module prints the
+      README's output, with `GOFLAGS=-mod=mod` and without.
 - [ ] A first tagged release (`v0.1.0`) with short release notes (what works, parity, limits), so `@latest` resolves
       to a version and not to a pseudo-version of `main`. Optional: prebuilt CLI binaries for linux/amd64,
       linux/arm64, darwin/arm64 and windows/amd64 on the GitHub release.
+      (2026-10-11) — partial: the notes are in `docs/releases/v0.1.0.md`, and `.github/workflows/release.yaml` turns
+      a pushed `v*` tag into a release with them and the CLI for the four platforms (cross-compiled on one Linux
+      runner, `.tar.gz`/`.zip` with LICENSE and README.md, `SHA256SUMS`); built locally, the darwin/arm64
+      `whistle doctor` passes. The tag follows the merge.
 - [x] Link the hosted web demo (12.2) from the README's "Web demo" section.
       (2026-10-11) — done with #43: https://cwbudde.github.io/go-whistle/.
 
 ### 12.2 Web demo
 
-- [ ] Insecure contexts: `fetchModel` (`web/whistle-client.js`) always calls `crypto.subtle.digest`, which exists only
+- [x] Insecure contexts: `fetchModel` (`web/whistle-client.js`) always calls `crypto.subtle.digest`, which exists only
       in secure contexts (https, localhost). Served over plain http (a LAN IP, an http-only host), "Fetch and load"
       fails with "Cannot read properties of undefined (reading 'digest')", and so does picking a local `.cact`. Fall
       back to a SHA-256 computed in Go (an exported `whistle.sha256(bytes)` in `cmd/whistle-wasm`, from
@@ -1527,13 +1539,28 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
       `caches === undefined` already is. **Accept:** `just wasm-test` (or a headless run against
       `http://<lan-ip>:<port>/`, where `isSecureContext` is false) loads the model with the SHA-256 checked and
       transcribes a clip.
+      (2026-10-11) — `whistle.sha256(bytes)` hashes in 1 MiB blocks, so the model is never copied into Go whole;
+      `sha256Of` in the client uses Web Crypto where there is one and else hands the buffer to the worker, which
+      gives it back with the digest (transferred both ways, no copy). Both the fetch and the local-file path use it;
+      a missing Cache Storage was already a miss. Over plain http the model status says the model is neither cached
+      nor hashed by Web Crypto, and the microphone (no `navigator.mediaDevices`, no `audioWorklet` on the context) is
+      disabled with a status line saying it needs https or localhost. `just wasm-test` now runs the page's path once
+      more without `crypto.subtle` and `caches`: Go hashes 3 MiB of bytes and gives them back unchanged, a wrong
+      hash is rejected, and with the model the pinned SHA-256 is checked in Go and `ls-other-3080-5040-0018` gives
+      the secure run's JSON (without timings). Also driven in headless Chrome against `http://192.168.213.61:8090/`
+      (`just wasm-serve`, `isSecureContext` false): "Fetch and load" from Hugging Face with the SHA-256 checked in
+      Go, a wrong hash rejected, the local `.cact` picked, and the German FLEURS clip transcribed with the CLI's JSON
+      (timings aside).
 - [x] A hosted demo: a GitHub Pages workflow that runs `just wasm` and publishes `web/` (the model still comes from
       Hugging Face, whose CDN sends CORS headers). Serve `.wasm` as `application/wasm` so `instantiateStreaming` is
       used. The build is 6.8 MiB, or 1.8 MiB gzipped.
       (2026-10-11) — `.github/workflows/pages.yaml` (#43) runs `test-wasm`, builds with `just wasm` and deploys `web/`
       on every push to `main`. GitHub Pages serves over https, so the secure-context item above does not bite there.
-- [ ] Stream result line: after `Stop`, the page shows "last pass 0 ms", the stop's `pass_ms`. Show the last real
+- [x] Stream result line: after `Stop`, the page shows "last pass 0 ms", the stop's `pass_ms`. Show the last real
       pass (or the total) instead.
+      (2026-10-11) — `StreamSession` counts the passes (the `streamProcess` calls; the stop runs none) and keeps the
+      last pass's time and the sum, so the line reads e.g. "7 passes, the last 2254 ms, 9.65 s in all" after the
+      stop too (headless Chrome, the German clip). `just wasm-test` checks it on a fake and on a real 1 s stream.
 
 ### 12.3 Performance on amd64
 

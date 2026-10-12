@@ -38,8 +38,12 @@ test-coverage:
     go test -v -coverprofile=coverage.out ./...
     go tool cover -html=coverage.out -o coverage.html
 
-# Run all checks (formatting, linting, tests, tidiness)
-ci: check-formatted test lint check-tidy
+# Cross-compile every package for the release targets CI does not run on, so their assembly is assembled too
+check-cross:
+    for t in linux/arm64 darwin/arm64 windows/amd64; do GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build ./... || exit 1; done
+
+# Run all checks (formatting, linting, tests, tidiness, cross-compiling)
+ci: check-formatted test lint check-tidy check-cross
 
 # Fetch the pinned Needle 3 engine (test oracle) into engine/<platform>/
 fetch-engine *args:
