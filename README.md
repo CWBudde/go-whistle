@@ -418,7 +418,9 @@ Every remaining difference is a near tie under our model, explained in the linke
   float WAVs are rejected; convert them, or pipe raw `f32le` into `whistle stream`.
 - **Speed:** slower than the engine, which is hand-tuned C++ with W2A8 kernels; see
   [bench/RESULTS.md](bench/RESULTS.md) for the numbers on the same machine (median TTFT 2.72× the engine's, decode
-  0.72×) and PLAN.md 12.3 for the GEMM on amd64, which still runs in pure Go.
+  0.72×) and PLAN.md 12.3 for the GEMM on amd64, which still runs in pure Go. On an x86 server (Xeon Gold 5520+,
+  linux/amd64) the engine's own build is slower, and Go is ahead to the first token (median TTFT 0.29× the engine's,
+  decode 1.05×): [bench/RESULTS-linux-amd64.md](bench/RESULTS-linux-amd64.md).
 
 ## Why this is a re-implementation, not a translation
 
