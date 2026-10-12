@@ -26,12 +26,15 @@ type Machine struct {
 }
 
 // SameMachine reports whether a and b describe the same hardware and
-// software: CPU, cores, core types, OS and architecture. A side whose CPU is
+// software: CPU, cores, core types, cpufreq governor, OS and architecture.
+// The governor sets the clock policy, so two runs under different ones do
+// not compare; an unknown one (darwin) matches only another unknown one. A
+// side whose CPU is
 // unknown matches nothing, so its timings are never paired with the other
 // side's as one machine's.
 func SameMachine(a, b Machine) bool {
-	return a.CPU != "" && a.CPU == b.CPU && a.Cores == b.Cores && a.CoreTypes == b.CoreTypes && a.OS == b.OS &&
-		a.Arch == b.Arch
+	return a.CPU != "" && a.CPU == b.CPU && a.Cores == b.Cores && a.CoreTypes == b.CoreTypes &&
+		a.Governor == b.Governor && a.OS == b.OS && a.Arch == b.Arch
 }
 
 // StartRun describes a run starting now: date, commit, machine and the

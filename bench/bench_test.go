@@ -284,6 +284,11 @@ func TestSameMachine(t *testing.T) {
 		t.Error("other core types count as the same machine")
 	}
 
+	n.CoreTypes, n.Governor = m.CoreTypes, "powersave"
+	if SameMachine(m, n) {
+		t.Error("another cpufreq governor counts as the same machine")
+	}
+
 	if SameMachine(Machine{}, Machine{}) {
 		t.Error("two unknown machines count as the same machine")
 	}
@@ -408,7 +413,7 @@ func TestJSONRoundTrip(t *testing.T) {
 // TestRenderGovernorAndPaths checks that the report names the results it
 // was rendered from and shows the governor row only when a side has one.
 func TestRenderGovernorAndPaths(t *testing.T) {
-	g := &GoResults{Run: Run{Machine: Machine{CPU: "CPU X", Cores: 8}, Inputs: sampleInputs}}
+	g := &GoResults{Run: Run{Machine: Machine{CPU: "CPU X", Cores: 8}, Inputs: sampleInputs}, GOMAXPROCS: 4}
 	e := &EngineResults{Run: Run{Machine: Machine{CPU: "CPU X", Cores: 8}, Inputs: sampleInputs}, Version: "3.2.0"}
 
 	var b bytes.Buffer
@@ -425,7 +430,7 @@ func TestRenderGovernorAndPaths(t *testing.T) {
 		t.Errorf("report does not name its sources:\n%s", out)
 	}
 
-	if !strings.Contains(out, "just bench -go bench/results/x/go.json -engine bench/results/x/engine.json "+
+	if !strings.Contains(out, "just bench -procs 4 -go bench/results/x/go.json -engine bench/results/x/engine.json "+
 		"-report bench/RESULTS-x.md\n") ||
 		!strings.Contains(out, "just oracle-bench -out bench/results/x/engine.json -go bench/results/x/go.json "+
 			"-report bench/RESULTS-x.md\n") {
@@ -447,6 +452,20 @@ func TestRenderGovernorAndPaths(t *testing.T) {
 
 	if !regexp.MustCompile(`\| governor +\| none \(no cpufreq; kvm guest\) +\| — +\|`).MatchString(b.String()) {
 		t.Errorf("report lacks the governor row:\n%s", b.String())
+	}
+
+	// With the defaults and every core, Reproduce keeps its plain commands.
+	g.GOMAXPROCS = 8
+
+	b.Reset()
+
+	err = Render(&b, g, e, DefaultPaths)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(b.String(), "just bench          # the Go side: bench/results/go.json, then this file\n") {
+		t.Errorf("Reproduce with the defaults changed:\n%s", b.String())
 	}
 }
 

@@ -119,7 +119,7 @@ The Go figures come from a fresh `whistle-bench` child per mode (`Load`, then on
 
 ```bash
 # the Go side: bench/results/linux-amd64/go.json, then this file
-just bench -go bench/results/linux-amd64/go.json -engine bench/results/linux-amd64/engine.json -report bench/RESULTS-linux-amd64.md
+just bench -procs 16 -go bench/results/linux-amd64/go.json -engine bench/results/linux-amd64/engine.json -report bench/RESULTS-linux-amd64.md
 # the engine side: bench/results/linux-amd64/engine.json, then this file
 just oracle-bench -out bench/results/linux-amd64/engine.json -go bench/results/linux-amd64/go.json -report bench/RESULTS-linux-amd64.md
 # re-render this file from both JSON files
