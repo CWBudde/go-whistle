@@ -608,14 +608,33 @@ Engine-only: fitted against `testdata/text/engine/`.
 - [x] Engine corpus (`just oracle-text`, `testdata/text/engine/`): 24 cases with a fixed date fact, the answers
       byte-identical with the timings dropped at `--threads 4` (they depend on the thread count); also the depth
       runs, fused audio answers, `needle_init`'s prefix counts and `needle_embed` of text (F-047, F-049).
-- [ ] Greedy against beam, the stop tokens (`<|im_end|>`, `</tool_call>`, EOS) and `--max`.
+- [x] Greedy against beam, the stop tokens (`<|im_end|>`, `</tool_call>`, EOS) and `--max`.
+      (2026-10-12) — `toolcall.Decoder`: a forced `<think>\n`, then greedy; `</tool_call>` counts and ends the answer,
+      `<|im_end|>` and EOS end it uncounted, `--max` counts the forced tokens; the history keeps the answer less its
+      last token and `<|im_end|>`. With the dequantised `.cact` weights the reasoning is the engine's on 21 of 24
+      finished turns (the other three near-ties, margins ≤ 0.054) and the token count `needle_complete`'s on all but
+      three the grammar changes; `timer_budget` truncates at 8 as the engine (`TestDecodeMatchesEngine`; F-052).
 - [ ] The byte-level grammar compiled from the JSON schemas (types, `enum`, `const`, bounds, `format: date`, required
       keys, `anyOf`/`$ref`), applied as a token mask over byte-fallback pieces; the unconstrained `<think>` part.
 - [ ] Parse the call block into `function_calls`; the envelope's `type` (`call`, `respond`, refusal as an empty
       call), `success`/`error`/`error_code`/`reason`, `suppressed_calls` below confidence 0.1, `validation`
       (`ungrounded`, `negation`), `triggers` regexes.
+      (2026-10-12) — partial: `toolcall.Normalised.Envelope`, `NoTools`, `Triggered`. `just oracle-text triggers`
+      (`triggers.json`, byte-identical on a re-run) adds eleven trigger probes and the answer without tools. On all
+      35 corpus and unrouted probe turns the type, the failure fields, the split into function and suppressed calls
+      (below 0.1 unless a trigger matched an un-negated request), `negation` and `ungrounded` equal the engine's
+      (`TestEnvelopeMatchesEngine`; F-054). Remains: routing a triggered request to its tool, which needs the grammar
+      (three probes), and negation cues beyond "don't".
 - [ ] `confidence`: `ConfidenceHead` (`probe_pool` over the embedding and the 20 block outputs, a translation) and
       the min with the call's decode probability (engine).
+      (2026-10-12) — partial: `text.Model.Confidence` equals JAX within 8.2e-6 (`TestConfidenceMatchesJAX`);
+      `toolcall.Decoder.Confidence`, the sigmoid over the conversation as fed, is within 0.02 of the engine on every
+      turn whose decode is the engine's but `event_tomorrow` (0.026) and the `respond` turn (0.927 against 0.637)
+      (`TestEnvelopeMatchesEngine`; F-053). Remains: the `respond` turn, and the min with the decode probability,
+      never binding in the corpus.
+- [ ] The engine's post-decode repair (llms.txt:110: capitalisation, date re-resolution, enum/polarity flips,
+      dropping unevidenced optionals, duplicate and negation drops, rewrites), which F-048's 7 of the 12 differences
+      come from.
 - [ ] **Accept:** on the engine corpus, `type` and `function_calls` (name and arguments, as parsed JSON) equal the
       engine's on ≥ 95 % of the cases with every miss explained by a log-probability margin, `reasoning` equal on
       ≥ 90 %, `confidence` within 0.02.

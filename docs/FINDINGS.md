@@ -4575,7 +4575,131 @@ are listed as unidentified, where the engine counts more. `TestConversationTrim`
 - **The history.** Neither the error nor the answer reports the conversation's length, so how the engine drops
   earlier turns to make room, and how it renders the assistant's turns in the history (the porting notes: the forced
   `<think>`, one line, `</think>`, a newline, `<tool_call>[…]</tool_call>`), are not measured. `Conversation` renders
-  the turns the engine adds, not the history.
+  the turns the engine adds, not the history. F-052 fits the assistant's turn as fed from one conversation's next
+  answer.
 - **The cut's size.** An oversized turn keeps its end; how many tokens it keeps is not measured. `Turn` keeps as many
   as fit.
 - **`<`, `&` and `>`** in a tool result's strings (above).
+
+## F-052 — Decoding: a forced `<think>`, greedy, and which tokens the engine counts and feeds (PLAN.md 11.4) (2026-10-12)
+
+**Question.** How does the engine decode an answer (greedy or beam, which stop tokens, how `--max` counts), and what
+does it keep of the answer in the history?
+
+**The oracle.** `library.json`'s `needle_complete` counts per turn (24 cases, 25 turns) and the reasoning in
+`responses.json`, which the engine passes on as decoded (only the calls are rewritten after decoding, F-048). The Go
+decode runs the dequantised `needle3.cact` in float32; with the forced `<think>\n` below, the float `needle3.safetensors`
+gives the engine's reasoning on 5 of the 24 first turns, the `.cact` weights on 20, so the comparison uses them.
+
+**Measured.**
+
+- **A forced `<think>\n`.** Every answer that finishes has a reasoning, the `respond` turn's too. Without it the model
+  opens `timer_pasta`, `german_timer` and `thermostat_decimal` with `<tool_call>` directly; with `<think>\n` fed after
+  the prompt, their reasoning is the engine's word for word. The porting notes' "forced `<think>`" agrees. The forced
+  tokens count: `timer_budget` (`--max 8`) gives 8 tokens, the forced ones included.
+- **Greedy.** Fed `<think>\n` and decoded by argmax, the `.cact` model's reasoning equals the engine's on 21 of the 24
+  finished turns. The other three are near-ties (top-1 margins 0.006, 0.054 and 0.009 along the answer:
+  `alarm_morning`, `event_no_year`, `catalogue_reminder`), where float32 activations against the engine's int8 ones
+  (11.5) can tip the choice. Beam search is not needed to explain any answer.
+- **Counted tokens.** `</tool_call>` counts and ends the answer; `<|im_end|>` (after a `respond` text) and EOS end it
+  uncounted. Every turn whose reasoning is the engine's has `needle_complete`'s count, but three where the engine's
+  schema grammar differs: `lights_and_lock` and `catalogue_lock` write a key outside the schema (`action`,
+  `required`), which the engine's answer does not have, and `thermostat_decimal` writes the same call one token
+  shorter than the engine.
+- **The history.** The engine counts the answer's last token but never feeds it: the closing `</tool_call>`, or the
+  token that meets the budget, and the turn closes with `<|im_end|>`. `timer_then_result`'s tool-result turn gives the
+  engine's reasoning ("Timer set; confirm with end time from result.", 33 tokens) only from that history; with
+  `</tool_call>` fed before `<|im_end|>`, with only `</tool_call>`, with neither, or with a newline after, the model
+  writes "Timer set; respond with end time." (30 tokens). `timer_budget`'s confidence agrees (F-053).
+
+**Port.** `toolcall.Decoder` (`NewDecoder`, `Decode`) feeds a turn and `<think>\n`, decodes greedily to the stops
+above within the budget, records each token's probability and top-1 margin, and leaves the state with the answer
+less its last token and `<|im_end|>`. `TestDecodeMatchesEngine` decodes every corpus turn with the `.cact` weights
+and requires the engine's reasoning and count on each, but the three near-ties and the three grammar turns, which it
+lists and checks are still off. `TestFloatGreedyAgainstEngine` (F-048) runs on the decoder.
+
+**Open.** Whether the engine also stops at `</tool_call>` before the model would write `<|im_end|>` (it always writes
+it next), and the history after a truncated answer.
+
+## F-053 — Confidence: the ConfidenceHead's sigmoid over the conversation as fed (PLAN.md 11.4) (2026-10-12)
+
+**Question.** What is the envelope's `confidence`: the ConfidenceHead (upstream `probe_pool` and `HeadProjection`), how
+it is squashed, over which positions, and its "min with the call's decode probability" (llms.txt)?
+
+**Translation.** `text.Model.Confidence` pools `[embedding · √d, the 20 blocks' lane means]` (21 cells) as
+upstream's `probe_pool` (4 probes per cell, 4 queries, `_rms_unit` with no scale) and projects the 3072 values to a
+raw logit, as `forward_confidence`. On the forward fixture (`just text-forward-fixtures`, `<case>.confidence` over
+the whole sequence and over the prompt) the float weights agree with JAX within 8.2e-6 on every case and span. The
+head is sensitive to quantisation: its CQ4 tensors alone, on float cells, move the logit by up to 0.83; the whole
+dequantised `.cact` model by up to 2.9.
+
+**Fit against the engine.** With the `.cact` weights, `sigmoid(logit)` pooled over every token fed (the prompt, the
+earlier turns and the answer less its last token, without the closing `<|im_end|>`) is within 0.02 of the engine's
+`confidence` on every corpus and trigger-probe turn whose decode is the engine's, but two: `event_tomorrow` (0.026)
+and the `respond` turn (0.927 against 0.637). Pooled over the prompt alone, over the turn alone, or with the closing
+`<|im_end|>`, it is far off; the truncated `timer_budget` agrees (0.723 against 0.710) only without its last token,
+as F-052's history. The engine's own confidence moves in the 2nd to 4th decimal with the thread count (F-047).
+
+**The decode probability.** The call's tokens' probability (product, minimum or geometric mean) is above the head's
+score on every turn but `catalogue_lock`, where the product (0.48) would contradict the engine (0.63) under a decode
+the grammar changes. The min is never binding in the corpus, so it is not applied and not identified.
+
+**Port.** `toolcall.Decoder.Confidence` runs the forward pass over the conversation and returns the sigmoid.
+`TestEnvelopeMatchesEngine` requires 0.02 on every turn but the listed ones (near-ties, grammar, `event_tomorrow`,
+the `respond` turn) and checks those are still off.
+
+**Open.** The `respond` turn's score, the min with the decode probability, and the int8 activations (11.5), which the
+head's sensitivity makes the likely remainder.
+
+## F-054 — The envelope: types, errors, suppression, triggers and validation (PLAN.md 11.4) (2026-10-12)
+
+**Question.** How does the engine build its answer from the decoded text: the type, the failures, suppression, the
+`triggers` and the `validation` block?
+
+**The oracle.** The corpus answers and `just oracle-text triggers` (`testdata/text/engine/triggers.json`,
+byte-identical on a re-run): eleven queries over the `assistant` and `home` tools with `triggers` added (matching a
+call the model suppresses, routing a refusal or another tool's request, matching negated requests, upper case, an
+invalid regex, no match), the CLI's stderr, and the answer over an empty tool list.
+
+**Measured.**
+
+- **Fields** in the engine's order: `type`, `success`, `error`, `error_code`, `reason`, `function_calls`,
+  `suppressed_calls`, `reasoning`, `confidence` (`%.4f` in the engine's format string), then `validation` when the
+  answer has calls, suppressed ones included. Refusals, `respond` and truncated answers have none.
+- **Types.** A `<tool_call>[…]</tool_call>` after the reasoning is a `call`, `[]` a refusal; text instead is a
+  `respond` turn, with no calls and the text itself not in the envelope.
+- **Truncated** (the budget runs out): `success` false, `error` "tool call truncated: token budget exhausted",
+  `error_code` "truncated", `reason` "runtime_failure", no calls, `reasoning` null, the confidence as usual.
+- **No tools:** `{"type":"call","success":true,"error":null,"function_calls":[],"suppressed_calls":[],"reasoning":"no
+tools declared, returning the empty call","confidence":1.0000}`, without `error_code` and `reason`, as a string in
+  the binary.
+- **Suppression.** All calls go to `suppressed_calls` below confidence 0.1 (`alarm_morning` 0.092, `negation_door`
+  0.0315), unless a trigger matched and the request is not negated: `alarm_triggered` ships at 0.092; with the request
+  negated (`negation_triggered`, `negation_two_triggered`) the calls stay suppressed.
+- **Triggers** match case-insensitively (`CAPITAL`); an invalid one is skipped with "needle: ignoring invalid trigger
+  for set_alarm: (" on stderr. A match routes the request to its tool: the reasoning stays as decoded, but the call is
+  the triggered tool's even where the model refuses (`pizza_to_lights`: `set_lights` with room "kitchen";
+  `capital_upper`: room "France"; `weather_to_timer`: `set_timer` 60 minutes), and the confidence scores that answer.
+  Forcing the tool's name into the free decode gives broken arguments; the routing needs the grammar.
+- **`validation.negation`** is true for the requests with "don't" (`negation_door`, `negation_only`).
+- **`validation.ungrounded`** lists `tool.field`, under the model's snake names (`invoice.total` for `Invoice`), whose
+  value the request does not contain: strings case-insensitively (`set_lights.room` "kitchen" for a pizza order),
+  numbers as written (`set_timer.minutes` 60, `invoice.total` 1200.0 for "$1,200.00"), times as written (`06:45` for
+  "6:45", `15:00` for "3pm", while `12:30` is grounded). Enum values (`cycling` for "by bike"), dates (`format: date`,
+  and `2026-10-13 09:00` for "October 13th 2026 at 9:00") and booleans are not listed.
+
+**Port.** `toolcall.Normalised.Envelope` builds the envelope from a `Decoded` answer, the request and the confidence,
+with the caller's names in the calls (F-050); `Normalised.Triggered` and `Ignored` read the triggers `Normalise`
+drops; `NoTools` is the answer without tools; `Envelope.MarshalJSON` writes the engine's field order.
+`TestEnvelopeMatchesEngine` builds the envelope of every corpus turn and of the eight trigger probes the model answers
+without routing (35 turns): type, success, error, error_code, reason, the split into function and suppressed calls,
+negation and the ungrounded list equal the engine's on all of them. `TestEnvelope` and `TestNoTools` cover the rules
+without the model.
+
+**Open.**
+
+- **Routing** a triggered request to its tool (with the grammar, PLAN.md 11.4).
+- **Negation** beyond "don't": "do not" and "never" are the port's guesses; other languages are untested.
+- **Grounding** of nested objects and arrays (one path per field, arrays under the field's path) and against the
+  system facts and earlier turns, which the corpus does not show.
+- **The repair** of the calls after decoding (capitalisation, dates, dropped optionals; PLAN.md 11.4).
