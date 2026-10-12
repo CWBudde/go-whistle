@@ -79,6 +79,12 @@ func (n *Normalised) grammar(tools []string, required bool) *Grammar {
 		g.args[t] = c.compile(params, 0)
 	}
 
+	// A tool whose arguments no value matches cannot be called (PR #65
+	// review); a routed grammar without a callable tool falls back to the
+	// refusal (port-side).
+	g.tools = slices.DeleteFunc(g.tools, func(t string) bool { return !g.args[t].admits() })
+	g.required = g.required && len(g.tools) > 0
+
 	return g
 }
 
@@ -192,8 +198,14 @@ func (c *compiler) compile(s any, depth int) *node {
 
 	if all, ok := o.vals[allOf].([]any); ok {
 		merged := o.without(allOf)
+
 		for _, b := range all {
-			merged = merge(merged, c.resolve(b, depth))
+			r := c.resolve(b, depth)
+			if r == false {
+				return &node{kind: kindNever}
+			}
+
+			merged = merge(merged, r)
 		}
 
 		return c.compile(merged, depth+1)
@@ -205,7 +217,12 @@ func (c *compiler) compile(s any, depth int) *node {
 			alt := &node{kind: kindAlt}
 
 			for _, b := range list {
-				alt.alts = append(alt.alts, c.compile(merge(base, c.resolve(b, depth)), depth+1))
+				r := c.resolve(b, depth)
+				if r == false {
+					continue // a branch no value matches (PR #65 review)
+				}
+
+				alt.alts = append(alt.alts, c.compile(merge(base, r), depth+1))
 			}
 
 			return alt
@@ -492,23 +509,76 @@ func (n *node) requiredOf(o *object) []string {
 	return out
 }
 
-// admits reports whether some value matches n; a chain of anyOf deeper
-// than maxDepth (a schema that refers to itself) counts as admitting.
+// admits reports whether some value matches n, so that the automaton only
+// enters values it can finish (PR #65 review); a chain deeper than maxDepth
+// (a schema that refers to itself) counts as admitting.
 func (n *node) admits() bool { return n.admitsAt(0) }
 
 func (n *node) admitsAt(depth int) bool {
-	switch {
-	case depth > maxDepth:
+	if depth > maxDepth {
 		return true
-	case n.kind == kindNever:
+	}
+
+	switch n.kind {
+	case kindNever:
 		return false
-	case n.kind == kindLiterals:
+	case kindLiterals:
 		return len(n.lits) > 0
-	case n.kind == kindAlt:
+	case kindAlt:
 		return slices.ContainsFunc(n.alts, func(a *node) bool { return a.admitsAt(depth + 1) })
+	case kindString:
+		if n.date {
+			return n.minLen <= dateLen && (n.maxLen < 0 || n.maxLen >= dateLen)
+		}
+
+		return n.maxLen < 0 || n.minLen <= n.maxLen
+	case kindInteger, kindNumber:
+		return n.inhabited()
+	case kindArray:
+		return n.minItems <= n.maxItems && (n.minItems == 0 || n.items == nil || n.items.admitsAt(depth+1))
 	}
 
 	return true
+}
+
+// dateLen is the length of a format: date string, YYYY-MM-DD.
+const dateLen = 10
+
+// inhabited reports whether some number, or some integer, lies within n's
+// bounds.
+func (n *node) inhabited() bool {
+	lo, hi := n.lo, n.hi
+	if lo == nil || hi == nil {
+		return true
+	}
+
+	if n.kind == kindInteger {
+		return ceilRat(lo, n.loExcl).Cmp(floorRat(hi, n.hiExcl)) <= 0
+	}
+
+	c := lo.Cmp(hi)
+
+	return c < 0 || c == 0 && !n.loExcl && !n.hiExcl
+}
+
+// ceilRat is the least integer above r, or at r unless excl.
+func ceilRat(r *big.Rat, excl bool) *big.Int {
+	q := new(big.Int).Div(r.Num(), r.Denom()) // Euclidean: the floor, the denominator being positive
+	if !r.IsInt() || excl {
+		q.Add(q, big.NewInt(1))
+	}
+
+	return q
+}
+
+// floorRat is the greatest integer below r, or at r unless excl.
+func floorRat(r *big.Rat, excl bool) *big.Int {
+	q := new(big.Int).Div(r.Num(), r.Denom())
+	if r.IsInt() && excl {
+		q.Sub(q, big.NewInt(1))
+	}
+
+	return q
 }
 
 // numberNode compiles a number or integer schema with its bounds.

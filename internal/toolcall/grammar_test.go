@@ -319,6 +319,107 @@ func TestGrammarCalls(t *testing.T) {
 	}
 }
 
+// TestGrammarBooleanBranches: a false branch of anyOf admits nothing, a
+// false branch of allOf makes the schema admit nothing (PR #65 review).
+func TestGrammarBooleanBranches(t *testing.T) {
+	checkGrammar(t, "boolean branches", grammarCase{
+		params: `{"type":"object","$defs":{"no":false},"properties":{"s":{"anyOf":[false,{"type":"string"}]},` +
+			`"r":{"anyOf":[{"$ref":"#/$defs/no"},{"type":"integer"}]},"none":{"allOf":[false]},` +
+			`"yes":{"allOf":[true,{"type":"boolean"}]}}}`,
+		accept: []string{`{"s":"x"}`, `{"r":1}`, `{"yes":true}`, `{}`},
+		reject: []string{`{"s":1}`, `{"s":null}`, `{"r":"x"}`, `{"none":1}`, `{"none":"x"}`, `{"yes":1}`},
+		dead:   []string{`{"none`},
+	})
+}
+
+// TestGrammarSurrogatePairs: an escaped surrogate pair is one character
+// under the length bounds, as its UTF-8 spelling (PR #65 review).
+func TestGrammarSurrogatePairs(t *testing.T) {
+	checkGrammar(t, "surrogate pairs", grammarCase{
+		params: `{"type":"object","properties":{"c":{"type":"string","maxLength":1},"two":{"type":"string","minLength":2}}}`,
+		accept: []string{`{"c":"𝄞"}`, `{"c":"𝄞"}`, `{"c":"é"}`, `{"two":"𝄞x"}`},
+		reject: []string{`{"c":"𝄞x"}`, `{"c":"ab"}`, `{"two":"𝄞"}`},
+		// Past a high surrogate at the limit, only its low surrogate fits.
+		prefixes: []string{`{"c":"\uD834\uD`},
+		dead:     []string{`{"c":"\uD834\u0`, `{"c":"\uD834\uDB`, `{"c":"\uD834x`, `{"c":"\uD834\n`},
+	})
+}
+
+// stuckState is a state of g, reached from the start, where no byte
+// continues and the block has not ended, or "" when g has none; it
+// explores up to limit distinct states.
+func stuckState(g *Grammar, limit int) string {
+	type visit struct {
+		states []*stack
+		text   string
+	}
+
+	seen := map[string]bool{}
+	queue := []visit{{states: g.start()}}
+
+	for len(queue) > 0 && len(seen) < limit {
+		v := queue[0]
+		queue = queue[1:]
+
+		key := stateKey(v.states)
+		if seen[key] {
+			continue
+		}
+
+		seen[key] = true
+		next := 0
+
+		for b := range 256 {
+			if s := advanceAll(v.states, byte(b)); len(s) > 0 {
+				next++
+
+				queue = append(queue, visit{states: s, text: v.text + string(rune(b))})
+			}
+		}
+
+		if next == 0 && !slices.ContainsFunc(v.states, (*stack).accepting) {
+			return v.text
+		}
+	}
+
+	return ""
+}
+
+// TestGrammarNoDeadEnds: every state the grammar lets the decoder reach
+// can still end, so the token mask never runs empty, also for tools
+// without parameters and for schemas no value matches (PR #65 review).
+func TestGrammarNoDeadEnds(t *testing.T) {
+	for name, tools := range map[string]string{
+		"no parameters":    `[{"name":"t"}]`,
+		"empty properties": `[{"name":"t","parameters":{"type":"object","properties":{}}}]`,
+		"false parameters": `[{"name":"t","parameters":false},{"name":"u","parameters":{"type":"object"}}]`,
+		"min over max length": `[{"name":"t","parameters":{"type":"object","properties":{` +
+			`"s":{"type":"string","minLength":2,"maxLength":1},"d":{"type":"string","format":"date","maxLength":5}}}}]`,
+		"min over max items": `[{"name":"t","parameters":{"type":"object","properties":{` +
+			`"a":{"type":"array","minItems":3,"maxItems":2},"b":{"type":"array","minItems":65},` +
+			`"c":{"type":"array","minItems":1,"items":false}}}}]`,
+		"empty number range": `[{"name":"t","parameters":{"type":"object","properties":{` +
+			`"i":{"type":"integer","minimum":1.2,"maximum":1.8},"n":{"type":"number","minimum":2,"maximum":1},` +
+			`"x":{"type":"number","exclusiveMinimum":1,"exclusiveMaximum":1}}}}]`,
+		"empty enum":     `[{"name":"t","parameters":{"type":"object","properties":{"e":{"enum":[]}}}}]`,
+		"false allOf":    `[{"name":"t","parameters":{"type":"object","properties":{"f":{"allOf":[false]}}}}]`,
+		"false required": `[{"name":"t","parameters":{"type":"object","properties":{"f":false},"required":["f"]}}]`,
+		"length limit": `[{"name":"t","parameters":{"type":"object","properties":{` +
+			`"c":{"type":"string","maxLength":1}}}}]`,
+	} {
+		n, err := Normalise([]byte(tools))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+
+		for _, g := range []*Grammar{n.Grammar(), n.grammar(n.tools, true)} {
+			if s := stuckState(g, 20000); s != "" {
+				t.Errorf("%s (required %v): stuck after %q", name, g.required, s)
+			}
+		}
+	}
+}
+
 // testTokenizer is a small sentencepiece model: <unk>, <s>, </s>, the
 // user-defined <tool_call>, the 256 byte-fallback pieces and normal pieces.
 func testTokenizer(t *testing.T, normal ...string) *spm.Processor {

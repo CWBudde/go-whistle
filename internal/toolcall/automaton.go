@@ -211,6 +211,10 @@ type strM struct {
 	lo, hi byte  // the range of the next continuation byte
 	length int   // characters, counted only when n bounds them
 	prev   byte  // the date's previous character
+	cp     uint16
+	// high: the last character was an escaped high surrogate, which the
+	// escaped low surrogate after it completes uncounted.
+	high bool
 }
 
 func (m strM) feed(b byte, below *stack, out []*stack) []*stack {
@@ -237,13 +241,13 @@ func (m strM) next(b byte) (strM, bool) {
 	case m.esc > 0:
 		return m.escape(b)
 	case b == '"':
-		m.done = m.length >= m.n.minLen && (!m.n.date || m.length == 10)
+		m.done = m.length >= m.n.minLen && (!m.n.date || m.length == dateLen)
 
 		return m, m.done
 	case b == '\\':
 		m.esc = 1
 
-		return m, !m.n.date && m.room()
+		return m, !m.n.date && (m.room() || m.high)
 	case b < 0x20:
 		return m, false
 	case b < 0x80:
@@ -275,21 +279,12 @@ func (m strM) continuation(b byte) (strM, bool) {
 	return m.char()
 }
 
-// escape feeds a byte of an escape sequence.
+// escape feeds a byte of an escape sequence. An escaped surrogate pair is
+// one character, as its UTF-8 spelling (PR #65 review); past a high
+// surrogate with no room left, only its low surrogate may follow.
 func (m strM) escape(b byte) (strM, bool) {
 	if m.esc >= 2 {
-		if !isHex(b) {
-			return m, false
-		}
-
-		m.esc++
-		if m.esc < 6 {
-			return m, true
-		}
-
-		m.esc = 0
-
-		return m.char()
+		return m.hexDigit(b)
 	}
 
 	switch b {
@@ -298,12 +293,42 @@ func (m strM) escape(b byte) (strM, bool) {
 
 		return m.char()
 	case 'u':
-		m.esc = 2
+		m.esc, m.cp = 2, 0
 
 		return m, true
 	}
 
 	return m, false
+}
+
+// hexDigit feeds a digit of \uXXXX.
+func (m strM) hexDigit(b byte) (strM, bool) {
+	v, ok := hexValue(b)
+	if !ok || m.high && !m.room() && (m.esc == 2 && v != 0xD || m.esc == 3 && v < 0xC) {
+		return m, false
+	}
+
+	m.cp = m.cp<<4 | uint16(v)
+
+	m.esc++
+	if m.esc < 6 {
+		return m, true
+	}
+
+	m.esc = 0
+
+	if m.high && m.cp >= 0xDC00 && m.cp <= 0xDFFF {
+		m.high = false
+
+		return m, true
+	}
+
+	high := m.cp >= 0xD800 && m.cp <= 0xDBFF
+
+	m, ok = m.char()
+	m.high = high
+
+	return m, ok
 }
 
 // lead starts a multi-byte UTF-8 sequence, without overlong forms,
@@ -345,6 +370,8 @@ func (m strM) room() bool {
 
 // char counts a character that ended.
 func (m strM) char() (strM, bool) {
+	m.high = false
+
 	if !m.counts() {
 		return m, true
 	}
@@ -354,8 +381,18 @@ func (m strM) char() (strM, bool) {
 	return m, m.n.maxLen < 0 || m.length <= m.n.maxLen
 }
 
-func isHex(b byte) bool {
-	return b >= '0' && b <= '9' || b >= 'a' && b <= 'f' || b >= 'A' && b <= 'F'
+// hexValue is the value of the hex digit b.
+func hexValue(b byte) (byte, bool) {
+	switch {
+	case b >= '0' && b <= '9':
+		return b - '0', true
+	case b >= 'a' && b <= 'f':
+		return b - 'a' + 10, true
+	case b >= 'A' && b <= 'F':
+		return b - 'A' + 10, true
+	}
+
+	return 0, false
 }
 
 // dateChar reports whether b may be character i of a YYYY-MM-DD date after
@@ -673,7 +710,7 @@ func (m objM) after(b byte, below *stack, out []*stack) []*stack {
 
 		return step(m, m.complete(), below, out)
 	case m.phase == objFirst && b == '"':
-		return step(m.keyStart(), true, below, out)
+		return step(m.keyStart(), m.more(), below, out)
 	case m.phase == objNext && b == ',':
 		m.phase = objComma
 
@@ -702,7 +739,7 @@ func (m objM) keyByte(b byte, below *stack, out []*stack) []*stack {
 	if !ks.done {
 		m.raw += string(b)
 
-		return step(m, m.n.extra != nil || m.prefixOfProperty(), below, out)
+		return step(m, m.extraKeys() || m.prefixOfProperty(), below, out)
 	}
 
 	var key string
@@ -748,9 +785,13 @@ func (m objM) complete() bool {
 	return true
 }
 
-// more reports whether another key may follow.
+// extraKeys reports whether keys outside the properties may follow.
+func (m objM) extraKeys() bool { return m.n.extra != nil && m.n.extra.admits() }
+
+// more reports whether another key may follow, so that a key the object
+// cannot finish is never opened (PR #65 review).
 func (m objM) more() bool {
-	if m.n.extra != nil {
+	if m.extraKeys() {
 		return true
 	}
 
@@ -824,6 +865,10 @@ func (m arrM) feed(b byte, below *stack, out []*stack) []*stack {
 			items = anyNode
 		}
 
+		if !items.admits() {
+			return out
+		}
+
 		m.phase = arrNext
 		m.count++
 
@@ -868,7 +913,7 @@ func (m callsM) feed(b byte, below *stack, out []*stack) []*stack {
 
 		m.phase = arrNext
 
-		return step(callM{g: m.g}, b == '{', &stack{top: m, below: below}, out)
+		return step(callM{g: m.g}, b == '{' && len(m.g.tools) > 0, &stack{top: m, below: below}, out)
 	case arrNext:
 		switch b {
 		case ',':

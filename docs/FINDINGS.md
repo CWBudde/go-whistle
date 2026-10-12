@@ -4752,7 +4752,14 @@ compiled from the tools as rendered (`Normalise`, snake names), whose states are
   references closing on themselves, sibling keys merged. A merge unites `properties` and `required` and lets the
   branch's other keys win (port-side; no probe pins it).
 - **No dead ends:** a state is live only if it can still end (no escape or UTF-8 sequence past `maxLength`, no
-  unfinished literal at 20 characters, no key whose schema admits nothing), so the mask never runs empty.
+  unfinished literal at 20 characters, no key whose schema admits nothing), so the mask never runs empty. A schema
+  admits nothing when it is `false`, an `allOf` with a `false` branch, an `anyOf` whose branches all admit nothing, an
+  empty `enum`, a length or item range that is empty (`format: date` is 10 characters), a number range without a
+  number, or an integer range without an integer; such a key is never opened, such an array item never entered, and a
+  tool whose arguments admit nothing is not callable (a routed grammar without a callable tool allows the refusal,
+  port-side). A key is opened only where one can follow (a tool without parameters takes `{}` only). An escaped
+  surrogate pair is one character, as its UTF-8 spelling. `TestGrammarNoDeadEnds` walks every reachable state of such
+  schemas (PR #65 review).
 
 **The mask** (`tokenMask`): a token is allowed iff its bytes keep some state alive; a normal piece stands for its text
 (`▁` a space), a byte-fallback piece `<0xNN>` for its byte, so a UTF-8 character can span several; control,
@@ -4804,3 +4811,5 @@ keeps `lock_door` beside the triggered `set_lights`.
 - **Port-side choices no probe pins:** the merge of composed schemas, a bounded number's exponent, `oneOf`'s
   exclusivity, required keys no property declares, `pattern` and `multipleOf` (not enforced), and white space (none;
   the model never writes any).
+- **A number range with no spelling within 20 characters** (`minimum` 1234567890123456789.5, `maximum`
+  1234567890123456789.9) counts as admitting and can trap the decode at the cap; no real schema is that narrow.
