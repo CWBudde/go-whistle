@@ -21,14 +21,22 @@ const AcceptBoundPP = 0.1
 
 const missing = "—"
 
-// Render writes bench/RESULTS.md from the Go and the engine results;
-// either may be nil when that side has not run.
-func Render(w io.Writer, g *GoResults, e *EngineResults) error {
+// Paths are the results a report is rendered from and the report itself.
+type Paths struct{ Go, Engine, Report string }
+
+// DefaultPaths are the files `just bench` and `just oracle-bench` use
+// without flags.
+var DefaultPaths = Paths{Go: GoResultsPath, Engine: EngineResultsPath, Report: ReportPath}
+
+// Render writes the report p.Report from the Go and the engine results,
+// read from p.Go and p.Engine; either may be nil when that side has not
+// run.
+func Render(w io.Writer, g *GoResults, e *EngineResults, p Paths) error {
 	var b strings.Builder
 
 	b.WriteString("# Benchmarks: go-whistle against the Needle 3 engine\n\n" +
-		"PLAN.md 9.6 and the Phase 9 **Accept**. This file is generated from `" + GoResultsPath + "` (`just bench`)\n" +
-		"and `" + EngineResultsPath + "` (`just oracle-bench`); do not edit it by hand. Method and reading:\n" +
+		"PLAN.md 9.6 and the Phase 9 **Accept**. This file is generated from `" + p.Go + "` (`just bench`)\n" +
+		"and `" + p.Engine + "` (`just oracle-bench`); do not edit it by hand. Method and reading:\n" +
 		"`docs/FINDINGS.md` F-040.\n\n")
 
 	// The sides are compared only when they measured the same model and
@@ -40,7 +48,7 @@ func Render(w io.Writer, g *GoResults, e *EngineResults) error {
 	renderSpeed(&b, g, e, same)
 	renderPublished(&b, g, e, same)
 	renderMemory(&b, g, e)
-	renderMethod(&b)
+	renderMethod(&b, p, g)
 
 	_, err := io.WriteString(w, b.String())
 	if err != nil {
@@ -66,6 +74,11 @@ func renderRuns(b *strings.Builder, g *GoResults, e *EngineResults, same bool) {
 	t.row("commit", or(gr.Commit), or(er.Commit))
 	t.row("CPU", or(gr.Machine.CPU), or(er.Machine.CPU))
 	t.row("cores", cores(gr.Machine), cores(er.Machine))
+
+	if gr.Machine.Governor != "" || er.Machine.Governor != "" {
+		t.row("governor", or(gr.Machine.Governor), or(er.Machine.Governor))
+	}
+
 	t.row("memory", gibString(gr.Machine.MemoryGiB), gibString(er.Machine.MemoryGiB))
 	t.row("OS", or(gr.Machine.OS), or(er.Machine.OS))
 	t.row("Go", or(gr.Machine.GoVersion), or(er.Machine.GoVersion))
@@ -354,7 +367,7 @@ func rssMiB(v float64) string {
 	return mib(v)
 }
 
-func renderMethod(b *strings.Builder) {
+func renderMethod(b *strings.Builder, p Paths, g *GoResults) {
 	b.WriteString("## What is measured\n\n" +
 		"- **TTFT** is the engine's `ttft_ms` and `Result.TTFT`: from the PCM in hand to the first token after the\n" +
 		"  language token. It covers the front end, the encoder, the cross-attention memory and the first decoder\n" +
@@ -369,15 +382,39 @@ func renderMethod(b *strings.Builder) {
 		"  passes.\n" +
 		"- **Like with like** is Go against the engine library: the same PCM, in-process, the model loaded. Go runs\n" +
 		"  packed and float alternately in one process, clip by clip, so both see the same machine load.\n\n" +
-		"## Reproduce\n\n" +
-		"```bash\n" +
-		"just bench          # the Go side: bench/results/go.json, then this file\n" +
-		"just oracle-bench   # the engine side: bench/results/engine.json, then this file\n" +
-		"go run ./bench/cmd/whistle-bench report   # re-render this file from both JSON files\n" +
-		"```\n\n" +
+		"## Reproduce\n\n" + reproduce(p, g) +
 		"`just bench` needs `models/whistle/whistle.cact` (`whistle download`) and, for the WER,\n" +
 		"`models/corpus/librispeech` (`just oracle-librispeech-audio`); `just oracle-bench` needs `engine/<platform>`\n" +
 		"(`just fetch-engine`).\n")
+}
+
+// reproduce is the Reproduce section's commands, with the flags that
+// select p where it is not DefaultPaths, and -procs where the Go side ran
+// with fewer workers than the machine's cores.
+func reproduce(p Paths, g *GoResults) string {
+	procs := ""
+	if g != nil && g.GOMAXPROCS > 0 && g.GOMAXPROCS != g.Run.Machine.Cores {
+		procs = " -procs " + strconv.Itoa(g.GOMAXPROCS)
+	}
+
+	if p == DefaultPaths && procs == "" {
+		return "```bash\n" +
+			"just bench          # the Go side: bench/results/go.json, then this file\n" +
+			"just oracle-bench   # the engine side: bench/results/engine.json, then this file\n" +
+			"go run ./bench/cmd/whistle-bench report   # re-render this file from both JSON files\n" +
+			"```\n\n"
+	}
+
+	flags := " -go " + p.Go + " -engine " + p.Engine + " -report " + p.Report
+
+	return "```bash\n" +
+		"# the Go side: " + p.Go + ", then this file\n" +
+		"just bench" + procs + flags + "\n" +
+		"# the engine side: " + p.Engine + ", then this file\n" +
+		"just oracle-bench -out " + p.Engine + " -go " + p.Go + " -report " + p.Report + "\n" +
+		"# re-render this file from both JSON files\n" +
+		"go run ./bench/cmd/whistle-bench report" + flags + "\n" +
+		"```\n\n"
 }
 
 func (g *GoResults) mode(name string) *GoMode {

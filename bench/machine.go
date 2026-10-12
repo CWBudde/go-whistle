@@ -18,6 +18,7 @@ type Machine struct {
 	CPU       string  `json:"cpu"`
 	Cores     int     `json:"cores"`
 	CoreTypes string  `json:"core_types,omitempty"` // darwin: per performance level, "5 Super + 10 Performance"
+	Governor  string  `json:"governor,omitempty"`   // linux: cpu0's cpufreq scaling governor, "performance"
 	MemoryGiB float64 `json:"memory_gib"`
 	OS        string  `json:"os"`
 	Arch      string  `json:"arch"`
@@ -25,12 +26,15 @@ type Machine struct {
 }
 
 // SameMachine reports whether a and b describe the same hardware and
-// software: CPU, cores, core types, OS and architecture. A side whose CPU is
+// software: CPU, cores, core types, cpufreq governor, OS and architecture.
+// The governor sets the clock policy, so two runs under different ones do
+// not compare; an unknown one (darwin) matches only another unknown one. A
+// side whose CPU is
 // unknown matches nothing, so its timings are never paired with the other
 // side's as one machine's.
 func SameMachine(a, b Machine) bool {
-	return a.CPU != "" && a.CPU == b.CPU && a.Cores == b.Cores && a.CoreTypes == b.CoreTypes && a.OS == b.OS &&
-		a.Arch == b.Arch
+	return a.CPU != "" && a.CPU == b.CPU && a.Cores == b.Cores && a.CoreTypes == b.CoreTypes &&
+		a.Governor == b.Governor && a.OS == b.OS && a.Arch == b.Arch
 }
 
 // StartRun describes a run starting now: date, commit, machine and the
@@ -66,6 +70,7 @@ func Describe(ctx context.Context) Machine {
 		m.CPU = procField("/proc/cpuinfo", "model name")
 		m.MemoryGiB = gib(strings.TrimSuffix(procField("/proc/meminfo", "MemTotal"), " kB"), 1<<10)
 		m.OS = strings.Trim(procField("/etc/os-release", "PRETTY_NAME"), `"`) + ", kernel " + command(ctx, "uname", "-r")
+		m.Governor = linuxGovernor(ctx)
 	default:
 		m.OS = runtime.GOOS
 	}
@@ -84,6 +89,25 @@ func darwinCoreTypes(ctx context.Context) string {
 	}
 
 	return strings.Join(parts, " + ")
+}
+
+// linuxGovernor is cpu0's cpufreq scaling governor. Without cpufreq, as
+// in most virtual machines, it says so and names the hypervisor that
+// systemd-detect-virt reports: "none (no cpufreq; kvm guest)".
+func linuxGovernor(ctx context.Context) string {
+	raw, err := os.ReadFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")
+	if err == nil {
+		return strings.TrimSpace(string(raw))
+	}
+
+	// systemd-detect-virt prints "none" and exits 1 on bare metal, which
+	// command turns into "".
+	virt := command(ctx, "systemd-detect-virt")
+	if virt == "" || virt == "none" {
+		return "none (no cpufreq)"
+	}
+
+	return "none (no cpufreq; " + virt + " guest)"
 }
 
 // LoadAverage is the 1, 5 and 15 minute load average, "2.11 2.44 2.23", or

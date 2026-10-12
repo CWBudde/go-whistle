@@ -3542,6 +3542,47 @@ Without `models/` and without the engine:
 one command after a change to the Go side. `just oracle-bench` is only needed when the engine, the machine or the clips
 change; it was re-run after 9.5 only because the machine was quieter.
 
+### linux/amd64 (12.3, 2026-10-12)
+
+[`bench/RESULTS-linux-amd64.md`](../bench/RESULTS-linux-amd64.md), from `bench/results/linux-amd64/`. The machine is
+2× Intel Xeon Gold 5520+, 80 vCPUs, in a KVM guest without cpufreq, so there is no governor to record. It is a shared
+server; the load average was 6–14 during the runs. The Go side ran with `GOMAXPROCS` 16 (`-procs 16`), and the engine
+was 3.2.0's `linux-x86_64` build. `whistle doctor` there reports "AVX2: CQ LUT GEMV; AVX2+FMA: dot, axpy, softmax
+exp; GEMM in Go".
+
+| median over the 32 clips | Go packed | Go float | engine library | Go packed, `GOMAXPROCS` 4 |
+| ------------------------ | --------: | -------: | -------------: | ------------------------: |
+| TTFT (ms)                |      47.3 |     70.7 |          160.9 |                      51.4 |
+| decode (tok/s)           |       547 |      130 |            523 |                       363 |
+| wall (ms)                |      96.5 |    282.6 |          217.1 |                     124.2 |
+
+The last column is a separate `-procs 4 -wer=false` run, not committed, with a load average of 46 → 11. It answers
+whether Go wins only on threads, since the engine uses at most 4.
+
+- **Here Go is ahead to the first token.**
+  - The engine library's median TTFT is 160.9 ms against Go's 47.3 ms (0.29×), and 51.4 ms with 4 workers (0.32×).
+  - On the 30 s clip, it is 727.2 against 159.6 ms.
+  - On the M5 Pro the engine leads, 6.9 against 18.8 ms. Its TTFT here is 23× its M5 value; Go's is 2.5×.
+  - Why the engine's x86 build is that much slower is not visible from outside, since the engine is closed. Plausible
+    causes are less tuned x86 kernels than NEON, or its "fast cores, at most 4" choice on an 80-vCPU guest. Neither
+    was investigated.
+- **Decode** is even at 16 workers (547 against 523 tok/s, 1.05×). At 4 workers the engine leads (363 tok/s, 0.69×).
+- **The float path shows 12.3's missing GEMM.**
+  - On amd64 the float matrices run through the pure-Go `tensor.MatMulTransB`: float decodes at 0.24× of packed, on
+    the M5 at 0.56×.
+  - The packed path is the CQ LUT GEMV, which has AVX2.
+- **Memory:** a 30 s run peaks at 99.8 MiB RSS, against 52.2 MiB for the engine CLI.
+- **The engine's own transcripts differ by platform.**
+  - Its `linux-x86_64` CLI gives the committed (macos-arm64) fixtures' text on 29/32 clips.
+  - Go gives 31/32 on both platforms.
+- **Parity on amd64 is the same as on arm64.** These are the numbers 12.3's GEMM change has to hold:
+  - `TestTranscribeMatchesEngine`: 31/32.
+  - `TestEmbedMatchesEngine`: mean cosine 0.999828.
+  - Keywords at the default bias (`TestProbeFold`): 47/53 cases, 18/32 sets and 29/31 variants.
+  - The depth ladder 2–7 (`just depth-probe`): 24 + 27 + 29 + 29 + 28 + 24 = 161/192.
+  - The stream decisions (`just stream-parity`): 797/930.
+  - The LibriSpeech WER (`just eval-librispeech`): 5.35 %, against the engine's 5.30 %.
+
 ### Open
 
 - **TTFT**, 2.8× the engine's on the clips after 9.5: F-038's open items (the decoder's cross-attention memory, the
