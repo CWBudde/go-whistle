@@ -26,6 +26,10 @@ Written to testdata/text/forward/forward.safetensors (weights never stored):
                                          (the pre-norm stream exceeds the F16 range)
     tiny.embed           F32 (T, 768)    scaled input embedding
     tiny.logits          F32 (T, 8192)   logits at every position
+    <case>.confidence    F32 (2)         ConfidenceHead raw logit (forward_confidence,
+                                         no sigmoid) over the whole sequence and over
+                                         [BOS] + prompt only (tiny: the whole sequence
+                                         twice)
 
 long_tools passes the 1024-position sliding window of the local layers; the
 metadata's band_control records how far the network lands without the band.
@@ -345,6 +349,17 @@ def main():
         return logits, final
 
     @jax.jit
+    def confidence(params, tokens):
+        # upstream's own head path: hidden_cells (the scaled embedding and
+        # the 20 per-block lane means), keep = tokens != PAD, probe_pool and
+        # the projection; [..., 0] is the raw logit.
+        return model.apply({"params": params}, tokens, method=arch.SimpleAttentionNetwork.forward_confidence)[0]
+
+    def confidences(ids, prompt_len):
+        return np.asarray([confidence(params, jnp.asarray([ids], jnp.int32)),
+                           confidence(params, jnp.asarray([ids[:prompt_len]], jnp.int32))], np.float32)
+
+    @jax.jit
     def step_logits(params, tokens):
         return model.apply({"params": params}, tokens)[0]
 
@@ -386,8 +401,9 @@ def main():
             tensors[f"{name}.final"] = final.astype(np.float16)
         tensors[f"{name}.hidden_last"] = hidden[:, -1]
         tensors[f"{name}.logits_last"] = logits[-LAST:]
+        tensors[f"{name}.confidence"] = confidences(ids, prompt_len)
         print(f"{name}: {prompt_len} prompt + {len(ids) - prompt_len} completion tokens: "
-              f"{prompts[name]['completion']!r}", file=sys.stderr)
+              f"{prompts[name]['completion']!r}, confidence {tensors[f'{name}.confidence']}", file=sys.stderr)
 
     ids = [bos] + tok.encode(TINY)
     logits, _, hidden, embed = forward(ids)
@@ -396,6 +412,7 @@ def main():
     tensors["tiny.hidden"] = hidden
     tensors["tiny.embed"] = embed
     tensors["tiny.logits"] = logits
+    tensors["tiny.confidence"] = confidences(ids, len(ids))
 
     os.makedirs(args.out, exist_ok=True)
     metadata = {
