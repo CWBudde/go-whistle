@@ -490,14 +490,39 @@ func cover(nodes []*schemaAlias, obj map[string]any) (named, taken int) {
 	return named, taken
 }
 
-// lookup is the caller's name for the model's key k and its schema: from
-// the first node whose properties name it, then from the first
-// additionalProperties schema, else k unchanged.
+// lookup is the caller's name for the model's key k and its schema: the
+// name from the first node whose properties name it, the schemas of every
+// node that does (they all apply, as allOf branches; PR #63 review); then
+// from the first additionalProperties schema, else k unchanged.
 func lookup(nodes []*schemaAlias, k string) (string, *schemaAlias) {
+	var (
+		caller string
+		subs   []*schemaAlias
+		named  bool
+	)
+
 	for _, s := range nodes {
-		if c, ok := s.props[k]; ok {
-			return c, s.sub[k]
+		c, ok := s.props[k]
+		if !ok {
+			continue
 		}
+
+		if !named {
+			caller, named = c, true
+		}
+
+		if sub := s.sub[k]; sub != nil {
+			subs = append(subs, sub)
+		}
+	}
+
+	switch {
+	case len(subs) > 1:
+		return caller, &schemaAlias{props: map[string]string{}, sub: map[string]*schemaAlias{}, allOf: subs}
+	case named && len(subs) == 1:
+		return caller, subs[0]
+	case named:
+		return caller, nil
 	}
 
 	for _, s := range nodes {

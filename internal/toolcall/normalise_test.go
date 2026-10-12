@@ -420,6 +420,13 @@ func TestCallerArgsComposition(t *testing.T) {
 			`{"o":{"common_obj":{"inner_key":1},"alpha_key":2}}`,
 			`{"o":{"alphaKey":2,"commonObj":{"innerKey":1}}}`,
 		},
+		"repeated declarations combine": {
+			`[{"name":"t","parameters":{"properties":{"o":{"allOf":[` +
+				`{"properties":{"sharedObj":{"properties":{"firstKey":{}}}}},` +
+				`{"properties":{"sharedObj":{"properties":{"secondKey":{}}}}}]}}}}]`,
+			`{"o":{"shared_obj":{"first_key":1,"second_key":2}}}`,
+			`{"o":{"sharedObj":{"firstKey":1,"secondKey":2}}}`,
+		},
 	} {
 		n, err := Normalise([]byte(c.tools))
 		if err != nil {

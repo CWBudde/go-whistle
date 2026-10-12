@@ -4519,7 +4519,8 @@ answers, so `CallerArgs` follows a rule of the port's own (the reviews of PRs #6
 - of each `anyOf` and `oneOf` list one branch does: the one whose names (with its own nested branches) cover most of
   the object's keys, then whose `additionalProperties` takes most of the rest, the first on a tie;
 - a key gets the caller's name from the first applicable node that declares it (the schema's own properties first),
-  else falls under the first applicable `additionalProperties` schema, else stays as it is;
+  else falls under the first applicable `additionalProperties` schema, else stays as it is; its value follows the
+  schemas of every applicable node that declares it, combined as `allOf` branches;
 - the alternatives considered were the first branch with the key (keys of sibling branches mixed in one object) and
   the branch naming most keys of the whole schema (the common properties decided). Values are not checked against the
   branches' types, so two branches that name the same keys differently resolve to the first;
