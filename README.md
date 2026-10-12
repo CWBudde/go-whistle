@@ -12,7 +12,7 @@ en, de, fr, es, it, nl, pl).
 
 ## Quickstart
 
-Install the CLI (Go 1.25 or later; pure Go, no cgo) and fetch the pinned model files:
+Install the CLI (Go 1.27 or later, which an older `go` command downloads by itself; pure Go, no cgo) and fetch the pinned model files:
 
 ```bash
 go install github.com/cwbudde/go-whistle/cmd/whistle@latest
