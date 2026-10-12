@@ -696,13 +696,11 @@ const engineGrammar = "../../testdata/text/engine/grammar.json"
 var (
 	// grammarCallsDiffer: the calls (dispatched or suppressed).
 	grammarCallsDiffer = map[string]string{
-		"bounds_max":       "the repair drops brightness 100, which the request does not state",
-		"required_missing": "the repair capitalises the label",
-		"ref":              "decoded after a different reasoning, the engine writes a phone",
-		"number_bounds":    "the engine truncates",
-		"any_of":           "the engine truncates",
-		"max_items":        "the engine truncates",
-		"max_length":       "the engine truncates",
+		"ref":           "decoded after a different reasoning, the engine writes a phone",
+		"number_bounds": "the engine truncates",
+		"any_of":        "the engine truncates",
+		"max_items":     "the engine truncates",
+		"max_length":    "the engine truncates",
 	}
 	// grammarReasoningNearTie: the reasoning, at a near-tie (as
 	// reasoningNearTie).
