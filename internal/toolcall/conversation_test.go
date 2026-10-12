@@ -251,6 +251,14 @@ func TestConversation(t *testing.T) {
 		t.Errorf("Available = %d", got)
 	}
 
+	// No room even for the markers: refused without refuse too (PR #61 review).
+	maxNew := c.Available(0) - 5
+
+	ids, err := c.Turn("hello there", maxNew, false)
+	if !errors.Is(err, ErrContextOverflow) || c.Available(maxNew) != 5 {
+		t.Errorf("room %d: Turn gave %d tokens, %v", c.Available(maxNew), len(ids), err)
+	}
+
 	for in, want := range map[string]string{
 		`1.50e2`: `1.50e2`, `"é\/ b"`: `"é\/ b"`, ` true `: `true`, `{"a": 1, "a": 2}`: `{"a":1,"a":2}`,
 		"[1, \n \"a \\\" b\" ]": `[1,"a \" b"]`,

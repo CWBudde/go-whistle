@@ -1,6 +1,7 @@
 package toolcall
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -155,6 +156,11 @@ func toolNames(tools []any) []string {
 		for k, c := range names {
 			if c == caller {
 				out[i] += "_" + strconv.Itoa(k+1)
+				// A suffixed name another tool already has gets one more
+				// (PR #61 review); the engine's choice is not measured.
+				for _, ok := callers[out[i]]; ok; _, ok = callers[out[i]] {
+					out[i] += "_" + strconv.Itoa(k+1)
+				}
 			}
 		}
 	}
@@ -211,20 +217,17 @@ func schema(o *object) (*object, *schemaAlias) {
 }
 
 // properties renames a "properties" object's keys (the first of a snake
-// name keeps it, the next get _1, _2, …) and the schemas under them, and
-// returns the renamed object and the caller's names mapped to the model's.
+// name keeps it, the next get _1, _2, …, skipping names already taken) and
+// the schemas under them, and returns the renamed object and the caller's
+// names mapped to the model's.
 func (a *schemaAlias) properties(props *object) (*object, map[string]string) {
 	renamed := &object{vals: map[string]any{}}
 	back := map[string]string{}
-	taken := map[string]int{}
 
 	for _, k := range props.keys {
 		model := Snake(k)
-		if c := taken[model]; c > 0 {
-			taken[model]++
-			model += "_" + strconv.Itoa(c)
-		} else {
-			taken[model] = 1
+		for n := 1; slices.Contains(renamed.keys, model); n++ {
+			model = Snake(k) + "_" + strconv.Itoa(n)
 		}
 
 		v := props.vals[k]
@@ -356,11 +359,19 @@ func (n *Normalised) CallerName(name string) string {
 // CallerArgs is a call's arguments (a JSON object) under the caller's
 // property names: each key the model's schema renamed gets the caller's
 // name back, nested objects and arrays included. Keys the schema does not
-// know stay.
+// know stay, and numbers keep their literals (no float64 rounding of large
+// integers; PR #61 review).
 func (n *Normalised) CallerArgs(name string, args []byte) ([]byte, error) {
 	var v any
 
-	err := json.Unmarshal(args, &v)
+	dec := json.NewDecoder(bytes.NewReader(args))
+	dec.UseNumber()
+
+	err := dec.Decode(&v)
+	if err == nil && dec.More() {
+		err = errors.New("data after the arguments")
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("toolcall: arguments: %w", err)
 	}
@@ -389,9 +400,11 @@ func callerValue(v any, a *schemaAlias) any {
 
 		return out
 	case []any:
+		items := a.itemsAlias()
+
 		out := make([]any, len(t))
 		for i, x := range t {
-			out[i] = callerValue(x, a.items)
+			out[i] = callerValue(x, items)
 		}
 
 		return out
@@ -414,4 +427,21 @@ func (a *schemaAlias) lookup(k string) (string, *schemaAlias) {
 	}
 
 	return k, a.extra
+}
+
+// itemsAlias is the alias of an array's item schema: its own "items", or
+// that of the first anyOf, oneOf or allOf branch that has one (PR #61
+// review).
+func (a *schemaAlias) itemsAlias() *schemaAlias {
+	if a.items != nil {
+		return a.items
+	}
+
+	for _, b := range a.branches {
+		if b.items != nil {
+			return b.items
+		}
+	}
+
+	return nil
 }

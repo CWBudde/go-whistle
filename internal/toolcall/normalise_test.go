@@ -259,4 +259,43 @@ func TestCallerArgs(t *testing.T) {
 	if err == nil {
 		t.Error("CallerArgs accepted bad JSON")
 	}
+
+	// PR #61 review: integers past 2^53 keep their digits, and the items of
+	// an array schema inside a branch are renamed back.
+	n, err = Normalise([]byte(`[{"name":"t","parameters":{"properties":{"orderId":{"type":"integer"},` +
+		`"rows":{"anyOf":[{"type":"array","items":{"properties":{"itemName":{}}}}]}}}}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = n.CallerArgs("t", []byte(`{"order_id":12345678901234567890,"rows":[{"item_name":1.50}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `{"orderId":12345678901234567890,"rows":[{"itemName":1.50}]}`; string(out) != want {
+		t.Errorf("CallerArgs = %s, want %s", out, want)
+	}
+}
+
+// TestNormaliseUniqueNames: a generated suffix never repeats a name the
+// tools or properties already have (PR #61 review).
+func TestNormaliseUniqueNames(t *testing.T) {
+	n, err := Normalise([]byte(`[{"name":"setTimer"},{"name":"set_timer"},{"name":"set_timer_1"},` +
+		`{"name":"t","parameters":{"properties":{"fooBar":1,"foo_bar":2,"foo_bar_1":3}}}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := `[{"name":"set_timer_1_1"},{"name":"set_timer_2"},{"name":"set_timer_1"},` +
+		`{"name":"t","parameters":{"properties":{"foo_bar":1,"foo_bar_1":2,"foo_bar_1_1":3}}}]`
+	if n.JSON != want {
+		t.Errorf("got  %s\nwant %s", n.JSON, want)
+	}
+
+	for model, caller := range map[string]string{"set_timer_1_1": "setTimer", "set_timer_2": "set_timer", "set_timer_1": "set_timer_1"} {
+		if got := n.CallerName(model); got != caller {
+			t.Errorf("CallerName(%s) = %s, want %s", model, got, caller)
+		}
+	}
 }

@@ -64,10 +64,11 @@ func (c *Conversation) Available(maxNew int) int { return c.context - c.static -
 // Turn renders the next input, returns its token ids and moves the
 // conversation on. A turn longer than Available(maxNew) is refused with an
 // *OverflowError when refuse is set, as the engine's --fail-input-overflow
-// does; otherwise the input loses its first tokens until the turn fits, as
-// the engine keeps an oversized turn's end (docs/FINDINGS.md F-051: the
-// engine's exact cut is not measured). Either way the turn is no longer the
-// first, and the call before it is answered.
+// does, or when even the markers around the input do not fit; otherwise the
+// input loses its first tokens until the turn fits, as the engine keeps an
+// oversized turn's end (docs/FINDINGS.md F-051: the engine's exact cut is
+// not measured). Either way the turn is no longer the first, and the call
+// before it is answered.
 func (c *Conversation) Turn(input string, maxNew int, refuse bool) ([]int, error) {
 	head, body, tail := c.render(input)
 
@@ -77,14 +78,12 @@ func (c *Conversation) Turn(input string, maxNew int, refuse bool) ([]int, error
 	room := c.Available(maxNew)
 
 	if n := len(h) + len(b) + len(t); n > room {
-		if refuse {
+		// Without room for the markers no cut fits either (PR #61 review).
+		if refuse || room < len(h)+len(t) {
 			return nil, &OverflowError{Tokens: n, Available: room}
 		}
 
-		keep := max(room-len(h)-len(t), 0)
-		if keep < len(b) {
-			b = b[len(b)-keep:]
-		}
+		b = b[len(b)-(room-len(h)-len(t)):]
 	}
 
 	return append(append(h, b...), t...), nil
