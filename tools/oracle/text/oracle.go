@@ -135,6 +135,12 @@ func (o *oracle) speechHeader(command string) header {
 	return h
 }
 
+// flagModel is the CLI flag naming a .cact to load.
+const flagModel = "--model"
+
+// flagTools is the CLI flag naming the tools file.
+const flagTools = "--tools"
+
 // flagSystem is the CLI flag naming the file that holds the system text.
 const flagSystem = "--system"
 
@@ -156,7 +162,7 @@ func (o *oracle) threadArgs(toolset, system, threads string) ([]string, error) {
 		return nil, err
 	}
 
-	args := []string{"--model", o.needle3Path(), "--tools", o.toolsPath(toolset), flagSystem, sys}
+	args := []string{flagModel, o.needle3Path(), flagTools, o.toolsPath(toolset), flagSystem, sys}
 	if threads != "" {
 		args = append(args, "--threads", threads)
 	}

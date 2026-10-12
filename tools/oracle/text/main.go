@@ -12,6 +12,8 @@
 //	go run -tags oracle ./tools/oracle/text audio  # audio.json: speech in, tool calls out (needle3 + whistle)
 //	go run -tags oracle ./tools/oracle/text embed  # embed.json, embed.safetensors: needle_embed of short texts
 //	go run -tags oracle ./tools/oracle/text retrieval  # retrieval.json: needle_init past 5 tools, the tool index
+//	go run -tags oracle ./tools/oracle/text normalise  # normalise.json: needle_init on tools that need normalising
+//	go run -tags oracle ./tools/oracle/text turns  # turns.json: conversations over --serve, oversized turns refused
 //	go run -tags oracle ./tools/oracle/text all    # every subcommand above
 //	go run -tags oracle ./tools/oracle/text fetch  # download the pinned text model into models/needle3 (-dir)
 //
@@ -44,9 +46,11 @@ var subcommands = []struct {
 	{"audio", cmdAudio},
 	{"embed", cmdEmbed},
 	{"retrieval", cmdRetrieval},
+	{"normalise", cmdNormalise},
+	{"turns", cmdTurns},
 }
 
-const usage = "usage: oracle/text cases|date|depth|audio|embed|retrieval|all " +
+const usage = "usage: oracle/text cases|date|depth|audio|embed|retrieval|normalise|turns|all " +
 	"[-out dir] [-cases file] [-needle3 dir] [-whistle dir] [-engine dir] [-audio dir]\n" +
 	"       oracle/text fetch [-dir models/needle3]"
 

@@ -1,0 +1,478 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "libneedle3: needle_init(system, tools, NULL); needle --model needle3.cact --tools <probe tools> --system <system file> --threads 4 --prompt <query>",
+  "system": "date: 2026-10-11 Sun 09:30",
+  "probes": [
+    {
+      "id": "assistant",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "init": 314
+    },
+    {
+      "id": "assistant_openai",
+      "tools": "[{\"type\":\"function\",\"function\":{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}}]",
+      "init": 314
+    },
+    {
+      "id": "assistant_camel",
+      "tools": "[{\"name\":\"setTimer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"setAlarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"sendMessage\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"getWeather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"createEvent\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"durationMinutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "init": 314
+    },
+    {
+      "id": "assistant_triggers",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]}]",
+      "init": 314
+    },
+    {
+      "id": "assistant_openai_camel_triggers",
+      "tools": "[{\"type\":\"function\",\"function\":{\"name\":\"setTimer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]}},{\"type\":\"function\",\"function\":{\"name\":\"setAlarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]}},{\"type\":\"function\",\"function\":{\"name\":\"sendMessage\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]}},{\"type\":\"function\",\"function\":{\"name\":\"getWeather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]}},{\"type\":\"function\",\"function\":{\"name\":\"createEvent\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"durationMinutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]},\"triggers\":[\"\\\\b(timer|alarm)\\\\b\"]}}]",
+      "init": 314
+    },
+    {
+      "id": "assistant_openai_extra_keys",
+      "tools": "[{\"type\":\"function\",\"function\":{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},\"strict\":true,\"x-foo\":1},{\"type\":\"function\",\"function\":{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},\"strict\":true,\"x-foo\":1},{\"type\":\"function\",\"function\":{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},\"strict\":true,\"x-foo\":1},{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},\"strict\":true,\"x-foo\":1},{\"type\":\"function\",\"function\":{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}},\"strict\":true,\"x-foo\":1}]",
+      "init": 314
+    },
+    {
+      "id": "assistant_openai_type_tool",
+      "tools": "[{\"type\":\"tool\",\"function\":{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}}},{\"type\":\"tool\",\"function\":{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}}},{\"type\":\"tool\",\"function\":{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}}},{\"type\":\"tool\",\"function\":{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}}},{\"type\":\"tool\",\"function\":{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}}]",
+      "init": 314
+    },
+    {
+      "id": "assistant_kept_keys",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]},\"examples\":[\"x\"],\"x-foo\":1,\"strict\":true,\"title\":\"T\",\"returns\":{\"type\":\"string\"}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]},\"examples\":[\"x\"],\"x-foo\":1,\"strict\":true,\"title\":\"T\",\"returns\":{\"type\":\"string\"}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]},\"examples\":[\"x\"],\"x-foo\":1,\"strict\":true,\"title\":\"T\",\"returns\":{\"type\":\"string\"}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]},\"examples\":[\"x\"],\"x-foo\":1,\"strict\":true,\"title\":\"T\",\"returns\":{\"type\":\"string\"}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]},\"examples\":[\"x\"],\"x-foo\":1,\"strict\":true,\"title\":\"T\",\"returns\":{\"type\":\"string\"}}]",
+      "init": 454
+    },
+    {
+      "id": "name setTimer",
+      "tools": "[{\"name\":\"setTimer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 49
+    },
+    {
+      "id": "name SetTimer",
+      "tools": "[{\"name\":\"SetTimer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 49
+    },
+    {
+      "id": "name HTTPServer",
+      "tools": "[{\"name\":\"HTTPServer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 50
+    },
+    {
+      "id": "name getURL2",
+      "tools": "[{\"name\":\"getURL2\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 49
+    },
+    {
+      "id": "name getHTTPResponseCode",
+      "tools": "[{\"name\":\"getHTTPResponseCode\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 55
+    },
+    {
+      "id": "name XMLHttpRequest",
+      "tools": "[{\"name\":\"XMLHttpRequest\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 53
+    },
+    {
+      "id": "name IOError",
+      "tools": "[{\"name\":\"IOError\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 50
+    },
+    {
+      "id": "name turnOnTV",
+      "tools": "[{\"name\":\"turnOnTV\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 51
+    },
+    {
+      "id": "name get2FACode",
+      "tools": "[{\"name\":\"get2FACode\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 52
+    },
+    {
+      "id": "name v2Api",
+      "tools": "[{\"name\":\"v2Api\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 50
+    },
+    {
+      "id": "name a1B2c3",
+      "tools": "[{\"name\":\"a1B2c3\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 52
+    },
+    {
+      "id": "name lightsOn42Now",
+      "tools": "[{\"name\":\"lightsOn42Now\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 52
+    },
+    {
+      "id": "name ABC",
+      "tools": "[{\"name\":\"ABC\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 48
+    },
+    {
+      "id": "name x",
+      "tools": "[{\"name\":\"x\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 47
+    },
+    {
+      "id": "name already_snake",
+      "tools": "[{\"name\":\"already_snake\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 51
+    },
+    {
+      "id": "name Mixed_Case",
+      "tools": "[{\"name\":\"Mixed_Case\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 52
+    },
+    {
+      "id": "name set timer",
+      "tools": "[{\"name\":\"set timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 49
+    },
+    {
+      "id": "name _private",
+      "tools": "[{\"name\":\"_private\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 49
+    },
+    {
+      "id": "name trailing_",
+      "tools": "[{\"name\":\"trailing_\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 48
+    },
+    {
+      "id": "name __zoom_in__",
+      "tools": "[{\"name\":\"__zoom_in__\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 50
+    },
+    {
+      "id": "name kebab-case-name",
+      "tools": "[{\"name\":\"kebab-case-name\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 54
+    },
+    {
+      "id": "name send.message",
+      "tools": "[{\"name\":\"send.message\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 49
+    },
+    {
+      "id": "name set-Timer",
+      "tools": "[{\"name\":\"set-Timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 49
+    },
+    {
+      "id": "name ÄpfelZählen",
+      "tools": "[{\"name\":\"ÄpfelZählen\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 56
+    },
+    {
+      "id": "name naïveBayes",
+      "tools": "[{\"name\":\"naïveBayes\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 52
+    },
+    {
+      "id": "name getÜbersicht",
+      "tools": "[{\"name\":\"getÜbersicht\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 51
+    },
+    {
+      "id": "property minutesLeft",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutesLeft\":{\"type\":\"string\"}},\"required\":[\"minutesLeft\"]}}]",
+      "init": 53
+    },
+    {
+      "id": "property HTTPCode",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"HTTPCode\":{\"type\":\"string\"}},\"required\":[\"HTTPCode\"]}}]",
+      "init": 55
+    },
+    {
+      "id": "property maxRetryCount",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"maxRetryCount\":{\"type\":\"string\"}},\"required\":[\"maxRetryCount\"]}}]",
+      "init": 59
+    },
+    {
+      "id": "property userID",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"userID\":{\"type\":\"string\"}},\"required\":[\"userID\"]}}]",
+      "init": 53
+    },
+    {
+      "id": "property max count",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"max count\":{\"type\":\"string\"}},\"required\":[\"max count\"]}}]",
+      "init": 53
+    },
+    {
+      "id": "property größeWert",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"größeWert\":{\"type\":\"string\"}},\"required\":[\"größeWert\"]}}]",
+      "init": 63
+    },
+    {
+      "id": "nested_object_items",
+      "tools": "[{\"name\":\"setThing\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"outerKey\":{\"type\":\"object\",\"properties\":{\"innerKey\":{\"type\":\"string\"}},\"required\":[\"innerKey\"]},\"listKey\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"itemKey\":{\"type\":\"string\"}}}},\"enumKey\":{\"type\":\"string\",\"enum\":[\"fooBar\",\"bazQux\"]}},\"required\":[\"outerKey\"]}}]",
+      "init": 116
+    },
+    {
+      "id": "nested_anyof",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"a\":{\"anyOf\":[{\"type\":\"object\",\"properties\":{\"innerKey\":{\"type\":\"string\"}}},{\"type\":\"string\"}]}}}}]",
+      "init": 63
+    },
+    {
+      "id": "nested_oneof",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"a\":{\"oneOf\":[{\"type\":\"object\",\"properties\":{\"innerKey\":{\"type\":\"string\"}}},{\"type\":\"string\"}]}}}}]",
+      "init": 63
+    },
+    {
+      "id": "nested_allof",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"a\":{\"allOf\":[{\"type\":\"object\",\"properties\":{\"innerKey\":{\"type\":\"string\"}}}]}}}}]",
+      "init": 59
+    },
+    {
+      "id": "nested_additional",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"object\",\"properties\":{\"innerKey\":{\"type\":\"string\"}}}}}}}]",
+      "init": 65
+    },
+    {
+      "id": "nested_property_named_properties",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"properties\":{\"type\":\"object\",\"properties\":{\"innerKey\":{\"type\":\"string\"}}}}}}]",
+      "init": 55
+    },
+    {
+      "id": "untouched_defs",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"a\":{\"$ref\":\"#/$defs/MyThing\"}},\"$defs\":{\"MyThing\":{\"type\":\"object\",\"properties\":{\"innerKey\":{\"type\":\"string\"}}}}}}]",
+      "init": 75
+    },
+    {
+      "id": "untouched_items_list",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"array\",\"items\":[{\"type\":\"object\",\"properties\":{\"innerKey\":{\"type\":\"string\"}}}]}}}}]",
+      "init": 60
+    },
+    {
+      "id": "untouched_required_unknown",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"maxCount\":{\"type\":\"string\"}},\"required\":[\"otherKey\"]}}]",
+      "init": 50
+    },
+    {
+      "id": "untouched_nested_triggers",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"string\"}},\"triggers\":[\"x\"]}}]",
+      "init": 48
+    },
+    {
+      "id": "untouched_function_string",
+      "tools": "[{\"type\":\"function\",\"function\":\"x\"}]",
+      "init": 30
+    },
+    {
+      "id": "untouched_name_number",
+      "tools": "[{\"name\":5,\"description\":\"x\"}]",
+      "init": 27
+    },
+    {
+      "id": "no_parameters",
+      "tools": "[{\"name\":\"getTime\",\"description\":\"x\"}]",
+      "init": 30
+    },
+    {
+      "id": "collide_tools",
+      "tools": "[{\"name\":\"setTimer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_timer\",\"description\":\"Start a kitchen countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}}]",
+      "init": 128
+    },
+    {
+      "id": "collide_tools_three",
+      "tools": "[{\"name\":\"setTimer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}},{\"name\":\"set_timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}},{\"name\":\"SetTimer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 110
+    },
+    {
+      "id": "collide_tools_identical",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}},{\"name\":\"set_timer\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}]",
+      "init": 78
+    },
+    {
+      "id": "collide_props",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"maxCount\":{\"type\":\"string\"},\"max_count\":{\"type\":\"integer\"}},\"required\":[\"maxCount\",\"max_count\"]}}]",
+      "init": 67
+    },
+    {
+      "id": "collide_props_three",
+      "tools": "[{\"name\":\"t\",\"description\":\"Do it\",\"parameters\":{\"type\":\"object\",\"properties\":{\"maxCount\":{\"type\":\"string\"},\"max_count\":{\"type\":\"integer\"},\"MaxCount\":{\"type\":\"boolean\"}}}}]",
+      "init": 66
+    }
+  ],
+  "answers": [
+    {
+      "probe": "assistant_camel",
+      "query": "set a timer for 10 minutes for the pasta",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "setTimer",
+            "arguments": {
+              "minutes": 10,
+              "label": "Pasta"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+        "confidence": 0.9324,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "probe": "assistant_camel",
+      "query": "add a meeting called standup on 2026-10-13 at 09:00 for 15 minutes",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "createEvent",
+            "arguments": {
+              "title": "Standup",
+              "date": "2026-10-13",
+              "time": "09:00",
+              "durationMinutes": 15
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "title 'standup' from query; date '2026-10-13' from query; time '09:00' from query; duration_minutes 15 from query; location omitted",
+        "confidence": 0.8424,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "probe": "assistant_openai",
+      "query": "set a timer for 10 minutes for the pasta",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_timer",
+            "arguments": {
+              "minutes": 10,
+              "label": "Pasta"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+        "confidence": 0.9324,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "probe": "assistant_openai",
+      "query": "add a meeting called standup on 2026-10-13 at 09:00 for 15 minutes",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "create_event",
+            "arguments": {
+              "title": "Standup",
+              "date": "2026-10-13",
+              "time": "09:00",
+              "duration_minutes": 15
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "title 'standup' from query; date '2026-10-13' from query; time '09:00' from query; duration_minutes 15 from query; location omitted",
+        "confidence": 0.8424,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "probe": "collide_tools",
+      "query": "set a timer for 10 minutes for the pasta",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "setTimer",
+            "arguments": {
+              "minutes": 10,
+              "label": "Pasta"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'",
+        "confidence": 0.3714,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "probe": "collide_tools",
+      "query": "add a meeting called standup on 2026-10-13 at 09:00 for 15 minutes",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_timer",
+            "arguments": {
+              "minutes": 15,
+              "label": "Standup"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'standup' -> label 'standup'; '2026-10-13 at 09:00' -> date 2026-10-13 09:00; '15 minutes' -> minutes 15",
+        "confidence": 0.4944,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    }
+  ]
+}

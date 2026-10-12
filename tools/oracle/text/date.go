@@ -158,7 +158,7 @@ func (o *oracle) dateProbe(ctx context.Context, lib *library, k textCase, v date
 		return probe{}, err
 	}
 
-	args := append([]string{"--model", o.needle3Path(), "--tools", o.toolsPath(k.Toolset), "--threads", cliThreads},
+	args := append([]string{flagModel, o.needle3Path(), flagTools, o.toolsPath(k.Toolset), "--threads", cliThreads},
 		sys...)
 
 	res, err := runCLI(ctx, o.needle(), maxArgs(k, append(args, "--prompt", k.Query)...))
