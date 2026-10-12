@@ -11,6 +11,7 @@
 //	go run -tags oracle ./tools/oracle/text depth  # depth.json: which --depth values load, answers along the ladder
 //	go run -tags oracle ./tools/oracle/text audio  # audio.json: speech in, tool calls out (needle3 + whistle)
 //	go run -tags oracle ./tools/oracle/text embed  # embed.json, embed.safetensors: needle_embed of short texts
+//	go run -tags oracle ./tools/oracle/text retrieval  # retrieval.json: needle_init past 5 tools, the tool index
 //	go run -tags oracle ./tools/oracle/text all    # every subcommand above
 //	go run -tags oracle ./tools/oracle/text fetch  # download the pinned text model into models/needle3 (-dir)
 //
@@ -42,9 +43,10 @@ var subcommands = []struct {
 	{"depth", cmdDepth},
 	{"audio", cmdAudio},
 	{"embed", cmdEmbed},
+	{"retrieval", cmdRetrieval},
 }
 
-const usage = "usage: oracle/text cases|date|depth|audio|embed|all " +
+const usage = "usage: oracle/text cases|date|depth|audio|embed|retrieval|all " +
 	"[-out dir] [-cases file] [-needle3 dir] [-whistle dir] [-engine dir] [-audio dir]\n" +
 	"       oracle/text fetch [-dir models/needle3]"
 

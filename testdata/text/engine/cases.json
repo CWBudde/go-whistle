@@ -158,6 +158,328 @@
           "required": ["vendor", "total"]
         }
       }
+    ],
+    "catalogue": [
+      {
+        "name": "set_timer",
+        "description": "Start a countdown timer",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "minutes": {
+              "type": "integer",
+              "description": "Duration in minutes"
+            },
+            "label": {
+              "type": "string",
+              "description": "What the timer is for"
+            }
+          },
+          "required": ["minutes"]
+        }
+      },
+      {
+        "name": "set_alarm",
+        "description": "Set an alarm clock",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "time": {
+              "type": "string",
+              "description": "Alarm time as HH:MM, 24-hour"
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "required": ["time"]
+        }
+      },
+      {
+        "name": "send_message",
+        "description": "Send a text message to a contact",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "recipient": {
+              "type": "string",
+              "description": "Contact name"
+            },
+            "message": {
+              "type": "string",
+              "description": "Message text"
+            }
+          },
+          "required": ["recipient", "message"]
+        }
+      },
+      {
+        "name": "get_weather",
+        "description": "Get the weather forecast for a place and day",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "City name"
+            },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "description": "Day of the forecast"
+            }
+          },
+          "required": ["location"]
+        }
+      },
+      {
+        "name": "create_event",
+        "description": "Add an event to the calendar",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string",
+              "format": "date"
+            },
+            "time": {
+              "type": "string",
+              "description": "Start time as HH:MM, 24-hour"
+            },
+            "duration_minutes": {
+              "type": "integer"
+            },
+            "location": {
+              "type": "string"
+            }
+          },
+          "required": ["title", "date"]
+        }
+      },
+      {
+        "name": "set_lights",
+        "description": "Turn a room's lights on or off and set their brightness",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "room": {
+              "type": "string"
+            },
+            "on": {
+              "type": "boolean"
+            },
+            "brightness": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": ["room", "on"]
+        }
+      },
+      {
+        "name": "set_thermostat",
+        "description": "Set the heating or cooling target temperature",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "temperature": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string",
+              "enum": ["celsius", "fahrenheit"]
+            }
+          },
+          "required": ["temperature"]
+        }
+      },
+      {
+        "name": "lock_door",
+        "description": "Lock a door",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "door": {
+              "type": "string"
+            }
+          },
+          "required": ["door"]
+        }
+      },
+      {
+        "name": "unlock_door",
+        "description": "Unlock a door",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "door": {
+              "type": "string"
+            }
+          },
+          "required": ["door"]
+        }
+      },
+      {
+        "name": "play_music",
+        "description": "Play music in a room",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Artist, album, song or genre"
+            },
+            "room": {
+              "type": "string"
+            }
+          },
+          "required": ["query"]
+        }
+      },
+      {
+        "name": "add_to_list",
+        "description": "Add one or more items to a named shopping or to-do list",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "list": {
+              "type": "string",
+              "description": "List name, e.g. groceries"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Items to add"
+            }
+          },
+          "required": ["list", "items"]
+        }
+      },
+      {
+        "name": "call_contact",
+        "description": "Start a phone call to a contact from the address book",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Contact name"
+            },
+            "speaker": {
+              "type": "boolean",
+              "description": "Use the speakerphone"
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "navigate",
+        "description": "Start turn-by-turn navigation to an address or a place",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "destination": {
+              "type": "string",
+              "description": "Address or place name"
+            },
+            "mode": {
+              "type": "string",
+              "enum": ["driving", "walking", "cycling", "transit"]
+            },
+            "avoid_tolls": {
+              "type": "boolean",
+              "description": "Avoid toll roads"
+            }
+          },
+          "required": ["destination"]
+        }
+      },
+      {
+        "name": "translate_text",
+        "description": "Translate a text into another language",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Text to translate"
+            },
+            "target": {
+              "type": "string",
+              "description": "Target language as an ISO 639-1 code"
+            }
+          },
+          "required": ["text", "target"]
+        }
+      },
+      {
+        "name": "search_web",
+        "description": "Search the web and return the top results with their titles and links",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query"
+            },
+            "count": {
+              "type": "integer",
+              "description": "Number of results, 1 to 10"
+            }
+          },
+          "required": ["query"]
+        }
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email with a subject and a body to one or more recipients",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "to": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Recipient names or addresses"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Subject line"
+            },
+            "body": {
+              "type": "string",
+              "description": "Message body"
+            }
+          },
+          "required": ["to", "subject", "body"]
+        }
+      },
+      {
+        "name": "set_reminder",
+        "description": "Remind the user of something at a date and time",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "What to remind of"
+            },
+            "when": {
+              "type": "string",
+              "description": "Date and time as YYYY-MM-DD HH:MM"
+            }
+          },
+          "required": ["text", "when"]
+        }
+      }
     ]
   },
   "cases": [
@@ -279,6 +601,36 @@
       "toolset": "assistant",
       "query": "set a timer for 10 minutes for the pasta",
       "max": 8
+    },
+    {
+      "id": "catalogue_lock",
+      "covers": "17 tools: a call to the 8th",
+      "toolset": "catalogue",
+      "query": "lock the garage door"
+    },
+    {
+      "id": "catalogue_navigate",
+      "covers": "17 tools: a call to the 13th",
+      "toolset": "catalogue",
+      "query": "take me to the central station by bike"
+    },
+    {
+      "id": "catalogue_translate",
+      "covers": "17 tools: a call to the 14th",
+      "toolset": "catalogue",
+      "query": "translate good morning into Italian"
+    },
+    {
+      "id": "catalogue_email",
+      "covers": "17 tools: a call to the 16th",
+      "toolset": "catalogue",
+      "query": "email Tom and Sara that the review moves to Friday, subject review"
+    },
+    {
+      "id": "catalogue_reminder",
+      "covers": "17 tools: a call to the 17th, the last",
+      "toolset": "catalogue",
+      "query": "remind me to call the bank on October 13th 2026 at 9:00"
     }
   ],
   "audio": [

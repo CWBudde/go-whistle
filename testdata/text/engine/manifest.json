@@ -28,19 +28,20 @@
     "date.json: date, answers with and without the date: fact",
     "depth.json: depth, the --depth ladder",
     "audio.json: audio, answers to speech (needle3.cact + whistle.cact)",
-    "embed.json, embed.safetensors: embed, needle_embed of short texts"
+    "embed.json, embed.safetensors: embed, needle_embed of short texts",
+    "retrieval.json: retrieval, needle_init past 5 tools and up to the context budget, the tool index"
   ],
-  "cases": 19,
-  "turns": 20,
+  "cases": 24,
+  "turns": 25,
   "responses": "responses.json",
   "dropped_fields": ["*_tps", "*_ms", "*_mb"],
   "types": {
-    "call": 19,
+    "call": 24,
     "respond": 1
   },
   "function_calls": {
     "0": 6,
-    "1": 11,
+    "1": 16,
     "2": 3
   },
   "min_confidence": 0.0315,
@@ -159,10 +160,15 @@
         "french_message",
         "spanish_lights_music",
         "timer_then_result",
-        "timer_budget"
+        "timer_budget",
+        "catalogue_lock",
+        "catalogue_navigate",
+        "catalogue_translate",
+        "catalogue_email",
+        "catalogue_reminder"
       ],
       "differing_fields": {
-        "confidence": 18,
+        "confidence": 23,
         "reasoning": 3
       }
     }

@@ -124,11 +124,18 @@ func (l *library) loadFile(p string) error {
 // session runs needle_init with the system facts and the tools JSON (no tool index) and returns its result, the
 // tokenized static-prefix length.
 func (l *library) session(system, tools string) (int32, error) {
-	sys, tls := cString(system), cString(tools)
+	return l.sessionIndex(system, tools, "")
+}
 
-	rc := l.init(sys, tls, nil)
+// sessionIndex is session with a tool index path ("" for none), the file in which needle_init keeps the tool set's
+// embeddings when it retrieves.
+func (l *library) sessionIndex(system, tools, index string) (int32, error) {
+	sys, tls, idx := cString(system), cString(tools), cString(index)
+
+	rc := l.init(sys, tls, idx)
 	runtime.KeepAlive(sys)
 	runtime.KeepAlive(tls)
+	runtime.KeepAlive(idx)
 
 	if rc < 0 {
 		return rc, fmt.Errorf("needle_init: %s (%d)", l.lastError(), rc)

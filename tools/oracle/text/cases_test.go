@@ -82,15 +82,23 @@ func TestParseCorpusRejects(t *testing.T) {
 }
 
 // TestCommittedCorpus checks testdata/text/engine/cases.json: it parses, every case has a fixed date fact, and the
-// cases the date and depth subcommands name exist.
+// cases the date, depth and retrieval subcommands name exist, and the retrieval tool set has more tools than a turn
+// renders under retrieval.
 func TestCommittedCorpus(t *testing.T) {
 	c, err := readCorpus(filepath.Join("..", "..", "..", "testdata", "text", "engine", "cases.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if n := len(c.Cases); n < 12 || n > 20 {
-		t.Errorf("%d cases, want 12 to 20", n)
+	if n := len(c.Cases); n < 12 || n > 30 {
+		t.Errorf("%d cases, want 12 to 30", n)
+	}
+
+	var catalogue []json.RawMessage
+
+	err = json.Unmarshal(c.Toolsets[retrievalToolset], &catalogue)
+	if err != nil || len(catalogue) <= 5 {
+		t.Errorf("toolset %s: %d tools (%v), want more than 5", retrievalToolset, len(catalogue), err)
 	}
 
 	for _, k := range c.Cases {
@@ -99,7 +107,7 @@ func TestCommittedCorpus(t *testing.T) {
 		}
 	}
 
-	for _, id := range slices.Concat(dateCases, depthCases) {
+	for _, id := range slices.Concat(dateCases, depthCases, []string{retrievalCase}) {
 		_, err := c.find(id)
 		if err != nil {
 			t.Error(err)

@@ -477,5 +477,130 @@
       "reasoning": null,
       "confidence": 0.7098
     }
+  ],
+  "catalogue_lock": [
+    {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "lock_door",
+          "arguments": {
+            "door": "garage"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "door 'garage' from query; required parameter 'door' is missing",
+      "confidence": 0.6294,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    }
+  ],
+  "catalogue_navigate": [
+    {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "navigate",
+          "arguments": {
+            "destination": "central station",
+            "mode": "cycling"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "destination 'central station' from query; mode 'cycling' from 'by bike'; avoid_tolls omitted",
+      "confidence": 0.622,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    }
+  ],
+  "catalogue_translate": [
+    {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "translate_text",
+          "arguments": {
+            "text": "good morning",
+            "target": "Italian"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "text 'good morning' from query; target 'Italian' from query",
+      "confidence": 0.6398,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    }
+  ],
+  "catalogue_email": [
+    {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "send_email",
+          "arguments": {
+            "to": ["Tom", "Sara"],
+            "subject": "Review",
+            "body": "the review moves to Friday"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "Two recipients: 'Tom' and 'Sara'. Subject 'review' from query. Body 'the review moves to Friday' from query.",
+      "confidence": 0.2129,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    }
+  ],
+  "catalogue_reminder": [
+    {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "set_reminder",
+          "arguments": {
+            "text": "call the bank",
+            "when": "2026-10-13 09:00"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'remind me to call the bank' -> text 'call the bank'; 'on October 13th 2026 at 9:00' -> when '2026-10-13 09:00'.",
+      "confidence": 0.4818,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    }
   ]
 }

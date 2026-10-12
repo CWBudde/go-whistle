@@ -21,6 +21,36 @@
       "same_as_cli": true,
       "same_on_repeat": true
     },
+    "catalogue_email": {
+      "init": 1025,
+      "complete": [74],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "catalogue_lock": {
+      "init": 1025,
+      "complete": [36],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "catalogue_navigate": {
+      "init": 1025,
+      "complete": [48],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "catalogue_reminder": {
+      "init": 1025,
+      "complete": [67],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
+    "catalogue_translate": {
+      "init": 1025,
+      "complete": [46],
+      "same_as_cli": true,
+      "same_on_repeat": true
+    },
     "event_explicit": {
       "init": 314,
       "complete": [103],
