@@ -94,9 +94,9 @@ func (p *pyParser) value() (any, error) {
 		text string
 		v    any
 	}{
-		{"true", true},
-		{"false", false},
-		{"null", nil},
+		{jsonTrue, true},
+		{jsonFalse, false},
+		{jsonNull, nil},
 		{"NaN", json.Number("NaN")},
 		{"Infinity", json.Number("Infinity")},
 		{"-Infinity", json.Number("-Infinity")},

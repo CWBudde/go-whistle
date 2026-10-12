@@ -616,6 +616,17 @@ Engine-only: fitted against `testdata/text/engine/`.
       three the grammar changes; `timer_budget` truncates at 8 as the engine (`TestDecodeMatchesEngine`; F-052).
 - [ ] The byte-level grammar compiled from the JSON schemas (types, `enum`, `const`, bounds, `format: date`, required
       keys, `anyOf`/`$ref`), applied as a token mask over byte-fallback pieces; the unconstrained `<think>` part.
+      (2026-10-13) — partial: `toolcall.Grammar` (`Normalised.Grammar`, `GrammarFor`), a byte-level pushdown automaton
+      over the call block compiled from the rendered schemas (the item's keywords, `oneOf`/`allOf`, local recursive
+      `$ref`, upstream's caps of 20-character numbers and 64 items), and `tokenMask` over normal and byte-fallback
+      pieces; `Decoder.Decode` keeps the reasoning free and masks from `<tool_call>` on. Model-free tests per keyword,
+      the mask against brute force over Needle 3's vocabulary, and no reachable dead end (`TestGrammar*`,
+      `TestTokenMask*`, `TestGrammarNoDeadEnds`). Against the engine: `lights_and_lock` and `catalogue_lock` now
+      have its calls and count, `spanish_lights_music` its calls; `just oracle-text grammar` (`grammar.json`, 15
+      schema-breaking requests, byte-identical on a re-run) gives its calls on 8 (`TestGrammarMatchesEngine`); the
+      float greedy calls go from 10 to 14 of 24 (F-055). Remains: `thermostat_decimal` is one token short of the
+      engine's count, and four probes the engine truncates at 512 tokens, which show nothing of how its grammar
+      traps the model there.
 - [ ] Parse the call block into `function_calls`; the envelope's `type` (`call`, `respond`, refusal as an empty
       call), `success`/`error`/`error_code`/`reason`, `suppressed_calls` below confidence 0.1, `validation`
       (`ungrounded`, `negation`), `triggers` regexes.
@@ -625,6 +636,10 @@ Engine-only: fitted against `testdata/text/engine/`.
       (below 0.1 unless a trigger matched an un-negated request), `negation` and `ungrounded` equal the engine's
       (`TestEnvelopeMatchesEngine`; F-054). Remains: routing a triggered request to its tool, which needs the grammar
       (three probes), and negation cues beyond "don't".
+      (2026-10-13) — routing done: a trigger restricts the grammar to its tools and requires a call
+      (`GrammarFor`); `capital_upper` has the engine's call, `weather_to_timer` and `pizza_to_lights` differ only
+      where the repair step works (a capital, an unstated optional), with confidence within 0.002 on all three
+      (`TestEnvelopeMatchesEngine`; F-055). Remains: negation cues beyond "don't".
 - [ ] `confidence`: `ConfidenceHead` (`probe_pool` over the embedding and the 20 block outputs, a translation) and
       the min with the call's decode probability (engine).
       (2026-10-12) — partial: `text.Model.Confidence` equals JAX within 8.2e-6 (`TestConfidenceMatchesJAX`);

@@ -1,0 +1,405 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "needle --model needle3.cact --tools <tools> --system <system file> --threads 4 --prompt <query>",
+  "system": "date: 2026-10-11 Sun 09:30",
+  "probes": [
+    {
+      "id": "bounds_max",
+      "covers": "an integer above its maximum",
+      "tools": "[{\"name\":\"set_lights\",\"description\":\"Turn a room's lights on or off and set their brightness\",\"parameters\":{\"type\":\"object\",\"properties\":{\"room\":{\"type\":\"string\"},\"on\":{\"type\":\"boolean\"},\"brightness\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":100}},\"required\":[\"room\",\"on\"]}}]",
+      "query": "set the kitchen lights to 150 percent",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_lights",
+            "arguments": {
+              "room": "kitchen",
+              "on": false
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "room 'kitchen' from query; brightness 150 from '150 percent'.",
+        "confidence": 0.5728,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "bounds_min_max",
+      "covers": "an integer within minimum and maximum",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":60}},\"required\":[\"minutes\"]}}]",
+      "query": "set a timer for 90 minutes",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "set_timer",
+            "arguments": {
+              "minutes": 9
+            }
+          }
+        ],
+        "reasoning": "'90 minutes' -> minutes 90.",
+        "confidence": 0.0,
+        "validation": {
+          "ungrounded": ["set_timer.minutes"],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "integer_decimal",
+      "covers": "a decimal for an integer",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}}]",
+      "query": "set a timer for 2.5 minutes",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_timer",
+            "arguments": {
+              "minutes": 2
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'2.5 minutes' -> minutes 2.5; no label given so omitted",
+        "confidence": 0.918,
+        "validation": {
+          "ungrounded": ["set_timer.minutes"],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "number_bounds",
+      "covers": "a number with exclusive bounds",
+      "tools": "[{\"name\":\"set_thermostat\",\"description\":\"Set the heating target temperature\",\"parameters\":{\"type\":\"object\",\"properties\":{\"temperature\":{\"type\":\"number\",\"exclusiveMinimum\":5,\"exclusiveMaximum\":30}},\"required\":[\"temperature\"]}}]",
+      "query": "set the heating to 35.5 degrees",
+      "answer": {
+        "type": "call",
+        "success": false,
+        "error": "tool call truncated: token budget exhausted",
+        "error_code": "truncated",
+        "reason": "runtime_failure",
+        "function_calls": [],
+        "suppressed_calls": [],
+        "reasoning": "'35.5 degrees' -> temperature 35.5.",
+        "confidence": 0.1847
+      }
+    },
+    {
+      "id": "enum_unnamed",
+      "covers": "an enum value the request does not name",
+      "tools": "[{\"name\":\"set_fan\",\"description\":\"Set the fan speed\",\"parameters\":{\"type\":\"object\",\"properties\":{\"speed\":{\"type\":\"string\",\"enum\":[\"low\",\"medium\",\"high\"]}},\"required\":[\"speed\"]}}]",
+      "query": "turn the fan up to max",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_fan",
+            "arguments": {
+              "speed": "high"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'max' -> speed 'high'",
+        "confidence": 0.7915,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "const",
+      "covers": "a const value",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\"},\"kind\":{\"const\":\"countdown\"}},\"required\":[\"minutes\",\"kind\"]}}]",
+      "query": "set a timer for 5 minutes",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_timer",
+            "arguments": {
+              "minutes": 5,
+              "kind": "countdown"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'5 minutes' -> minutes 5; no label given, so omit optional param.",
+        "confidence": 0.5536,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "date_free",
+      "covers": "format: date for a vague date",
+      "tools": "[{\"name\":\"Invoice\",\"description\":\"The fields of an invoice\",\"parameters\":{\"type\":\"object\",\"properties\":{\"vendor\":{\"type\":\"string\"},\"total\":{\"type\":\"number\"},\"due_date\":{\"type\":\"string\",\"format\":\"date\"}},\"required\":[\"vendor\",\"total\",\"due_date\"]}}]",
+      "query": "Invoice from Bolt Ltd, total 40 EUR, due at the end of next month.",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "Invoice",
+            "arguments": {
+              "vendor": "Bolt Ltd",
+              "total": 40.0,
+              "due_date": "2026-10-09"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "vendor 'Bolt Ltd' from query; total 40 from '40 EUR'; due_date '2026-10-09' from 'end of next month' resolved against system date 2026-10-11",
+        "confidence": 0.2265,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "any_of",
+      "covers": "anyOf of a date and an integer",
+      "tools": "[{\"name\":\"set_reminder\",\"description\":\"Remind the user of something\",\"parameters\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"when\":{\"anyOf\":[{\"type\":\"string\",\"format\":\"date\"},{\"type\":\"integer\",\"minimum\":1,\"description\":\"days from now\"}]}},\"required\":[\"text\",\"when\"]}}]",
+      "query": "remind me in 3 days to water the plants",
+      "answer": {
+        "type": "call",
+        "success": false,
+        "error": "tool call truncated: token budget exhausted",
+        "error_code": "truncated",
+        "reason": "runtime_failure",
+        "function_calls": [],
+        "suppressed_calls": [],
+        "reasoning": "'remind me in 3 days' -> set_reminder with text 'water the plants' and days 3 from query.",
+        "confidence": 0.0695
+      }
+    },
+    {
+      "id": "ref",
+      "covers": "a $ref to an object in $defs",
+      "tools": "[{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"$defs\":{\"contact\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"phone\":{\"type\":\"string\"}},\"required\":[\"name\"]}},\"properties\":{\"recipient\":{\"$ref\":\"#/$defs/contact\"},\"message\":{\"type\":\"string\"}},\"required\":[\"recipient\",\"message\"]}}]",
+      "query": "text Anna that I'm running late",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "send_message",
+            "arguments": {
+              "recipient": {
+                "name": "Anna",
+                "phone": "}. message: "
+              },
+              "message": "I'm running late"
+            }
+          }
+        ],
+        "reasoning": "'Anna' -> name 'Anna'; 'that I'm running late' -> message 'I'm running late'; no phone given -> omit optional parameter",
+        "confidence": 0.0,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "closed",
+      "covers": "no additionalProperties",
+      "tools": "[{\"name\":\"lock_door\",\"description\":\"Lock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}}]",
+      "query": "lock the front door",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "lock_door",
+            "arguments": {
+              "door": "front door"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'front door' -> door 'front door', 'lock' -> lock_door.",
+        "confidence": 0.5969,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "additional_true",
+      "covers": "additionalProperties: true",
+      "tools": "[{\"name\":\"lock_door\",\"description\":\"Lock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"],\"additionalProperties\":true}}]",
+      "query": "lock the front door",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "lock_door",
+            "arguments": {
+              "door": "front door"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'front door' -> door 'front door'; 'lock' -> action 'lock'",
+        "confidence": 0.5816,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "additional_integer",
+      "covers": "additionalProperties of a type",
+      "tools": "[{\"name\":\"lock_door\",\"description\":\"Lock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"],\"additionalProperties\":{\"type\":\"integer\"}}}]",
+      "query": "lock the front door",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "lock_door",
+            "arguments": {
+              "door": "front door"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'front door' -> door 'front door', 'lock' -> lock_door tool.",
+        "confidence": 0.5073,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      }
+    },
+    {
+      "id": "max_items",
+      "covers": "an array above maxItems",
+      "tools": "[{\"name\":\"add_to_list\",\"description\":\"Add items to a named list\",\"parameters\":{\"type\":\"object\",\"properties\":{\"list\":{\"type\":\"string\"},\"items\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"maxItems\":2}},\"required\":[\"list\",\"items\"]}}]",
+      "query": "add milk, eggs, bread and butter to the groceries list",
+      "answer": {
+        "type": "call",
+        "success": false,
+        "error": "tool call truncated: token budget exhausted",
+        "error_code": "truncated",
+        "reason": "runtime_failure",
+        "function_calls": [],
+        "suppressed_calls": [],
+        "reasoning": "list 'groceries' from query; items ['milk','eggs','bread','butter'] from query",
+        "confidence": 0.1245
+      }
+    },
+    {
+      "id": "max_length",
+      "covers": "a string above maxLength",
+      "tools": "[{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\"},\"message\":{\"type\":\"string\",\"maxLength\":12}},\"required\":[\"recipient\",\"message\"]}}]",
+      "query": "text Anna that I'm running late and will be there in twenty minutes",
+      "answer": {
+        "type": "call",
+        "success": false,
+        "error": "tool call truncated: token budget exhausted",
+        "error_code": "truncated",
+        "reason": "runtime_failure",
+        "function_calls": [],
+        "suppressed_calls": [],
+        "reasoning": "recipient 'Anna' from query; message 'I'm running late and will be there in twenty minutes' from query; tool send_message chosen because user wants to text a contact",
+        "confidence": 0.3544
+      }
+    },
+    {
+      "id": "required_missing",
+      "covers": "a required key the request does not give",
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}}]",
+      "query": "set a timer for the pasta",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "set_timer",
+            "arguments": {
+              "label": "Pasta",
+              "minutes": 15
+            }
+          }
+        ],
+        "reasoning": "'pasta' -> label 'pasta'; no minutes given so omitted.",
+        "confidence": 0.3872,
+        "validation": {
+          "ungrounded": ["set_timer.minutes"],
+          "negation": false
+        }
+      }
+    }
+  ]
+}

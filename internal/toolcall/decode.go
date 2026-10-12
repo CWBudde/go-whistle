@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
+	"strings"
 
 	"github.com/cwbudde/go-whistle/internal/spm"
 	"github.com/cwbudde/go-whistle/internal/text"
@@ -25,8 +27,8 @@ type Decoded struct {
 	// Probs is each token's softmax probability where the model chose it
 	// (1 for the forced tokens).
 	Probs []float64
-	// Margins is each token's top-1 minus top-2 logit (+Inf for the forced
-	// tokens).
+	// Margins is each token's top-1 minus top-2 logit among the tokens the
+	// grammar allows (+Inf for the forced tokens and where one is allowed).
 	Margins []float64
 	// Truncated reports a budget that ran out before the answer ended.
 	Truncated bool
@@ -34,19 +36,27 @@ type Decoded struct {
 
 // Decoder decodes answers greedily, as the engine does.
 type Decoder struct {
-	m     *text.Model
-	p     *spm.Processor
-	think []int
-	call  int // </tool_call>, the last counted token of a call
-	end   int // <|im_end|>
-	eos   int
+	m        *text.Model
+	p        *spm.Processor
+	think    []int
+	thinkEnd int // </think>
+	open     int // <tool_call>
+	call     int // </tool_call>, the last counted token of a call
+	end      int // <|im_end|>
+	eos      int
+	mask     *tokenMask
 }
 
 // NewDecoder is a decoder for m with the tokenizer p.
 func NewDecoder(m *text.Model, p *spm.Processor) (*Decoder, error) {
-	d := &Decoder{m: m, p: p, think: p.Encode(thinkOpen), eos: p.EOSID()}
+	d := &Decoder{
+		m: m, p: p, think: p.Encode(thinkOpen), eos: p.EOSID(),
+		mask: newTokenMask(p, m.Config().OutVocab),
+	}
 
-	for piece, id := range map[string]*int{toolCallEnd: &d.call, imEnd: &d.end} {
+	for piece, id := range map[string]*int{
+		thinkClose: &d.thinkEnd, toolCallStart: &d.open, toolCallEnd: &d.call, imEnd: &d.end,
+	} {
 		var ok bool
 
 		*id, ok = p.PieceID(piece)
@@ -58,7 +68,11 @@ func NewDecoder(m *text.Model, p *spm.Processor) (*Decoder, error) {
 	return d, nil
 }
 
-const toolCallEnd = "</tool_call>"
+const (
+	thinkClose    = "</think>"
+	toolCallStart = "<tool_call>"
+	toolCallEnd   = "</tool_call>"
+)
 
 // Decode feeds input (a turn's tokens: the static prefix and the first
 // turn, or a later turn) to s and decodes the answer within maxNew tokens.
@@ -66,7 +80,13 @@ const toolCallEnd = "</tool_call>"
 // (a closing </tool_call>, or the one that met the budget), and
 // <|im_end|>, as the engine keeps the assistant's turn in the history
 // (docs/FINDINGS.md F-052).
-func (d *Decoder) Decode(s *text.State, input []int, maxNew int) (*Decoded, error) {
+//
+// Under the grammar g (nil: none) the reasoning stays free; from
+// <tool_call> on, each token is the most likely one whose bytes keep g's
+// automaton alive, and </tool_call> may only close a whole call block. A
+// grammar that requires a call (a routed request) also forces "\n" and
+// <tool_call> right after </think> (docs/FINDINGS.md F-055).
+func (d *Decoder) Decode(s *text.State, input []int, maxNew int, g *Grammar) (*Decoded, error) {
 	if maxNew < 1 {
 		return nil, errors.New("toolcall: no token budget")
 	}
@@ -90,20 +110,27 @@ func (d *Decoder) Decode(s *text.State, input []int, maxNew int) (*Decoded, erro
 	row := logits[len(logits)-v:]
 
 	out.Truncated = len(out.Tokens) == maxNew
+	c := &constraint{d: d, g: g}
 
 	for !out.Truncated {
-		best, second := top2(row)
+		best, second, err := c.choose(row)
+		if err != nil {
+			return nil, err
+		}
+
 		if best == d.end || best == d.eos {
 			break
 		}
 
 		out.Tokens = append(out.Tokens, best)
 		out.Probs = append(out.Probs, softmaxAt(row, best))
-		out.Margins = append(out.Margins, float64(row[best]-row[second]))
+		out.Margins = append(out.Margins, margin(row, best, second))
 
 		if best == d.call {
 			break
 		}
+
+		c.took(best)
 
 		if len(out.Tokens) == maxNew {
 			out.Truncated = true
@@ -159,6 +186,119 @@ func (d *Decoder) Confidence(s *text.State) (float64, error) {
 	}
 
 	return 1 / (1 + math.Exp(-float64(h))), nil
+}
+
+// constraint tracks where an answer is against a grammar: the free
+// reasoning, the part after </think> and the call block.
+type constraint struct {
+	d       *Decoder
+	g       *Grammar
+	phase   uint8
+	prelude string   // what a routed answer still has to write before <tool_call>
+	states  []*stack // the call block's automaton
+}
+
+// Answer phases.
+const (
+	inThink = iota
+	afterThink
+	inCall
+)
+
+// allowed are the tokens the grammar allows next, nil for any.
+func (c *constraint) allowed() ([]int, error) {
+	switch {
+	case c.g == nil || c.phase == inThink:
+		return nil, nil
+	case c.phase == afterThink && !c.g.required:
+		return nil, nil
+	case c.phase == afterThink && c.prelude == "":
+		return []int{c.d.open}, nil
+	case c.phase == afterThink:
+		var ids []int
+
+		for id, bs := range c.d.mask.bytes {
+			if len(bs) > 0 && strings.HasPrefix(c.prelude, string(bs)) {
+				ids = append(ids, id)
+			}
+		}
+
+		return ids, nil
+	}
+
+	ids := c.d.mask.allowed(c.g, c.states)
+	if slices.ContainsFunc(c.states, (*stack).accepting) {
+		ids = append(slices.Clip(ids), c.d.call)
+	}
+
+	if len(ids) == 0 {
+		return nil, errors.New("toolcall: the grammar allows no token")
+	}
+
+	return ids, nil
+}
+
+// choose are the most and the second most likely tokens of row the
+// grammar allows.
+func (c *constraint) choose(row []float32) (best, second int, err error) {
+	allowed, err := c.allowed()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if allowed == nil {
+		best, second = top2(row)
+
+		return best, second, nil
+	}
+
+	best, second = top2Of(row, allowed)
+
+	return best, second, nil
+}
+
+// took moves on past the token id.
+func (c *constraint) took(id int) {
+	switch {
+	case c.phase == inThink && id == c.d.thinkEnd:
+		c.phase, c.prelude = afterThink, "\n"
+	case c.phase == afterThink && id == c.d.open && c.g != nil:
+		c.phase, c.states = inCall, c.g.start()
+	case c.phase == afterThink:
+		c.prelude = strings.TrimPrefix(c.prelude, string(c.d.mask.bytes[id]))
+	case c.phase == inCall:
+		c.states = c.g.feed(c.states, c.d.mask.bytes[id])
+	}
+}
+
+// top2Of are the indices of the largest and second-largest values of row
+// among ids, the first id on a tie; one id is both.
+func top2Of(row []float32, ids []int) (best, second int) {
+	best, second = ids[0], -1
+
+	for _, id := range ids[1:] {
+		switch {
+		case row[id] > row[best]:
+			best, second = id, best
+		case second < 0 || row[id] > row[second]:
+			second = id
+		}
+	}
+
+	if second < 0 {
+		second = best
+	}
+
+	return best, second
+}
+
+// margin is row[best] - row[second], +Inf when they are one token.
+func margin(row []float32, best, second int) float64 {
+	if best == second {
+		return math.Inf(1)
+	}
+
+	return float64(row[best] - row[second])
 }
 
 // top2 are the indices of row's largest and second-largest values, the

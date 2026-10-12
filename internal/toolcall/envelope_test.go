@@ -24,29 +24,30 @@ type engineEnvelope struct {
 }
 
 // Envelope turns that differ from the engine's, and why (docs/FINDINGS.md
-// F-053, F-054). Keys are "case/turn".
+// F-053, F-054, F-055). Keys are "case/turn".
 var (
 	// The confidence is off by more than 0.02: the decode differs at a
-	// near-tie or under the grammar (decode_test.go), the head's score of a
-	// respond turn is not fitted, nor event_tomorrow's (0.026).
+	// near-tie (decode_test.go), the head's score of a respond turn is not
+	// fitted, nor that of three turns decoded as the engine does
+	// (event_tomorrow 0.026; under the grammar lights_and_lock 0.031,
+	// catalogue_lock 0.027; docs/FINDINGS.md F-055).
 	confidenceOff = map[string]string{
-		"alarm_morning/0":        "near-tie",
-		"alarm_untriggered/0":    "near-tie",
-		"alarm_triggered/0":      "near-tie",
-		"alarm_invalid/0":        "near-tie",
-		"alarm_no_match/0":       "near-tie",
-		"catalogue_reminder/0":   "near-tie",
-		"lights_and_lock/0":      "grammar",
-		"catalogue_lock/0":       "grammar",
-		"spanish_lights_music/0": "grammar",
-		"timer_then_result/1":    "respond turn",
-		"event_tomorrow/0":       "0.026",
+		"alarm_morning/0":      "near-tie",
+		"alarm_untriggered/0":  "near-tie",
+		"alarm_triggered/0":    "near-tie",
+		"alarm_invalid/0":      "near-tie",
+		"alarm_no_match/0":     "near-tie",
+		"catalogue_reminder/0": "near-tie",
+		"timer_then_result/1":  "respond turn",
+		"event_tomorrow/0":     "0.026",
+		"lights_and_lock/0":    "0.031",
+		"catalogue_lock/0":     "0.027",
 	}
 )
 
 // The calls differ from the engine's, by its repair after decoding (the
-// capitalisation, an empty optional dropped, a date re-resolved, a polarity
-// flipped) or its schema grammar (keys outside the schema); PLAN.md 11.4.
+// capitalisation, an empty optional dropped, an optional the request never
+// states dropped, a date re-resolved, a polarity flipped); PLAN.md 11.4.
 var callsDiffer = map[string]string{
 	"timer_pasta/0":            "capitalisation",
 	"timer_then_result/0":      "capitalisation",
@@ -56,20 +57,24 @@ var callsDiffer = map[string]string{
 	"event_explicit/0":         "capitalisation",
 	"french_message/0":         "capitalisation",
 	"catalogue_email/0":        "capitalisation",
+	"weather_to_timer/0":       "capitalisation",
 	"alarm_morning/0":          "empty optional",
 	"alarm_untriggered/0":      "empty optional",
 	"alarm_triggered/0":        "empty optional",
 	"alarm_invalid/0":          "empty optional",
 	"alarm_no_match/0":         "empty optional",
+	"pizza_to_lights/0":        "unstated optional",
 	"weather_friday/0":         "date",
 	"event_no_year/0":          "date, capitalisation",
 	"negation_door/0":          "polarity",
 	"negation_triggered/0":     "polarity",
 	"negation_two_triggered/0": "polarity",
-	"lights_and_lock/0":        "grammar",
-	"spanish_lights_music/0":   "grammar",
-	"catalogue_lock/0":         "grammar",
 }
+
+// ungroundedDiffers are the turns whose ungrounded list differs from the
+// engine's, which lists the calls after its repair: pizza_to_lights'
+// brightness, which the repair drops (PLAN.md 11.4).
+var ungroundedDiffers = map[string]bool{"pizza_to_lights/0": true}
 
 // reasoningDiffers are the turns decoded differently from the engine at a
 // near-tie (decode_test.go).
@@ -129,8 +134,10 @@ func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) {
 			t.Errorf("%s: negation %v, engine %v", key, g.Validation.Negation, want.Validation.Negation)
 		}
 
-		if !reflect.DeepEqual(g.Validation.Ungrounded, want.Validation.Ungrounded) {
-			t.Errorf("%s: ungrounded %v, engine %v", key, g.Validation.Ungrounded, want.Validation.Ungrounded)
+		same := reflect.DeepEqual(g.Validation.Ungrounded, want.Validation.Ungrounded)
+		if listed := ungroundedDiffers[key]; listed == same {
+			t.Errorf("%s: ungrounded %v, engine %v (listed: %v)", key, g.Validation.Ungrounded,
+				want.Validation.Ungrounded, listed)
 		}
 	}
 
@@ -141,8 +148,10 @@ func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) {
 }
 
 // TestEnvelopeMatchesEngine builds the envelope of every turn of the engine
-// corpus and of the trigger probes the model answers without routing, from
-// the dequantised needle3.cact decode (docs/FINDINGS.md F-054).
+// corpus and of every trigger probe, from the dequantised needle3.cact
+// decode under the grammar; the routed probes (weather_to_timer,
+// pizza_to_lights, capital_upper) decode their call under the triggered
+// tool's grammar (docs/FINDINGS.md F-054, F-055).
 func TestEnvelopeMatchesEngine(t *testing.T) {
 	if testing.Short() {
 		t.Skip("decodes the engine corpus")
@@ -182,18 +191,10 @@ func TestEnvelopeMatchesEngine(t *testing.T) {
 	}
 
 	for _, pr := range triggers.Probes {
-		if routed[pr.ID] {
-			continue
-		}
-
 		turn := decodeTurns(t, d, m, p, triggers.System, []byte(pr.Tools), []string{pr.Query}, 512)[0]
 		envelopeTurn(t, pr.ID+"/0", turn, pr.Answer)
 	}
 }
-
-// routed are the trigger probes the engine routes to a tool the model does
-// not call; that takes its grammar (PLAN.md 11.4).
-var routed = map[string]bool{"weather_to_timer": true, "pizza_to_lights": true, "capital_upper": true}
 
 // TestEnvelope covers the envelope's rules without the model.
 func TestEnvelope(t *testing.T) {
