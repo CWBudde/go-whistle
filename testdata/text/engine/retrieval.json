@@ -1,0 +1,236 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "libneedle3: needle_init(system, tools, <scratch index path>); needle --model needle3.cact --tools <catalogue> --system <system file> --threads 4 --tool-index <path> --prompt <query>",
+  "heads": [2],
+  "context": 8192,
+  "toolset": "catalogue",
+  "synthetic_tool": "{\"name\":\"tool_000\",\"description\":\"Do thing number 0\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}},\"required\":[\"x\"]}}",
+  "probes": [
+    {
+      "tools": 1,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "ebad0cf4d514b214fcea8e7930565d32b5494f8250747c5b4825c1acf12eb399",
+      "init": 72,
+      "index_written": false
+    },
+    {
+      "tools": 2,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "01dfdf4e9aabb26cfb2ac3673711b4f69f6b20362a8da73c5ad9dca504dcd33a",
+      "init": 123,
+      "index_written": false
+    },
+    {
+      "tools": 3,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "9db9c3e8ac550ff2121a240dd4d45c45e12b0b5af7b9162dd8c0619feb479eb4",
+      "init": 178,
+      "index_written": false
+    },
+    {
+      "tools": 4,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "76ab806d7259823e6e81010cde12c907a3d268fc19224b86b6796806dd5e6c15",
+      "init": 237,
+      "index_written": false
+    },
+    {
+      "tools": 5,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "a7f21ab5eccb3bd4d7720f7fa7b14eba1bc5f0dfb46426f7c3f2a07cd9c74663",
+      "init": 314,
+      "index_written": false
+    },
+    {
+      "tools": 6,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "1f735fa70f201f41ca4abac5247bd48b0a049639c38b9575c21734d8a6cd9c0f",
+      "init": 377,
+      "index_written": false
+    },
+    {
+      "tools": 7,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "b11d80320c2e531f5fc9b6c141b3b25d9901e3dc475f82b748966788cc4a8c5a",
+      "init": 426,
+      "index_written": false
+    },
+    {
+      "tools": 8,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "3734490766adf3128a81f33a399d40c9f37a85f0e9c22e92944b9a2c772ff127",
+      "init": 457,
+      "index_written": false
+    },
+    {
+      "tools": 9,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "983c243e63dcad976b39e7ae0c0b6aaed9912a0f268ede24ff08e9bdbc2d1fc2",
+      "init": 488,
+      "index_written": false
+    },
+    {
+      "tools": 10,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "7642ec5c50046a031f9741c4ad0bfcc1346db2bca9ed60381f6b8a973bfa37e0",
+      "init": 537,
+      "index_written": false
+    },
+    {
+      "tools": 11,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "8fd07fcc3ddbc51a884effcbddcfbb00874f51662a14045186783a9d49aa8501",
+      "init": 614,
+      "index_written": false
+    },
+    {
+      "tools": 12,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "6ba23c36e2d860eae0202eb2727276c75504748b167cc6cb76d95418a19c43ec",
+      "init": 671,
+      "index_written": false
+    },
+    {
+      "tools": 13,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "334a18bbb06c1027d0747a2dc659ef475eb0ee84b7ba38e372d70fd66752a1dc",
+      "init": 750,
+      "index_written": false
+    },
+    {
+      "tools": 14,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "b2eab1a51d884fb45b8c55d1bc1c57c10892f1a43f2a140a70547542b90d4241",
+      "init": 812,
+      "index_written": false
+    },
+    {
+      "tools": 15,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "c9323f6d7701fdc7bdbe56d6d801aabdccd1edef6b664137e688b3610831a8b5",
+      "init": 875,
+      "index_written": false
+    },
+    {
+      "tools": 16,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "bedfbaad59511a41eed6bbf07f44dc7d2d5f4036a8dd0d5aee787962875d12c1",
+      "init": 957,
+      "index_written": false
+    },
+    {
+      "tools": 17,
+      "synthetic": 0,
+      "pad": 0,
+      "tools_sha256": "c2e83c2cdcc9c64f228a67cccf4a4d643e5c34e92563a10bf8a7cf14ca3c0333",
+      "init": 1025,
+      "index_written": false
+    },
+    {
+      "tools": 32,
+      "synthetic": 15,
+      "pad": 0,
+      "tools_sha256": "3ddfd8e17065918a1968a7c8473f789ed2b2e3f22c2b092f5bdd2ad61391bf25",
+      "init": 1488,
+      "index_written": false
+    },
+    {
+      "tools": 64,
+      "synthetic": 47,
+      "pad": 0,
+      "tools_sha256": "4cce1669495672d330d780bec14eb3c2522fc1de04fe8f216e6b2d0d70766a93",
+      "init": 2524,
+      "index_written": false
+    },
+    {
+      "tools": 128,
+      "synthetic": 111,
+      "pad": 0,
+      "tools_sha256": "1abe5d19f7d3aa5ed3a713c37e637bd90828fe0ec2e02632aade0e2e265d7d09",
+      "init": 4605,
+      "index_written": false
+    },
+    {
+      "tools": 200,
+      "synthetic": 183,
+      "pad": 0,
+      "tools_sha256": "47ddcce2eb1ee0b824dd2f26d2af56aee3de85cf49124def261604a1f23f3c55",
+      "init": 6923,
+      "index_written": false
+    },
+    {
+      "tools": 239,
+      "synthetic": 222,
+      "pad": 6,
+      "tools_sha256": "c3298ef7a58cfcf02c961b35dc3e234a9ec3cbfd91d502e0a0f60d72b9df00cb",
+      "init": 8191,
+      "index_written": false
+    },
+    {
+      "tools": 239,
+      "synthetic": 222,
+      "pad": 7,
+      "tools_sha256": "e14ec9b85eb397defdb644eaa7e470d8e93c608fd1e8d820aedcd4461edb55c2",
+      "init": -1,
+      "error": "needle_init context budget exceeded: static prefix is 8192 tokens, model context is 8192 tokens; reduce system/tools JSON or declare more than 5 tools to enable per-turn retrieval",
+      "index_written": false
+    }
+  ],
+  "cli": {
+    "run": "--tool-index <scratch path> --prompt <catalogue_reminder>",
+    "exit": 0,
+    "index_written": false,
+    "answer": {
+      "type": "call",
+      "success": true,
+      "error": null,
+      "error_code": null,
+      "reason": null,
+      "function_calls": [
+        {
+          "name": "set_reminder",
+          "arguments": {
+            "text": "call the bank",
+            "when": "2026-10-13 09:00"
+          }
+        }
+      ],
+      "suppressed_calls": [],
+      "reasoning": "'remind me to call the bank' -> text 'call the bank'; 'on October 13th 2026 at 9:00' -> when '2026-10-13 09:00'.",
+      "confidence": 0.4818,
+      "validation": {
+        "ungrounded": [],
+        "negation": false
+      }
+    }
+  }
+}

@@ -29,6 +29,7 @@ var fixtureFiles = []string{
 	"depth.json: depth, the --depth ladder",
 	"audio.json: audio, answers to speech (needle3.cact + whistle.cact)",
 	"embed.json, embed.safetensors: embed, needle_embed of short texts",
+	"retrieval.json: retrieval, needle_init past 5 tools and up to the context budget, the tool index",
 }
 
 // textManifest is testdata/text/engine/manifest.json: what produced responses.json, what the checks found, and the
