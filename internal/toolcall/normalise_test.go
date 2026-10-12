@@ -360,4 +360,22 @@ func TestCallerArgsBranches(t *testing.T) {
 	if want := `{"bag":{"anyName":{"innerKey":1}},"rows":[{"secondKey":2},{"firstKey":3}]}`; string(out) != want {
 		t.Errorf("CallerArgs = %s, want %s", out, want)
 	}
+
+	// Branches that suffix one name differently: the branch that names the
+	// whole object decides (PR #62 review).
+	n, err = Normalise([]byte(`[{"name":"t","parameters":{"properties":{"rows":{"anyOf":[` +
+		`{"type":"array","items":{"properties":{"fooBar":{}}}},` +
+		`{"type":"array","items":{"properties":{"foo_bar":{},"fooBar":{}}}}]}}}}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = n.CallerArgs("t", []byte(`{"rows":[{"foo_bar":1,"foo_bar_1":2},{"foo_bar":3}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `{"rows":[{"fooBar":2,"foo_bar":1},{"fooBar":3}]}`; string(out) != want {
+		t.Errorf("CallerArgs = %s, want %s", out, want)
+	}
 }

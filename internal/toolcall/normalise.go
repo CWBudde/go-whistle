@@ -404,10 +404,17 @@ func callerValue(v any, a *schemaAlias) any {
 
 	switch t := v.(type) {
 	case map[string]any:
+		// One schema node names the whole object: the one, of a and its
+		// branches, whose properties hold most of its keys (PR #62 review).
+		node := a.choose(t)
 		out := make(map[string]any, len(t))
 
 		for k, x := range t {
 			caller, sub := a.lookup(k)
+			if c, ok := node.props[k]; ok {
+				caller, sub = c, node.sub[k]
+			}
+
 			out[caller] = callerValue(x, sub)
 		}
 
@@ -471,6 +478,40 @@ func merged(a *schemaAlias, pick func(*schemaAlias) *schemaAlias) *schemaAlias {
 	default:
 		return &schemaAlias{props: map[string]string{}, sub: map[string]*schemaAlias{}, branches: found}
 	}
+}
+
+// choose is the node of a and its branches, nested ones included, whose
+// properties name most of obj's keys; a on a tie with it, else the first.
+func (a *schemaAlias) choose(obj map[string]any) *schemaAlias {
+	cover := func(s *schemaAlias) int {
+		n := 0
+
+		for k := range obj {
+			if _, ok := s.props[k]; ok {
+				n++
+			}
+		}
+
+		return n
+	}
+
+	best, score := a, cover(a)
+
+	var walk func(s *schemaAlias)
+
+	walk = func(s *schemaAlias) {
+		for _, b := range s.branches {
+			if c := cover(b); c > score {
+				best, score = b, c
+			}
+
+			walk(b)
+		}
+	}
+
+	walk(a)
+
+	return best
 }
 
 // find looks k up in the properties and then, depth first, in the anyOf,
