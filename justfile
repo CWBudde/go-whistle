@@ -113,6 +113,10 @@ text-tokenizer-fixture *args:
 text-forward-fixtures *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/text_forward_fixtures.py {{args}}
 
+# Regenerate the Needle 3 prompt-rendering fixture for internal/toolcall (testdata/text/prompt) from upstream's render_example
+text-prompt-fixtures *args:
+    NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/text_prompt_fixtures.py {{args}}
+
 # Regenerate the shared Needle 3 block fixtures for internal/needle (testdata/needle); --f64-check compares against float64
 needle-fixtures *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 uv run --project scripts python scripts/needle_fixtures.py {{args}}
