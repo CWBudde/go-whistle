@@ -4621,6 +4621,9 @@ lists and checks are still off. `TestFloatGreedyAgainstEngine` (F-048) runs on t
 **Open.** Whether the engine also stops at `</tool_call>` before the model would write `<|im_end|>` (it always writes
 it next), and the history after a truncated answer.
 
+Under the schema grammar (F-055) `lights_and_lock` and `catalogue_lock` have the engine's count; `thermostat_decimal`'s
+one token stays unexplained.
+
 ## F-053 — Confidence: the ConfidenceHead's sigmoid over the conversation as fed (PLAN.md 11.4) (2026-10-12)
 
 **Question.** What is the envelope's `confidence`: the ConfidenceHead (upstream `probe_pool` and `HeadProjection`), how
@@ -4702,8 +4705,102 @@ without the model.
 
 **Open.**
 
-- **Routing** a triggered request to its tool (with the grammar, PLAN.md 11.4).
+- **Routing** a triggered request to its tool (with the grammar, PLAN.md 11.4). Closed by F-055.
 - **Negation** beyond "don't": "do not" and "never" are the port's guesses; other languages are untested.
 - **Grounding** of nested objects and arrays (one path per field, arrays under the field's path) and against the
   system facts and earlier turns, which the corpus does not show.
 - **The repair** of the calls after decoding (capitalisation, dates, dropped optionals; PLAN.md 11.4).
+
+## F-055 — The call block's grammar: a byte-level automaton from the schemas, a token mask, routing (PLAN.md 11.4) (2026-10-13)
+
+**Question.** The engine decodes the call "under a byte-level grammar compiled from your schemas" (llms.txt, the
+porting notes); the reasoning is "unconstrained". Which schema keywords does it enforce and how, how is it applied to
+the tokens, and what does a trigger's routing do with it (F-054)?
+
+**The oracle.** The corpus (F-047…F-054) and `just oracle-text grammar` (`testdata/text/engine/grammar.json`,
+byte-identical on a re-run): 15 single-tool requests whose free decode would break the schema (an integer above its
+maximum, 90 minutes under `maximum: 60`, 2.5 for an integer, exclusive bounds, an enum value the request does not
+name, a `const`, a vague date under `format: date`, `anyOf` of a date and an integer, a `$ref` object, a closed object
+and the same under `additionalProperties: true` and of a type, `maxItems`, `maxLength`, a missing required key).
+Upstream's tool-design guide adds: "a bounded number cannot grow past its maximum", "a numeric literal stops at twenty
+characters", "an array stops after sixty-four items", and that a matching trigger "narrows the grammar to the tools
+that declared it and removes the empty call".
+
+**The layout.** Every call block of the corpus is compact JSON after `</think>\n<tool_call>`:
+`[{"name":"…","arguments":{…}},…]`, `name` before `arguments`, no white space outside strings, and the model writes it
+with the same tokens `Encode` gives the text (all 23 call blocks).
+
+**The grammar** (`toolcall.Grammar`, `Normalised.Grammar`, `GrammarFor`): a pushdown automaton over bytes,
+compiled from the tools as rendered (`Normalise`, snake names), whose states are stacks of matchers:
+
+- **Calls:** the list, empty unless routed; each name one of the tools; `name` then `arguments`; compact JSON.
+- **Types:** `string` (valid UTF-8, no raw control characters, JSON's escapes), `integer` (no fraction or exponent),
+  `number`, `boolean`, `null`, `object`, `array`, a type list; no type and no object or array keyword is any value.
+- **`enum`, `const`:** one of the values as the tools spell them (`writeValue`).
+- **Bounds:** `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum` on every prefix: a digit is allowed only
+  if some number it starts lies within them, within 20 characters (`bounds_min_max`: 9 for "90 minutes" under
+  `maximum: 60`, as the engine; `integer_decimal`: 2 for 2.5, as the engine). A bounded number has no exponent
+  (port-side). `minLength`, `maxLength` in characters, `minItems`, `maxItems` (at most 64).
+- **`format: date`:** `YYYY-MM-DD`, months 01–12, days 01–31, no escapes (`date_free`: the engine's `2026-10-09`).
+- **Objects:** every key once, any order, `}` only after the `required` keys. An object with `properties` takes no
+  other key, whatever its `additionalProperties`: the corpus's `action` and `required` keys and the probes'
+  `additional_true` and `additional_integer` (the model writes `action: "lock"` and `"required": 8` when allowed, the
+  engine neither, while its reasoning still says "action 'lock'"). An object without `properties` takes any key,
+  valued under an `additionalProperties` schema. A required key no property declares is dropped (port-side).
+- **`anyOf`, `oneOf`, `allOf`, `$ref`:** a branch of `anyOf` or `oneOf` merged with the schema around it (exclusivity
+  not enforced), every `allOf` branch merged; `$ref` a local JSON pointer into the parameters (`#/$defs/…`), recursive
+  references closing on themselves, sibling keys merged. A merge unites `properties` and `required` and lets the
+  branch's other keys win (port-side; no probe pins it).
+- **No dead ends:** a state is live only if it can still end (no escape or UTF-8 sequence past `maxLength`, no
+  unfinished literal at 20 characters, no key whose schema admits nothing), so the mask never runs empty.
+
+**The mask** (`tokenMask`): a token is allowed iff its bytes keep some state alive; a normal piece stands for its text
+(`▁` a space), a byte-fallback piece `<0xNN>` for its byte, so a UTF-8 character can span several; control,
+user-defined and unknown pieces never stand inside the block. A trie of the vocabulary's bytes walks the states once
+per step, and the grammar caches the allowed set per state. `Decoder.Decode` takes the argmax over the allowed
+tokens from `<tool_call>` on and `</tool_call>` once the block can end; the reasoning and the text after `</think>`
+stay free. Alternatives tried: a mask that requires the canonical tokenisation of the names and keys (the corpus's
+names are tokenised as in the prompt, so it changes nothing) and a re-encoded block for the count (equal to the
+decoded one on every turn).
+
+**Routing.** A trigger that matches a request that is not negated routes it: the grammar holds the triggered tools,
+requires a call, and forces `\n<tool_call>` after `</think>`. A negated request is not routed: `negation_triggered`
+keeps `lock_door` beside the triggered `set_lights`.
+
+**Against the engine** (the `.cact` weights; `TestDecodeMatchesEngine`, `TestEnvelopeMatchesEngine`,
+`TestGrammarMatchesEngine`):
+
+- **The grammar turns:** `lights_and_lock` (73 → 69 tokens) and `catalogue_lock` (40 → 36) now have the engine's count
+  and calls, `spanish_lights_music` writes `on` for `off` and has the engine's calls and confidence. Every other turn
+  keeps its reasoning and count. `extract_invoice` already had the engine's calls with the `.cact` weights; with the
+  float weights (`TestFloatGreedyAgainstEngine`) the grammar gives the required `due_date` for `invoice_number`, and
+  14 of 24 cases are equal (10 before).
+- **`thermostat_decimal`** stays one token short (43 against 44) with the engine's reasoning and call. Under a masked
+  argmax the engine would have to refuse `mostat`, `unit` or the `":"` before `celsius` in this turn only, which no
+  rule consistent with the other 20 turns does; the one same-text alternative in the reasoning (`▁2` `1` for `▁21`) has
+  a margin of 2.5, far from the near-ties (≤ 0.06), and the float weights give 43 too. Not identified.
+- **The confidence** of `lights_and_lock` (0.339 against 0.370) and `catalogue_lock` (0.656 against 0.629) stays off
+  by more than 0.02 although their decode is now the engine's, as `event_tomorrow`'s (F-053).
+- **The routed probes:** `capital_upper` gives the engine's call (`set_lights` room "France", on true) and confidence
+  (0.110 against 0.111), `weather_to_timer` its call but for the label's capital (the repair) at 0.028 against 0.026,
+  `pizza_to_lights` room "kitchen", on true and a `brightness` of 50, which the engine's repair drops as an optional
+  number the request never states (its `ungrounded` list lacks it too), at 0.0065 against 0.0058. The reasoning is the
+  free decode's on all three.
+- **The probes:** the calls equal the engine's on 8 of 15 (`bounds_min_max`, `integer_decimal`, `enum_unnamed`,
+  `const`, `date_free`, `closed`, `additional_true`, `additional_integer`), on `required_missing` but for the label's
+  capital. `bounds_max` writes `brightness: 100`, which the engine's answer lacks (the repair drops unstated
+  optionals). `ref` decodes a different reasoning at a near-tie (0.048) and the engine then writes a junk `phone`.
+
+**Open.**
+
+- **Four probes the engine truncates** at 512 tokens: `number_bounds` (35.5 under `exclusiveMaximum: 30`), `any_of`,
+  `max_items`, `max_length`. Each needs the grammar to cut the value the model wants to write; the port closes them (25.5,
+  a date, two items, 12 characters). The CLI shows neither the text nor the tokens, so how the engine's automaton traps
+  the model there is not known; one reading is a bound checked only at the value's end.
+- **`thermostat_decimal`'s extra token** (above).
+- **The confidence 0.0000** of `bounds_min_max` and `ref`, both with a value the grammar forced and the request does not
+  ground (9 for "90", the junk phone). The call's decode probability does not explain it: its product over the block
+  would be 0.0003 for `integer_decimal`, where the engine says 0.918. It belongs to the gates of the repair step.
+- **Port-side choices no probe pins:** the merge of composed schemas, a bounded number's exponent, `oneOf`'s
+  exclusivity, required keys no property declares, `pattern` and `multipleOf` (not enforced), and white space (none;
+  the model never writes any).
