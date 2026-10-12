@@ -38,7 +38,9 @@ func (c *KVCache) Fork() KVCache {
 // positions Len() … Len()+t−1, appends their keys and values to c and
 // returns t rows of Dim values. On an empty cache it equals Forward with
 // MaskCausal, and any split of a sequence into Extend calls gives the same
-// rows as one call, up to float32 summation order. rope is nil for no
+// rows as one call, up to float32 summation order. With SetWindow the
+// cache keeps every position and each row attends to its band; the int8
+// cache takes no window. rope is nil for no
 // rotary embedding; otherwise it must cover Len()+t positions.
 func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float32, error) {
 	err := a.check(x, t, MaskCausal, nil)
@@ -49,6 +51,10 @@ func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float3
 	if rope != nil && (rope.HeadDim() != a.qk || rope.Len() < c.n+t) {
 		return nil, fmt.Errorf("needle: RoPE tables for head width %d and %d positions, want %d and %d",
 			rope.HeadDim(), rope.Len(), a.qk, c.n+t)
+	}
+
+	if a.window > 0 && a.int8.KV {
+		return nil, fmt.Errorf("needle: a window of %d on the int8 KV cache", a.window)
 	}
 
 	qW, kW, vW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v
