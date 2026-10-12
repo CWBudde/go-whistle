@@ -45,6 +45,7 @@ type Attention struct {
 	gateProj            Linear    // [heads·v, dim]
 	outProj             Linear    // [dim, heads·v]
 	int8                Int8      // SetInt8
+	window              int       // SetWindow, 0 without
 }
 
 // LoadAttention loads the attention with the names prefix+"q_proj", …
@@ -95,6 +96,26 @@ func LoadAttention(src weights.Source, prefix string) (*Attention, error) {
 // then keeps the cache in int8 (KVCache). The projections keep float32
 // inputs. Call it before the attention is used.
 func (a *Attention) SetInt8(q Int8) { a.int8 = q }
+
+// SetWindow narrows the causal mask to a band of w positions, the query
+// at position p seeing the keys max(0, p−w+1) … p, as upstream's local
+// layers (SimpleAttentionNetwork: causal & (pos_q − pos_k) <
+// sliding_window; docs/FINDINGS.md F-045); 0 is the plain causal mask.
+// Upstream's taps read the same band (tap_ok), so a window narrower than
+// the taps would cut them too: it is rejected, as is a negative one. Only
+// MaskCausal takes a window. Call it before the attention is used.
+func (a *Attention) SetWindow(w int) error {
+	if w < 0 || w > 0 && w < a.taps {
+		return fmt.Errorf("needle: window %d with %d taps, want 0 or at least the taps", w, a.taps)
+	}
+
+	a.window = w
+
+	return nil
+}
+
+// Window is the causal band set by SetWindow, 0 without.
+func (a *Attention) Window() int { return a.window }
 
 // Dim is the model width of the input and the output.
 func (a *Attention) Dim() int { return a.dim }
@@ -164,6 +185,10 @@ func (a *Attention) check(x []float32, t int, mask Mask, rope *Rope) error {
 
 	if mask != MaskNone && mask != MaskCausal {
 		return fmt.Errorf("needle: unknown attention mask %v", mask)
+	}
+
+	if a.window > 0 && mask != MaskCausal {
+		return fmt.Errorf("needle: a window of %d on the attention with %v", a.window, mask)
 	}
 
 	if rope != nil && (rope.HeadDim() != a.qk || rope.Len() < t) {
@@ -329,13 +354,20 @@ func (a *Attention) attend(q, k, v []float32, t, off int, mask Mask, tr *attnTra
 // divides by it.
 func (a *Attention) attendScale() float32 { return float32(math.Sqrt(float64(a.qk))) }
 
-// keysAt is the number of keys query row i at position off + i sees.
-func keysAt(keys, off, i int, mask Mask) int {
-	if mask == MaskCausal {
-		return off + i + 1
+// keySpan is the keys [lo, hi) query row i at position off + i sees: all
+// of them unmasked, 0 … off+i causal, and the last Window of those with a
+// window.
+func (a *Attention) keySpan(keys, off, i int, mask Mask) (lo, hi int) {
+	if mask != MaskCausal {
+		return 0, keys
 	}
 
-	return keys
+	hi = off + i + 1
+	if a.window > 0 {
+		lo = max(0, hi-a.window)
+	}
+
+	return lo, hi
 }
 
 // attendRows is attend one query row at a time: a dot product per key for
@@ -352,21 +384,25 @@ func (a *Attention) attendRows(q, k, v []float32, t, off int, mask Mask, tr *att
 
 		for i := range t {
 			qi := q[i*qW+h*a.qk : i*qW+(h+1)*a.qk]
-			s := scores[:keysAt(keys, off, i, mask)]
+			lo, hi := a.keySpan(keys, off, i, mask)
+			s := scores[:hi-lo]
 
 			for j := range s {
-				s[j] = tensor.DotProduct(qi, k[j*kW+kv*a.qk:j*kW+(kv+1)*a.qk]) / scale
+				kj := (lo + j) * kW
+				s[j] = tensor.DotProduct(qi, k[kj+kv*a.qk:kj+(kv+1)*a.qk]) / scale
 			}
 
 			softmaxInPlace(s)
 
 			o := out[i*oW+h*a.v : i*oW+(h+1)*a.v]
+
 			for j, p := range s {
-				tensor.Axpy(o, p, v[j*vW+kv*a.v:j*vW+(kv+1)*a.v])
+				vj := (lo + j) * vW
+				tensor.Axpy(o, p, v[vj+kv*a.v:vj+(kv+1)*a.v])
 			}
 
 			if tr != nil {
-				copy(tr.probs[(h*t+i)*keys:], s)
+				copy(tr.probs[(h*t+i)*keys+lo:], s)
 			}
 		}
 	}
@@ -420,13 +456,14 @@ func (a *Attention) attendGEMM(q, k, v []float32, t, off int, mask Mask, tr *att
 
 		for i := range m {
 			row := probs[i*keys : (i+1)*keys]
-			n := keysAt(keys, off, r0+i, mask)
+			lo, n := a.keySpan(keys, off, r0+i, mask)
 
-			for j := range row[:n] {
-				row[j] /= scale
+			for j := range row[lo:n] {
+				row[lo+j] /= scale
 			}
 
-			softmaxInPlace(row[:n])
+			softmaxInPlace(row[lo:n])
+			clear(row[:lo])
 			clear(row[n:])
 
 			if tr != nil {

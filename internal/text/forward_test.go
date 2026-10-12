@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 
@@ -22,7 +23,11 @@ const (
 // at every position (PLAN.md 11.2).
 const minCos = 0.9999
 
-var forwardCases = []string{"timer_en", "message_de", "lights_two_calls"}
+// forwardCases are the fixture's prompts with their greedy completions;
+// longCase passes the 1024-position sliding window of the local layers.
+var forwardCases = []string{"timer_en", "message_de", "lights_two_calls", longCase}
+
+const longCase = "long_tools"
 
 func requireFile(t *testing.T, path string) {
 	t.Helper()
@@ -105,6 +110,20 @@ func (f fixture) ints(t *testing.T, name string) []int {
 	return out
 }
 
+// final returns a case's reference final rows and the position of the
+// first: every position, or for the long case those from <case>.final_from
+// on.
+func (f fixture) final(t *testing.T, name string) ([]float32, int) {
+	t.Helper()
+
+	from := 0
+	if f.store.Has(name + ".final_from") {
+		from = f.ints(t, name+".final_from")[0]
+	}
+
+	return f.floats(t, name+".final"), from
+}
+
 func cosine(a, b []float32) float64 {
 	var ab, aa, bb float64
 
@@ -163,7 +182,7 @@ func TestForwardMatchesJAX(t *testing.T) {
 			tokens := fx.ints(t, name+".tokens")
 			wantArg := fx.ints(t, name+".argmax")
 			margin := fx.floats(t, name+".margin")
-			wantFinal := fx.floats(t, name+".final")
+			wantFinal, from := fx.final(t, name)
 			wantLast := fx.floats(t, name+".logits_last")
 			wantHidden := fx.floats(t, name+".hidden_last")
 
@@ -173,8 +192,8 @@ func TestForwardMatchesJAX(t *testing.T) {
 			}
 
 			n := len(tokens)
-			fin, finRow := rowCos(out.Final, wantFinal, d)
-			all := cosine(out.Final, wantFinal)
+			fin, finRow := rowCos(out.Final[from*d:], wantFinal, d)
+			all := cosine(out.Final[from*d:], wantFinal)
 
 			last := len(wantLast) / v
 			lc, lcRow := rowCos(out.Logits[(n-last)*v:], wantLast, v)
@@ -201,7 +220,7 @@ func TestForwardMatchesJAX(t *testing.T) {
 
 			t.Logf("%d positions: final cos %.9f (worst row %.9f at %d); logits_last worst %.9f at %d; "+
 				"hidden_last worst %.9f at layer %d; top-1 %d/%d equal, smallest JAX margin %.4g",
-				n, all, fin, finRow, lc, n-last+lcRow, hid, hidLayer, n-mism, n, minMargin)
+				n, all, fin, from+finRow, lc, n-last+lcRow, hid, hidLayer, n-mism, n, minMargin)
 
 			for _, c := range []struct {
 				what string
@@ -212,6 +231,85 @@ func TestForwardMatchesJAX(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestForwardBandMatters is the long case's control: with every layer on
+// the plain causal mask, as before the band, the model must miss the
+// reference somewhere past the window (cosine or top-1), so the fixture
+// tells the banded mask from the causal one. The positions before the
+// window must not change at all.
+func TestForwardBandMatters(t *testing.T) {
+	requireFile(t, forwardFixture)
+
+	m := loadFloat(t)
+	fx := openFixture(t)
+	d, v, w := m.cfg.Dim, m.cfg.OutVocab, m.cfg.SlidingWindow
+	tokens := fx.ints(t, longCase+".tokens")
+	wantArg := fx.ints(t, longCase+".argmax")
+	wantFinal, from := fx.final(t, longCase)
+
+	banded, err := m.Forward(tokens, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setBand(t, m, 0)
+	t.Cleanup(func() { setBand(t, m, w) })
+
+	causal, err := m.Forward(tokens, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(tokens) <= w || from > w {
+		t.Fatalf("%d positions, final rows from %d: nothing past the window of %d", len(tokens), from, w)
+	}
+
+	if !slices.Equal(causal.Final[:w*d], banded.Final[:w*d]) {
+		t.Error("the band changed positions before the window")
+	}
+
+	fin, row := rowCos(causal.Final[from*d:], wantFinal, d)
+	mism := 0
+
+	for p := range tokens {
+		if argmax(causal.Logits[p*v:(p+1)*v]) != wantArg[p] {
+			mism++
+		}
+	}
+
+	t.Logf("without the band: final worst row cosine %.6f at %d, top-1 %d/%d differ", fin, from+row, mism,
+		len(tokens))
+
+	if fin >= minCos && mism == 0 {
+		t.Error("the long case does not tell the banded mask from the causal one")
+	}
+}
+
+// setBand sets the window of the local layers (Load's SlidingWindow, 0 for
+// none).
+func setBand(t *testing.T, m *Model, w int) {
+	t.Helper()
+
+	for l, b := range m.blocks {
+		if !slices.Contains(m.cfg.GlobalLayers, l) {
+			err := b.SetWindow(w)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+// TestForwardTooLong: past MaxSeqLen, the RoPE and the trained length,
+// Forward fails without running.
+func TestForwardTooLong(t *testing.T) {
+	m := loadFloat(t)
+
+	_, err := m.Forward(make([]int, m.cfg.MaxSeqLen+1), false)
+	if !errors.Is(err, ErrTooLong) {
+		t.Errorf("%d positions: %v, want ErrTooLong", m.cfg.MaxSeqLen+1, err)
 	}
 }
 
@@ -295,7 +393,7 @@ func TestForwardCactDequantised(t *testing.T) {
 	for _, name := range forwardCases {
 		tokens := fx.ints(t, name+".tokens")
 		wantArg := fx.ints(t, name+".argmax")
-		wantFinal := fx.floats(t, name+".final")
+		wantFinal, from := fx.final(t, name)
 		prompt := fx.ints(t, name+".prompt_len")[0]
 
 		out, err := m.Forward(tokens, false)
@@ -315,8 +413,8 @@ func TestForwardCactDequantised(t *testing.T) {
 			}
 		}
 
-		fin, _ := rowCos(out.Final, wantFinal, d)
-		all := cosine(out.Final, wantFinal)
+		fin, _ := rowCos(out.Final[from*d:], wantFinal, d)
+		all := cosine(out.Final[from*d:], wantFinal)
 		t.Logf("%s: final cos %.6f (worst row %.6f), top-1 %d/%d equal, %d/%d on the completion",
 			name, all, fin, equal, n, equalGen, n-prompt+1)
 

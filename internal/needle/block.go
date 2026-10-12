@@ -67,6 +67,11 @@ func LoadBlock(src weights.Source, prefix string) (*Block, error) {
 // is used.
 func (b *Block) SetInt8(q Int8) { b.attn.SetInt8(q) }
 
+// SetWindow narrows the block's causal self-attention to a band of w
+// positions (Attention.SetWindow), as upstream's local layers. Call it
+// before b is used.
+func (b *Block) SetWindow(w int) error { return b.attn.SetWindow(w) }
+
 // Dim is the model width of the input and the output.
 func (b *Block) Dim() int { return b.dim }
 

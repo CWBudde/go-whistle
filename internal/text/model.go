@@ -11,23 +11,25 @@
 // The blocks are Whistle's decoder blocks at width 768 (12 query heads,
 // GQA 12:2, a HadamardMLP of 1024 that zero-pads the width), with five
 // engram sites of six tables and no cross-attention. Layers outside
-// global_layers attend within a sliding window of 1024 positions in
-// upstream; Forward runs sequences up to that length, where the window
-// equals the causal mask (docs/FINDINGS.md F-045).
+// global_layers attend within a sliding window of 1024 positions, the
+// band causal & (pos_q − pos_k) < sliding_window of upstream's local mask;
+// the global layers see every earlier position (docs/FINDINGS.md F-045).
 package text
 
 import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
+	"sync"
 
 	"github.com/cwbudde/go-whistle/internal/needle"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
 
-// ErrWindow reports a sequence longer than the sliding window of the
-// local layers, whose banded mask Forward does not implement yet.
-var ErrWindow = errors.New("text: sequence longer than the sliding window")
+// ErrTooLong reports a sequence longer than MaxSeqLen, the longest the
+// model was trained for.
+var ErrTooLong = errors.New("text: sequence longer than max_seq_len")
 
 // Model is the float32 text model.
 type Model struct {
@@ -41,6 +43,9 @@ type Model struct {
 	engrams []*needle.Engram // by site
 	site    map[int]int      // layer → site
 	final   needle.ZCRMSNorm
+
+	ropeOnce sync.Once
+	rope     *needle.Rope // Extend's tables over MaxSeqLen positions
 }
 
 // checkConfig requires OutVocab in [1, Vocab] and cfg.GlobalLayers to be
@@ -66,7 +71,8 @@ func checkConfig(cfg Config) error {
 }
 
 // Load builds the model from src, which serves the cact.TextNames names
-// (Source does), with the geometry cfg.
+// (Source does), with the geometry cfg. The blocks outside
+// cfg.GlobalLayers get the window cfg.SlidingWindow (0 for none).
 func Load(src weights.Source, cfg Config) (*Model, error) {
 	err := checkConfig(cfg)
 	if err != nil {
@@ -83,19 +89,9 @@ func Load(src weights.Source, cfg Config) (*Model, error) {
 	m.head = m.emb.Rows(0, cfg.OutVocab)
 
 	for l := range cfg.Layers {
-		b, err := needle.LoadBlock(src, fmt.Sprintf("layer%02d.", l))
+		b, h, err := loadLayer(src, cfg, l)
 		if err != nil {
-			return nil, fmt.Errorf("text: %w", err)
-		}
-
-		h, err := needle.LoadMHC(src, "", l)
-		if err != nil {
-			return nil, fmt.Errorf("text: %w", err)
-		}
-
-		if b.Dim() != cfg.Dim || h.Dim() != cfg.Dim || h.Lanes() != cfg.Lanes {
-			return nil, fmt.Errorf("text: layer %d widths %d/%d, %d lanes; config %d, %d lanes",
-				l, b.Dim(), h.Dim(), h.Lanes(), cfg.Dim, cfg.Lanes)
+			return nil, err
 		}
 
 		m.blocks, m.mhc = append(m.blocks, b), append(m.mhc, h)
@@ -123,6 +119,34 @@ func Load(src weights.Source, cfg Config) (*Model, error) {
 	return m, nil
 }
 
+// loadLayer loads layer l's block and mHC and gives a local layer the
+// sliding window.
+func loadLayer(src weights.Source, cfg Config, l int) (*needle.Block, *needle.MHC, error) {
+	b, err := needle.LoadBlock(src, fmt.Sprintf("layer%02d.", l))
+	if err != nil {
+		return nil, nil, fmt.Errorf("text: %w", err)
+	}
+
+	h, err := needle.LoadMHC(src, "", l)
+	if err != nil {
+		return nil, nil, fmt.Errorf("text: %w", err)
+	}
+
+	if b.Dim() != cfg.Dim || h.Dim() != cfg.Dim || h.Lanes() != cfg.Lanes {
+		return nil, nil, fmt.Errorf("text: layer %d widths %d/%d, %d lanes; config %d, %d lanes",
+			l, b.Dim(), h.Dim(), h.Lanes(), cfg.Dim, cfg.Lanes)
+	}
+
+	if !slices.Contains(cfg.GlobalLayers, l) {
+		err = b.SetWindow(cfg.SlidingWindow)
+		if err != nil {
+			return nil, nil, fmt.Errorf("text: layer %d: %w", l, err)
+		}
+	}
+
+	return b, h, nil
+}
+
 // Config is the model's geometry.
 func (m *Model) Config() Config { return m.cfg }
 
@@ -141,38 +165,30 @@ type Output struct {
 }
 
 // Forward runs the model on tokens with the causal mask, as
-// SimpleAttentionNetwork.__call__ with mask=None and quant=False, and
-// returns every position's output. hidden collects the per-block lane
-// means. Sequences longer than the sliding window fail with ErrWindow.
+// SimpleAttentionNetwork.__call__ with mask=None and quant=False (the
+// causal mask, banded on the local layers), and returns every position's
+// output. hidden collects the per-block lane means. Sequences longer than
+// MaxSeqLen fail with ErrTooLong.
 func (m *Model) Forward(tokens []int, hidden bool) (*Output, error) {
 	t, d := len(tokens), m.cfg.Dim
 	if t == 0 {
 		return nil, errors.New("text: no tokens")
 	}
 
-	if m.cfg.SlidingWindow > 0 && t > m.cfg.SlidingWindow && len(m.cfg.GlobalLayers) < m.cfg.Layers {
-		return nil, fmt.Errorf("%w: %d positions, window %d", ErrWindow, t, m.cfg.SlidingWindow)
+	err := m.checkLen(t)
+	if err != nil {
+		return nil, err
 	}
 
-	out := &Output{Embed: make([]float32, t*d)}
+	out := &Output{}
 
-	for i, tok := range tokens {
-		if tok < 0 || tok >= m.cfg.Vocab {
-			return nil, fmt.Errorf("text: token %d at %d outside the vocabulary of %d", tok, i, m.cfg.Vocab)
-		}
-
-		row := out.Embed[i*d : (i+1)*d]
-		m.emb.Row(row, tok)
-
-		for k := range row {
-			row[k] *= m.scale
-		}
+	out.Embed, err = m.embed(tokens, 0)
+	if err != nil {
+		return nil, err
 	}
 
 	kv := make([]*needle.EngramKV, len(m.engrams))
 	for s, e := range m.engrams {
-		var err error
-
 		kv[s], err = e.Forward(tokens)
 		if err != nil {
 			return nil, fmt.Errorf("text: %w", err)
@@ -190,8 +206,6 @@ func (m *Model) Forward(tokens []int, hidden bool) (*Output, error) {
 
 		block := func(u []float32) ([]float32, error) { return b.Forward(u, t, needle.MaskCausal, rope, ekv) }
 
-		var err error
-
 		stream, err = m.mhc[l].Forward(stream, t, block)
 		if err != nil {
 			return nil, fmt.Errorf("text: layer %d: %w", l, err)
@@ -202,11 +216,50 @@ func (m *Model) Forward(tokens []int, hidden bool) (*Output, error) {
 		}
 	}
 
-	out.Final = needle.CollapseLanes(stream, m.cfg.Lanes, d)
-	m.final.Apply(out.Final, out.Final)
-
-	out.Logits = make([]float32, t*m.cfg.OutVocab)
-	m.head.Apply(out.Logits, out.Final, t)
+	out.Final, out.Logits = m.output(stream, t)
 
 	return out, nil
+}
+
+// checkLen rejects sequences past MaxSeqLen with ErrTooLong.
+func (m *Model) checkLen(t int) error {
+	if m.cfg.MaxSeqLen > 0 && t > m.cfg.MaxSeqLen {
+		return fmt.Errorf("%w: %d positions, max_seq_len %d", ErrTooLong, t, m.cfg.MaxSeqLen)
+	}
+
+	return nil
+}
+
+// embed returns the scaled input embedding of tokens, t rows of Dim
+// values; off is the first token's position, for the error message.
+func (m *Model) embed(tokens []int, off int) ([]float32, error) {
+	d := m.cfg.Dim
+	x := make([]float32, len(tokens)*d)
+
+	for i, tok := range tokens {
+		if tok < 0 || tok >= m.cfg.Vocab {
+			return nil, fmt.Errorf("text: token %d at %d outside the vocabulary of %d", tok, off+i, m.cfg.Vocab)
+		}
+
+		row := x[i*d : (i+1)*d]
+		m.emb.Row(row, tok)
+
+		for k := range row {
+			row[k] *= m.scale
+		}
+	}
+
+	return x, nil
+}
+
+// output is the stack's end on t rows of the stream: the lane mean after
+// final_norm and the tied head's logits.
+func (m *Model) output(stream []float32, t int) (final, logits []float32) {
+	final = needle.CollapseLanes(stream, m.cfg.Lanes, m.cfg.Dim)
+	m.final.Apply(final, final)
+
+	logits = make([]float32, t*m.cfg.OutVocab)
+	m.head.Apply(logits, final, t)
+
+	return final, logits
 }

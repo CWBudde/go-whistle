@@ -4135,7 +4135,7 @@ count at fixed text) would narrow it.
 `TestByteKeywords` and `TestCaseKeywords` pin them. The probes of F-042 and F-044 vary F-029's bias (`f029Bias`), so
 their tables stay reproducible.
 
-## F-045 — The Needle 3 text model: its files against Whistle's, the `.cact` map, and a float forward pass equal to JAX (PLAN.md 11.1, 11.2) (2026-10-11)
+## F-045 — The Needle 3 text model: its files against Whistle's, the `.cact` map, and a float forward pass equal to JAX (PLAN.md 11.1, 11.2) (2026-10-11, 2026-10-12)
 
 **Question.** Do `needle3.safetensors` and `needle3.cact` (HF `Cactus-Compute/needle3` @ `93e88ede`) load through the
 readers built for Whistle, what differs from Whistle's files, and does a forward pass on the shared blocks of
@@ -4196,6 +4196,7 @@ from `needle3.safetensors`:
 | `timer_en`         | 120       | 0.999999974           | 1.000000000         | 120/120     | 0.0146              |
 | `message_de`       | 188       | 0.999999975           | 1.000000000         | 188/188     | 0.0826              |
 | `lights_two_calls` | 188       | 0.999999975           | 1.000000000         | 188/188     | 0.0016              |
+| `long_tools`       | 1230      | 0.999999974           | 1.000000000         | 1230/1230   | 0.0051              |
 
 The 6-token plain text agrees at every layer and position at cosine 1.000000000, though the pre-norm stream grows to
 1.7e7 at the last block (the per-layer lane means reach 1e4 at layer 0). The F16 rounding of the stored final states
@@ -4210,10 +4211,47 @@ every layer past 0 compared at cosine 0.19–0.58. The script now makes every te
 cosine 0.939–0.946 (worst row 0.79) and the reference's top-1 on 440/496 positions, 93/99 on the completions. The CQ
 weights are no stand-in for the float model; the engine's numerics are 11.5's business.
 
+`long_tools` is the band's case (2026-10-12, below); its final rows are stored and compared from position 992 on.
+
+### The band past 1024 positions (2026-10-12)
+
+Upstream's stack builds `local_mask = mask & band` with `band = (pos_q − pos_k) < sliding_window` and gives it to every
+layer outside `global_layers` (`jnp.where(gflag > 0, mask, local_mask)`); `__call__` always passes a mask (the causal
+one when given none), so the band is always on. The attention reads the mask twice: in the softmax, and in the causal
+taps, whose `tap_ok` is the mask's j-th diagonal. A band of w keeps the diagonals below w, so for w = 1024 and three
+taps the taps are unchanged. The engram values are computed once from the full causal mask (`_engram_kv`), not the band.
+
+`needle.Attention.SetWindow(w)` (and `Block.SetWindow`) narrows the causal mask to the keys max(0, p − w + 1) … p in
+both attend paths and in `Extend`; 0 is the old mask, and Whistle never sets it. It rejects a window narrower than the
+taps (where `tap_ok` would cut them, which is not implemented), a window on the unmasked attention, and `Extend` on the
+int8 KV cache (the text model's engine numerics are 11.5's). A float64 reference of upstream's attention with the band
+agrees on windows 1–12, with and without taps, on the per-row and the GEMM path; a window at least as long as the
+sequence gives the causal output bit for bit. Whistle's `Transcribe` and `Embed` hashes on the 32 clips (as above)
+equal `main`'s natively and with `-tags purego`.
+
+`text.Load` sets the window on the 16 local layers, and `Forward` takes up to `max_seq_len` (8192) positions (the error
+is now `ErrTooLong`). The new fixture case `long_tools` is a `render_example` prompt with 16 tools (1198 tokens; the
+`set_timer` tool the query needs comes first, some 1160 positions before the answer) and its greedy completion, which
+calls `set_timer` with 25 minutes and the label "bread". The script also runs the network without the band
+(`sliding_window` 0) as a control: past position 1024 the final rows then fall to cosine 0.8876 (max |Δ| 0.0101), the
+logits to 0.9947, and 15 of 206 top-1 tokens change; before 1024 the two agree exactly. Go reproduces both sides: with
+the band, the row above; without it (`TestForwardBandMatters`), the same 0.887637 and 15 changed top-1 tokens.
+
+### Incremental decoding (2026-10-12)
+
+`text.State` holds a `KVCache` per layer and an `EngramCache` per site, and `Model.Extend(s, tokens)` runs the new
+tokens through `Engram.Extend` and `Block.Extend` inside the mHC, as Whistle's decoder does (F-022), with RoPE tables
+over `max_seq_len` positions. The local layers' caches keep every position and attend to their band. `Fork` shares the
+prefix's keys and values (F-026). On all four forward cases, one call, the prompt then one token per call, and uneven
+chunks (on `long_tools` 1000 + 30 + 200, across the window's edge) give `Forward`'s logits at every position at cosine
+1.000000000000, and so JAX's top-1 everywhere. A parent and two forks continuing from one prompt, interleaved token by
+token, each equal `Forward` on their own sequence; rejected calls (a token outside the vocabulary, more than
+`max_seq_len` positions) leave the state as it was.
+
 ### Open
 
-The banded mask of the local layers past 1024 positions (`Forward` refuses longer input with `ErrWindow`), and the
-incremental path with KV and engram caches (PLAN.md 11.2).
+The engine's side of the text model: its int8 activations and KV with the KV window of 256 (11.5), and the prompt
+rendering, decoding and envelope (11.3, 11.4).
 
 ## F-046 — The Needle 3 text tokenizer is sentencepiece, and `RefTokenizer` agrees on valid text (PLAN.md 11.1) (2026-10-11)
 

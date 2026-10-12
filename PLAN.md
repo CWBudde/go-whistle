@@ -1387,7 +1387,7 @@ RAW tokenizer.
       sentencepiece on every fixture text and id sequence.
       (2026-10-11) — met; numbers in the items above.
 
-### 11.2 Float forward pass (`internal/text`, `internal/needle` additive; needs 11.1)
+### 11.2 Float forward pass (`internal/text`, `internal/needle` additive; needs 11.1) — ✅ DONE (2026-10-12)
 
 A translation of `SimpleAttentionNetwork.__call__` on the shared blocks.
 
@@ -1411,13 +1411,28 @@ A translation of `SimpleAttentionNetwork.__call__` on the shared blocks.
       case every layer and position 1.000000000 at |stream| up to 1.7e7, top-1 equal at 496/496 positions (smallest
       JAX margin 0.0016). The dequantised `.cact` weights alone (float activations) give final cosine 0.939–0.946
       and the reference's top-1 on 440/496 positions (F-045).
-- [ ] The banded mask of the local layers past 1024 positions, with a fixture longer than the window.
-- [ ] Incremental decoding: `KVCache`/`EngramCache` per layer (`Block.Extend`), equal to the full forward at every
+- [x] The banded mask of the local layers past 1024 positions, with a fixture longer than the window.
+      (2026-10-12) — `needle.Attention.SetWindow`/`Block.SetWindow` narrow the causal mask to upstream's band
+      (pos_q − pos_k) < w in both attend paths and in `Extend`, additively: Whistle's `Transcribe` and `Embed` hashes on
+      the 32 clips equal `main`'s, natively and with `-tags purego`. `text.Load` sets 1024 on the 16 local layers, and
+      `Forward` takes up to `max_seq_len` (`ErrTooLong`; `ErrWindow` is gone). The new fixture case `long_tools` (16
+      tools, 1198 + 32 tokens, the needed tool ~1160 positions before the answer): final worst row 0.999999974, top-1
+      1230/1230 (`TestForwardMatchesJAX`). Without the band, JAX and Go both fall to 0.8876 with 15 top-1 changes past
+      1024 (`TestForwardBandMatters`), so the case tells the two masks apart (F-045).
+- [x] Incremental decoding: `KVCache`/`EngramCache` per layer (`Block.Extend`), equal to the full forward at every
       position, fork for beams.
-- [ ] **Accept:** against float32 JAX, cosine ≥ 0.9999 for the final hidden states (per position), the per-block
+      (2026-10-12) — `text.State`, `Model.NewState`, `Model.Extend` (logits per new token) and `State.Fork`. On all four
+      cases, one call, the prompt then one token per call, and uneven chunks (1000 + 30 + 200 across the window) give
+      `Forward`'s logits at cosine 1.000000000000 at every position, and JAX's top-1 (`TestExtendMatchesForward`); a
+      parent and two forks interleaved token by token each equal their own `Forward` (`TestExtendFork`); rejected
+      calls leave the state unchanged (`TestExtendErrors`).
+- [x] **Accept:** against float32 JAX, cosine ≥ 0.9999 for the final hidden states (per position), the per-block
       hidden states and the logits, and the next-token top-1 equal at every position of every fixture.
       partial: (2026-10-11) — met for sequences up to the 1024-position window (numbers above); the banded mask and
       the incremental path are open.
+      (2026-10-12) — met on every fixture case, `long_tools` past the window included: final worst row 0.999999974,
+      `logits_last` and `hidden_last` 1.000000000, top-1 equal at 1230/1230 positions; the incremental path gives the
+      same logits.
 
 ### 11.3 Prompt format (`internal/text` or a new `internal/toolcall`; needs 11.1)
 

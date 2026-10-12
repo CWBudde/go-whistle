@@ -115,6 +115,16 @@ func refLinear(x []float64, t, in int, w []float64, out int) []float64 {
 // refAttention transcribes architecture.py MultiHeadAttention (flash=False)
 // in float64: jnp.repeat for GQA, so query head h reads KV head h // rep.
 func (ta tinyAttention) refAttention(prefix string, x []float64, t int, causal bool, rope *Rope) []float64 {
+	return ta.refAttentionBand(prefix, x, t, causal, 0, rope)
+}
+
+// refAttentionBand is refAttention with the causal mask narrowed to the
+// band (i − j) < window of SimpleAttentionNetwork's local layers; window 0
+// is no band. The taps are not masked, which equals upstream's tap_ok on
+// the band for window ≥ taps (docs/FINDINGS.md F-045).
+func (ta tinyAttention) refAttentionBand(prefix string, x []float64, t int, causal bool, window int,
+	rope *Rope,
+) []float64 {
 	qW, kW, vW, oW := ta.heads*ta.qk, ta.kvHeads*ta.qk, ta.kvHeads*ta.v, ta.heads*ta.v
 	q := refLinear(x, t, ta.dim, ta.w(prefix, "q_proj"), qW)
 	k := refLinear(x, t, ta.dim, ta.w(prefix, "k_proj"), kW)
@@ -163,7 +173,7 @@ func (ta tinyAttention) refAttention(prefix string, x []float64, t int, causal b
 			m := math.Inf(-1)
 
 			for j := range t {
-				if causal && j > i {
+				if causal && (j > i || window > 0 && i-j >= window) {
 					w[j] = math.Inf(-1)
 
 					continue
@@ -524,17 +534,24 @@ func TestAttendGEMMMatchesRows(t *testing.T) {
 	for _, c := range []struct {
 		rows, off int
 		mask      Mask
+		window    int
 	}{
-		{1, 0, MaskNone},
-		{7, 0, MaskNone},
-		{8, 0, MaskNone},
-		{13, 0, MaskNone},
-		{130, 0, MaskNone},
-		{1, 9, MaskCausal},
-		{8, 0, MaskCausal},
-		{9, 5, MaskCausal},
-		{33, 2, MaskCausal},
+		{1, 0, MaskNone, 0},
+		{7, 0, MaskNone, 0},
+		{8, 0, MaskNone, 0},
+		{13, 0, MaskNone, 0},
+		{130, 0, MaskNone, 0},
+		{1, 9, MaskCausal, 0},
+		{8, 0, MaskCausal, 0},
+		{9, 5, MaskCausal, 0},
+		{33, 2, MaskCausal, 0},
+		{1, 9, MaskCausal, 3},
+		{8, 0, MaskCausal, 1},
+		{9, 5, MaskCausal, 4},
+		{33, 2, MaskCausal, 7},
+		{40, 0, MaskCausal, 64},
 	} {
+		a.window = c.window
 		r := rand.New(rand.NewPCG(uint64(c.rows), uint64(c.off)))
 		keys := c.off + c.rows
 		q := randVec(r, c.rows*qW, 1)
@@ -546,7 +563,7 @@ func TestAttendGEMMMatchesRows(t *testing.T) {
 		want := a.attendRows(q, k, v, c.rows, c.off, c.mask, rowTr)
 		got := a.attendGEMM(q, k, v, c.rows, c.off, c.mask, gemmTr)
 
-		name := fmt.Sprintf("%d rows at %d, %v", c.rows, c.off, c.mask)
+		name := fmt.Sprintf("%d rows at %d, %v, window %d", c.rows, c.off, c.mask, c.window)
 		if d := maxAbsDiff64(got, toFloat64(want)); d > 1e-5 {
 			t.Errorf("%s: outputs differ by %.3g", name, d)
 		}
