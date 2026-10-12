@@ -346,6 +346,25 @@ func TestGrammarBooleanBranches(t *testing.T) {
 	if g := n.GrammarFor("go"); g.required || !g.Accepts([]byte(`[]`)) {
 		t.Error("a trigger for an uncallable tool requires a call")
 	}
+
+	// "parameters": true takes any arguments; a required property whose
+	// schema admits nothing makes the tool uncallable (PR #65 review).
+	n, err = Normalise([]byte(`[{"name":"any","parameters":true},` +
+		`{"name":"req","parameters":{"type":"object","properties":{"f":false},"required":["f"]}}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	g := n.Grammar()
+	for _, block := range []string{`[{"name":"any","arguments":{}}]`, `[{"name":"any","arguments":{"x":1,"y":["z"]}}]`} {
+		if !g.Accepts([]byte(block)) {
+			t.Errorf("parameters true rejects %s", block)
+		}
+	}
+
+	if g.Accepts([]byte(`[{"name":"req","arguments":{}}]`)) {
+		t.Error("a tool with an impossible required property is callable")
+	}
 }
 
 // TestGrammarSurrogatePairs: an escaped surrogate pair is one character
@@ -409,6 +428,7 @@ func TestGrammarNoDeadEnds(t *testing.T) {
 		"no parameters":    `[{"name":"t"}]`,
 		"empty properties": `[{"name":"t","parameters":{"type":"object","properties":{}}}]`,
 		"false parameters": `[{"name":"t","parameters":false},{"name":"u","parameters":{"type":"object"}}]`,
+		"true parameters":  `[{"name":"t","parameters":true}]`,
 		"min over max length": `[{"name":"t","parameters":{"type":"object","properties":{` +
 			`"s":{"type":"string","minLength":2,"maxLength":1},"d":{"type":"string","format":"date","maxLength":5}}}}]`,
 		"min over max items": `[{"name":"t","parameters":{"type":"object","properties":{` +

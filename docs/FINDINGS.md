@@ -4755,9 +4755,10 @@ compiled from the tools as rendered (`Normalise`, snake names), whose states are
   unfinished literal at 20 characters, no key whose schema admits nothing), so the mask never runs empty. A schema
   admits nothing when it is `false` (a tool's whole `parameters` included), an `allOf` with a `false` branch, an `anyOf` whose branches all admit nothing, an
   empty `enum`, a length or item range that is empty (`format: date` is 10 characters), a number range without a
-  number, or an integer range without an integer; such a key is never opened, such an array item never entered, and a
+  number, an integer range without an integer, or an object with a required property declared so; such a key is never opened, such an array item never entered, and a
   tool whose arguments admit nothing is not callable (a routed grammar without a callable tool allows the refusal,
-  port-side). A key is opened only where one can follow (a tool without parameters takes `{}` only). An escaped
+  port-side). A key is opened only where one can follow (a tool without parameters takes `{}` only; one whose
+  `parameters` is `true` takes any arguments). An escaped
   surrogate pair is one character, as its UTF-8 spelling. `TestGrammarNoDeadEnds` walks every reachable state of such
   schemas (PR #65 review).
 

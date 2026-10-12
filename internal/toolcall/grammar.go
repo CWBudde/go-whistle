@@ -68,10 +68,15 @@ func (n *Normalised) grammar(tools []string, required bool) *Grammar {
 		g.tools = append(g.tools, t)
 
 		params := n.params[t]
+		b, isBool := n.bools[t]
 
 		switch {
-		case n.never[t]:
+		case isBool && !b:
 			g.args[t] = &node{kind: kindNever}
+
+			continue
+		case isBool:
+			g.args[t] = &node{kind: kindObject, extra: anyNode}
 
 			continue
 		case params == nil:
@@ -463,7 +468,8 @@ func (c *compiler) typed(o *object, t string, depth int) *node {
 // object without "properties" takes any keys, their values under an
 // "additionalProperties" schema, none under false. A required key that no
 // property declares is left out, so an object can always close
-// (port-side).
+// (port-side); one whose declared schema admits nothing makes the object
+// admit nothing (PR #65 review).
 func (c *compiler) objectNode(o *object, depth int) *node {
 	n := &node{kind: kindObject, props: map[string]*node{}}
 
@@ -490,29 +496,43 @@ func (c *compiler) objectNode(o *object, depth int) *node {
 		n.extra = nil
 	}
 
-	n.required = n.requiredOf(o)
+	required, ok := n.requiredOf(o)
+	if !ok {
+		return &node{kind: kindNever}
+	}
+
+	n.required = required
 
 	return n
 }
 
-// requiredOf are the "required" keys of o that the object n can hold.
-func (n *node) requiredOf(o *object) []string {
+// requiredOf are the "required" keys of o that the object n can hold; ok
+// is false when one of them has a slot that no value matches.
+func (n *node) requiredOf(o *object) (out []string, ok bool) {
 	req, _ := o.vals["required"].([]any)
 
-	var out []string
-
 	for _, r := range req {
-		s, ok := r.(string)
-		if !ok || slices.Contains(out, s) {
+		s, isStr := r.(string)
+		if !isStr || slices.Contains(out, s) {
 			continue
 		}
 
-		if v := n.props[s]; v != nil && v.admits() || n.extra != nil && n.extra.admits() {
-			out = append(out, s)
+		slot := n.props[s]
+		if slot == nil {
+			slot = n.extra
 		}
+
+		switch {
+		case slot == nil:
+			continue
+		case !slot.admits():
+			return nil, false
+		}
+
+		out = append(out, s)
 	}
 
-	return out
+	return out, true
 }
 
 // admits reports whether some value matches n, so that the automaton only

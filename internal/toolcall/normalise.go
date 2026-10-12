@@ -29,7 +29,7 @@ type Normalised struct {
 	names    map[string]string       // the model's tool name -> the caller's
 	args     map[string]*schemaAlias // the model's tool name -> its parameters' renames
 	params   map[string]*object      // the model's tool name -> its parameters as rendered
-	never    map[string]bool         // the model's tool names whose parameters are the schema false
+	bools    map[string]bool         // the model's tool name -> its parameters, when a boolean schema
 	tools    []string                // the model's tool names, in declaration order
 	triggers []toolTriggers          // in declaration order
 }
@@ -81,7 +81,7 @@ func Normalise(raw []byte) (*Normalised, error) {
 		return nil, errors.New("toolcall: tools: not a JSON array")
 	}
 
-	n := &Normalised{names: map[string]string{}, args: map[string]*schemaAlias{}, params: map[string]*object{}, never: map[string]bool{}}
+	n := &Normalised{names: map[string]string{}, args: map[string]*schemaAlias{}, params: map[string]*object{}, bools: map[string]bool{}}
 
 	tools := make([]any, len(list))
 	for i, t := range list {
@@ -106,8 +106,8 @@ func Normalise(raw []byte) (*Normalised, error) {
 			n.names[model] = caller
 		}
 
-		if tool.vals["parameters"] == false && model != "" {
-			n.never[model] = true // no arguments match: not callable (PR #65 review)
+		if b, ok := tool.vals["parameters"].(bool); ok && model != "" {
+			n.bools[model] = b // true takes any arguments, false none: not callable (PR #65 review)
 		}
 
 		if params, ok := tool.vals["parameters"].(*object); ok {
