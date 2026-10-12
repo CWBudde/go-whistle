@@ -378,4 +378,20 @@ func TestCallerArgsBranches(t *testing.T) {
 	if want := `{"rows":[{"fooBar":2,"foo_bar":1},{"fooBar":3}]}`; string(out) != want {
 		t.Errorf("CallerArgs = %s, want %s", out, want)
 	}
+
+	// A key the chosen branch does not name is not renamed by a sibling.
+	n, err = Normalise([]byte(`[{"name":"t","parameters":{"properties":{"obj":{"anyOf":[` +
+		`{"properties":{"alphaKey":{},"betaKey":{}}},{"properties":{"foreignKey":{}}}]}}}}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = n.CallerArgs("t", []byte(`{"obj":{"alpha_key":1,"beta_key":2,"foreign_key":3}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `{"obj":{"alphaKey":1,"betaKey":2,"foreign_key":3}}`; string(out) != want {
+		t.Errorf("CallerArgs = %s, want %s", out, want)
+	}
 }

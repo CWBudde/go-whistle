@@ -369,7 +369,10 @@ func (n *Normalised) CallerName(name string) string {
 // property names: each key the model's schema renamed gets the caller's
 // name back, nested objects and arrays included. Keys the schema does not
 // know stay, and numbers keep their literals (no float64 rounding of large
-// integers; PR #61 review).
+// integers; PR #61 review). Under anyOf, oneOf and allOf an object takes
+// the names of the branch that names most of its keys; branches that name
+// as many are not told apart by the values' types, so an ambiguous union
+// takes the first (PR #62 review).
 func (n *Normalised) CallerArgs(name string, args []byte) ([]byte, error) {
 	var v any
 
@@ -411,8 +414,15 @@ func callerValue(v any, a *schemaAlias) any {
 
 		for k, x := range t {
 			caller, sub := a.lookup(k)
-			if c, ok := node.props[k]; ok {
-				caller, sub = c, node.sub[k]
+
+			// With a branch chosen, its siblings name nothing (PR #62
+			// review): the branch's own subtree and extras, then a's
+			// properties.
+			if node != a {
+				caller, sub = node.lookup(k)
+				if c, ok := a.props[k]; ok && caller == k && sub == nil {
+					caller, sub = c, a.sub[k]
+				}
 			}
 
 			out[caller] = callerValue(x, sub)
