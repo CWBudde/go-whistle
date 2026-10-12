@@ -4326,3 +4326,56 @@ more`), 21 fails to load. Depth 19 already moves the confidence; low depths chan
 **Consequences for the port.** Decoding parity (11.4) is measured at 4 threads, on calls and arguments first; the
 confidence and the reasoning get tolerances, since the engine itself moves them with the thread count. The static
 prefix counts pin the prompt rendering (11.3) without seeing the engine's tokens.
+
+## F-048 — The text model's prompt: `render_example` in Go, the static prefix `needle_init` counts, and a float decode against the engine (PLAN.md 11.3) (2026-10-12)
+
+**Question.** What does the engine feed the text model for a request, and how far does the float model, decoding
+greedily on that prompt, get to the engine's calls before the envelope (11.4)?
+
+**The rendering.** `toolcall.Render` translates `finetune.render_example`. An optional
+`<|im_start|>system\n{facts}<|im_end|>\n`, then `<|im_start|>user\n<tools>{tools}</tools>\n{query}<|im_end|>\n` and
+`<|im_start|>assistant\n`; the facts are stripped as Python's `str.strip`, the input is `[BOS]` and the sentencepiece
+ids (`toolcall.Encode`). `toolcall.ToolsJSON` writes the tool schemas as Python's
+`json.dumps(json.loads(raw), separators=(",", ":"), ensure_ascii=False)`:
+
+- **Order:** the caller's key order, with a repeated key keeping its first place and its last value, as a dict does.
+- **Text:** non-ASCII and U+2028 raw; only `"`, `\`, the five named escapes and other control characters (`\u0007`,
+  lower case) are escaped. Go's `encoding/json` would also escape `<`, `>`, `&` and U+2028.
+- **Numbers:** integers in full (`-0` is 0); every literal with a `.`, `e` or `E` is a float in Python's repr
+  (`1e2` → `100.0`, `2E-5` → `2e-05`, `1e16` → `1e+16`, `1e400` → `Infinity`).
+
+`toolcall.WithDateFact` is the Python client's `_with_date_fact` with the clock passed in (the engine adds no date,
+F-047). `scripts/text_prompt_fixtures.py` runs upstream's functions on the 19 engine cases, the forward fixture's 4
+prompts and 9 edge cases (escapes, floats, duplicates, overflow, blank and padded facts, no tools, markers in the
+query), plus 10 date cases at a fixed clock (`testdata/text/prompt/render.json`). Go gives every prompt byte for
+byte, every id sequence and every date fact.
+
+**The static prefix.** `needle_init` returns 314, 243 and 91 for the three tool sets of the engine corpus, 6 more
+with a `; locale: xx-XX` suffix (F-047). `[BOS]` and the rendering up to `</tools>` (`toolcall.StaticPrefix`) gives
+exactly that on all 19 cases (`TestStaticPrefixMatchesEngine`); its ids are the start of the whole prompt's ids,
+since `</tools>` is a user-defined piece. One other reading fits as well: the rendering up to the query without
+`[BOS]`, because the `\n` after `</tools>` is a token of its own. The counts cannot tell the two apart; the first is
+the training format (`[BOS] + encode(prompt)`), so it is the one kept. Both give the same input for a whole prompt.
+
+**The float decode.** `TestFloatGreedyAgainstEngine` renders each case's first turn, decodes greedily with the float
+model (`text.Model.Extend`, F-045) until `</tool_call>`, `<|im_end|>` or EOS within the case's token budget, and
+sets the calls against the engine's. 7 of 19 are equal: the thermostat, both refusals, `negation_only`, the German
+and French cases, and the truncation under `--max 8`. The other 12 differ where the engine works on the decode:
+
+| what the engine does                     | cases                                                                  | float model against engine                                                   |
+| ---------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| capitalises the first letter of a string | `timer_pasta`, `timer_then_result`, `event_tomorrow`, `event_explicit` | `pasta` → `Pasta`, `dentist`, `lunch with Marco`                             |
+| re-resolves dates against the date fact  | `weather_friday`, `event_no_year` (also capitalised)                   | Friday `2026-10-13` → `2026-10-16`; `2026-03-04` → `2027-03-04`              |
+| rewrites a message                       | `message_and_timer`                                                    | `I'm running late` → `Running late`                                          |
+| holds the arguments to the schema        | `lights_and_lock`, `spanish_lights_music`, `extract_invoice`           | extra `action`; `off` for `on`; `invoice_number` for the required `due_date` |
+| suppresses calls below confidence 0.1    | `alarm_morning`, `negation_door`                                       | an extra `label`; one call for the engine's two                              |
+
+The engine's own `reasoning` still carries the float model's values in several of these (`'pasta' -> label
+'pasta'`, `date '2026-10-13' from 'Friday'`, `'March 4th' -> date '2026-03-04'`), so they are rewritten after the
+decode, not decoded differently. The schema cases fit "a byte-level grammar compiled from your schemas" (F-047),
+which would forbid `action` and `off` and require `due_date`. The smallest top-1 margin along each decode is
+0.002–0.48; none of the 12 differences needs a near-tie to explain it.
+
+**Consequences for 11.4.** The decode half of 11.3's Accept waits for the envelope: the schema grammar, the
+confidence head and its suppression, and the post-decode rewrites (capitalisation, date resolution against the
+date fact and the source years, message trimming). These cases are the test set for each.

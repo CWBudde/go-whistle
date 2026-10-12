@@ -1444,12 +1444,23 @@ A translation of `SimpleAttentionNetwork.__call__` on the shared blocks.
 A translation of `render_example` and `Needle.__init__`, then fitted where the engine renders more than upstream
 shows (multi-turn, tool results, retrieval).
 
-- [ ] Render system facts, tools and query as `render_example`, the tools JSON byte for byte as Python's
+- [x] Render system facts, tools and query as `render_example`, the tools JSON byte for byte as Python's
       `json.dumps(…, separators=(",", ":"), ensure_ascii=False)` with the caller's key order; the date fact of
       `_with_date_fact` behind an option (no clock in tests).
-- [ ] `needle_init` returns the token count of the static prefix (system and tools): match it on the engine corpus to
+      (2026-10-12) — `internal/toolcall`: `Render`, `Encode` (`[BOS]` + sentencepiece), `ToolsJSON` (the caller's key
+      order, a repeated key in its first place with its last value, Python's escapes, integers in full, floats in
+      Python's repr, `Infinity` past the range) and `WithDateFact(system, now)`. `scripts/text_prompt_fixtures.py`
+      runs upstream's `render_example` and `_with_date_fact` (fixed clock) on the 19 engine cases, the 4 forward
+      prompts, 9 edge cases and 10 date cases (`testdata/text/prompt/render.json`, byte-identical on a re-run): every
+      prompt, id sequence and date fact equal (`TestRenderMatchesPython`, `TestEncodeMatchesPython`,
+      `TestWithDateFactMatchesPython`; F-048).
+- [x] `needle_init` returns the token count of the static prefix (system and tools): match it on the engine corpus to
       pin down the engine's prefix rendering. The engine side is recorded (`testdata/text/engine/manifest.json`:
       314, 243 and 91 tokens for the three tool sets, +6 for a `; locale: xx-XX` suffix).
+      (2026-10-12) — `toolcall.StaticPrefix`, `[BOS]` and the rendering up to `</tools>`, has `needle_init`'s count on
+      all 19 cases (9 × 314, 6 × 243, 1 × 91, 2 × 320, 1 × 249; `TestStaticPrefixMatchesEngine`), and its ids start
+      the whole prompt's. The rendering up to the query without `[BOS]` fits the counts too (the `\n` after `</tools>`
+      is one token); the counts cannot separate the two, and both give the same input for a whole prompt (F-048).
 - [ ] Multi-turn (`complete` after `complete`, `run`'s tool results, `<tool_result>`), `reset`, and the engine's turn
       limit and trimming (`--fail-input-overflow`).
 - [ ] Tool retrieval: with more than 5 tools only the top 5 are rendered ("a built-in retrieval head"); find what
@@ -1457,6 +1468,11 @@ shows (multi-turn, tool results, retrieval).
 - [ ] **Accept:** the static-prefix token count equals `needle_init`'s on every engine case, and a float greedy decode
       of the rendered prompt gives the engine's `function_calls` on at least the cases where the float model's
       top-1 is not a near-tie.
+      (2026-10-12) — partial: the static-prefix half is met (above). The decode half waits for 11.4, by the user's
+      decision: the float model's greedy calls (`TestFloatGreedyAgainstEngine`, the case's token budget) equal the
+      engine's on 7 of 19 cases; the other 12 differ where the engine works after or around the decode, not at
+      near-ties: it capitalises strings (5), re-resolves dates (2), rewrites a message (1), holds the arguments to the
+      schema (3) and suppresses calls below confidence 0.1 (2; F-048).
 
 ### 11.4 Decoding and the response envelope (new `internal/toolcall`; needs 11.2, 11.3, the engine corpus)
 
