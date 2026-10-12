@@ -11,8 +11,10 @@ import (
 // State is one sequence's decoding state for Extend (docs/FINDINGS.md
 // F-022, F-026): the self-attention's KVCache per layer, the EngramCache
 // per engram site and the tokens so far. The local layers' caches keep
-// every position and attend to the last SlidingWindow of them.
+// every position and attend to the last SlidingWindow of them. A state
+// belongs to the model that made it.
 type State struct {
+	model  *Model
 	kv     []needle.KVCache
 	engram []needle.EngramCache
 	tokens []int
@@ -20,7 +22,9 @@ type State struct {
 
 // NewState starts an empty sequence.
 func (m *Model) NewState() *State {
-	return &State{kv: make([]needle.KVCache, len(m.blocks)), engram: make([]needle.EngramCache, len(m.engrams))}
+	return &State{
+		model: m, kv: make([]needle.KVCache, len(m.blocks)), engram: make([]needle.EngramCache, len(m.engrams)),
+	}
 }
 
 // Len is the number of tokens fed so far.
@@ -34,6 +38,7 @@ func (s *State) Tokens() []int { return slices.Clone(s.tokens) }
 // shared until either state appends to them (needle.KVCache.Fork).
 func (s *State) Fork() *State {
 	f := &State{
+		model:  s.model,
 		kv:     make([]needle.KVCache, len(s.kv)),
 		engram: make([]needle.EngramCache, len(s.engram)),
 		tokens: slices.Clip(s.tokens),
@@ -61,7 +66,9 @@ func (m *Model) Extend(s *State, tokens []int) ([]float32, error) {
 		return nil, nil
 	}
 
-	if len(s.kv) != len(m.blocks) || len(s.engram) != len(m.engrams) {
+	// Another model's caches hold its weights' keys, values and engram
+	// rows, even where the geometry matches (PR #51 review).
+	if s.model != m {
 		return nil, errors.New("text: the state belongs to another model")
 	}
 

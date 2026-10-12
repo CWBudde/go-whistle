@@ -183,9 +183,10 @@ func TestExtendFork(t *testing.T) {
 	}
 }
 
-// TestExtendErrors: a token outside the vocabulary and a sequence past
-// MaxSeqLen are rejected without changing the state, which then extends
-// as if they had not happened; no tokens is a no-op.
+// TestExtendErrors: a token outside the vocabulary, a sequence past
+// MaxSeqLen and another model, even of the same geometry, are rejected
+// without changing the state, which then extends as if they had not
+// happened; no tokens is a no-op.
 func TestExtendErrors(t *testing.T) {
 	requireFile(t, forwardFixture)
 
@@ -225,6 +226,17 @@ func TestExtendErrors(t *testing.T) {
 	_, err = m.Extend(s, make([]int, m.cfg.MaxSeqLen))
 	if !errors.Is(err, ErrTooLong) {
 		t.Errorf("past max_seq_len: %v, want ErrTooLong", err)
+	}
+
+	other := &Model{cfg: m.cfg, blocks: m.blocks, engrams: m.engrams}
+
+	_, err = other.Extend(s, tokens[half:half+1])
+	if err == nil {
+		t.Error("a state extended by another model of the same geometry")
+	}
+
+	if s.Len() != half {
+		t.Errorf("another model: Len %d, want %d", s.Len(), half)
 	}
 
 	logits, err := m.Extend(s, nil)
