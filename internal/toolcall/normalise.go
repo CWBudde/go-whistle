@@ -179,13 +179,15 @@ func toolNames(tools []any) []string {
 
 // schemaAlias maps a schema's renamed keys back: props from the model's
 // property names to the caller's, and the nested schemas by the model's
-// names.
+// names. allOf holds the branches that all apply; alts the anyOf and the
+// oneOf list, of each of which one branch applies.
 type schemaAlias struct {
-	props    map[string]string
-	sub      map[string]*schemaAlias
-	items    *schemaAlias
-	extra    *schemaAlias // additionalProperties
-	branches []*schemaAlias
+	props map[string]string
+	sub   map[string]*schemaAlias
+	items *schemaAlias
+	extra *schemaAlias // additionalProperties
+	allOf []*schemaAlias
+	alts  [][]*schemaAlias
 }
 
 // schema renames the properties of a JSON schema object and of the schemas
@@ -218,7 +220,14 @@ func schema(o *object) (*object, *schemaAlias) {
 
 	for _, key := range []string{"anyOf", "oneOf", "allOf"} {
 		if list, ok := o.vals[key].([]any); ok {
-			o = o.with(key, a.branchList(list))
+			renamed, group := branchList(list)
+			o = o.with(key, renamed)
+
+			if key == "allOf" {
+				a.allOf = group
+			} else {
+				a.alts = append(a.alts, group)
+			}
 		}
 	}
 
@@ -253,9 +262,12 @@ func (a *schemaAlias) properties(props *object) (*object, map[string]string) {
 	return renamed, back
 }
 
-// branchList renames the schemas of an anyOf, oneOf or allOf list.
-func (a *schemaAlias) branchList(list []any) []any {
+// branchList renames the schemas of an anyOf, oneOf or allOf list and
+// returns their aliases.
+func branchList(list []any) ([]any, []*schemaAlias) {
 	out := make([]any, len(list))
+
+	var group []*schemaAlias
 
 	for i, b := range list {
 		out[i] = b
@@ -264,11 +276,11 @@ func (a *schemaAlias) branchList(list []any) []any {
 			var ba *schemaAlias
 
 			out[i], ba = schema(bo)
-			a.branches = append(a.branches, ba)
+			group = append(group, ba)
 		}
 	}
 
-	return out
+	return out, group
 }
 
 // renameAll is a "required" list with each name the properties renamed
@@ -369,10 +381,9 @@ func (n *Normalised) CallerName(name string) string {
 // property names: each key the model's schema renamed gets the caller's
 // name back, nested objects and arrays included. Keys the schema does not
 // know stay, and numbers keep their literals (no float64 rounding of large
-// integers; PR #61 review). Under anyOf, oneOf and allOf an object takes
-// the names of the branch that names most of its keys; branches that name
-// as many are not told apart by the values' types, so an ambiguous union
-// takes the first (PR #62 review).
+// integers; PR #61 review). Under allOf every branch names keys; of an anyOf
+// or oneOf list one branch does, chosen by applicable (a port-side rule,
+// docs/FINDINGS.md F-050).
 func (n *Normalised) CallerArgs(name string, args []byte) ([]byte, error) {
 	var v any
 
@@ -407,24 +418,11 @@ func callerValue(v any, a *schemaAlias) any {
 
 	switch t := v.(type) {
 	case map[string]any:
-		// One schema node names the whole object: the one, of a and its
-		// branches, whose properties hold most of its keys (PR #62 review).
-		node := a.choose(t)
+		nodes := a.applicable(t)
 		out := make(map[string]any, len(t))
 
 		for k, x := range t {
-			caller, sub := a.lookup(k)
-
-			// With a branch chosen, its siblings name nothing (PR #62
-			// review): the branch's own subtree and extras, then a's
-			// properties.
-			if node != a {
-				caller, sub = node.lookup(k)
-				if c, ok := a.props[k]; ok && caller == k && sub == nil {
-					caller, sub = c, a.sub[k]
-				}
-			}
-
+			caller, sub := lookup(nodes, k)
 			out[caller] = callerValue(x, sub)
 		}
 
@@ -443,106 +441,107 @@ func callerValue(v any, a *schemaAlias) any {
 	}
 }
 
-// lookup is the caller's name for the model's key k and its schema's
-// alias: from the properties, then the branches, then additionalProperties.
-func (a *schemaAlias) lookup(k string) (string, *schemaAlias) {
-	if c, sub, ok := a.find(k); ok {
-		return c, sub
+// applicable are the schema nodes that name obj's keys (docs/FINDINGS.md
+// F-050, port-side): a itself, every allOf branch, and of each anyOf and
+// oneOf list the one branch whose own applicable nodes name most of obj's
+// keys, then take most of the rest with an additionalProperties schema,
+// the first on a tie; nested branches the same way. Values are not
+// checked against the branches' types.
+func (a *schemaAlias) applicable(obj map[string]any) []*schemaAlias {
+	nodes := make([]*schemaAlias, 1, 1+len(a.allOf)+len(a.alts))
+	nodes[0] = a
+
+	for _, b := range a.allOf {
+		nodes = append(nodes, b.applicable(obj)...)
 	}
 
-	return k, a.extraAlias()
-}
+	for _, group := range a.alts {
+		var (
+			best         []*schemaAlias
+			named, taken = -1, -1
+		)
 
-// extraAlias is the alias of the schema for keys the properties do not
-// name: the node's additionalProperties, or one in its anyOf, oneOf and
-// allOf branches, nested ones included (PR #61 review).
-func (a *schemaAlias) extraAlias() *schemaAlias {
-	return merged(a, func(s *schemaAlias) *schemaAlias { return s.extra })
-}
-
-// merged is the alias part pick gives on a and, depth first, on its
-// branches: nil without any, the one found, or a node whose branches are
-// all of them, so that a lookup tries each.
-func merged(a *schemaAlias, pick func(*schemaAlias) *schemaAlias) *schemaAlias {
-	var found []*schemaAlias
-
-	var walk func(s *schemaAlias)
-
-	walk = func(s *schemaAlias) {
-		if p := pick(s); p != nil {
-			found = append(found, p)
-		}
-
-		for _, b := range s.branches {
-			walk(b)
-		}
-	}
-
-	walk(a)
-
-	switch len(found) {
-	case 0:
-		return nil
-	case 1:
-		return found[0]
-	default:
-		return &schemaAlias{props: map[string]string{}, sub: map[string]*schemaAlias{}, branches: found}
-	}
-}
-
-// choose is the node of a and its branches, nested ones included, whose
-// properties name most of obj's keys; a on a tie with it, else the first.
-func (a *schemaAlias) choose(obj map[string]any) *schemaAlias {
-	cover := func(s *schemaAlias) int {
-		n := 0
-
-		for k := range obj {
-			if _, ok := s.props[k]; ok {
-				n++
+		for _, b := range group {
+			cand := b.applicable(obj)
+			if n, t := cover(cand, obj); n > named || n == named && t > taken {
+				best, named, taken = cand, n, t
 			}
 		}
 
-		return n
+		nodes = append(nodes, best...)
 	}
 
-	best, score := a, cover(a)
+	return nodes
+}
 
-	var walk func(s *schemaAlias)
+// cover is how many of obj's keys the nodes' properties name, and how many
+// of the others an additionalProperties schema of theirs takes.
+func cover(nodes []*schemaAlias, obj map[string]any) (named, taken int) {
+	extra := slices.ContainsFunc(nodes, func(s *schemaAlias) bool { return s.extra != nil })
 
-	walk = func(s *schemaAlias) {
-		for _, b := range s.branches {
-			if c := cover(b); c > score {
-				best, score = b, c
-			}
-
-			walk(b)
+	for k := range obj {
+		if slices.ContainsFunc(nodes, func(s *schemaAlias) bool { _, ok := s.props[k]; return ok }) {
+			named++
+		} else if extra {
+			taken++
 		}
 	}
 
-	walk(a)
-
-	return best
+	return named, taken
 }
 
-// find looks k up in the properties and then, depth first, in the anyOf,
-// oneOf and allOf branches, nested ones included (PR #61 review).
-func (a *schemaAlias) find(k string) (string, *schemaAlias, bool) {
-	if c, ok := a.props[k]; ok {
-		return c, a.sub[k], true
-	}
-
-	for _, b := range a.branches {
-		if c, sub, ok := b.find(k); ok {
-			return c, sub, true
+// lookup is the caller's name for the model's key k and its schema: from
+// the first node whose properties name it, then from the first
+// additionalProperties schema, else k unchanged.
+func lookup(nodes []*schemaAlias, k string) (string, *schemaAlias) {
+	for _, s := range nodes {
+		if c, ok := s.props[k]; ok {
+			return c, s.sub[k]
 		}
 	}
 
-	return "", nil, false
+	for _, s := range nodes {
+		if s.extra != nil {
+			return k, s.extra
+		}
+	}
+
+	return k, nil
 }
 
-// itemsAlias is the alias of an array's item schema: its own "items" and
-// those of its anyOf, oneOf and allOf branches, nested ones included, all
-// of them tried (PR #61 review).
+// itemsAlias is the alias of an array's elements: its "items" and those of
+// its allOf branches all apply, and of each anyOf and oneOf list's branches
+// with items one is chosen per element, as for objects; nil without any.
 func (a *schemaAlias) itemsAlias() *schemaAlias {
-	return merged(a, func(s *schemaAlias) *schemaAlias { return s.items })
+	it := &schemaAlias{props: map[string]string{}, sub: map[string]*schemaAlias{}}
+
+	if a.items != nil {
+		it.allOf = append(it.allOf, a.items)
+	}
+
+	for _, b := range a.allOf {
+		if bi := b.itemsAlias(); bi != nil {
+			it.allOf = append(it.allOf, bi)
+		}
+	}
+
+	for _, group := range a.alts {
+		var alts []*schemaAlias
+
+		for _, b := range group {
+			if bi := b.itemsAlias(); bi != nil {
+				alts = append(alts, bi)
+			}
+		}
+
+		if alts != nil {
+			it.alts = append(it.alts, alts)
+		}
+	}
+
+	if it.allOf == nil && it.alts == nil {
+		return nil
+	}
+
+	return it
 }

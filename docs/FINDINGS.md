@@ -4511,8 +4511,22 @@ to `needle_init` unchanged, so the rules exist only inside the engine. Which are
 prefix of the normalised tools has `needle_init`'s count on all 58 sets (33 of them differ without normalising).
 `TestNormaliseAliasesMatchEngine`: the alias table gives back the engine's names in all 6 answers.
 
-**Open.** The separators that tokenise like `_`, and the collision suffixes' digits (above). 11.4 applies
-`CallerName` and `CallerArgs` to the parsed calls.
+**Port-side, not measured: mapping arguments through composed schemas.** The engine's answers show that calls carry
+the caller's names; how it maps them back under `anyOf`, `oneOf` and `allOf` is not observable from the recorded
+answers, so `CallerArgs` follows a rule of the port's own (the reviews of PRs #61 and #62):
+
+- every `allOf` branch names keys, together with the schema's own properties;
+- of each `anyOf` and `oneOf` list one branch does: the one whose names (with its own nested branches) cover most of
+  the object's keys, then whose `additionalProperties` takes most of the rest, the first on a tie;
+- a key gets the caller's name from the first applicable node that declares it (the schema's own properties first),
+  else falls under the first applicable `additionalProperties` schema, else stays as it is;
+- the alternatives considered were the first branch with the key (keys of sibling branches mixed in one object) and
+  the branch naming most keys of the whole schema (the common properties decided). Values are not checked against the
+  branches' types, so two branches that name the same keys differently resolve to the first;
+- an array's items follow the same rule per element; generated name suffixes never repeat a name already given.
+
+**Open.** The separators that tokenise like `_`, the collision suffixes' digits (above), and the engine's own rule for
+composed schemas (above). 11.4 applies `CallerName` and `CallerArgs` to the parsed calls.
 
 ## F-051 — Multi-turn: the wire format of later turns and tool results, the per-turn budget, and what a refused turn does (PLAN.md 11.3) (2026-10-12)
 
