@@ -1103,7 +1103,8 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       faster than `nibble4`. Batched: 1.40× at 5 rows of q_proj, 1.11× at 375, but 1.06× slower on the 5-beam head.
       The blocked copy doubles the CQ memory to 33.27 MB (still 6.6× below float32). Details: `docs/FINDINGS.md`
       F-034. Both halves merged: the LUT GEMV, the FWHT and the softmax exp have NEON/AVX2 assembly; the Monarch
-      Kronecker products run on `internal/tensor`'s existing NEON/AVX2 GEMM; Sinkhorn stayed in Go (8.6× faster in the
+      Kronecker products run on `internal/tensor`'s NEON GEMM on arm64 and in pure Go on amd64, which has no GEMM
+      kernel yet (12.3); Sinkhorn stayed in Go (8.6× faster in the
       exp domain, under 1 % of the profile, F-035). Every kernel has a pure-Go fallback and an equivalence test, and the
       amd64 builds pass in linux/amd64 Docker with AVX2.
 - [x] 9.5 Parallelism: the encoder over time blocks and heads; the decoder over beams.
@@ -1519,13 +1520,21 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
       (`v0.0.0-20261011164734-4aafa14c5ca7`, main before this change) installs, `whistle download`, `doctor` and
       the README's `transcribe` lines give the README's output, and the Go API program in a new module prints the
       README's output, with `GOFLAGS=-mod=mod` and without.
-- [ ] A first tagged release (`v0.1.0`) with short release notes (what works, parity, limits), so `@latest` resolves
+- [x] A first tagged release (`v0.1.0`) with short release notes (what works, parity, limits), so `@latest` resolves
       to a version and not to a pseudo-version of `main`. Optional: prebuilt CLI binaries for linux/amd64,
       linux/arm64, darwin/arm64 and windows/amd64 on the GitHub release.
       (2026-10-11) — partial: the notes are in `docs/releases/v0.1.0.md`, and `.github/workflows/release.yaml` turns
       a pushed `v*` tag into a release with them and the CLI for the four platforms (cross-compiled on one Linux
       runner, `.tar.gz`/`.zip` with LICENSE and README.md, `SHA256SUMS`); built locally, the darwin/arm64
       `whistle doctor` passes. The tag follows the merge.
+      (2026-10-12) — `v0.1.0` is tagged on `24828b8`, but its release workflow stopped on the arm64 builds:
+      `internal/needle/exp_arm64.s` uses Go 1.27 mnemonics while `go.mod` said Go 1.25 (F-035). The tag stays, since
+      Go versions are immutable. #49 requires Go 1.27, adds `just check-cross` to CI and the `v0.1.1` notes, and
+      `v0.1.1` (`fff05e3`) is the release:
+      https://github.com/CWBudde/go-whistle/releases/tag/v0.1.1, with the four archives and `SHA256SUMS`. The
+      darwin/arm64 and linux/amd64 archives match `SHA256SUMS`, and their `whistle doctor` passes on an M5 Pro and on
+      a Xeon. proxy.golang.org serves `v0.1.1`, and `go install …/cmd/whistle@latest` in a clean `GOPATH` installs
+      `v0.1.1`.
 - [x] Link the hosted web demo (12.2) from the README's "Web demo" section.
       (2026-10-11) — done with #43: https://cwbudde.github.io/go-whistle/.
 
@@ -1574,10 +1583,20 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
       decisions, the LibriSpeech WER and the `Embed` cosine against the engine), the `Embed` and `Transcribe` outputs
       that change are named with their largest difference and their fixtures regenerated in the same change, and a
       measured TTFT gain on an x86 machine.
-- [ ] Benchmarks on linux/amd64: `bench/RESULTS.md` has only the Apple M5 Pro. Add a `just bench` run on an x86
+      (2026-10-12) — partial: 9.4's note now says the GEMM is NEON on arm64 and pure Go on amd64. The kernel waits for
+      algo-tensor 1.1 (its PR #6), 1.2 (after algo-transcribe PR #9), v0.2.0 and 1.3. The amd64 numbers it has to hold
+      are those of the next item: 31/32, keywords 47/53, depth 161/192, stream 797/930, WER 5.35 %, `Embed` 0.999828.
+- [x] Benchmarks on linux/amd64: `bench/RESULTS.md` has only the Apple M5 Pro. Add a `just bench` run on an x86
       machine (with the CPU, cores and governor recorded), and the engine side where a linux/amd64 engine build
       exists. On the 4600H laptop, `transcribe --json` reported a TTFT of 101–108 ms and 150–270 tok/s on five fixture
       clips, about 5× the M5 Pro's TTFT, under background load and not measured with `just bench`.
+      (2026-10-12) — `bench/RESULTS-linux-amd64.md`, from `bench/results/linux-amd64/` (`just bench -procs 16` and
+      `just oracle-bench` with `-go`, `-engine`/`-out` and `-report`). The machine is 2× Xeon Gold 5520+, 80 vCPUs, a
+      KVM guest; the governor row says "none (no cpufreq; kvm guest)", which `bench` now records on linux. The engine
+      ran its 3.2.0 `linux-x86_64` build. Median over the 32 clips, Go packed against the engine library: TTFT 47.3
+      against 160.9 ms (0.29×), and decode 547 against 523 tok/s (1.05×). With 4 workers, as the engine uses: 51.4 ms
+      and 363 tok/s (0.69×). The float path decodes at 130 tok/s, since the GEMM is in Go. On amd64, parity is the
+      same as on arm64. `docs/FINDINGS.md` F-040 "linux/amd64".
 
 ### 12.4 Remaining speed gap (optional)
 
