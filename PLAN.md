@@ -408,7 +408,9 @@ alternatives tried and the dated history are in `docs/FINDINGS.md` and the git h
 - [x] 8.2 `Embed` in `needle_embed`'s layout, every clip ≥ 0.999033 (F-027).
 - [x] 8.3 `NewStream`, `Process`, `Stop`: LocalAgreement-2, the 15 s sentence trim, the engine's stream JSON;
       `just stream-parity` 797/930 calls equal (F-036).
-- [x] 8.4 Buffers past 30 s: the engine's sentence trim, otherwise the last 30 s (F-036).
+- [x] 8.4 Buffers past 30 s: the engine's sentence trim. With nothing to trim the engine most likely passes the whole
+      buffer; the port deliberately feeds only the last 30 s, so `long-silence-lead`'s calls at 34 and 36 s still differ
+      (F-036).
 - [x] **Accept** (reworded by the user's decision) met: at 1 s chunks the final text equals the offline transcript on
       18/32 clips, as often as the engine's own stream (`TestStreamAccept`).
 
@@ -698,20 +700,20 @@ The repository went public on 2026-10-11; writing the first blog post about it t
 
 All resolved for Whistle.
 
-| #   | Unknown                                                  | Resolution                                                                     |
-| --- | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| U1  | Mel log flavour, floor, normalisation; "250–3500 Hz"     | power, soft log knee 76 dB below the peak, per-channel norm, full band (F-020) |
-| U2  | Stem strides, padding, activations                       | stride 2 on all three convs, zero padding 1, SiLU (F-016)                      |
-| U3  | Encoder conv module, macaron scale, `pe_gate`, positions | GLU a·σ(b), FFN ½, RoPE only, `pe_gate` unused (F-017, F-019)                  |
-| U4  | The audio manifest values `3246, 1`                      | magic 0xCAE and version 1 (F-006)                                              |
-| U5  | Shared Hadamard permutations between encoder and decoder | shared (F-017)                                                                 |
-| U6  | Cross-attention position in the block                    | after the self-attention (F-021)                                               |
-| U7  | Decoder prompt format, language detection                | `[<s>]`, language by argmax (F-023, F-024)                                     |
-| U8  | Beam length normalisation, EOS rules                     | Whisper's at 5 beams, Σ log p / len (F-026)                                    |
-| U9  | Keyword bias weight and revocation                       | 2.15 nats per token, revoked on failure; the engine's rule not found (F-044)   |
-| U10 | Silence gate                                             | p99 − p10 of 250–3500 Hz mel frame energy ≤ 5 dB (F-031)                       |
-| U11 | Word timestamps and probabilities                        | Whisper's alignment over the last half of the layers (F-033)                   |
-| U12 | Stream commit rule                                       | LocalAgreement-2, 15 s trim; past 30 s the last 30 s (F-032, F-036)            |
+| #   | Unknown                                                  | Resolution                                                                         |
+| --- | -------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| U1  | Mel log flavour, floor, normalisation; "250–3500 Hz"     | power, soft log knee 76 dB below the peak, per-channel norm, full band (F-020)     |
+| U2  | Stem strides, padding, activations                       | stride 2 on all three convs, zero padding 1, SiLU (F-016)                          |
+| U3  | Encoder conv module, macaron scale, `pe_gate`, positions | GLU a·σ(b), FFN ½, RoPE only, `pe_gate` unused (F-017, F-019)                      |
+| U4  | The audio manifest values `3246, 1`                      | magic 0xCAE and version 1 (F-006)                                                  |
+| U5  | Shared Hadamard permutations between encoder and decoder | shared (F-017)                                                                     |
+| U6  | Cross-attention position in the block                    | after the self-attention (F-021)                                                   |
+| U7  | Decoder prompt format, language detection                | `[<s>]`, language by argmax (F-023, F-024)                                         |
+| U8  | Beam length normalisation, EOS rules                     | Whisper's at 5 beams, Σ log p / len (F-026)                                        |
+| U9  | Keyword bias weight and revocation                       | 2.15 nats per token, revoked on failure; the engine's rule not found (F-044)       |
+| U10 | Silence gate                                             | p99 − p10 of 250–3500 Hz mel frame energy ≤ 5 dB (F-031)                           |
+| U11 | Word timestamps and probabilities                        | Whisper's alignment over the last half of the layers (F-033)                       |
+| U12 | Stream commit rule                                       | LocalAgreement-2, 15 s trim; past 30 s the port keeps 30 s, the engine not (F-036) |
 
 ## Non-goals
 
