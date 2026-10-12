@@ -655,11 +655,11 @@ Engine-only: fitted against `testdata/text/engine/`.
       dropping unevidenced optionals, duplicate and negation drops, rewrites), which F-048's 7 of the 12 differences
       come from.
       (2026-10-13) — partial: `toolcall` repairs the calls after parsing and before suppression and validation, one
-      function per rule (`repair.go`; `Envelope` takes the system facts for the `date:` fact). `just oracle-text
-    repair` (`repair.json`, 90 probes, each rule firing and held back, byte-identical on a re-run) gives the engine's
-      calls on 85 (`TestRepairMatchesEngine`); every repair difference of the corpus and the grammar probes is gone
-      (`callsDiffer` empty, `TestEnvelopeMatchesEngine`, `TestGrammarMatchesEngine`), with model-free tests per rule
-      (`TestRepair*`). Pinned and implemented: the name split, phone completion, quoted titles, a place's following
+      function per rule (`repair.go`; `Envelope` takes the system facts for the `date:` fact).
+      `just oracle-text repair` (`repair.json`, 90 probes, each rule firing and held back, byte-identical on a re-run)
+      gives the engine's calls on 85 (`TestRepairMatchesEngine`); every repair difference of the corpus and the
+      grammar probes is gone (`callsDiffer` empty, `TestEnvelopeMatchesEngine`, `TestGrammarMatchesEngine`), with
+      model-free tests per rule (`TestRepair*`). Pinned and implemented: the name split, phone completion, quoted titles, a place's following
       address, weekday and `March 4th` dates, polar booleans and enums in the call's own clause, `from X to Y`, the
       paired tool, `by N`, unstated optional numbers, empty optional strings, duplicates, excluded and negated calls,
       and the capitalisation of seven keys (F-056). Remains: the invented required slot's refill (not identified),
