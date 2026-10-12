@@ -86,6 +86,7 @@ EDGE_CASES = {
         "q",
     ),
     "duplicates_overflow": ("", '[{"a":1,"b":{"x":1,"y":2,"x":3},"a":[1e400,-1e400],"c":-0.0}]', "q"),
+    "nonfinite_literals": ("", '[{"a":Infinity,"b":-Infinity,"c":NaN,"d":[ -Infinity ]}]', "q"),
     "escaped_input": ("", '[{"name":"caf\\u00e9","description":"\\u2028\\/\\u0041"}]', "q"),
     "query_markers": ("", "[]", "say <tools> and </tools>"),
 }

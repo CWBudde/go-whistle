@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"math/big"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -19,19 +19,20 @@ import (
 // key keeps its first place and its last value, as a dict does), writes
 // non-ASCII text raw and escapes only what Python escapes, writes integers
 // in full and every number with a '.', 'e' or 'E' as Python's float repr
-// ("100.0" for 1e2, "1e-07", "Infinity" past the float range).
+// ("100.0" for 1e2, "1e-07", "Infinity" past the float range). Like
+// json.loads it also reads NaN, Infinity and -Infinity.
 func ToolsJSON(raw []byte) (string, error) {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
+	p := &pyParser{s: raw}
 
-	v, err := decodeValue(dec)
+	v, err := p.value()
 	if err != nil {
 		return "", fmt.Errorf("toolcall: tools: %w", err)
 	}
 
-	_, err = dec.Token()
-	if !errors.Is(err, io.EOF) {
-		return "", errors.New("toolcall: tools: data after the JSON value")
+	p.space()
+
+	if p.i != len(p.s) {
+		return "", fmt.Errorf("toolcall: tools: data after the JSON value at byte %d", p.i)
 	}
 
 	if _, ok := v.([]any); !ok {
@@ -51,61 +52,135 @@ type object struct {
 	vals map[string]any
 }
 
-// decodeValue reads one JSON value: an object, a []any, a string, a
-// json.Number, a bool or nil.
-func decodeValue(dec *json.Decoder) (any, error) {
-	tok, err := dec.Token()
-	if err != nil {
-		return nil, err
-	}
+// pyParser reads JSON as Python's json.loads does: standard JSON plus the
+// literals NaN, Infinity and -Infinity, which encoding/json rejects.
+// Values are an *object, a []any, a string, a json.Number (the literal,
+// non-finite ones included), a bool or nil.
+type pyParser struct {
+	s []byte
+	i int
+}
 
-	switch t := tok.(type) {
-	case json.Delim:
-		switch t {
-		case '[':
-			return decodeArray(dec)
-		case '{':
-			return decodeObject(dec)
-		}
+// number is a JSON number literal.
+var number = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?`)
 
-		return nil, fmt.Errorf("unexpected %v", t)
-	default:
-		return t, nil
+func (p *pyParser) space() {
+	for p.i < len(p.s) && strings.IndexByte(" \t\n\r", p.s[p.i]) >= 0 {
+		p.i++
 	}
 }
 
-func decodeArray(dec *json.Decoder) (any, error) {
+func (p *pyParser) errorf(format string, a ...any) error {
+	return fmt.Errorf("byte %d: %s", p.i, fmt.Sprintf(format, a...))
+}
+
+func (p *pyParser) value() (any, error) {
+	p.space()
+
+	if p.i >= len(p.s) {
+		return nil, p.errorf("unexpected end of input")
+	}
+
+	rest := p.s[p.i:]
+
+	for _, lit := range []struct {
+		text string
+		v    any
+	}{
+		{"true", true},
+		{"false", false},
+		{"null", nil},
+		{"NaN", json.Number("NaN")},
+		{"Infinity", json.Number("Infinity")},
+		{"-Infinity", json.Number("-Infinity")},
+	} {
+		if bytes.HasPrefix(rest, []byte(lit.text)) {
+			p.i += len(lit.text)
+
+			return lit.v, nil
+		}
+	}
+
+	switch rest[0] {
+	case '[':
+		return p.array()
+	case '{':
+		return p.object()
+	case '"':
+		return p.str()
+	}
+
+	if m := number.Find(rest); m != nil {
+		p.i += len(m)
+
+		return json.Number(m), nil
+	}
+
+	return nil, p.errorf("invalid character %q", rest[0])
+}
+
+func (p *pyParser) array() (any, error) {
+	p.i++ // [
+
 	out := []any{}
 
-	for dec.More() {
-		v, err := decodeValue(dec)
+	p.space()
+
+	if p.i < len(p.s) && p.s[p.i] == ']' {
+		p.i++
+
+		return out, nil
+	}
+
+	for {
+		v, err := p.value()
 		if err != nil {
 			return nil, err
 		}
 
 		out = append(out, v)
+
+		done, err := p.next(']')
+		if err != nil || done {
+			return out, err
+		}
 	}
-
-	_, err := dec.Token() // ]
-
-	return out, err
 }
 
-func decodeObject(dec *json.Decoder) (any, error) {
+func (p *pyParser) object() (any, error) {
+	p.i++ // {
+
 	o := &object{vals: map[string]any{}}
 
-	for dec.More() {
-		tok, err := dec.Token()
+	p.space()
+
+	if p.i < len(p.s) && p.s[p.i] == '}' {
+		p.i++
+
+		return o, nil
+	}
+
+	for {
+		p.space()
+
+		if p.i >= len(p.s) || p.s[p.i] != '"' {
+			return nil, p.errorf("want an object key")
+		}
+
+		key, err := p.str()
 		if err != nil {
 			return nil, err
 		}
 
-		key, ok := tok.(string)
-		if !ok {
-			return nil, fmt.Errorf("object key %v", tok)
+		p.space()
+
+		if p.i >= len(p.s) || p.s[p.i] != ':' {
+			return nil, p.errorf("want ':'")
 		}
 
-		v, err := decodeValue(dec)
+		p.i++
+
+		v, err := p.value()
 		if err != nil {
 			return nil, err
 		}
@@ -115,11 +190,58 @@ func decodeObject(dec *json.Decoder) (any, error) {
 		}
 
 		o.vals[key] = v
+
+		done, err := p.next('}')
+		if err != nil || done {
+			return o, err
+		}
+	}
+}
+
+// next consumes ',' (false) or the closing delimiter (true).
+func (p *pyParser) next(closing byte) (bool, error) {
+	p.space()
+
+	if p.i < len(p.s) {
+		switch p.s[p.i] {
+		case ',':
+			p.i++
+
+			return false, nil
+		case closing:
+			p.i++
+
+			return true, nil
+		}
 	}
 
-	_, err := dec.Token() // }
+	return false, p.errorf("want ',' or %q", closing)
+}
 
-	return o, err
+// str reads a string literal; encoding/json decodes its escapes and, as
+// json.loads does, rejects raw control characters.
+func (p *pyParser) str() (string, error) {
+	start := p.i
+
+	for p.i++; p.i < len(p.s); p.i++ {
+		switch p.s[p.i] {
+		case '\\':
+			p.i++
+		case '"':
+			p.i++
+
+			var out string
+
+			err := json.Unmarshal(p.s[start:p.i], &out)
+			if err != nil {
+				return "", p.errorf("string: %v", err)
+			}
+
+			return out, nil
+		}
+	}
+
+	return "", p.errorf("unterminated string")
 }
 
 func writeValue(b *strings.Builder, v any) {

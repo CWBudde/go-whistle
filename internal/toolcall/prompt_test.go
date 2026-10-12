@@ -153,7 +153,7 @@ func TestWithDateFactMatchesPython(t *testing.T) {
 // TestToolsJSONErrors: invalid JSON, trailing data and tools that are not
 // an array are rejected.
 func TestToolsJSONErrors(t *testing.T) {
-	for _, raw := range []string{``, `[`, `{"name":"x"}`, `"tools"`, `[1] [2]`, `[{"a":}]`, `[1,]`} {
+	for _, raw := range []string{``, `[`, `{"name":"x"}`, `"tools"`, `[1] [2]`, `[{"a":}]`, `[1,]`, `[01]`, `[NaNx]`} {
 		_, err := ToolsJSON([]byte(raw))
 		if err == nil {
 			t.Errorf("ToolsJSON(%q) accepted", raw)

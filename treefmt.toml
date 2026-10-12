@@ -28,6 +28,8 @@ excludes = [
     "testdata/oracle/**",
     # Tokenizer fixture, written by scripts/tokenizer_fixture.py; same reason
     "testdata/tokenizer/**",
+    # Prompt-rendering fixture, written by scripts/text_prompt_fixtures.py; same reason
+    "testdata/text/prompt/**",
 
     # Build artifacts
     "bin/**",
