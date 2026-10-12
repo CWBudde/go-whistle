@@ -237,9 +237,14 @@ func (p *pyParser) str() (string, error) {
 		case '"':
 			p.i++
 
+			err := loneSurrogate(p.s[start+1 : p.i-1])
+			if err != nil {
+				return "", p.errorf("string: %v", err)
+			}
+
 			var out string
 
-			err := json.Unmarshal(p.s[start:p.i], &out)
+			err = json.Unmarshal(p.s[start:p.i], &out)
 			if err != nil {
 				return "", p.errorf("string: %v", err)
 			}
@@ -322,6 +327,60 @@ func writeString(b *strings.Builder, s string) {
 	}
 
 	b.WriteByte('"')
+}
+
+// loneSurrogate reports an escaped surrogate (\uD800–\uDFFF) that is not
+// a high one followed by an escaped low one. Python's json.loads keeps
+// such a code point, which its tokenizer then cannot encode, while
+// encoding/json would put U+FFFD in its place and change the prompt
+// silently (PR #55 review).
+func loneSurrogate(lit []byte) error {
+	for i := 0; i < len(lit); i++ {
+		if lit[i] != '\\' {
+			continue
+		}
+
+		i++
+
+		if i >= len(lit) || lit[i] != 'u' {
+			continue
+		}
+
+		r := hexRune(lit[i+1:])
+		i += 4
+
+		switch {
+		case r >= 0xd800 && r < 0xdc00:
+			if len(lit) > i+2 && lit[i+1] == '\\' && lit[i+2] == 'u' {
+				if lo := hexRune(lit[i+3:]); lo >= 0xdc00 && lo < 0xe000 {
+					i += 6
+
+					continue
+				}
+			}
+
+			return fmt.Errorf("lone surrogate \\u%04x", r)
+		case r >= 0xdc00 && r < 0xe000:
+			return fmt.Errorf("lone surrogate \\u%04x", r)
+		}
+	}
+
+	return nil
+}
+
+// hexRune is the code point of the 4 hex digits at the start of b, -1 if
+// there are none.
+func hexRune(b []byte) rune {
+	if len(b) < 4 {
+		return -1
+	}
+
+	n, err := strconv.ParseUint(string(b[:4]), 16, 32)
+	if err != nil {
+		return -1
+	}
+
+	return rune(n)
 }
 
 // pyNumber is a JSON number literal as Python's json module reads and

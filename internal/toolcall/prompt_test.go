@@ -151,14 +151,32 @@ func TestWithDateFactMatchesPython(t *testing.T) {
 }
 
 // TestToolsJSONErrors: invalid JSON, trailing data, tools that are not an
-// array and invalid UTF-8 (json.loads raises UnicodeDecodeError) are
-// rejected.
+// array, invalid UTF-8 (json.loads raises UnicodeDecodeError) and escaped
+// lone surrogates (which Python keeps and its tokenizer cannot encode) are
+// rejected; an escaped surrogate pair is one character.
 func TestToolsJSONErrors(t *testing.T) {
-	for _, raw := range []string{``, `[`, `{"name":"x"}`, `"tools"`, `[1] [2]`, `[{"a":}]`, `[1,]`, `[01]`, `[NaNx]`, "[\"\xff\"]"} {
+	for _, raw := range []string{
+		``, `[`, `{"name":"x"}`, `"tools"`, `[1] [2]`, `[{"a":}]`, `[1,]`, `[01]`, `[NaNx]`, "[\"\xff\"]",
+		`["\ud800"]`, `["\udc00"]`, `["a\ud800b"]`, `["\ud800\u0041"]`,
+	} {
 		_, err := ToolsJSON([]byte(raw))
 		if err == nil {
 			t.Errorf("ToolsJSON(%q) accepted", raw)
 		}
+	}
+}
+
+// TestToolsJSONSurrogatePairs: an escaped surrogate pair is one character,
+// written raw as Python does, and an escaped backslash before "ud800" is
+// text, not a surrogate.
+func TestToolsJSONSurrogatePairs(t *testing.T) {
+	got, err := ToolsJSON([]byte(`["\ud83d\ude00","\\ud800"]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `["😀","\\ud800"]`; got != want {
+		t.Errorf("got %s, want %s", got, want)
 	}
 }
 
