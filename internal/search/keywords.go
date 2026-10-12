@@ -60,7 +60,7 @@ type Bias struct {
 	once      bool // a keyword earns its bonus once per text: a repeat's tokens are taken back when it completes
 
 	// Probe axes of docs/FINDINGS.md F-044; DefaultBias sets fold to
-	// foldCases, the others are off.
+	// foldCases and spent, the others are off.
 	fold    foldMode  // how a keyword's case is matched: Forms on token ids, more cases, or folded bytes
 	share   foldShare // under foldBytes: how a keyword's bonus is spread over the tokens of the text
 	wordEnd bool      // under foldBytes: a keyword completes only before a non-letter or EOS
@@ -70,15 +70,20 @@ type Bias struct {
 }
 
 // DefaultBias is the bias the keyword fixtures picked (docs/FINDINGS.md
-// F-029, F-044): 1.8 nats per matched token, all of it taken back when a
-// partial match fails, 1.5 more on completion, the keyword after a space
-// and bare, as written, with its first letter upper- and lower-cased, all
-// in lower case, and in lower case but for a capital first letter (the
-// engine ignores the keyword's case). With Default it reproduces the
-// engine's text with the keywords on 47 of 53 fixture cases.
+// F-029, F-044): 2.15 nats per matched token, all of it taken back when a
+// partial match fails, no completion bonus, nothing more for a keyword
+// once it completed (spent), the keyword after a space and bare, as
+// written, with its first letter upper- and lower-cased, all in lower
+// case, and in lower case but for a capital first letter (the engine
+// ignores the keyword's case). With Default it reproduces the engine's
+// text with the keywords on 47 of 53 fixture cases, 28 of 32 keyword sets
+// and 28 of 31 variants; the user chose it over w=1.8 complete=1.5 (18 of
+// 32 sets, 29 of 31 variants), which misses de-paare-missed instead of
+// pl-francja-present and loops on repeated keywords.
 func DefaultBias() Bias {
 	return Bias{
-		Weight: 1.8, Revoke: 1, Complete: 1.5, Forms: FormSpace | FormBare | FormCapital | FormLower, fold: foldCases,
+		Weight: 2.15, Revoke: 1, Complete: 0, Forms: FormSpace | FormBare | FormCapital | FormLower, fold: foldCases,
+		spent: true,
 	}
 }
 
