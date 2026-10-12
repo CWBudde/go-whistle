@@ -2637,7 +2637,7 @@ Go reference (`lutTables2Generic`, `lutTables4Generic`, `lutLookupGeneric`, `fwh
 | FWHT        | h = 1, 2, 4 in registers (`UZP1`/`UZP2`), then 8 floats/pass | h = 1, 2, 4 in registers (`VPERMILPS`, `VPERM2F128`, blends)  |
 
 On NEON that is 24 vector instructions per 32 rows and index byte, i.e. per 128 weights of CQ2 or 64 of CQ4; on AVX2,
-17 and 5 loads. Go 1.25 (`go.mod`) lacks the NEON float instructions and `SHRN`, so they are `WORD`-encoded, as in
+17 and 5 loads. Go 1.25 (`go.mod` then; 1.27 since F-035's `exp_arm64.s`) lacks the NEON float instructions and `SHRN`, so they are `WORD`-encoded, as in
 `internal/tensor`. Every word was checked against Go 1.27's mnemonics with `go tool objdump`. On amd64 the kernel
 needs AVX2 only (`cpu.X86.HasAVX2` at run time); without it `lutAsm` is false, and the Go reference runs.
 
@@ -2811,6 +2811,12 @@ shapes, single thread, median of three):
    and handles the tails. `TestExpSubSumMatchesGeneric` (lengths 0–69, 127–129, 375, 1000, 4099 at offsets 0–3,
    logits spread up to 100, ±Inf, NaN) and a 65,536-point sweep of [−90, 0] give at most 0.99 ulp from
    `math.Exp`. The kernel takes 150 ns for 375 values against 1186 ns for the fallback.
+
+   Unlike the other NEON kernels (F-034, F-041), `exp_arm64.s` uses Go 1.27's vector float mnemonics (`VFSUB`,
+   `VFCMGT`, `VFRINTN`, …) rather than `WORD` encodings, which Go 1.25 and 1.26 do not assemble. CI ran on amd64 only,
+   so this showed first when the `v0.1.0` release workflow cross-compiled darwin/arm64 and linux/arm64 (2026-10-12).
+   `go.mod` now requires Go 1.27, and `just check-cross` (in `just ci` and CI's `test-unit`) builds every package for
+   linux/arm64, darwin/arm64 and windows/amd64.
 
 **Not changed, and why.**
 

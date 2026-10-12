@@ -166,8 +166,7 @@ func runTranscribe(m *whistle.Model, path string, opts whistle.TranscribeOptions
 func fileError(path string, err error) error {
 	msg := strings.TrimPrefix(err.Error(), "whistle: ")
 
-	var pe *fs.PathError
-	if errors.As(err, &pe) {
+	if pe, ok := errors.AsType[*fs.PathError](err); ok {
 		msg = pe.Err.Error() // "no such file or directory" without the reader's prefixes
 	}
 

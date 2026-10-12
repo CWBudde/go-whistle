@@ -10,7 +10,7 @@ Pure-Go port of [Whistle](https://huggingface.co/Cactus-Compute/whistle), the 55
 The engine itself is only used as a black-box test oracle. See `PLAN.md` for the roadmap and the model reference card.
 
 **Module:** `github.com/cwbudde/go-whistle`
-**Go version:** 1.25+
+**Go version:** 1.27+ (the arm64 assembly uses Go 1.27 mnemonics)
 
 ## Ground Rules
 
@@ -33,7 +33,7 @@ just test              # go test -v ./...
 just test-race
 just lint              # golangci-lint (config in .golangci.yml)
 just fmt               # treefmt (gofumpt, gci, prettier, shfmt)
-just ci                # check-formatted + test + lint + check-tidy
+just ci                # check-formatted + test + lint + check-tidy + check-cross
 
 go test -v -run TestName ./internal/<pkg>/...
 ```

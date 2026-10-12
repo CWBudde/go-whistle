@@ -154,8 +154,8 @@ func missingJSONKeys(raw []byte, t reflect.Type) ([]string, error) {
 
 	var missing []string
 
-	for i := range t.NumField() {
-		name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
+	for field := range t.Fields() {
+		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
 		if _, ok := present[name]; !ok {
 			missing = append(missing, name)
 		}
