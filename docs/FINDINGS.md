@@ -4466,3 +4466,101 @@ with code 1 in the manifest, retrieval is off." The engine binary's only trace o
   OpenAI-style `{"type":"function","function":{…}}` entries, turns tool and property names into snake_case, drops keys
   the model was not trained on (`triggers` among them), and maps the names back in the calls. None of the corpus's
   tools needs this; it is a new 11.3 item.
+
+## F-050 — Tool normalisation: the engine unwraps, snake-cases and drops `triggers` before it renders, and maps the names back (PLAN.md 11.3) (2026-10-12)
+
+**Question.** The porting notes say the engine normalises the tools before rendering: it unwraps OpenAI-style
+entries, converts tool and property names to snake_case, drops keys the model was not trained on (`triggers` among
+them), and keeps an alias table so the calls carry the caller's names. Upstream's Python client passes dict schemas
+to `needle_init` unchanged, so the rules exist only inside the engine. Which are they exactly?
+
+**Measured.** `just oracle-text normalise` writes `testdata/text/engine/normalise.json` (byte-identical on a re-run):
+`needle_init`'s count on 58 tool sets and the CLI's answers to two queries over three of them.
+
+- **Unwrapping.** An entry with a `function` object is that object: `{"type":"function","function":{…}}`, the same
+  with `"type":"tool"`, and with other keys beside it (dropped) all count 314, the plain `assistant` set's count. An
+  entry whose `function` is a string stays as it is.
+- **Dropped keys.** Only a tool's top-level `triggers`. `examples`, `x-foo`, `strict`, `title`, `returns`,
+  `metadata`, `$schema`, … at the top, in `parameters` or in a property, are all counted as written; so is a
+  `triggers` key inside `parameters`.
+- **Snake case.** 26 tool names and 6 property names pin the rule `toolcall.Snake` implements: a capital that starts
+  a lower-case word, and one after a lower-case letter or a digit, get an underscore before them; runs of other
+  characters than ASCII letters and digits become one underscore; underscores at the ends go; the name is lower-cased
+  (`getHTTPResponseCode` → `get_http_response_code`, `get2FACode` → `get2_fa_code`, `set timer` → `set_timer`,
+  `__zoom_in__` → `zoom_in`). A name with non-ASCII characters is left as it is (`naïveBayes`, `ÄpfelZählen`,
+  `größeWert`). Spaces and leading or trailing underscores are pinned by the counts; `-`, `.`, `/`, `:`, `+`, `$`
+  and `~` tokenise exactly as `_` does, so the counts cannot tell whether they become `_`; the port follows the notes'
+  "snake*case" and turns them into `*`.
+- **Where.** Tool names; the property names of `parameters` and of every property schema, of `items` when it is an
+  object, of the `anyOf`, `oneOf` and `allOf` branches and of an `additionalProperties` schema; `required` entries
+  that name a renamed property. Not `$defs` (nor the `$ref` names), not an `items` list, not `required` names that
+  are no property, not enum values.
+- **Collisions.** Tools whose different names share a snake name all get a suffix: `setTimer` and `set_timer` count
+  as `set_timer_1` and `set_timer_2`, three such as `_1`, `_2`, `_3`; two tools of the same name stay as they are.
+  Within one object the first property keeps the snake name and the next get one: `maxCount`, `max_count` count as
+  `max_count`, `max_count_1`, and the `required` order shows which is which. All digits tokenise alike, so which
+  number goes to which tool, and that the suffixes are numbers at all, is the port's choice (declaration order).
+- **The alias table.** Over the camelCase tools the engine calls `setTimer` and `createEvent` with `durationMinutes`;
+  over the OpenAI-style ones `set_timer` and `create_event` with `duration_minutes`; over the colliding pair it calls
+  `setTimer` for "set a timer" and `set_timer` (the "kitchen" timer) for the meeting. So the calls carry the caller's
+  tool and argument names.
+
+**Port.** `toolcall.Normalise(raw)` returns the tools JSON to render (`Normalised.JSON`) and the alias table:
+`CallerName` and `CallerArgs` map the model's names back, through nested objects, arrays, branches and
+`additionalProperties`. Without anything to normalise it is `ToolsJSON`. `TestNormaliseMatchesEngine`: the static
+prefix of the normalised tools has `needle_init`'s count on all 58 sets (33 of them differ without normalising).
+`TestNormaliseAliasesMatchEngine`: the alias table gives back the engine's names in all 6 answers.
+
+**Open.** The separators that tokenise like `_`, and the collision suffixes' digits (above). 11.4 applies
+`CallerName` and `CallerArgs` to the parsed calls.
+
+## F-051 — Multi-turn: the wire format of later turns and tool results, the per-turn budget, and what a refused turn does (PLAN.md 11.3) (2026-10-12)
+
+**Question.** How does the engine render a conversation after the first turn, when is a turn a tool result, what is
+its turn limit, and what happens to a turn that does not fit?
+
+**The oracle.** The CLI's `--fail-input-overflow` refuses "a turn that would not fit the context window instead of
+trimming it" with `input exceeds the context window (N tokens, M available)`. A large `--max` shrinks the room (8192 −
+314 − 7000 = 878 tokens), so probes of about a thousand tokens are refused at once with their exact length.
+`just oracle-text turns` writes `testdata/text/engine/turns.json` (byte-identical on a re-run): 53 conversations over
+`needle --serve`, each on a fresh server, every turn's answer, and a last probe. The probes are stored as head, a
+repeated unit and tail, with each text's SHA-256.
+
+**Measured.**
+
+- **The first turn** continues the user message the static prefix opened: `\n{input}<|im_end|>\n<|im_start|>assistant\n`
+  (N = the input's tokens + 6), as `Render` writes it.
+- **A later user turn** opens its own: `\n<|im_start|>user\n{input}<|im_end|>\n<|im_start|>assistant\n` (+ 9).
+- **A tool result**: `\n<|im_start|>tool\n<tool_result>{json}</tool_result><|im_end|>\n<|im_start|>assistant\n`
+  (+ 11). An input is one when the answer before it made at least one call (two calls too) and it is JSON: arrays,
+  objects, strings, numbers and literals alike. After a suppressed call, a refusal (no call), a `respond` answer or a
+  refused turn, JSON is a user turn; so is invalid JSON after a call, and JSON as the first turn.
+- **The tool result's JSON** loses the white space outside its strings and keeps everything else as written: `1.50`,
+  `1e2`, `-0`, large integers, `\/`, the `\uXXXX` escapes (non-ASCII, ASCII, control, upper-case hex) and repeated
+  keys all count as written; a pretty-printed or padded array counts as its compact form. Python's
+  `json.dumps(json.loads(…))` misses 5 of these probes. `<`, `&` and `>` inside its strings are the exception: each
+  costs 2 tokens more alone, and the three adjacent cost 8 more, which no per-character spelling we tried (`<`,
+  entities, full-width forms, any 3-byte character) explains. Their spelling is not identified.
+- **A refused turn still counts:** after a refused first turn the next one is a later turn (+ 9), and after a refused
+  turn that followed a call, JSON is a user turn.
+- **Reset** starts over: the first turn's form again.
+- **The budget** is per turn: M = context − static prefix − the answer's token limit (7366 at `--max 512`, 7778 at
+  100, 878 at 7000), whatever came before. Earlier turns do not count; the engine makes room for a turn that fits M.
+- **Without the flag** an oversized turn is cut, not refused, and keeps its end: with a timer request at the end of
+  about 1500 tokens the engine calls `set_timer` (25 minutes, "Eggs"); with the request at the start it does not.
+
+**Port.** `toolcall.Conversation` (`NewConversation`, `Turn`, `Answered`, `Reset`, `Available`) renders the three
+forms, decides tool results as above, refuses with `*OverflowError` (`ErrContextOverflow` with the engine's two
+numbers), and otherwise drops the input's first tokens until the turn fits. `TestConversationMatchesEngine` replays
+all 53 conversations: 41 refusals equal the engine's numbers; the 12 with `<`, `&` or `>` in a tool result's strings
+are listed as unidentified, where the engine counts more. `TestConversationTrim` checks the two cut turns.
+
+**Open.**
+
+- **The history.** Neither the error nor the answer reports the conversation's length, so how the engine drops
+  earlier turns to make room, and how it renders the assistant's turns in the history (the porting notes: the forced
+  `<think>`, one line, `</think>`, a newline, `<tool_call>[…]</tool_call>`), are not measured. `Conversation` renders
+  the turns the engine adds, not the history.
+- **The cut's size.** An oversized turn keeps its end; how many tokens it keeps is not measured. `Turn` keeps as many
+  as fit.
+- **`<`, `&` and `>`** in a tool result's strings (above).

@@ -567,14 +567,31 @@ shows (multi-turn, tool results, retrieval).
       `\n…<|im_end|>\n<|im_start|>assistant\n` and a tool result as
       `\n<|im_start|>tool\n<tool_result>{…}</tool_result><|im_end|>\n<|im_start|>assistant\n`; the Python docs add
       that a turn after a call is a tool result only when it parses as JSON (F-049).
+      (2026-10-12) — partial: the turns the engine adds are pinned. `just oracle-text turns` (`turns.json`, 53
+      conversations over `needle --serve --fail-input-overflow`, byte-identical on a re-run) reads each probe's length
+      and room from the refusal. `toolcall.Conversation` renders the first turn, later user turns and tool results
+      (JSON after an answer with a call, minified with every literal as written), counts a refused turn, resets, and
+      refuses past context − static prefix − `--max` with the engine's numbers: 41 of 41 refusals equal
+      (`TestConversationMatchesEngine`); without the flag an oversized turn keeps its end (`TestConversationTrim`).
+      Remains: how the engine drops earlier turns and renders the assistant's turns in the history (no count reports
+      the history), how much of a cut turn it keeps, and its spelling of `<`, `&` and `>` in a tool result's strings
+      (12 probes count more than the minified text) (F-051).
 - [x] Tool retrieval: nothing ranks the tools. `needle3.cact` has no embedding head, so engine 3.2.0 renders every
       declared tool (1–239 measured); its one limit is the 8192-token context, `toolcall.CheckPrefix`
       (`TestStaticPrefixPastFiveTools`, `TestRetrievalOff`) (F-049).
-- [ ] Tool normalisation before rendering, from upstream's porting notes (F-049): unwrap OpenAI-style
-      `{"type":"function","function":{…}}` entries, turn tool and property names into snake_case, drop keys the model
+- [x] Tool normalisation before rendering, from upstream's porting notes (F-049): unwrap OpenAI-style
+      `{"type":"function","function":{…}}` entries, turn tool and property names into snake*case, drop keys the model
       was not trained on (`triggers` among them), and keep an alias table so the calls carry the caller's names. The
       corpus's tools need none of it; `needle_init`'s counts on tools that do (OpenAI-style, camelCase, `triggers`)
       pin the rendering, the answers the aliasing.
+      (2026-10-12) — `toolcall.Normalise`: an entry's `function` object, only a tool's top-level `triggers` dropped,
+      `toolcall.Snake` on tool and property names (non-ASCII names untouched) down nested properties, `items`,
+      `anyOf`/`oneOf`/`allOf` and `additionalProperties` but not `$defs`, `required` following, and suffixes for
+      colliding names; `CallerName`/`CallerArgs` map the calls back. `just oracle-text normalise` (`normalise.json`,
+      58 sets, byte-identical on a re-run): the normalised static prefix has `needle_init`'s count on all 58, 33 of
+      which differ without it (`TestNormaliseMatchesEngine`), and the engine's calls over camelCase, OpenAI-style and
+      colliding tools carry the caller's names as the alias table gives them (`TestNormaliseAliasesMatchEngine`).
+      Separators that tokenise like `*` and the suffixes' digits are not identified by the counts (F-050).
 - [ ] **Accept:** the static-prefix token count equals `needle_init`'s on every engine case, and a float greedy decode
       of the rendered prompt gives the engine's `function_calls` on at least the cases where the float model's
       top-1 is not a near-tie.
