@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"regexp"
 	"slices"
@@ -368,8 +369,12 @@ func (n *Normalised) CallerArgs(name string, args []byte) ([]byte, error) {
 	dec.UseNumber()
 
 	err := dec.Decode(&v)
-	if err == nil && dec.More() {
-		err = errors.New("data after the arguments")
+	if err == nil {
+		// Anything after the value, a stray ']' included, is an error.
+		var extra any
+		if !errors.Is(dec.Decode(&extra), io.EOF) {
+			err = errors.New("data after the arguments")
+		}
 	}
 
 	if err != nil {
@@ -416,30 +421,40 @@ func callerValue(v any, a *schemaAlias) any {
 // lookup is the caller's name for the model's key k and its schema's
 // alias: from the properties, then the branches, then additionalProperties.
 func (a *schemaAlias) lookup(k string) (string, *schemaAlias) {
-	if c, ok := a.props[k]; ok {
-		return c, a.sub[k]
-	}
-
-	for _, b := range a.branches {
-		if c, ok := b.props[k]; ok {
-			return c, b.sub[k]
-		}
+	if c, sub, ok := a.find(k); ok {
+		return c, sub
 	}
 
 	return k, a.extra
 }
 
+// find looks k up in the properties and then, depth first, in the anyOf,
+// oneOf and allOf branches, nested ones included (PR #61 review).
+func (a *schemaAlias) find(k string) (string, *schemaAlias, bool) {
+	if c, ok := a.props[k]; ok {
+		return c, a.sub[k], true
+	}
+
+	for _, b := range a.branches {
+		if c, sub, ok := b.find(k); ok {
+			return c, sub, true
+		}
+	}
+
+	return "", nil, false
+}
+
 // itemsAlias is the alias of an array's item schema: its own "items", or
-// that of the first anyOf, oneOf or allOf branch that has one (PR #61
-// review).
+// that of the first anyOf, oneOf or allOf branch, nested ones included,
+// that has one (PR #61 review).
 func (a *schemaAlias) itemsAlias() *schemaAlias {
 	if a.items != nil {
 		return a.items
 	}
 
 	for _, b := range a.branches {
-		if b.items != nil {
-			return b.items
+		if it := b.itemsAlias(); it != nil {
+			return it
 		}
 	}
 

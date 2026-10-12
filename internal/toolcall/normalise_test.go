@@ -276,6 +276,30 @@ func TestCallerArgs(t *testing.T) {
 	if want := `{"orderId":12345678901234567890,"rows":[{"itemName":1.50}]}`; string(out) != want {
 		t.Errorf("CallerArgs = %s, want %s", out, want)
 	}
+
+	for _, bad := range []string{`{"order_id":1}]`, `{"order_id":1} {}`, `{"order_id":1}x`} {
+		_, err = n.CallerArgs("t", []byte(bad))
+		if err == nil {
+			t.Errorf("CallerArgs accepted %s", bad)
+		}
+	}
+
+	// Nested branches.
+	n, err = Normalise([]byte(`[{"name":"t","parameters":{"properties":{"pick":{"anyOf":[{"allOf":[` +
+		`{"properties":{"innerKey":{"type":"array","items":{"oneOf":[{"anyOf":[{"type":"array",` +
+		`"items":{"properties":{"deepKey":{}}}}]}]}}}}]}]}}}}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = n.CallerArgs("t", []byte(`{"pick":{"inner_key":[[{"deep_key":1}]]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `{"pick":{"innerKey":[[{"deepKey":1}]]}}`; string(out) != want {
+		t.Errorf("CallerArgs = %s, want %s", out, want)
+	}
 }
 
 // TestNormaliseUniqueNames: a generated suffix never repeats a name the
