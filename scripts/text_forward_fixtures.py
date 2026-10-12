@@ -17,13 +17,18 @@ Written to testdata/text/forward/forward.safetensors (weights never stored):
     <case>.prompt_len    I64 (1)         positions of [BOS] + prompt
     <case>.argmax        I64 (T)         top-1 next token at every position
     <case>.margin        F32 (T)         top-1 minus top-2 logit at every position
-    <case>.final         F16 (T, 768)    stack output after final_norm
+    <case>.final         F16 (T, 768)    stack output after final_norm (long_tools:
+                                         the rows from long_tools.final_from on)
+    long_tools.final_from I64 (1)        first stored final row (1024 - 32)
     <case>.hidden_last   F32 (L, 768)    lane mean after each block, last position
     <case>.logits_last   F32 (2, 8192)   logits at the last 2 positions
     tiny.hidden          F32 (L, T, 768) lane mean after each block, all positions
                                          (the pre-norm stream exceeds the F16 range)
     tiny.embed           F32 (T, 768)    scaled input embedding
     tiny.logits          F32 (T, 8192)   logits at every position
+
+long_tools passes the 1024-position sliding window of the local layers; the
+metadata's band_control records how far the network lands without the band.
 
 Deterministic: no randomness, no timestamps, metadata in sorted key order.
 Regenerate with
@@ -37,6 +42,7 @@ which runs
 """
 
 import argparse
+import copy
 import hashlib
 import importlib
 import json
@@ -102,6 +108,75 @@ LIGHTS = {
     },
 }
 
+
+
+def tool(name, description, properties, required):
+    return {
+        "name": name,
+        "description": description,
+        "parameters": {"type": "object", "properties": properties, "required": required},
+    }
+
+
+def prop(kind, description):
+    return {"type": kind, "description": description}
+
+
+# Fifteen more tools after TIMER, so that the prompt passes the 1024-position
+# sliding window of the local layers and the tool the query needs sits more
+# than a window before the answer: only the global layers see it directly.
+MORE_TOOLS = [
+    MESSAGE,
+    LIGHTS,
+    tool("get_weather", "Get the current weather and the forecast for a city, in metric units",
+         {"city": prop("string", "City name, optionally with the country"),
+          "days": prop("integer", "Forecast days from 0 (today only) to 7")}, ["city"]),
+    tool("play_music", "Play a song, an album, an artist or a playlist on the speakers of a room",
+         {"query": prop("string", "What to play, as the user said it"),
+          "room": prop("string", "Room whose speakers to use; the current room if left out"),
+          "shuffle": prop("boolean", "Shuffle the tracks")}, ["query"]),
+    tool("create_event", "Create a calendar event with a title, a start, a duration and optional guests",
+         {"title": prop("string", "Event title"),
+          "start": prop("string", "Start as YYYY-MM-DD HH:MM in local time"),
+          "minutes": prop("integer", "Duration in minutes"),
+          "guests": {"type": "array", "items": {"type": "string"}, "description": "Names of the people to invite"}},
+         ["title", "start"]),
+    tool("set_alarm", "Set an alarm for a time of day, once or on repeating weekdays",
+         {"time": prop("string", "Time of day as HH:MM"),
+          "days": {"type": "array", "items": {"type": "string"}, "description": "Weekdays to repeat on, e.g. Mon"},
+          "label": prop("string", "Alarm label")}, ["time"]),
+    tool("add_to_list", "Add one or more items to a named shopping or to-do list",
+         {"list": prop("string", "List name, e.g. groceries"),
+          "items": {"type": "array", "items": {"type": "string"}, "description": "Items to add"}},
+         ["list", "items"]),
+    tool("call_contact", "Start a phone call to a contact from the address book",
+         {"name": prop("string", "Contact name"),
+          "speaker": prop("boolean", "Use the speakerphone")}, ["name"]),
+    tool("navigate", "Start turn-by-turn navigation to an address or a place",
+         {"destination": prop("string", "Address or place name"),
+          "mode": {"type": "string", "enum": ["driving", "walking", "cycling", "transit"]},
+          "avoid_tolls": prop("boolean", "Avoid toll roads")}, ["destination"]),
+    tool("set_thermostat", "Set the target temperature of a room's thermostat",
+         {"room": prop("string", "Room name"),
+          "celsius": prop("number", "Target temperature in degrees Celsius")}, ["room", "celsius"]),
+    tool("lock_door", "Lock or unlock a smart door lock",
+         {"door": prop("string", "Door name, e.g. front or garage"),
+          "locked": prop("boolean", "True to lock, false to unlock")}, ["door", "locked"]),
+    tool("translate_text", "Translate a text into another language",
+         {"text": prop("string", "Text to translate"),
+          "target": prop("string", "Target language as an ISO 639-1 code")}, ["text", "target"]),
+    tool("search_web", "Search the web and return the top results with their titles and links",
+         {"query": prop("string", "Search query"),
+          "count": prop("integer", "Number of results, 1 to 10")}, ["query"]),
+    tool("send_email", "Send an email with a subject and a body to one or more recipients",
+         {"to": {"type": "array", "items": {"type": "string"}, "description": "Recipient names or addresses"},
+          "subject": prop("string", "Subject line"),
+          "body": prop("string", "Message body")}, ["to", "subject", "body"]),
+    tool("set_reminder", "Remind the user of something at a date and time",
+         {"text": prop("string", "What to remind of"),
+          "when": prop("string", "Date and time as YYYY-MM-DD HH:MM")}, ["text", "when"]),
+]
+
 # name -> render_example input (answers are left out: the model writes them).
 CASES = {
     "timer_en": {"system": SYSTEM, "tools": [TIMER], "query": "set a timer for 10 minutes for the pasta"},
@@ -115,7 +190,14 @@ CASES = {
         "tools": [LIGHTS, TIMER],
         "query": "turn off the kitchen lights and dim the living room to 30 percent",
     },
+    "long_tools": {
+        "system": SYSTEM,
+        "tools": [TIMER, *MORE_TOOLS],
+        "query": "set a timer for 25 minutes for the bread",
+    },
 }
+LONG = "long_tools"  # the case past the sliding window
+FINAL_FROM = 1024 - 32  # LONG's final rows are stored from this position on
 TINY = "Hello, world"  # plain text, no chat format: [BOS] + encode(TINY)
 
 
@@ -176,6 +258,30 @@ def load_params(path):
     return traverse_util.unflatten_dict(flat), json.loads(meta["config"])
 
 
+def band_control(window, logits, final, causal_logits, causal_final):
+    """How far the plain causal mask lands from the banded one on the
+    positions past the window: the smallest per-row cosine of the final
+    rows and of the logits, the largest |difference| of the final rows,
+    and the positions whose top-1 changes."""
+    causal_logits = np.asarray(causal_logits[0], np.float32)
+    causal_final = np.asarray(causal_final[0], np.float32)
+
+    def min_cos(a, b):
+        a, b = a.astype(np.float64), b.astype(np.float64)
+        cos = (a * b).sum(-1) / np.linalg.norm(a, axis=-1) / np.linalg.norm(b, axis=-1)
+        return float(cos.min())
+
+    past = slice(window, None)
+    return {
+        "positions": int(final.shape[0] - window),
+        "final_min_cosine": min_cos(final[past], causal_final[past]),
+        "final_max_abs_diff": float(np.abs(final[past] - causal_final[past]).max()),
+        "logits_min_cosine": min_cos(logits[past], causal_logits[past]),
+        "top1_changed": int((logits[past].argmax(-1) != causal_logits[past].argmax(-1)).sum()),
+        "before_window_max_abs_diff": float(np.abs(final[:window] - causal_final[:window]).max()),
+    }
+
+
 def write_sorted_metadata(path, tensors, metadata):
     """save_file, then rewrite the header with __metadata__ keys sorted, so
     two runs give the same bytes."""
@@ -208,6 +314,11 @@ def main():
     config = arch.TransformerConfig.from_saved(saved)
     config.dtype, config.flash = "float32", False
     model = arch.SimpleAttentionNetwork(config)
+    # The control for LONG: the same network without the band, every layer
+    # on the plain causal mask.
+    unbanded = copy.copy(config)
+    unbanded.sliding_window = 0
+    causal_model = arch.SimpleAttentionNetwork(unbanded)
     tok = tokmod.SANTokenizer(args.tokenizer)
     bos, eos = tokmod.BOS_ID, tokmod.EOS_ID
 
@@ -226,6 +337,12 @@ def main():
         logits = model.apply({"params": params}, tokens)
         final, hidden, embed = model.apply({"params": params}, tokens, method=stack_out)
         return logits, final, hidden, embed
+
+    @jax.jit
+    def run_causal(params, tokens):
+        logits = causal_model.apply({"params": params}, tokens)
+        final, _, _ = causal_model.apply({"params": params}, tokens, method=stack_out)
+        return logits, final
 
     @jax.jit
     def step_logits(params, tokens):
@@ -259,7 +376,14 @@ def main():
         tensors[f"{name}.prompt_len"] = np.asarray([prompt_len], np.int64)
         tensors[f"{name}.argmax"] = np.argmax(logits, axis=-1).astype(np.int64)
         tensors[f"{name}.margin"] = (top2[:, 1] - top2[:, 0]).astype(np.float32)
-        tensors[f"{name}.final"] = final.astype(np.float16)
+        if name == LONG:
+            tensors[f"{name}.final_from"] = np.asarray([FINAL_FROM], np.int64)
+            tensors[f"{name}.final"] = final[FINAL_FROM:].astype(np.float16)
+            control = band_control(config.sliding_window, logits, final,
+                                   *run_causal(params, jnp.asarray([ids], jnp.int32)))
+            print(f"{name}: without the band {control}", file=sys.stderr)
+        else:
+            tensors[f"{name}.final"] = final.astype(np.float16)
         tensors[f"{name}.hidden_last"] = hidden[:, -1]
         tensors[f"{name}.logits_last"] = logits[-LAST:]
         print(f"{name}: {prompt_len} prompt + {len(ids) - prompt_len} completion tokens: "
@@ -275,6 +399,7 @@ def main():
 
     os.makedirs(args.out, exist_ok=True)
     metadata = {
+        "band_control": json.dumps(control, sort_keys=True),
         "upstream": UPSTREAM_PIN,
         "weights": WEIGHTS_PIN,
         "safetensors_sha256": pinned("needle3.safetensors"),
