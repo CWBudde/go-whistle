@@ -4410,3 +4410,59 @@ which would forbid `action` and `off` and require `due_date`. The smallest top-1
 **Consequences for 11.4.** The decode half of 11.3's Accept waits for the envelope: the schema grammar, the
 confidence head and its suppression, and the post-decode rewrites (capitalisation, date resolution against the
 date fact and the source years, message trimming). These cases are the test set for each.
+
+## F-049 — Tool retrieval is off for the pinned model: the engine renders every tool, up to the 8192-token context (PLAN.md 11.3) (2026-10-12)
+
+**Question.** Upstream's `llms.txt` says that "with more than 5 declared tools, a built-in retrieval head renders only
+the top-5 per turn and constrains the grammar to that subset", and `--tool-index` keeps "this tool set's embeddings".
+What ranks the tools, when `needle3.cact` has no embedding head?
+
+**Upstream.** The Python docs (cactuscompute.com/blog/needle-python-docs) say "every schema is embedded once at init
+by a built-in contrastive head" and "each turn embeds the query". The porting notes
+(cactuscompute.com/blog/porting-needle) say when: "That path switches on only when the archive carries an embedding
+head, and this release does not ship one", so "every declared tool goes into the prefix"; "If your port sees no head
+with code 1 in the manifest, retrieval is off." The engine binary's only trace of retrieval is the budget error below.
+
+**Measured.** `just oracle-text retrieval` writes `testdata/text/engine/retrieval.json`:
+
+- **Heads.** `needle3.cact`'s `heads.manifest` holds one code, 2 (confidence). There is no 1 (embedding) and no 3
+  (router).
+- **Every tool is rendered.** `needle_init`, given a tool index path, runs on every prefix of a 17-tool `catalogue`
+  (the corpus's 10 assistant and home tools and 7 more) and on the catalogue plus synthetic tools up to 200 and 239
+  tools. Its count grows with every tool (72, 123, …, 1025 for 17 tools, 1488, 2524, 4605, 6923 and 8191) and equals
+  `toolcall.StaticPrefix`, `[BOS]` and the rendering of all the tools, on all 22 accepted sets
+  (`TestStaticPrefixPastFiveTools`), and on the 5 new corpus cases with 1025 tokens (`TestStaticPrefixMatchesEngine`,
+  24 cases). Earlier scratch runs agree to 400 tools.
+- **No index.** No run writes the index file, neither through the library nor with the CLI's `--tool-index`.
+- **The budget.** At 8191 tokens `needle_init` accepts (about 4 s of prefill). At 8192 it refuses at once:
+  "needle_init context budget exceeded: static prefix is 8192 tokens, model context is 8192 tokens; reduce
+  system/tools JSON or declare more than 5 tools to enable per-turn retrieval". The message suggests retrieval
+  whatever the model carries. 8192 is `max_position_embeddings`. Scratch runs with 250, 300 and 400 tools were refused
+  at 8470, 10109 and 13378 tokens, each the Go count.
+- **The calls.** Five new corpus cases (`catalogue_*`, 24 cases now) on the 17 tools ask for the 8th, 13th, 14th,
+  16th and 17th tool, and the engine calls each. The float model, greedy over the same prompt with all 17 tools, picks
+  the same tool in all five. Three are equal. In `catalogue_lock` it adds a `required` argument (the schema grammar of
+  11.4). In `catalogue_email` it writes `review` for `Review` and `["tom"]` for `["Tom","Sara"]`. Over the 24 cases
+  `TestFloatGreedyAgainstEngine` now gives 10 equal and 14 differing (F-048's 7 of 19 plus 3).
+
+**Port.**
+
+- `toolcall.StaticPrefix` stays as it is: it already renders every tool.
+- `toolcall.CheckPrefix(prefix, context)` is the budget check: `ErrContextBudget` at `context` tokens or more, with
+  the engine's numbers.
+- `toolcall.Retrieves(embeddingHead, tools)` is upstream's rule: an embedding head and more than `RetrievalTools`
+  (5) tools.
+- `text.Source.HasHead(code)` reads the heads.
+- The pinned model never retrieves, so the branch with an embedding head is not measured.
+
+**Open.**
+
+- **A future model with an embedding head:** retrieval comes back, and with it the question of what the engine
+  embeds per schema.
+- **A caller's own shortlist:** the porting notes give a recipe with `needle_embed`, the 5 tools with the highest
+  `index @ q`. They call `needle_embed` "not a contrastively trained embedding", a "unit-norm vector of 3072 floats
+  (four probe queries over width 768)" (PLAN.md 11.9).
+- **Normalisation before rendering:** the same notes say the engine normalises the tools first. It unwraps
+  OpenAI-style `{"type":"function","function":{…}}` entries, turns tool and property names into snake_case, drops keys
+  the model was not trained on (`triggers` among them), and maps the names back in the calls. None of the corpus's
+  tools needs this; it is a new 11.3 item.

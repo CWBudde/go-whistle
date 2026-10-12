@@ -1463,8 +1463,30 @@ shows (multi-turn, tool results, retrieval).
       is one token); the counts cannot separate the two, and both give the same input for a whole prompt (F-048).
 - [ ] Multi-turn (`complete` after `complete`, `run`'s tool results, `<tool_result>`), `reset`, and the engine's turn
       limit and trimming (`--fail-input-overflow`).
-- [ ] Tool retrieval: with more than 5 tools only the top 5 are rendered ("a built-in retrieval head"); find what
+      Note (2026-10-12): upstream's porting notes (cactuscompute.com/blog/porting-needle) give the wire format to
+      check: "The first user turn continues the open `user` message; later turns open their own", a later turn as
+      `\n…<|im_end|>\n<|im_start|>assistant\n` and a tool result as
+      `\n<|im_start|>tool\n<tool_result>{…}</tool_result><|im_end|>\n<|im_start|>assistant\n`; the Python docs add
+      that a turn after a call is a tool result only when it parses as JSON (F-049).
+- [x] Tool retrieval: with more than 5 tools only the top 5 are rendered ("a built-in retrieval head"); find what
       ranks them (`needle_embed`, `--tool-index`), since `needle3.cact` has no embedding or router head.
+      (2026-10-12) — nothing ranks them: retrieval needs an embedding head (heads.manifest code 1, upstream's porting
+      notes), and `needle3.cact` carries only the confidence head (code 2), so engine 3.2.0 renders every declared
+      tool. `just oracle-text retrieval` (`retrieval.json`, byte-identical on a re-run): `needle_init` with a tool
+      index path on 1–17 tools of a new `catalogue` set and on 32, 64, 128, 200 and 239 tools counts 72 … 8191 tokens,
+      `toolcall.StaticPrefix` of all the tools on all 22 (`TestStaticPrefixPastFiveTools`); no index file is ever
+      written, the CLI's `--tool-index` neither; at 8192 tokens (`max_position_embeddings`) it refuses with
+      "context budget exceeded … declare more than 5 tools to enable per-turn retrieval", whatever the model.
+      `toolcall.CheckPrefix` refuses the same (`ErrContextBudget`), `toolcall.Retrieves` is upstream's rule (an
+      embedding head and more than 5 tools; the head branch unmeasured), `text.Source.HasHead` reads the heads
+      (`TestRetrievalOff`). Five new corpus cases on the 17 tools (24 now) call the 8th, 13th, 14th, 16th and 17th tool; their static
+      prefix is `needle_init`'s 1025 (`TestStaticPrefixMatchesEngine`), and the float model picks the same tool in all
+      five (F-049).
+- [ ] Tool normalisation before rendering, from upstream's porting notes (F-049): unwrap OpenAI-style
+      `{"type":"function","function":{…}}` entries, turn tool and property names into snake_case, drop keys the model
+      was not trained on (`triggers` among them), and keep an alias table so the calls carry the caller's names. The
+      corpus's tools need none of it; `needle_init`'s counts on tools that do (OpenAI-style, camelCase, `triggers`)
+      pin the rendering, the answers the aliasing.
 - [ ] **Accept:** the static-prefix token count equals `needle_init`'s on every engine case, and a float greedy decode
       of the rendered prompt gives the engine's `function_calls` on at least the cases where the float model's
       top-1 is not a near-tie.
@@ -1533,6 +1555,9 @@ Engine-only: fitted against `testdata/text/engine/`.
 ### 11.9 Text embeddings (optional; needs 11.2)
 
 - [ ] `needle_embed` for text: find what it pools without an embedding head in `needle3.cact`.
+      Note (2026-10-12): upstream's porting notes call it "four probe queries over width 768", "not a contrastively
+      trained embedding", and give a shortlist recipe over it (`argsort(-(index @ q))[:k]`) for callers with many tools,
+      since the engine does not retrieve without an embedding head (F-049).
 - [ ] **Accept:** cosine ≥ 0.99 against `needle_embed` on the recorded inputs.
 
 ## Phase 12 — Public release & follow-ups from the first write-up
