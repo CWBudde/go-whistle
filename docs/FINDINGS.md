@@ -411,8 +411,10 @@ Nothing here is reverse-engineered. This entry records the copy source, what was
 tag and the tolerances, so later kernel work can tell copied behaviour from go-whistle decisions.
 
 Since 2026-10-11 both packages live in the module `github.com/cwbudde/algo-tensor` (v0.1.0, the union of
-go-whistle's and go-pocket-tts' copies; its comments keep these F-numbers). Paths such as `internal/tensor/asm_test.go`
-below name the files as they were here; the module has them under `tensor/` and `ops/`.
+go-whistle's and go-pocket-tts' copies; its comments keep these F-numbers). Since 2026-10-12 go-whistle takes
+v0.3.1, whose `Conv2D` runs groups = 1 through im2col on arm64 and js/wasm (F-038, "The stem's conv through
+algo-tensor v0.3.1"). Paths such as `internal/tensor/asm_test.go` below name the files as they were here; the module
+has them under `tensor/` and `ops/`.
 
 **Source.** `github.com/cwbudde/go-pocket-tts` `internal/runtime/tensor` and `internal/runtime/ops` at `9faba38`.
 Every copied file starts with a comment that names its source file and commit, plus a `Change:` line when the file
@@ -3364,6 +3366,34 @@ depth and keyword regressions pass, `just eval-librispeech` WER 223/4167 = 5.35 
   of the peak.
 - **The log-mel front end** (6 ms of the 30 s TTFT) is single-threaded.
 - **The 3–5 % decode cost after a parallel encoder** (above).
+
+### The stem's conv through algo-tensor v0.3.1 (2026-10-12)
+
+algo-tensor v0.3.0 (its PLAN 1.3) runs `ops.Conv2D` with groups = 1 as im2col plus `MatMulTransBBias` on arm64 and
+js/wasm, not on amd64; v0.3.1 adds a bit-exact `Linear` that go-whistle does not call. Of the stem's convs only the
+first (3 × 3, 1 → 128) has groups = 1; the depthwise stages keep their code. The CLI on the 32 fixture clips, `main`
+(3a747a2, v0.1.0) against the bump (afd44c8):
+
+| output (32 clips; float on 3)                          | arm64 NEON                                                       | arm64 purego, linux/amd64 |
+| ------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------- |
+| `embed`, packed                                        | all differ: max abs diff 0.022, cosine ≥ 0.9999996               | byte-identical            |
+| `embed`, float                                         | all differ: max abs diff 2.6e-6                                  | byte-identical            |
+| `transcribe --json --word-timestamps`, packed, depth 4 | text, words, times equal; 15 clips move one probability by 0.001 | byte-identical            |
+| `transcribe`, float                                    | byte-identical                                                   | byte-identical            |
+
+The packed difference is larger, most likely because the lut kernel quantises its activations (F-034), so a last-bit
+change sometimes moves a value across a rounding step. Parity on arm64 (the Phase 9 numbers):
+`TestTranscribeMatchesEngine` 31/32, `TestEmbedMatchesEngine` 0.999827 → 0.999828 (worst clip 0.999034 → 0.999038),
+keywords 47/53 (28/32 sets, 28/31 variants), depth ladder 161/192, `just stream-parity` 797/930, WER 5.35 %. Packed
+against float: mean 1 − cos 4.8e-8 → 2.3e-8, worst frame 0.999945 → 0.999984. Only the int8 mode moves the other
+way, within its floors: 30/32 as before, `Embed` 0.999719 → 0.999716, worst clip 0.994891 → 0.994790.
+`TestWhistleStemChunks` (chunked stem = whole stem) and `TestWhistleEmbedWorkers` still hold bit for bit, and
+`just wasm-test ""` passes with the model.
+
+Speed: none at the default 15 workers, where the stem already runs in parallel chunks. Three interleaved `whistle-bench`
+runs gave packed TTFT medians of 18.9, 19.3, 19.6 ms (main) against 19.4, 19.1, 19.2 ms, and about 61 ms for both on
+the 30 s clip. On one worker (`GOMAXPROCS=1`), `whistle embed` of the longest fixture clip takes 79.1 ms against
+81.2 ms (median of 20).
 
 ## F-040 — Benchmarks against the engine on the same machine, and the packed WER (9.6, Phase 9 Accept) (2026-10-10)
 
