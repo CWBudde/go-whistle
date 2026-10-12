@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"sync"
 
 	"github.com/cwbudde/go-whistle/internal/needle"
 	"github.com/cwbudde/go-whistle/internal/weights"
@@ -42,6 +43,9 @@ type Model struct {
 	engrams []*needle.Engram // by site
 	site    map[int]int      // layer → site
 	final   needle.ZCRMSNorm
+
+	ropeOnce sync.Once
+	rope     *needle.Rope // Extend's tables over MaxSeqLen positions
 }
 
 // checkConfig requires OutVocab in [1, Vocab] and cfg.GlobalLayers to be

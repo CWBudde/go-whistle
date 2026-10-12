@@ -1,0 +1,138 @@
+package text
+
+import (
+	"errors"
+	"fmt"
+	"slices"
+
+	"github.com/cwbudde/go-whistle/internal/needle"
+)
+
+// State is one sequence's decoding state for Extend (docs/FINDINGS.md
+// F-022, F-026): the self-attention's KVCache per layer, the EngramCache
+// per engram site and the tokens so far. The local layers' caches keep
+// every position and attend to the last SlidingWindow of them.
+type State struct {
+	kv     []needle.KVCache
+	engram []needle.EngramCache
+	tokens []int
+}
+
+// NewState starts an empty sequence.
+func (m *Model) NewState() *State {
+	return &State{kv: make([]needle.KVCache, len(m.blocks)), engram: make([]needle.EngramCache, len(m.engrams))}
+}
+
+// Len is the number of tokens fed so far.
+func (s *State) Len() int { return len(s.tokens) }
+
+// Tokens is the token history.
+func (s *State) Tokens() []int { return slices.Clone(s.tokens) }
+
+// Fork returns a state with s's history that extends independently of s,
+// as one beam's continuation: the cached keys and values of the prefix are
+// shared until either state appends to them (needle.KVCache.Fork).
+func (s *State) Fork() *State {
+	f := &State{
+		kv:     make([]needle.KVCache, len(s.kv)),
+		engram: make([]needle.EngramCache, len(s.engram)),
+		tokens: slices.Clip(s.tokens),
+	}
+
+	for i := range s.kv {
+		f.kv[i] = s.kv[i].Fork()
+	}
+
+	for i := range s.engram {
+		f.engram[i] = s.engram[i].Fork()
+	}
+
+	return f
+}
+
+// Extend feeds tokens to the sequence s and returns their next-token
+// logits, one row of OutVocab values per token: row i scores the token
+// after tokens[i]. Feeding a sequence in one call or in pieces gives
+// Forward's logits up to float32 summation order. On an error s is left
+// as it was. No tokens return nil.
+func (m *Model) Extend(s *State, tokens []int) ([]float32, error) {
+	t, off := len(tokens), s.Len()
+	if t == 0 {
+		return nil, nil
+	}
+
+	if len(s.kv) != len(m.blocks) || len(s.engram) != len(m.engrams) {
+		return nil, errors.New("text: the state belongs to another model")
+	}
+
+	if m.cfg.MaxSeqLen <= 0 {
+		return nil, errors.New("text: Extend needs max_seq_len for the RoPE tables")
+	}
+
+	err := m.checkLen(off + t)
+	if err != nil {
+		return nil, err
+	}
+
+	x, err := m.embed(tokens, off)
+	if err != nil {
+		return nil, err
+	}
+
+	m.ropeOnce.Do(func() { m.rope = needle.NewRope(m.cfg.QKDim, m.cfg.MaxSeqLen, m.cfg.Rope) })
+
+	// The caches only append or replace their slices, so copies of the
+	// headers are the old state.
+	kv, engram := slices.Clone(s.kv), slices.Clone(s.engram)
+
+	logits, err := m.extend(s, x, tokens)
+	if err != nil {
+		s.kv, s.engram = kv, engram
+
+		return nil, err
+	}
+
+	s.tokens = append(s.tokens, tokens...)
+
+	return logits, nil
+}
+
+// extend runs the stack on the embedded rows x of tokens, advancing s's
+// caches.
+func (m *Model) extend(s *State, x []float32, tokens []int) ([]float32, error) {
+	t := len(tokens)
+	ekv := make([]*needle.EngramKV, len(m.engrams))
+
+	for i, e := range m.engrams {
+		var err error
+
+		ekv[i], err = e.Extend(tokens, &s.engram[i])
+		if err != nil {
+			return nil, fmt.Errorf("text: %w", err)
+		}
+	}
+
+	stream := needle.ExpandLanes(x, m.cfg.Lanes, m.cfg.Dim)
+
+	for l, b := range m.blocks {
+		var site *needle.EngramKV
+		if i, ok := m.site[l]; ok {
+			site = ekv[i]
+		}
+
+		block := func(u []float32) ([]float32, error) {
+			return b.Extend(u, t, &s.kv[l], m.rope, site, needle.Hooks{})
+		}
+
+		var err error
+
+		stream, err = m.mhc[l].Forward(stream, t, block)
+		if err != nil {
+			return nil, fmt.Errorf("text: layer %d: %w", l, err)
+		}
+	}
+
+	_, logits := m.output(stream, t)
+
+	return logits, nil
+}
