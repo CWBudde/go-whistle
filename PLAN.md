@@ -1632,6 +1632,9 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
       the depth ladder, the stream decisions, the LibriSpeech WER and the `Embed` cosine against the engine), the
       `Embed` and `Transcribe` outputs that change are named with their largest difference and their fixtures
       regenerated in the same change, amd64 outputs are unchanged, and `just bench` gives the TTFT before and after.
+      js/wasm changes too, and CI skips its model-gated tests: with the model, `just wasm-test ""` (no `-short`) passes,
+      the `whistle` package's engine parity under Node and the headless page's JSON against the CLI's on its 4 clips
+      included.
 - [ ] js/wasm speed (F-043 "Open"): about 22 tok/s and a TTFT of 0.3–0.8 s on one thread without SIMD. Try several
       workers, each with its own 17 MB model, to run the beams or the encoder blocks in parallel. A hand-written wasm
       SIMD module for the LUT kernels would leave pure Go; decide first whether it is worth that.
