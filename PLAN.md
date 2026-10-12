@@ -1591,9 +1591,10 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
 - [ ] GEMM in AVX2+FMA: `algo-tensor` has `gemm_arm64.s` but no amd64 GEMM, and `whistle doctor` says so on x86
       ("AVX2: CQ LUT GEMV; AVX2+FMA: dot, axpy, softmax exp; GEMM in Go"). The float products (the Monarch
       Kronecker products, the float path) therefore run in pure Go there. 9.4's note that they run on "the existing
-      NEON/AVX2 GEMM" is only true on arm64; correct it. The kernel belongs in `algo-tensor`: its PLAN 1.3 (after 1.1,
-      1.2 and v0.2.0) gives `tensor.MatMulTransB` an AVX2 + FMA kernel as a numerics change, released as v0.3.0;
-      then bump the module here. **Accept:** with algo-tensor v0.3.0, the parity numbers on amd64 and arm64 stay at
+      NEON/AVX2 GEMM" is only true on arm64; correct it. The kernel belongs in `algo-tensor`: its PLAN 1.4 (after 1.2,
+      the AVX2 port of algo-transcribe's kernels) gives `tensor.MatMulTransB` an AVX2 + FMA kernel as a numerics
+      change, released as v0.4.0; then bump the module here. **Accept:** with algo-tensor v0.4.0 (its 1.4, the
+      AVX2 + FMA `MatMulTransB`), the parity numbers on amd64 and arm64 stay at
       least as good as before (`TestTranscribeMatchesEngine`, the keyword fixtures, the depth ladder, the stream
       decisions, the LibriSpeech WER and the `Embed` cosine against the engine), the `Embed` and `Transcribe` outputs
       that change are named with their largest difference and their fixtures regenerated in the same change, and a
@@ -1601,6 +1602,10 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
       (2026-10-12) — partial: 9.4's note now says the GEMM is NEON on arm64 and pure Go on amd64. The kernel waits for
       algo-tensor 1.1 (its PR #6), 1.2 (after algo-transcribe PR #9), v0.2.0 and 1.3. The amd64 numbers it has to hold
       are those of the next item: 31/32, keywords 47/53, depth 161/192, stream 797/930, WER 5.35 %, `Embed` 0.999828.
+      (2026-10-12) — the gate moved: algo-tensor released v0.2.0 after its 1.1 (`b33d487`, without 1.2), and its PR #7
+      splits 1.3: the `Conv2D` routing (v0.3.0, not on amd64) stays 1.3, the AVX2 + FMA `MatMulTransB` becomes 1.4
+      after 1.2. By the user's decision 1.2 is released as v0.3.1 and 1.4 as v0.4.0, and the Accept names v0.4.0. The
+      kernel now waits for 1.2 (after algo-transcribe PR #9) and 1.4; adopting v0.3.0 is a 12.4 item.
 - [x] Benchmarks on linux/amd64: `bench/RESULTS.md` has only the Apple M5 Pro. Add a `just bench` run on an x86
       machine (with the CPU, cores and governor recorded), and the engine side where a linux/amd64 engine build
       exists. On the 4600H laptop, `transcribe --json` reported a TTFT of 101–108 ms and 150–270 tok/s on five fixture
@@ -1619,6 +1624,17 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
       32 clips (F-040). Profile where the TTFT goes (front end, stem, encoder, memory, first decoder steps) and take
       up the open levers of F-037 and F-041. Engine speed is still not a hard goal (Risks); the aim is a measured
       breakdown and whichever levers pay off without moving the parity numbers.
+- [ ] Adopt algo-tensor v0.3.0 (its 1.3, algo-tensor PR #7): `ops.Conv2D` with groups = 1 runs through
+      `Conv2DPlan` (im2col and `MatMulTransBBias`) on arm64 and js/wasm, not on amd64. Whistle's stem
+      (`internal/encoder/stem.go`) is such a conv: algo-tensor measured it 9.51 → 3.93 ms on an Apple M5 Pro (one
+      worker), and its `Conv2D` bits change there (golden case max |Δ| 9.5 × 10⁻⁷). **Accept:** with v0.3.0, the
+      parity numbers on arm64 stay at least as good as before (`TestTranscribeMatchesEngine`, the keyword fixtures,
+      the depth ladder, the stream decisions, the LibriSpeech WER and the `Embed` cosine against the engine), the
+      `Embed` and `Transcribe` outputs that change are named with their largest difference and their fixtures
+      regenerated in the same change, amd64 outputs are unchanged, and `just bench` gives the TTFT before and after.
+      js/wasm changes too, and CI skips its model-gated tests: with the model, `just wasm-test ""` (no `-short`) passes,
+      the `whistle` package's engine parity under Node and the headless page's JSON against the CLI's on its 4 clips
+      included.
 - [ ] js/wasm speed (F-043 "Open"): about 22 tok/s and a TTFT of 0.3–0.8 s on one thread without SIMD. Try several
       workers, each with its own 17 MB model, to run the beams or the encoder blocks in parallel. A hand-written wasm
       SIMD module for the LUT kernels would leave pure Go; decide first whether it is worth that.
