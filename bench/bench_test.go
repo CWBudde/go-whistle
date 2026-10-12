@@ -110,7 +110,7 @@ func TestRender(t *testing.T) {
 
 	var b bytes.Buffer
 
-	err := Render(&b, g, e, GoResultsPath, EngineResultsPath)
+	err := Render(&b, g, e, DefaultPaths)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestRender(t *testing.T) {
 
 	b.Reset()
 
-	err = Render(&b, g, e, GoResultsPath, EngineResultsPath)
+	err = Render(&b, g, e, DefaultPaths)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestRender(t *testing.T) {
 
 	b.Reset()
 
-	err = Render(&b, g, e, GoResultsPath, EngineResultsPath)
+	err = Render(&b, g, e, DefaultPaths)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func TestRenderNotComparable(t *testing.T) {
 
 			var b bytes.Buffer
 
-			err := Render(&b, g, e, GoResultsPath, EngineResultsPath)
+			err := Render(&b, g, e, DefaultPaths)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -297,7 +297,7 @@ func TestRenderUnknownRSS(t *testing.T) {
 
 	var b bytes.Buffer
 
-	err := Render(&b, g, e, GoResultsPath, EngineResultsPath)
+	err := Render(&b, g, e, DefaultPaths)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +323,7 @@ func TestRenderClipCount(t *testing.T) {
 
 	var b bytes.Buffer
 
-	err := Render(&b, g, nil, GoResultsPath, EngineResultsPath)
+	err := Render(&b, g, nil, DefaultPaths)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestRenderClipCount(t *testing.T) {
 func TestRenderWithoutResults(t *testing.T) {
 	var b bytes.Buffer
 
-	err := Render(&b, nil, nil, GoResultsPath, EngineResultsPath)
+	err := Render(&b, nil, nil, DefaultPaths)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -413,7 +413,9 @@ func TestRenderGovernorAndPaths(t *testing.T) {
 
 	var b bytes.Buffer
 
-	err := Render(&b, g, e, "bench/results/x/go.json", "bench/results/x/engine.json")
+	err := Render(&b, g, e, Paths{
+		Go: "bench/results/x/go.json", Engine: "bench/results/x/engine.json", Report: "bench/RESULTS-x.md",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -421,6 +423,13 @@ func TestRenderGovernorAndPaths(t *testing.T) {
 	out := b.String()
 	if !strings.Contains(out, "generated from `bench/results/x/go.json` (`just bench`)\nand `bench/results/x/engine.json`") {
 		t.Errorf("report does not name its sources:\n%s", out)
+	}
+
+	if !strings.Contains(out, "just bench -go bench/results/x/go.json -engine bench/results/x/engine.json "+
+		"-report bench/RESULTS-x.md\n") ||
+		!strings.Contains(out, "just oracle-bench -out bench/results/x/engine.json -go bench/results/x/go.json "+
+			"-report bench/RESULTS-x.md\n") {
+		t.Errorf("Reproduce lacks the paths' flags:\n%s", out)
 	}
 
 	if strings.Contains(out, "| governor") {
@@ -431,7 +440,7 @@ func TestRenderGovernorAndPaths(t *testing.T) {
 
 	b.Reset()
 
-	err = Render(&b, g, e, GoResultsPath, EngineResultsPath)
+	err = Render(&b, g, e, DefaultPaths)
 	if err != nil {
 		t.Fatal(err)
 	}
