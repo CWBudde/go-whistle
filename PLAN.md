@@ -1609,7 +1609,8 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
       are those of the next item: 31/32, keywords 47/53, depth 161/192, stream 797/930, WER 5.35 %, `Embed` 0.999828.
       (2026-10-12) — the gate moved: algo-tensor released v0.2.0 after its 1.1 (`b33d487`, without 1.2), and its PR #7
       splits 1.3: the `Conv2D` routing (v0.3.0, not on amd64) stays 1.3, the AVX2 + FMA `MatMulTransB` becomes 1.4
-      after 1.2. By the user's decision 1.2 is released as v0.3.1 and 1.4 as v0.4.0, and the Accept names v0.4.0. The
+      after 1.2. By the user's decision 1.2 and 1.4 ship together as v0.4.0 (1.2 also moves bits on AVX2 machines, a minor
+      release by algo-tensor's rules; algo-tensor PR #8), and the Accept names v0.4.0. The
       kernel now waits for 1.2 (after algo-transcribe PR #9) and 1.4; adopting v0.3.0 is a 12.4 item.
 - [x] Benchmarks on linux/amd64: `bench/RESULTS.md` has only the Apple M5 Pro. Add a `just bench` run on an x86
       machine (with the CPU, cores and governor recorded), and the engine side where a linux/amd64 engine build
