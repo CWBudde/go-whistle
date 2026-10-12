@@ -60,7 +60,7 @@ type Bias struct {
 	once      bool // a keyword earns its bonus once per text: a repeat's tokens are taken back when it completes
 
 	// Probe axes of docs/FINDINGS.md F-044; DefaultBias sets fold to
-	// foldCases, the others are off.
+	// foldCases and spent, the others are off.
 	fold    foldMode  // how a keyword's case is matched: Forms on token ids, more cases, or folded bytes
 	share   foldShare // under foldBytes: how a keyword's bonus is spread over the tokens of the text
 	wordEnd bool      // under foldBytes: a keyword completes only before a non-letter or EOS
@@ -70,15 +70,20 @@ type Bias struct {
 }
 
 // DefaultBias is the bias the keyword fixtures picked (docs/FINDINGS.md
-// F-029, F-044): 1.8 nats per matched token, all of it taken back when a
-// partial match fails, 1.5 more on completion, the keyword after a space
-// and bare, as written, with its first letter upper- and lower-cased, all
-// in lower case, and in lower case but for a capital first letter (the
-// engine ignores the keyword's case). With Default it reproduces the
-// engine's text with the keywords on 47 of 53 fixture cases.
+// F-029, F-044): 2.15 nats per matched token, all of it taken back when a
+// partial match fails, no completion bonus, nothing more for a keyword
+// once it completed (spent), the keyword after a space and bare, as
+// written, with its first letter upper- and lower-cased, all in lower
+// case, and in lower case but for a capital first letter (the engine
+// ignores the keyword's case). With Default it reproduces the engine's
+// text with the keywords on 47 of 53 fixture cases, 28 of 32 keyword sets
+// and 28 of 31 variants; the user chose it over w=1.8 complete=1.5 (18 of
+// 32 sets, 29 of 31 variants), which misses de-paare-missed instead of
+// pl-francja-present and loops on repeated keywords.
 func DefaultBias() Bias {
 	return Bias{
-		Weight: 1.8, Revoke: 1, Complete: 1.5, Forms: FormSpace | FormBare | FormCapital | FormLower, fold: foldCases,
+		Weight: 2.15, Revoke: 1, Complete: 0, Forms: FormSpace | FormBare | FormCapital | FormLower, fold: foldCases,
+		spent: true,
 	}
 }
 
@@ -161,6 +166,7 @@ type Keywords struct {
 	end   []bool        // a keyword ends here
 	key   []int         // the keyword a spelling that ends at the node spells, shared by its forms (Bias.once)
 	via   [][]int       // the keywords whose spellings pass through the node (Bias.spent)
+	ends  [][]int       // the keywords whose spellings end at the node (Bias.spent)
 	start kwState       // the state at the start of the text
 	bias  Bias
 	bytes *byteKeywords // the matcher under Bias.fold == foldBytes, which Adjust and Bonus use instead
@@ -380,7 +386,7 @@ func build(ids [][]int, weight func(id int) float64, b Bias) *Keywords {
 func buildWeighted(ids [][]int, ws [][]float64, b Bias) *Keywords {
 	k := &Keywords{
 		next: []map[int]int{{}}, fail: []int{0}, up: []int{0}, w: []float64{0}, depth: []int{0}, end: []bool{false},
-		key: []int{0}, via: [][]int{nil}, bias: b,
+		key: []int{0}, via: [][]int{nil}, ends: [][]int{nil}, bias: b,
 	}
 
 	for i, s := range ids {
@@ -548,6 +554,7 @@ func (k *Keywords) add(ids []int, ws []float64) {
 			k.end = append(k.end, false)
 			k.key = append(k.key, -1-c) // a spelling of its own until identify
 			k.via = append(k.via, nil)
+			k.ends = append(k.ends, nil)
 			k.next[n][id] = c
 		}
 
@@ -560,7 +567,8 @@ func (k *Keywords) add(ids []int, ws []float64) {
 // identify gives the node each spelling of ids ends at the key of its
 // keyword, keys[i] for spelling i, so that Bias.once counts a keyword once
 // whatever its form. A node two keywords' spellings share keeps the
-// first's key. Without identify each spelling is a keyword of its own.
+// first's key, and lists both in ends: under Bias.spent they complete
+// together. Without identify each spelling is a keyword of its own.
 func (k *Keywords) identify(ids [][]int, keys []int) {
 	set := make([]bool, len(k.key))
 
@@ -573,8 +581,16 @@ func (k *Keywords) identify(ids [][]int, keys []int) {
 			}
 		}
 
-		if n != 0 && !set[n] {
+		if n == 0 {
+			continue
+		}
+
+		if !set[n] {
 			k.key[n], set[n] = key, true
+		}
+
+		if !slices.Contains(k.ends[n], key) {
+			k.ends[n] = append(k.ends[n], key)
 		}
 	}
 }
@@ -664,11 +680,20 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 		kn := k.suffix(c, l)
 
 		if k.bias.spent {
-			if slices.Contains(next.done, k.key[kn]) {
+			keys := k.endKeys(kn)
+			if !slices.ContainsFunc(keys, func(key int) bool { return !slices.Contains(next.done, key) }) {
 				continue // a repeat: no completion, and its tokens earned nothing
 			}
 
-			next.done = append(slices.Clip(next.done), k.key[kn])
+			// Every keyword spelled to kn completes: a keyword given
+			// twice, or case variants that share the spelling (PR #53
+			// review).
+			next.done = slices.Clip(next.done)
+			for _, key := range keys {
+				if !slices.Contains(next.done, key) {
+					next.done = append(next.done, key)
+				}
+			}
 		}
 
 		if k.bias.once {
@@ -698,6 +723,16 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 	next.cov = cov
 
 	return next, d
+}
+
+// endKeys is the keywords whose spellings end at node n: those identify
+// recorded, else the node's own key.
+func (k *Keywords) endKeys(n int) []int {
+	if len(k.ends[n]) > 0 {
+		return k.ends[n]
+	}
+
+	return []int{k.key[n]}
 }
 
 // spent reports whether every keyword through node c has completed

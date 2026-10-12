@@ -4135,6 +4135,16 @@ count at fixed text) would narrow it.
 `TestByteKeywords` and `TestCaseKeywords` pin them. The probes of F-042 and F-044 vary F-029's bias (`f029Bias`), so
 their tables stay reproducible.
 
+### Decision (2026-10-12)
+
+The user took both trades: `DefaultBias` is now `w=2.15 complete=0 fold=cases spent` (revoke 1, all forms), the
+summary table's row with `de-paare-missed` equal. `TestProbeFold` (grid 4) on it: 47/53 keyword cases (won
+`de-paare-missed`, lost `pl-francja-present` against the old default), 28/32 keyword sets (was 18/32), 28/31
+variants (was 29/31: the variant `Cowley` is now a finished-slot search miss), and no phrase loops. The engine's rule
+is still unknown; this is the best trade the grids found, not the rule. The four fast keyword cases of
+`TestKeywordsMatchEngine` keep the engine's text, two with lower scores (`en-transfer-distractor` 0.0711 → 0.0072,
+`de-paare-adoptionsplan-list` 0.1830 → 0.1673), whose floors moved below them. Nothing without keywords changes.
+
 ## F-045 — The Needle 3 text model: its files against Whistle's, the `.cact` map, and a float forward pass equal to JAX (PLAN.md 11.1, 11.2) (2026-10-11, 2026-10-12)
 
 **Question.** Do `needle3.safetensors` and `needle3.cact` (HF `Cactus-Compute/needle3` @ `93e88ede`) load through the

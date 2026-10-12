@@ -241,8 +241,8 @@ var keywordFast = []string{
 }
 
 // keywordFloors are their ranking scores with the bonus, measured with the
-// .cact weights (0.1270, −0.1575, 0.0711, 0.1830) and floored just below.
-var keywordFloors = []float64{0.12, -0.17, 0.06, 0.17}
+// .cact weights (0.1395, −0.1575, 0.0072, 0.1673) and floored just below.
+var keywordFloors = []float64{0.13, -0.17, 0, 0.16}
 
 // TestKeywordsMatchEngine beam-decodes keywordFast with Default and the
 // Adjust of their keyword files under DefaultBias, and requires the

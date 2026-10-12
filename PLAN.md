@@ -1176,7 +1176,7 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       `whistle/example_test.go` has 10 examples: 4 model-free with `// Output:` (the result and stream JSON, reading
       engine JSON, embedding rows), 6 that need the model and only compile under `go test` (each was run against
       the model with its output checked once).
-- [ ] Follow-up from 6.3: `de-paare-missed`, the one keyword search miss. Weaker hypotheses with the shared keyword
+- [x] Follow-up from 6.3: `de-paare-missed`, the one keyword search miss. Weaker hypotheses with the shared keyword
       bonus end one token earlier and fill Whisper's 5 finished slots (F-029); find the engine's rule that keeps the
       right one.
       (2026-10-11) — partial: no finished-slot rule is the engine's. Nine variants behind a test-only switch
@@ -1204,6 +1204,11 @@ the engine's word times and probabilities, so this phase needs no new oracle run
       `w=2.15 complete=0` (`de-paare-missed` equal, 28/32 sets) for `pl-francja-present`, and `spent` for the
       variant `Cowley`. Open: what the engine's bonus depends on, since `accomun` and `Paare` both have 3 tokens and
       want bonuses on either side of the threshold that prunes "Bare" (F-044).
+      (2026-10-12) — closed by the user's decision on the two trades: `DefaultBias` is `w=2.15 complete=0` with the
+      case spellings and `spent`. `de-paare-missed` is equal; `TestProbeFold` (grid 4): 47/53 cases (`pl-francja-present`
+      lost for it), 28/32 keyword sets (was 18/32), 28/31 variants (`Cowley` lost), no phrase loops. The engine's rule
+      itself was not found (F-044 "Decision"). `TestKeywordsMatchEngine` keeps the engine's text on its four cases;
+      two score floors moved.
 - [x] Optional: an HTTP server (`/transcribe`, `/stream` over WebSocket)
       (2026-10-11) — `whistle serve` (`internal/server`) loads the model once. `POST /transcribe` takes a WAV body
       or raw 16 kHz mono PCM (`?format=s16le|f32le`) with the options as query parameters (`language`, repeatable

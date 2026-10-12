@@ -36,7 +36,7 @@ import (
 func foldName(b Bias) string { return biasName(b) }
 
 // foldGrid is the biases of grid WHISTLE_PROBE_GRID (default 2) of
-// TestProbeFold, DefaultBias first.
+// TestProbeFold, F-029's bias first.
 func foldGrid() []Bias {
 	switch probeEnv("WHISTLE_PROBE_GRID", 4) {
 	case 1:
@@ -52,9 +52,9 @@ func foldGrid() []Bias {
 
 // foldGrid4 is the summary of docs/FINDINGS.md F-044 (11 biases): F-029's
 // bias, with the case spellings, the spent rule and both, F-042's gain
-// alone, with the case spellings (DefaultBias) and with both, the window
-// that makes de-paare-missed equal, the bias that reproduces every
-// keyword set, and the best byte matchers.
+// alone, with the case spellings (DefaultBias until 2026-10-12) and with
+// both, the window that makes de-paare-missed equal (DefaultBias), the
+// bias that reproduces every keyword set, and the best byte matchers.
 func foldGrid4() []Bias {
 	out, add := foldAdder()
 	ext := func(b *Bias) { b.fold, b.spent = foldCases, true }
@@ -70,8 +70,8 @@ func foldGrid4() []Bias {
 	add(func(b *Bias) { b.fold, b.Weight, b.Complete = foldBytes, 1.8, 0 })
 	add(func(b *Bias) { b.fold, b.share, b.Weight, b.Complete = foldBytes, shareToken, 2.2, 0 })
 
-	if (*out)[5] != DefaultBias() {
-		panic("foldGrid4: row 5 is not DefaultBias")
+	if (*out)[7] != DefaultBias() {
+		panic("foldGrid4: row 7 is not DefaultBias")
 	}
 
 	return *out

@@ -67,6 +67,31 @@ func TestKeywordSpent(t *testing.T) {
 	}
 }
 
+// TestKeywordSpentShared: two keywords whose spellings end at the same
+// node (a keyword given twice, or case variants under foldCases) complete
+// together, so under spent a repeat earns nothing for either (PR #53
+// review); a third keyword through the node but ending later stays live.
+func TestKeywordSpentShared(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ids  [][]int
+		keys []int
+		text []int
+		want float64
+	}{
+		{"one keyword", [][]int{{1, 2}}, []int{0}, []int{1, 2, 1, 2}, 2.5},
+		{"the same keyword twice", [][]int{{1, 2}, {1, 2}}, []int{0, 1}, []int{1, 2, 1, 2}, 2.5},
+		{"a longer keyword through it", [][]int{{1, 2}, {1, 2, 3}}, []int{0, 1}, []int{1, 2, 1, 2, 3}, 2.5 + 3.5},
+	} {
+		k := build(tc.ids, unit, Bias{Weight: 1, Revoke: 1, Complete: 0.5, Forms: FormSpace, spent: true})
+		k.identify(tc.ids, tc.keys)
+
+		if got := k.Bonus(tc.text, -1); math.Abs(got-tc.want) > 1e-12 {
+			t.Errorf("%s: Bonus(%v) = %g, want %g", tc.name, tc.text, got, tc.want)
+		}
+	}
+}
+
 // TestByteKeywords pins the byte matcher (foldBytes) on the real
 // vocabulary: it matches a keyword whatever its case and its tokens, the
 // keyword's own tokens earn what the token matcher gives them, shareToken

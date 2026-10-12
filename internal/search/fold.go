@@ -10,8 +10,8 @@ import (
 
 // The case-folded matchers of the F-044 probe (docs/FINDINGS.md): the
 // engine gives "Paare", "paare" and "PAARE" the same text, while
-// Keywords matches token ids, the first letter's two cases only. Both are
-// off in DefaultBias.
+// Keywords matches token ids, the first letter's two cases only. The byte
+// matcher is off in DefaultBias; the case spellings (foldCases) are on.
 
 // foldMode is how a keyword's case is matched (Bias.fold).
 type foldMode int
