@@ -4693,7 +4693,11 @@ with the caller's names in the calls (F-050); `Normalised.Triggered` and `Ignore
 drops; `NoTools` is the answer without tools; `Envelope.MarshalJSON` writes the engine's field order.
 `TestEnvelopeMatchesEngine` builds the envelope of every corpus turn and of the eight trigger probes the model answers
 without routing (35 turns): type, success, error, error_code, reason, the split into function and suppressed calls,
-negation and the ungrounded list equal the engine's on all of them. `TestEnvelope` and `TestNoTools` cover the rules
+negation and the ungrounded list equal the engine's on all of them; the calls on all but the 21 turns the engine's
+repair (capitalisation, an empty optional dropped, a re-resolved date, a flipped polarity) or grammar changes, and the
+reasoning on all but the 7 near-ties, which the test lists and checks are still off. A field's schemas for grounding
+include the `allOf`, `anyOf` and `oneOf` branches that declare it, and an enum, const or date format in any of them
+exempts it (port-side; the corpus has no composed schemas; PR #64 review). `TestEnvelope` and `TestNoTools` cover the rules
 without the model.
 
 **Open.**

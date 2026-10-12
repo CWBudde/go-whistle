@@ -44,7 +44,42 @@ var (
 	}
 )
 
-// envelopeTurn checks one turn's envelope against the engine's.
+// The calls differ from the engine's, by its repair after decoding (the
+// capitalisation, an empty optional dropped, a date re-resolved, a polarity
+// flipped) or its schema grammar (keys outside the schema); PLAN.md 11.4.
+var callsDiffer = map[string]string{
+	"timer_pasta/0":            "capitalisation",
+	"timer_then_result/0":      "capitalisation",
+	"timer_triggered/0":        "capitalisation",
+	"message_and_timer/0":      "capitalisation",
+	"event_tomorrow/0":         "capitalisation",
+	"event_explicit/0":         "capitalisation",
+	"french_message/0":         "capitalisation",
+	"catalogue_email/0":        "capitalisation",
+	"alarm_morning/0":          "empty optional",
+	"alarm_untriggered/0":      "empty optional",
+	"alarm_triggered/0":        "empty optional",
+	"alarm_invalid/0":          "empty optional",
+	"alarm_no_match/0":         "empty optional",
+	"weather_friday/0":         "date",
+	"event_no_year/0":          "date, capitalisation",
+	"negation_door/0":          "polarity",
+	"negation_triggered/0":     "polarity",
+	"negation_two_triggered/0": "polarity",
+	"lights_and_lock/0":        "grammar",
+	"spanish_lights_music/0":   "grammar",
+	"catalogue_lock/0":         "grammar",
+}
+
+// reasoningDiffers are the turns decoded differently from the engine at a
+// near-tie (decode_test.go).
+var reasoningDiffers = map[string]bool{
+	"alarm_morning/0": true, "alarm_untriggered/0": true, "alarm_triggered/0": true, "alarm_invalid/0": true,
+	"alarm_no_match/0": true, "event_no_year/0": true, "catalogue_reminder/0": true,
+}
+
+// envelopeTurn checks one turn's envelope against the engine's: every field,
+// the calls and the reasoning but on the turns listed.
 func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) {
 	t.Helper()
 
@@ -75,6 +110,16 @@ func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) {
 	if len(g.Calls) != len(want.Calls) || len(g.Suppressed) != len(want.Suppressed) {
 		t.Errorf("%s: %d calls, %d suppressed; engine %d, %d", key, len(g.Calls), len(g.Suppressed),
 			len(want.Calls), len(want.Suppressed))
+	}
+
+	d := diffCalls(append(g.Calls, g.Suppressed...), append(want.Calls, want.Suppressed...))
+	if why, listed := callsDiffer[key]; listed == (d == "") {
+		t.Errorf("%s: calls %q (listed: %q)", key, d, why)
+	}
+
+	same := reflect.DeepEqual(g.Reasoning, want.Reasoning)
+	if near := reasoningDiffers[key]; near == same {
+		t.Errorf("%s: reasoning %v, engine %v (listed as a near-tie: %v)", key, g.Reasoning, want.Reasoning, near)
 	}
 
 	if (g.Validation == nil) != (want.Validation == nil) {
@@ -285,6 +330,44 @@ func TestContainsNumber(t *testing.T) {
 	} {
 		if got := containsNumber(c.s, c.lit); got != c.want {
 			t.Errorf("containsNumber(%q, %q) = %v", c.s, c.lit, got)
+		}
+	}
+}
+
+// TestUngroundedComposed: a field's schemas include the allOf, anyOf and
+// oneOf branches that declare it, so their enums exempt it (PR #64 review).
+func TestUngroundedComposed(t *testing.T) {
+	tools := `[{"name":"t","parameters":{"type":"object","properties":{"o":{"allOf":[{"properties":{` +
+		`"mode":{"enum":["fast","slow"]},"name":{"type":"string"}}}]},"list":{"type":"array","items":{"oneOf":[` +
+		`{"properties":{"day":{"type":"string","format":"date"}}}]}}},"anyOf":[{"properties":{"color":{` +
+		`"enum":["red"]}}}]}}]`
+
+	n, err := Normalise([]byte(tools))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	calls := []modelCall{{"t", []byte(`{"o":{"mode":"fast","name":"zed"},"color":"red",` +
+		`"list":[{"day":"next week"}],"other":"elsewhere"}`)}}
+
+	got := n.ungrounded(calls, "x")
+	if want := []string{"t.o.name", "t.other"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("ungrounded = %v, want %v", got, want)
+	}
+}
+
+func TestTop2(t *testing.T) {
+	for _, c := range []struct {
+		row          []float32
+		best, second int
+	}{
+		{[]float32{3}, 0, 0},
+		{[]float32{1, 2}, 1, 0},
+		{[]float32{5, 1, 7, 6}, 2, 3},
+		{[]float32{2, 2, 1}, 0, 1},
+	} {
+		if b, s := top2(c.row); b != c.best || s != c.second {
+			t.Errorf("top2(%v) = %d, %d, want %d, %d", c.row, b, s, c.best, c.second)
 		}
 	}
 }

@@ -162,8 +162,12 @@ func (d *Decoder) Confidence(s *text.State) (float64, error) {
 }
 
 // top2 are the indices of row's largest and second-largest values, the
-// first on a tie.
+// first on a tie; a row of one value is both (PR #64 review).
 func top2(row []float32) (best, second int) {
+	if len(row) == 1 {
+		return 0, 0
+	}
+
 	best, second = 0, 1
 	if row[second] > row[best] {
 		best, second = second, best

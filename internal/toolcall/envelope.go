@@ -196,22 +196,21 @@ func (n *Normalised) ungrounded(calls []modelCall, input string) []string {
 	seen := map[string]bool{}
 	lower := strings.ToLower(input)
 
-	var walk func(path string, v any, schema *object)
+	var walk func(path string, v any, schemas []*object)
 
-	walk = func(path string, v any, schema *object) {
+	walk = func(path string, v any, schemas []*object) {
 		switch t := v.(type) {
 		case *object:
-			props := member(schema, "properties")
 			for _, k := range t.keys {
-				walk(path+"."+k, t.vals[k], member(props, k))
+				walk(path+"."+k, t.vals[k], under(schemas, "properties", k))
 			}
 		case []any:
-			items := member(schema, "items")
+			items := under(schemas, "items", "")
 			for _, x := range t {
 				walk(path, x, items)
 			}
 		default:
-			if !grounded(t, schema, lower) && !seen[path] {
+			if !grounded(t, schemas, lower) && !seen[path] {
 				seen[path] = true
 				out = append(out, path)
 			}
@@ -226,7 +225,12 @@ func (n *Normalised) ungrounded(calls []modelCall, input string) []string {
 			continue
 		}
 
-		walk(c.name, v, n.params[c.name])
+		var params []*object
+		if ps := n.params[c.name]; ps != nil {
+			params = composed(ps)
+		}
+
+		walk(c.name, v, params)
 	}
 
 	return out
@@ -243,30 +247,68 @@ func member(o *object, key string) *object {
 	return m
 }
 
+// composed is s and, recursively, the branches of its allOf, anyOf and
+// oneOf lists: every schema that may describe a value of s (a port-side
+// rule, docs/FINDINGS.md F-054).
+func composed(s *object) []*object {
+	out := []*object{s}
+
+	for _, key := range compositions {
+		list, _ := s.vals[key].([]any)
+		for _, b := range list {
+			if o, ok := b.(*object); ok {
+				out = append(out, composed(o)...)
+			}
+		}
+	}
+
+	return out
+}
+
+// under are the composed schemas of key under schemas: of property k of
+// their "properties", or of their "items" when k is "".
+func under(schemas []*object, key, k string) []*object {
+	var out []*object
+
+	for _, s := range schemas {
+		sub := member(s, key)
+		if k != "" {
+			sub = member(sub, k)
+		}
+
+		if sub != nil {
+			out = append(out, composed(sub)...)
+		}
+	}
+
+	return out
+}
+
 // isoDate is a calendar date as the model writes one.
 var isoDate = regexp.MustCompile(`\d{4}-\d{2}-\d{2}`)
 
 // grounded reports whether the request lowered contains the leaf value v of
-// a field with schema s.
-func grounded(v any, s *object, lowered string) bool {
-	if s != nil {
-		if _, ok := s.vals["enum"]; ok {
+// a field with the schemas schemas; an enum, const or date format in any of
+// them exempts it.
+func grounded(v any, schemas []*object, lowered string) bool {
+	date := false
+
+	for _, s := range schemas {
+		_, enum := s.vals["enum"]
+		_, constant := s.vals["const"]
+
+		if enum || constant {
 			return true
 		}
 
-		if _, ok := s.vals["const"]; ok {
-			return true
+		if f, _ := s.vals["format"].(string); f == "date" || f == "date-time" {
+			date = true
 		}
 	}
 
 	switch t := v.(type) {
 	case string:
-		format := ""
-		if s != nil {
-			format, _ = s.vals["format"].(string)
-		}
-
-		if format == "date" || format == "date-time" || isoDate.MatchString(t) {
+		if date || isoDate.MatchString(t) {
 			return true
 		}
 

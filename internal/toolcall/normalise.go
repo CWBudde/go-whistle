@@ -123,6 +123,12 @@ func Normalise(raw []byte) (*Normalised, error) {
 	return n, nil
 }
 
+// compositions are the keywords whose branch lists compose a schema: one
+// branch of each anyOf and oneOf applies, every allOf branch.
+var compositions = []string{"anyOf", "oneOf", allOf}
+
+const allOf = "allOf"
+
 // unwrap is an OpenAI-style entry's "function" object, or the entry.
 func unwrap(t any) any {
 	if o, ok := t.(*object); ok {
@@ -236,12 +242,12 @@ func schema(o *object) (*object, *schemaAlias) {
 		o = o.with("additionalProperties", ex)
 	}
 
-	for _, key := range []string{"anyOf", "oneOf", "allOf"} {
+	for _, key := range compositions {
 		if list, ok := o.vals[key].([]any); ok {
 			renamed, group := branchList(list)
 			o = o.with(key, renamed)
 
-			if key == "allOf" {
+			if key == allOf {
 				a.allOf = group
 			} else {
 				a.alts = append(a.alts, group)
