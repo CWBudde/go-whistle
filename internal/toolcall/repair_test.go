@@ -351,6 +351,10 @@ func TestRepairDefaultNumber(t *testing.T) {
 		{"digits", timer, "set a timer for 3 minutes", "", call("3"), call("3")},
 		{"a number word", timer, "set a timer for five minutes", "", call("5"), call("5")},
 		{"optional: no default, dropped unstated", optional, "set a timer", "", call("15"), `[{"name":"set_timer","arguments":{}}]`},
+		{
+			"a boolean property schema", oneTool("set_timer", `"off":false,"minutes":{"type":"integer","default":7}`,
+				`"minutes"`), "set a timer for the pasta", "", call("15"), call("7"),
+		},
 	}
 
 	runRepair(t, cases)

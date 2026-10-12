@@ -4896,7 +4896,8 @@ oscillating`: `low` → `high`). Both probes where it fires still differ: see Op
   is the only call ("the lights everywhere except the bedroom"); `garage door` for "but not the garage" stays.
 - **Negated clauses** (fires on 1 at equal reasoning, 1 more at a different one, 1 must not): a call to a tool whose
   name starts with the verb after a negation is dropped ("don't play anything" drops `play_music`, "don't lock" drops
-  `lock_door`; "never unlock" keeps `lock_door`).
+  `lock_door`; "never unlock" keeps `lock_door`). The verb drops its calls from every clause, not only the negated
+  one: `negated_verb` loses the jazz of its affirmative clause, although llms.txt says "in its own clause".
 - **Order:** phone completion before the duplicate drop, the quote before capitalisation, the repair before
   `ungrounded` (`pizza_to_lights` lists no `brightness`); the rest commute on every probe.
 

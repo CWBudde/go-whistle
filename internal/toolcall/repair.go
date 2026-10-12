@@ -406,6 +406,9 @@ func (r *repairer) defaultNumber(c *repairCall) {
 
 	for _, k := range r.properties(c.name) {
 		s := r.property(c.name, k)
+		if s == nil { // a boolean schema has no default (PR #66 review)
+			continue
+		}
 
 		d, ok := s.vals["default"].(json.Number)
 		if !ok || !isNumberType(s) || !r.required(c.name, k) {
@@ -813,8 +816,11 @@ var negatedVerb = regexp.MustCompile(`(?i)\b(?:don['’]?t|do not|never)\s+(\w+)
 
 // dropCalls drops the calls for something the request excludes ("except
 // the hallway": a call with that value, unless it is the only call) or
-// negates in its own clause ("don't lock": a call to a tool whose name
-// starts with that verb), and duplicate calls (docs/FINDINGS.md F-056).
+// negates ("don't lock": a call to a tool whose name starts with that
+// verb), and duplicate calls (docs/FINDINGS.md F-056). A negated verb drops
+// its calls from every clause, not only its own: the engine drops the jazz
+// of "play jazz in the kitchen and don't play anything in the bedroom"
+// (negated_verb).
 func (r *repairer) dropCalls(cs []*repairCall) []*repairCall {
 	links := exclusion.FindAllStringIndex(r.input, -1)
 	excluded := make([]string, 0, len(links))
