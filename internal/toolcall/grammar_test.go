@@ -330,6 +330,22 @@ func TestGrammarBooleanBranches(t *testing.T) {
 		reject: []string{`{"s":1}`, `{"s":null}`, `{"r":"x"}`, `{"none":1}`, `{"none":"x"}`, `{"yes":1}`},
 		dead:   []string{`{"none`},
 	})
+
+	// "parameters": false is no arguments at all, not none declared: the
+	// tool is not callable, and a trigger for it routes nothing.
+	n, err := Normalise([]byte(`[{"name":"t","parameters":false,"triggers":["go"]},{"name":"u"}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if g := n.Grammar(); g.Accepts([]byte(`[{"name":"t","arguments":{}}]`)) ||
+		!g.Accepts([]byte(`[{"name":"u","arguments":{}}]`)) {
+		t.Error("a tool with parameters false is callable, or one without parameters is not")
+	}
+
+	if g := n.GrammarFor("go"); g.required || !g.Accepts([]byte(`[]`)) {
+		t.Error("a trigger for an uncallable tool requires a call")
+	}
 }
 
 // TestGrammarSurrogatePairs: an escaped surrogate pair is one character

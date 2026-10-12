@@ -4753,7 +4753,7 @@ compiled from the tools as rendered (`Normalise`, snake names), whose states are
   branch's other keys win (port-side; no probe pins it).
 - **No dead ends:** a state is live only if it can still end (no escape or UTF-8 sequence past `maxLength`, no
   unfinished literal at 20 characters, no key whose schema admits nothing), so the mask never runs empty. A schema
-  admits nothing when it is `false`, an `allOf` with a `false` branch, an `anyOf` whose branches all admit nothing, an
+  admits nothing when it is `false` (a tool's whole `parameters` included), an `allOf` with a `false` branch, an `anyOf` whose branches all admit nothing, an
   empty `enum`, a length or item range that is empty (`format: date` is 10 characters), a number range without a
   number, or an integer range without an integer; such a key is never opened, such an array item never entered, and a
   tool whose arguments admit nothing is not callable (a routed grammar without a callable tool allows the refusal,

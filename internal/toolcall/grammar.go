@@ -68,7 +68,13 @@ func (n *Normalised) grammar(tools []string, required bool) *Grammar {
 		g.tools = append(g.tools, t)
 
 		params := n.params[t]
-		if params == nil {
+
+		switch {
+		case n.never[t]:
+			g.args[t] = &node{kind: kindNever}
+
+			continue
+		case params == nil:
 			// A tool without parameters takes no arguments (port-side).
 			g.args[t] = &node{kind: kindObject}
 
