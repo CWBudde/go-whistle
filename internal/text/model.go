@@ -44,6 +44,8 @@ type Model struct {
 	site    map[int]int      // layer → site
 	final   needle.ZCRMSNorm
 
+	confidence *probeHead // nil without the head
+
 	ropeOnce sync.Once
 	rope     *needle.Rope // Extend's tables over MaxSeqLen positions
 }
@@ -72,7 +74,8 @@ func checkConfig(cfg Config) error {
 
 // Load builds the model from src, which serves the cact.TextNames names
 // (Source does), with the geometry cfg. The blocks outside
-// cfg.GlobalLayers get the window cfg.SlidingWindow (0 for none).
+// cfg.GlobalLayers get the window cfg.SlidingWindow (0 for none). The
+// ConfidenceHead is loaded when src carries it (HasConfidence).
 func Load(src weights.Source, cfg Config) (*Model, error) {
 	err := checkConfig(cfg)
 	if err != nil {
@@ -114,6 +117,11 @@ func Load(src weights.Source, cfg Config) (*Model, error) {
 	m.final, err = needle.LoadZCRMSNorm(src, "final_norm")
 	if err != nil {
 		return nil, fmt.Errorf("text: %w", err)
+	}
+
+	m.confidence, err = loadProbeHead(src, confidenceKey, cfg.Layers+1, cfg.Dim)
+	if err != nil {
+		return nil, err
 	}
 
 	return m, nil

@@ -21,8 +21,21 @@ type Normalised struct {
 	// StaticPrefix.
 	JSON string
 
-	names map[string]string       // the model's tool name -> the caller's
-	args  map[string]*schemaAlias // the model's tool name -> its parameters' renames
+	// Ignored are the triggers that do not compile, "tool: regex", which the
+	// engine skips with "needle: ignoring invalid trigger for tool: regex"
+	// (docs/FINDINGS.md F-054).
+	Ignored []string
+
+	names    map[string]string       // the model's tool name -> the caller's
+	args     map[string]*schemaAlias // the model's tool name -> its parameters' renames
+	params   map[string]*object      // the model's tool name -> its parameters as rendered
+	triggers []toolTriggers          // in declaration order
+}
+
+// toolTriggers are one tool's compiled triggers, under the model's name.
+type toolTriggers struct {
+	tool string
+	res  []*regexp.Regexp
 }
 
 // Normalise is the engine's preparation of the tools raw (a JSON array)
@@ -31,7 +44,8 @@ type Normalised struct {
 //
 //   - an entry with a "function" object is that object (OpenAI's
 //     {"type":"function","function":{…}}, whatever its type and other keys);
-//   - a tool's top-level "triggers" is dropped; every other key stays;
+//   - a tool's top-level "triggers" is dropped (Triggered reads it); every
+//     other key stays;
 //   - tool and property names become snake_case (Snake). A snake name that
 //     tools with different names share gets _1, _2, … on each of them in
 //     declaration order; within one object the first property keeps it and
@@ -65,7 +79,7 @@ func Normalise(raw []byte) (*Normalised, error) {
 		return nil, errors.New("toolcall: tools: not a JSON array")
 	}
 
-	n := &Normalised{names: map[string]string{}, args: map[string]*schemaAlias{}}
+	n := &Normalised{names: map[string]string{}, args: map[string]*schemaAlias{}, params: map[string]*object{}}
 
 	tools := make([]any, len(list))
 	for i, t := range list {
@@ -76,6 +90,10 @@ func Normalise(raw []byte) (*Normalised, error) {
 		tool, ok := tools[i].(*object)
 		if !ok {
 			continue
+		}
+
+		if model != "" {
+			n.addTriggers(model, tool.vals["triggers"])
 		}
 
 		tool = tool.without("triggers")
@@ -90,7 +108,7 @@ func Normalise(raw []byte) (*Normalised, error) {
 			tool = tool.with("parameters", params)
 
 			if model != "" {
-				n.args[model] = alias
+				n.args[model], n.params[model] = alias, params
 			}
 		}
 
@@ -104,6 +122,12 @@ func Normalise(raw []byte) (*Normalised, error) {
 
 	return n, nil
 }
+
+// compositions are the keywords whose branch lists compose a schema: one
+// branch of each anyOf and oneOf applies, every allOf branch.
+var compositions = []string{"anyOf", "oneOf", allOf}
+
+const allOf = "allOf"
 
 // unwrap is an OpenAI-style entry's "function" object, or the entry.
 func unwrap(t any) any {
@@ -218,12 +242,12 @@ func schema(o *object) (*object, *schemaAlias) {
 		o = o.with("additionalProperties", ex)
 	}
 
-	for _, key := range []string{"anyOf", "oneOf", "allOf"} {
+	for _, key := range compositions {
 		if list, ok := o.vals[key].([]any); ok {
 			renamed, group := branchList(list)
 			o = o.with(key, renamed)
 
-			if key == "allOf" {
+			if key == allOf {
 				a.allOf = group
 			} else {
 				a.alts = append(a.alts, group)
@@ -409,6 +433,54 @@ func (n *Normalised) CallerArgs(name string, args []byte) ([]byte, error) {
 	}
 
 	return out, nil
+}
+
+// Triggered are the model's names of the tools with a trigger that matches
+// input, in declaration order.
+func (n *Normalised) Triggered(input string) []string {
+	var tools []string
+
+	for _, tt := range n.triggers {
+		if slices.ContainsFunc(tt.res, func(re *regexp.Regexp) bool { return re.MatchString(input) }) {
+			tools = append(tools, tt.tool)
+		}
+	}
+
+	return tools
+}
+
+// addTriggers compiles a tool's "triggers", a list of regexes matched
+// case-insensitively (llms.txt; docs/FINDINGS.md F-054). Entries that are
+// not strings or do not compile (in Go's RE2 syntax) go to Ignored.
+func (n *Normalised) addTriggers(tool string, v any) {
+	list, ok := v.([]any)
+	if !ok {
+		return
+	}
+
+	tt := toolTriggers{tool: tool}
+
+	for _, e := range list {
+		s, ok := e.(string)
+		if !ok {
+			n.Ignored = append(n.Ignored, fmt.Sprintf("%s: %v", tool, e))
+
+			continue
+		}
+
+		re, err := regexp.Compile("(?i)" + s)
+		if err != nil {
+			n.Ignored = append(n.Ignored, tool+": "+s)
+
+			continue
+		}
+
+		tt.res = append(tt.res, re)
+	}
+
+	if tt.res != nil {
+		n.triggers = append(n.triggers, tt)
+	}
 }
 
 func callerValue(v any, a *schemaAlias) any {

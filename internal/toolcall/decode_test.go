@@ -23,75 +23,141 @@ type call struct {
 	Arguments map[string]any `json:"arguments"`
 }
 
-// greedy decodes from ids with the float model until </tool_call>,
-// <|im_end|> or EOS, at most maxNew tokens, and returns the generated text
-// and the smallest top-1 margin (top-1 minus top-2 logit) along the way.
-func greedy(t *testing.T, m *text.Model, p *spm.Processor, ids []int, maxNew int) (string, float64) {
+// loadModel loads the text model at path, skipping without it.
+func loadModel(t *testing.T, path string) *text.Model {
 	t.Helper()
 
-	stop := map[int]bool{p.EOSID(): true}
-
-	for _, piece := range []string{"</tool_call>", imEnd} {
-		id, ok := p.PieceID(piece)
-		if !ok {
-			t.Fatalf("no piece %s", piece)
-		}
-
-		stop[id] = true
+	_, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		t.Skipf("%s missing; run `just fetch-needle3`", path)
 	}
 
-	s := m.NewState()
-	v := m.Config().OutVocab
-
-	logits, err := m.Extend(s, ids)
+	src, err := text.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	row := logits[len(logits)-v:]
-	margin := math.Inf(1)
+	m, err := text.Load(src, src.TextConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	var out []int
+	return m
+}
 
-	for len(out) < maxNew {
-		best, second := top2(row)
-		margin = min(margin, float64(row[best]-row[second]))
-		out = append(out, best)
+// engineCase is one case of the engine corpus (testdata/text/engine).
+type engineCase struct {
+	ID      string            `json:"id"`
+	Toolset string            `json:"toolset"`
+	System  string            `json:"system"`
+	Query   string            `json:"query"`
+	Max     int               `json:"max"`
+	Results []json.RawMessage `json:"results"`
+}
 
-		if stop[best] {
-			break
-		}
+type engineCorpus struct {
+	System   string                     `json:"system"`
+	Toolsets map[string]json.RawMessage `json:"toolsets"`
+	Cases    []engineCase               `json:"cases"`
+}
 
-		row, err = m.Extend(s, []int{best})
+// engineAnswer is one turn's envelope of responses.json.
+type engineAnswer struct {
+	Reasoning  *string `json:"reasoning"`
+	Calls      []call  `json:"function_calls"`
+	Suppressed []call  `json:"suppressed_calls"`
+	ErrorCode  string  `json:"error_code"`
+}
+
+// turnOut is one decoded turn: the answer, its confidence and its envelope.
+type turnOut struct {
+	a    *Decoded
+	conf float64
+	env  *Envelope
+}
+
+// decodeTurns decodes the conversation inputs (a query, then tool results)
+// over the tools raw as the engine does, each answer's shipped calls
+// deciding whether the next input is a tool result (docs/FINDINGS.md F-051).
+func decodeTurns(t *testing.T, d *Decoder, m *text.Model, p *spm.Processor, system string, raw []byte,
+	inputs []string, maxNew int,
+) []turnOut {
+	t.Helper()
+
+	n, err := Normalise(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conv := NewConversation(p, system, n.JSON, m.Config().MaxSeqLen)
+	s := m.NewState()
+
+	out := make([]turnOut, 0, len(inputs))
+
+	for i, in := range inputs {
+		ids, err := conv.Turn(in, maxNew, true)
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		if i == 0 {
+			ids = append(StaticPrefix(p, system, n.JSON), ids...)
+		}
+
+		a, err := d.Decode(s, ids, maxNew)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		conf, err := d.Confidence(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err := n.Envelope(a, in, conf)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		conv.Answered(len(env.FunctionCalls))
+
+		out = append(out, turnOut{a: a, conf: conf, env: env})
 	}
 
-	txt, err := p.Decode(out)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return txt, margin
+	return out
 }
 
-func top2(row []float32) (best, second int) {
-	best, second = 0, 1
-	if row[second] > row[best] {
-		best, second = second, best
+// decodeCase decodes every turn of c as the engine does: the query, then
+// each recorded tool result after the answer before it.
+func decodeCase(t *testing.T, d *Decoder, m *text.Model, p *spm.Processor, corpus *engineCorpus, c engineCase) []turnOut {
+	t.Helper()
+
+	system := corpus.System
+	if c.System != "" {
+		system = c.System
 	}
 
-	for i := 2; i < len(row); i++ {
-		switch {
-		case row[i] > row[best]:
-			best, second = i, best
-		case row[i] > row[second]:
-			second = i
-		}
+	maxNew := 512 // needle --max's default
+	if c.Max > 0 {
+		maxNew = c.Max
 	}
 
-	return best, second
+	inputs := make([]string, 0, 1+len(c.Results))
+	inputs = append(inputs, c.Query)
+
+	for _, r := range c.Results {
+		inputs = append(inputs, string(r))
+	}
+
+	return decodeTurns(t, d, m, p, system, corpus.Toolsets[c.Toolset], inputs, maxNew)
+}
+
+// thinkOf is the reasoning between <think>\n and \n</think>.
+func thinkOf(answer string) string {
+	_, rest, _ := strings.Cut(answer, thinkOpen)
+	r, _, _ := strings.Cut(rest, "\n</think>")
+
+	return r
 }
 
 // parseCalls is the <tool_call>[…]</tool_call> block of a completion; no
@@ -102,7 +168,7 @@ func parseCalls(completion string) ([]call, error) {
 		return nil, nil
 	}
 
-	body, _, ok = strings.Cut(body, "</tool_call>")
+	body, _, ok = strings.Cut(body, toolCallEnd)
 	if !ok {
 		return nil, errors.New("no </tool_call>")
 	}
@@ -158,6 +224,99 @@ func diffCalls(got, want []call) string {
 	return strings.Join(diffs, "; ")
 }
 
+// minMargin is the smallest top-1 margin of the tokens in [from, to).
+func minMargin(a *Decoded, from, to int) float64 {
+	m := math.Inf(1)
+	for _, x := range a.Margins[from:min(to, len(a.Margins))] {
+		m = min(m, x)
+	}
+
+	return m
+}
+
+// Turns of the engine corpus whose decode differs from the engine's, and
+// why (docs/FINDINGS.md F-052).
+var (
+	// The reasoning differs at a near-tie: float activations against the
+	// engine's int8 ones (11.5).
+	reasoningNearTie = map[string]bool{"alarm_morning": true, "event_no_year": true, "catalogue_reminder": true}
+	// The reasoning is the engine's, the token count is not: the engine's
+	// schema grammar (11.4) keeps keys outside the schema out
+	// (lights_and_lock, catalogue_lock) and, on the same call, ends one
+	// token later (thermostat_decimal).
+	countGrammar = map[string]bool{"lights_and_lock": true, "catalogue_lock": true, "thermostat_decimal": true}
+)
+
+// TestDecodeMatchesEngine decodes every turn of the engine corpus with the
+// dequantised needle3.cact as the engine does (docs/FINDINGS.md F-052): the
+// forced "<think>\n", greedy, </tool_call> counted, <|im_end|> not, --max
+// counting the forced tokens, and the history closed with <|im_end|>. Each
+// turn's reasoning is the engine's and its generated-token count is
+// needle_complete's, but on the turns listed above; the truncated turn ends
+// at the budget as the engine's.
+func TestDecodeMatchesEngine(t *testing.T) {
+	if testing.Short() {
+		t.Skip("decodes the engine corpus")
+	}
+
+	p := loadTokenizer(t)
+	m := loadModel(t, needle3Cact)
+
+	d, err := NewDecoder(m, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		corpus    engineCorpus
+		responses map[string][]engineAnswer
+		library   struct {
+			Cases map[string]struct {
+				Complete []int `json:"complete"`
+			} `json:"cases"`
+		}
+	)
+
+	readJSON(t, engineCases, &corpus)
+	readJSON(t, engineResponse, &responses)
+	readJSON(t, engineLibrary, &library)
+
+	for _, c := range corpus.Cases {
+		for i, turn := range decodeCase(t, d, m, p, &corpus, c) {
+			a := turn.a
+			eng := responses[c.ID][i]
+			want := library.Cases[c.ID].Complete[i]
+
+			reasoning := ""
+			if eng.Reasoning != nil {
+				reasoning = *eng.Reasoning
+			}
+
+			think := thinkOf(a.Text) == reasoning
+			margin := minMargin(a, 0, len(a.Tokens))
+
+			t.Logf("%-20s turn %d  tokens %3d engine %3d  truncated %-5v  reasoning equal %-5v  min margin %.3f",
+				c.ID, i, len(a.Tokens), want, a.Truncated, think, margin)
+
+			switch {
+			case eng.ErrorCode == "truncated":
+				if !a.Truncated || len(a.Tokens) != want {
+					t.Errorf("%s: %d tokens, truncated %v; the engine truncates at %d", c.ID, len(a.Tokens), a.Truncated, want)
+				}
+			case reasoningNearTie[c.ID]:
+				if think || margin > 0.06 {
+					t.Errorf("%s: listed as a near-tie, but reasoning equal %v at margin %.3f", c.ID, think, margin)
+				}
+			case !think:
+				t.Errorf("%s turn %d: reasoning %q, engine %q", c.ID, i, thinkOf(a.Text), reasoning)
+			case countGrammar[c.ID] == (len(a.Tokens) == want):
+				t.Errorf("%s turn %d: %d tokens, engine %d (listed under the grammar: %v)",
+					c.ID, i, len(a.Tokens), want, countGrammar[c.ID])
+			}
+		}
+	}
+}
+
 // TestFloatGreedyAgainstEngine is the decode half of PLAN.md 11.3's
 // Accept, recorded rather than asserted (the user's decision of
 // 2026-10-12): each engine case's first turn rendered and decoded greedily
@@ -168,43 +327,21 @@ func diffCalls(got, want []call) string {
 // parses (docs/FINDINGS.md F-048).
 func TestFloatGreedyAgainstEngine(t *testing.T) {
 	if testing.Short() {
-		t.Skip("decodes 19 prompts with the float model")
+		t.Skip("decodes the engine corpus with the float model")
 	}
 
 	p := loadTokenizer(t)
+	m := loadModel(t, needle3Safetensors)
 
-	_, err := os.Stat(needle3Safetensors)
-	if errors.Is(err, os.ErrNotExist) {
-		t.Skipf("%s missing; run `just fetch-needle3`", needle3Safetensors)
-	}
-
-	src, err := text.Open(needle3Safetensors)
+	d, err := NewDecoder(m, p)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	m, err := text.Load(src, src.TextConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var corpus struct {
-		System   string                     `json:"system"`
-		Toolsets map[string]json.RawMessage `json:"toolsets"`
-		Cases    []struct {
-			ID      string `json:"id"`
-			Toolset string `json:"toolset"`
-			System  string `json:"system"`
-			Query   string `json:"query"`
-			Max     int    `json:"max"`
-		} `json:"cases"`
-	}
-
-	var responses map[string][]struct {
-		Calls      []call `json:"function_calls"`
-		Suppressed []call `json:"suppressed_calls"`
-		ErrorCode  string `json:"error_code"`
-	}
+	var (
+		corpus    engineCorpus
+		responses map[string][]engineAnswer
+	)
 
 	readJSON(t, engineCases, &corpus)
 	readJSON(t, engineResponse, &responses)
@@ -212,35 +349,22 @@ func TestFloatGreedyAgainstEngine(t *testing.T) {
 	tally := map[string]int{}
 
 	for _, c := range corpus.Cases {
-		system := corpus.System
-		if c.System != "" {
-			system = c.System
-		}
-
-		tools, err := ToolsJSON(corpus.Toolsets[c.Toolset])
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		maxNew := 512 // needle --max's default
-		if c.Max > 0 {
-			maxNew = c.Max
-		}
-
-		completion, margin := greedy(t, m, p, Encode(p, Render(system, tools, c.Query)), maxNew)
+		c.Results = nil // the first turn only
+		a := decodeCase(t, d, m, p, &corpus, c)[0].a
 		eng := responses[c.ID][0]
+		margin := minMargin(a, 0, len(a.Tokens))
 
-		got, err := parseCalls(completion)
+		got, err := parseCalls(a.Text)
 		if err != nil {
-			if eng.ErrorCode == "truncated" && c.Max > 0 {
+			if eng.ErrorCode == "truncated" && a.Truncated {
 				tally["equal"]++
 
-				t.Logf("%-20s margin %6.3f  truncated at %d tokens, as the engine", c.ID, margin, maxNew)
+				t.Logf("%-20s margin %6.3f  truncated at %d tokens, as the engine", c.ID, margin, len(a.Tokens))
 
 				continue
 			}
 
-			t.Errorf("%s: %v in %q", c.ID, err, completion)
+			t.Errorf("%s: %v in %q", c.ID, err, a.Text)
 
 			continue
 		}

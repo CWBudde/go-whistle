@@ -54,10 +54,18 @@ Per case `<case>`:
 | `long_tools.final_from` | I64  | (1)          | position of `long_tools.final`'s first row (992)             |
 | `<case>.hidden_last`    | F32  | (20, 768)    | lane mean of the stream after each block, last position      |
 | `<case>.logits_last`    | F32  | (2, 8192)    | logits at the last two positions                             |
+| `<case>.confidence`     | F32  | (2)          | ConfidenceHead raw logit: whole sequence, `[BOS]` + prompt   |
 | `tiny.tokens`           | I64  | (6)          | `[BOS]` and the ids of `Hello, world`                        |
 | `tiny.embed`            | F32  | (6, 768)     | scaled input embedding, `embedding[tokens] · √768`           |
 | `tiny.hidden`           | F32  | (20, 6, 768) | lane mean after each block, every position (above F16 range) |
 | `tiny.logits`           | F32  | (6, 8192)    | logits at every position                                     |
+| `tiny.confidence`       | F32  | (2)          | ConfidenceHead raw logit, the whole sequence twice           |
+
+`<case>.confidence` is upstream's own `forward_confidence` (`hidden_cells`: the scaled embedding and the 20 per-block
+lane means, `keep = tokens != PAD`, `probe_pool`, the projection), the raw logit before any sigmoid. Entry 0 runs it on
+the whole sequence (prompt and completion), entry 1 on `[BOS]` and the prompt alone (`prompt_len` positions); the mask
+is causal, so that equals pooling over the first `prompt_len` positions of the whole sequence. `tiny` has no prompt
+length: both entries are the whole sequence.
 
 The metadata holds the pins, the SHA-256 of both inputs, the numerics and, under `prompts`, every rendered prompt and
 its decoded completion.
@@ -67,4 +75,5 @@ its decoded completion.
 Cosine against the reference and top-1 equality, never relative error: `final` per row, `logits_last` per row,
 `hidden_last` per layer and every layer and position of `tiny` at cosine ≥ 0.9999, and the top-1 token equal at every
 position. `final` is stored as F16, which costs at most about 1e-7 of cosine; the pre-norm stream reaches 1.7e7 at the
-last block, so `tiny.hidden` stays F32.
+last block, so `tiny.hidden` stays F32. `confidence` is a scalar logit: within 1e-3 absolute of the reference for both
+spans.
