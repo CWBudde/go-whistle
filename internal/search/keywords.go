@@ -166,6 +166,7 @@ type Keywords struct {
 	end   []bool        // a keyword ends here
 	key   []int         // the keyword a spelling that ends at the node spells, shared by its forms (Bias.once)
 	via   [][]int       // the keywords whose spellings pass through the node (Bias.spent)
+	ends  [][]int       // the keywords whose spellings end at the node (Bias.spent)
 	start kwState       // the state at the start of the text
 	bias  Bias
 	bytes *byteKeywords // the matcher under Bias.fold == foldBytes, which Adjust and Bonus use instead
@@ -385,7 +386,7 @@ func build(ids [][]int, weight func(id int) float64, b Bias) *Keywords {
 func buildWeighted(ids [][]int, ws [][]float64, b Bias) *Keywords {
 	k := &Keywords{
 		next: []map[int]int{{}}, fail: []int{0}, up: []int{0}, w: []float64{0}, depth: []int{0}, end: []bool{false},
-		key: []int{0}, via: [][]int{nil}, bias: b,
+		key: []int{0}, via: [][]int{nil}, ends: [][]int{nil}, bias: b,
 	}
 
 	for i, s := range ids {
@@ -553,6 +554,7 @@ func (k *Keywords) add(ids []int, ws []float64) {
 			k.end = append(k.end, false)
 			k.key = append(k.key, -1-c) // a spelling of its own until identify
 			k.via = append(k.via, nil)
+			k.ends = append(k.ends, nil)
 			k.next[n][id] = c
 		}
 
@@ -565,7 +567,8 @@ func (k *Keywords) add(ids []int, ws []float64) {
 // identify gives the node each spelling of ids ends at the key of its
 // keyword, keys[i] for spelling i, so that Bias.once counts a keyword once
 // whatever its form. A node two keywords' spellings share keeps the
-// first's key. Without identify each spelling is a keyword of its own.
+// first's key, and lists both in ends: under Bias.spent they complete
+// together. Without identify each spelling is a keyword of its own.
 func (k *Keywords) identify(ids [][]int, keys []int) {
 	set := make([]bool, len(k.key))
 
@@ -578,8 +581,16 @@ func (k *Keywords) identify(ids [][]int, keys []int) {
 			}
 		}
 
-		if n != 0 && !set[n] {
+		if n == 0 {
+			continue
+		}
+
+		if !set[n] {
 			k.key[n], set[n] = key, true
+		}
+
+		if !slices.Contains(k.ends[n], key) {
+			k.ends[n] = append(k.ends[n], key)
 		}
 	}
 }
@@ -669,11 +680,20 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 		kn := k.suffix(c, l)
 
 		if k.bias.spent {
-			if slices.Contains(next.done, k.key[kn]) {
+			keys := k.endKeys(kn)
+			if !slices.ContainsFunc(keys, func(key int) bool { return !slices.Contains(next.done, key) }) {
 				continue // a repeat: no completion, and its tokens earned nothing
 			}
 
-			next.done = append(slices.Clip(next.done), k.key[kn])
+			// Every keyword spelled to kn completes: a keyword given
+			// twice, or case variants that share the spelling (PR #53
+			// review).
+			next.done = slices.Clip(next.done)
+			for _, key := range keys {
+				if !slices.Contains(next.done, key) {
+					next.done = append(next.done, key)
+				}
+			}
 		}
 
 		if k.bias.once {
@@ -703,6 +723,16 @@ func (k *Keywords) step(st kwState, id int) (kwState, float64) {
 	next.cov = cov
 
 	return next, d
+}
+
+// endKeys is the keywords whose spellings end at node n: those identify
+// recorded, else the node's own key.
+func (k *Keywords) endKeys(n int) []int {
+	if len(k.ends[n]) > 0 {
+		return k.ends[n]
+	}
+
+	return []int{k.key[n]}
 }
 
 // spent reports whether every keyword through node c has completed
