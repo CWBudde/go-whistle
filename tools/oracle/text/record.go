@@ -32,6 +32,7 @@ var fixtureFiles = []string{
 	"retrieval.json: retrieval, needle_init past 5 tools and up to the context budget, the tool index",
 	"normalise.json: normalise, needle_init on OpenAI-style, camelCase and colliding tools, answers naming the caller's tools",
 	"turns.json: turns, conversations over needle --serve with --fail-input-overflow probes",
+	"triggers.json: triggers, answers over tools with triggers and over no tools",
 }
 
 // textManifest is testdata/text/engine/manifest.json: what produced responses.json, what the checks found, and the

@@ -1,0 +1,399 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "needle --model needle3.cact --tools <tools with triggers> --system <system file> --threads 4 --prompt <query>",
+  "system": "date: 2026-10-11 Sun 09:30",
+  "probes": [
+    {
+      "id": "alarm_untriggered",
+      "toolset": "assistant",
+      "triggers": null,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "query": "wake me up at 6:45 tomorrow",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "set_alarm",
+            "arguments": {
+              "time": "06:45"
+            }
+          }
+        ],
+        "reasoning": "'6:45' -> time '06:45'; 'tomorrow' -> date '2026-10-12' (tomorrow relative to system date 2026-10-11); label omitted.",
+        "confidence": 0.092,
+        "validation": {
+          "ungrounded": ["set_alarm.time"],
+          "negation": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "id": "alarm_triggered",
+      "toolset": "assistant",
+      "triggers": {
+        "set_alarm": ["wake me"]
+      },
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]},\"triggers\":[\"wake me\"]},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "query": "wake me up at 6:45 tomorrow",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_alarm",
+            "arguments": {
+              "time": "06:45"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'6:45' -> time '06:45'; 'tomorrow' -> date '2026-10-12' (tomorrow relative to system date 2026-10-11); label omitted.",
+        "confidence": 0.092,
+        "validation": {
+          "ungrounded": ["set_alarm.time"],
+          "negation": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "id": "alarm_invalid",
+      "toolset": "assistant",
+      "triggers": {
+        "set_alarm": ["("]
+      },
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]},\"triggers\":[\"(\"]},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "query": "wake me up at 6:45 tomorrow",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "set_alarm",
+            "arguments": {
+              "time": "06:45"
+            }
+          }
+        ],
+        "reasoning": "'6:45' -> time '06:45'; 'tomorrow' -> date '2026-10-12' (tomorrow relative to system date 2026-10-11); label omitted.",
+        "confidence": 0.092,
+        "validation": {
+          "ungrounded": ["set_alarm.time"],
+          "negation": false
+        }
+      },
+      "stderr": "needle: ignoring invalid trigger for set_alarm: ("
+    },
+    {
+      "id": "alarm_no_match",
+      "toolset": "assistant",
+      "triggers": {
+        "set_alarm": ["\\bsnooze\\b"]
+      },
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]},\"triggers\":[\"\\\\bsnooze\\\\b\"]},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "query": "wake me up at 6:45 tomorrow",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "set_alarm",
+            "arguments": {
+              "time": "06:45"
+            }
+          }
+        ],
+        "reasoning": "'6:45' -> time '06:45'; 'tomorrow' -> date '2026-10-12' (tomorrow relative to system date 2026-10-11); label omitted.",
+        "confidence": 0.092,
+        "validation": {
+          "ungrounded": ["set_alarm.time"],
+          "negation": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "id": "timer_triggered",
+      "toolset": "assistant",
+      "triggers": {
+        "set_timer": ["\\btimer\\b"]
+      },
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]},\"triggers\":[\"\\\\btimer\\\\b\"]},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "query": "set a timer for 10 minutes for the pasta",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_timer",
+            "arguments": {
+              "minutes": 10,
+              "label": "Pasta"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+        "confidence": 0.9324,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "id": "weather_to_timer",
+      "toolset": "assistant",
+      "triggers": {
+        "set_timer": ["weather"]
+      },
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]},\"triggers\":[\"weather\"]},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "query": "what's the weather in Berlin on Friday",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_timer",
+            "arguments": {
+              "minutes": 60,
+              "label": "Weather"
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "location 'Berlin' from query; date '2026-10-13' from 'Friday' resolved against system date 2026-10-11",
+        "confidence": 0.0263,
+        "validation": {
+          "ungrounded": ["set_timer.minutes"],
+          "negation": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "id": "pizza_to_lights",
+      "toolset": "home",
+      "triggers": {
+        "set_lights": ["\\bpizza\\b"]
+      },
+      "tools": "[{\"name\":\"set_lights\",\"description\":\"Turn a room's lights on or off and set their brightness\",\"parameters\":{\"type\":\"object\",\"properties\":{\"room\":{\"type\":\"string\"},\"on\":{\"type\":\"boolean\"},\"brightness\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":100}},\"required\":[\"room\",\"on\"]},\"triggers\":[\"\\\\bpizza\\\\b\"]},{\"name\":\"set_thermostat\",\"description\":\"Set the heating or cooling target temperature\",\"parameters\":{\"type\":\"object\",\"properties\":{\"temperature\":{\"type\":\"number\"},\"unit\":{\"type\":\"string\",\"enum\":[\"celsius\",\"fahrenheit\"]}},\"required\":[\"temperature\"]}},{\"name\":\"lock_door\",\"description\":\"Lock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}},{\"name\":\"unlock_door\",\"description\":\"Unlock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}},{\"name\":\"play_music\",\"description\":\"Play music in a room\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Artist, album, song or genre\"},\"room\":{\"type\":\"string\"}},\"required\":[\"query\"]}}]",
+      "query": "order a large pepperoni pizza",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_lights",
+            "arguments": {
+              "room": "kitchen",
+              "on": true
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "No shopping or ordering tool available.",
+        "confidence": 0.0058,
+        "validation": {
+          "ungrounded": ["set_lights.room"],
+          "negation": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "id": "capital_upper",
+      "toolset": "home",
+      "triggers": {
+        "set_lights": ["CAPITAL"]
+      },
+      "tools": "[{\"name\":\"set_lights\",\"description\":\"Turn a room's lights on or off and set their brightness\",\"parameters\":{\"type\":\"object\",\"properties\":{\"room\":{\"type\":\"string\"},\"on\":{\"type\":\"boolean\"},\"brightness\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":100}},\"required\":[\"room\",\"on\"]},\"triggers\":[\"CAPITAL\"]},{\"name\":\"set_thermostat\",\"description\":\"Set the heating or cooling target temperature\",\"parameters\":{\"type\":\"object\",\"properties\":{\"temperature\":{\"type\":\"number\"},\"unit\":{\"type\":\"string\",\"enum\":[\"celsius\",\"fahrenheit\"]}},\"required\":[\"temperature\"]}},{\"name\":\"lock_door\",\"description\":\"Lock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}},{\"name\":\"unlock_door\",\"description\":\"Unlock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}},{\"name\":\"play_music\",\"description\":\"Play music in a room\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Artist, album, song or genre\"},\"room\":{\"type\":\"string\"}},\"required\":[\"query\"]}}]",
+      "query": "what's the capital of France",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_lights",
+            "arguments": {
+              "room": "France",
+              "on": true
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "No tool for geography or facts. The available tools are for lights, thermostat, and music.",
+        "confidence": 0.1111,
+        "validation": {
+          "ungrounded": [],
+          "negation": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "id": "negation_triggered",
+      "toolset": "home",
+      "triggers": {
+        "set_lights": ["\\b(turn|switch)\\b.*\\b(on|off)\\b"]
+      },
+      "tools": "[{\"name\":\"set_lights\",\"description\":\"Turn a room's lights on or off and set their brightness\",\"parameters\":{\"type\":\"object\",\"properties\":{\"room\":{\"type\":\"string\"},\"on\":{\"type\":\"boolean\"},\"brightness\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":100}},\"required\":[\"room\",\"on\"]},\"triggers\":[\"\\\\b(turn|switch)\\\\b.*\\\\b(on|off)\\\\b\"]},{\"name\":\"set_thermostat\",\"description\":\"Set the heating or cooling target temperature\",\"parameters\":{\"type\":\"object\",\"properties\":{\"temperature\":{\"type\":\"number\"},\"unit\":{\"type\":\"string\",\"enum\":[\"celsius\",\"fahrenheit\"]}},\"required\":[\"temperature\"]}},{\"name\":\"lock_door\",\"description\":\"Lock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}},{\"name\":\"unlock_door\",\"description\":\"Unlock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}},{\"name\":\"play_music\",\"description\":\"Play music in a room\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Artist, album, song or genre\"},\"room\":{\"type\":\"string\"}},\"required\":[\"query\"]}}]",
+      "query": "turn on the living room lights but don't unlock the front door",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "set_lights",
+            "arguments": {
+              "room": "living room",
+              "on": true
+            }
+          },
+          {
+            "name": "lock_door",
+            "arguments": {
+              "door": "front door"
+            }
+          }
+        ],
+        "reasoning": "Prohibition: 'turn on the living room lights' -> set_lights room 'living room' on false. Alternative: 'don't unlock the front door' -> lock_door door 'front door' no required params.",
+        "confidence": 0.0315,
+        "validation": {
+          "ungrounded": [],
+          "negation": true
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "id": "negation_two_triggered",
+      "toolset": "home",
+      "triggers": {
+        "lock_door": ["door"],
+        "set_lights": ["lights"]
+      },
+      "tools": "[{\"name\":\"set_lights\",\"description\":\"Turn a room's lights on or off and set their brightness\",\"parameters\":{\"type\":\"object\",\"properties\":{\"room\":{\"type\":\"string\"},\"on\":{\"type\":\"boolean\"},\"brightness\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":100}},\"required\":[\"room\",\"on\"]},\"triggers\":[\"lights\"]},{\"name\":\"set_thermostat\",\"description\":\"Set the heating or cooling target temperature\",\"parameters\":{\"type\":\"object\",\"properties\":{\"temperature\":{\"type\":\"number\"},\"unit\":{\"type\":\"string\",\"enum\":[\"celsius\",\"fahrenheit\"]}},\"required\":[\"temperature\"]}},{\"name\":\"lock_door\",\"description\":\"Lock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]},\"triggers\":[\"door\"]},{\"name\":\"unlock_door\",\"description\":\"Unlock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}},{\"name\":\"play_music\",\"description\":\"Play music in a room\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Artist, album, song or genre\"},\"room\":{\"type\":\"string\"}},\"required\":[\"query\"]}}]",
+      "query": "turn on the living room lights but don't unlock the front door",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [],
+        "suppressed_calls": [
+          {
+            "name": "set_lights",
+            "arguments": {
+              "room": "living room",
+              "on": true
+            }
+          },
+          {
+            "name": "lock_door",
+            "arguments": {
+              "door": "front door"
+            }
+          }
+        ],
+        "reasoning": "Prohibition: 'turn on the living room lights' -> set_lights room 'living room' on false. Alternative: 'don't unlock the front door' -> lock_door door 'front door' no required params.",
+        "confidence": 0.0315,
+        "validation": {
+          "ungrounded": [],
+          "negation": true
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "id": "negation_only_triggered",
+      "toolset": "home",
+      "triggers": {
+        "set_lights": ["lights"]
+      },
+      "tools": "[{\"name\":\"set_lights\",\"description\":\"Turn a room's lights on or off and set their brightness\",\"parameters\":{\"type\":\"object\",\"properties\":{\"room\":{\"type\":\"string\"},\"on\":{\"type\":\"boolean\"},\"brightness\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":100}},\"required\":[\"room\",\"on\"]},\"triggers\":[\"lights\"]},{\"name\":\"set_thermostat\",\"description\":\"Set the heating or cooling target temperature\",\"parameters\":{\"type\":\"object\",\"properties\":{\"temperature\":{\"type\":\"number\"},\"unit\":{\"type\":\"string\",\"enum\":[\"celsius\",\"fahrenheit\"]}},\"required\":[\"temperature\"]}},{\"name\":\"lock_door\",\"description\":\"Lock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}},{\"name\":\"unlock_door\",\"description\":\"Unlock a door\",\"parameters\":{\"type\":\"object\",\"properties\":{\"door\":{\"type\":\"string\"}},\"required\":[\"door\"]}},{\"name\":\"play_music\",\"description\":\"Play music in a room\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Artist, album, song or genre\"},\"room\":{\"type\":\"string\"}},\"required\":[\"query\"]}}]",
+      "query": "don't turn off the bedroom lights",
+      "answer": {
+        "type": "call",
+        "success": true,
+        "error": null,
+        "error_code": null,
+        "reason": null,
+        "function_calls": [
+          {
+            "name": "set_lights",
+            "arguments": {
+              "room": "bedroom",
+              "on": false
+            }
+          }
+        ],
+        "suppressed_calls": [],
+        "reasoning": "Prohibition on turning off lights. Alternative request: set lights to off. 'bedroom' -> room 'bedroom', 'don't turn off' -> on false.",
+        "confidence": 0.2549,
+        "validation": {
+          "ungrounded": [],
+          "negation": true
+        }
+      },
+      "stderr": ""
+    }
+  ],
+  "no_tools": {
+    "type": "call",
+    "success": true,
+    "error": null,
+    "function_calls": [],
+    "suppressed_calls": [],
+    "reasoning": "no tools declared, returning the empty call",
+    "confidence": 1.0
+  }
+}
