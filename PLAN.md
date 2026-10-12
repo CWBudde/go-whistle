@@ -1646,7 +1646,7 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
       32 clips (F-040). Profile where the TTFT goes (front end, stem, encoder, memory, first decoder steps) and take
       up the open levers of F-037 and F-041. Engine speed is still not a hard goal (Risks); the aim is a measured
       breakdown and whichever levers pay off without moving the parity numbers.
-- [ ] Adopt algo-tensor v0.3.0 (its 1.3, algo-tensor PR #7): `ops.Conv2D` with groups = 1 runs through
+- [x] Adopt algo-tensor v0.3.0 (its 1.3, algo-tensor PR #7): `ops.Conv2D` with groups = 1 runs through
       `Conv2DPlan` (im2col and `MatMulTransBBias`) on arm64 and js/wasm, not on amd64. Whistle's stem
       (`internal/encoder/stem.go`) is such a conv: algo-tensor measured it 9.51 → 3.93 ms on an Apple M5 Pro (one
       worker), and its `Conv2D` bits change there (golden case max |Δ| 9.5 × 10⁻⁷). **Accept:** with v0.3.0, the
@@ -1657,6 +1657,14 @@ The `de-paare-missed` follow-up stays in Phase 10, and the Needle 3 text model i
       js/wasm changes too, and CI skips its model-gated tests: with the model, `just wasm-test ""` (no `-short`) passes,
       the `whistle` package's engine parity under Node and the headless page's JSON against the CLI's on its 4 clips
       included.
+      (2026-10-12) — took v0.3.1 instead (v0.3.0 plus a bit-exact `Linear`, unused here). Of the native builds only
+      arm64 NEON changed: every `Embed` (packed max abs diff 0.022, cosine ≥ 0.9999996 to before; float 2.6e-6) and
+      one word probability by 0.001 on 15 of 32 clips; texts, words and times equal. purego and linux/amd64 (Docker)
+      outputs are byte-identical. No fixture holds Go output, so none was regenerated; the measured comments in
+      `packed_test.go` and `int8_test.go` and `bench/RESULTS.md` were. Parity: 31/32, keywords 47/53, depth 161/192,
+      stream 797/930, WER 5.35 %, `Embed` 0.999827 → 0.999828; int8 `Embed` 0.999719 → 0.999716 (30/32 as before).
+      `just wasm-test ""` passes. TTFT unchanged at 15 workers (interleaved medians 18.9–19.6 against 19.1–19.4 ms);
+      one worker: `embed` 81.2 → 79.1 ms. F-038 "The stem's conv through algo-tensor v0.3.1".
 - [ ] js/wasm speed (F-043 "Open"): about 22 tok/s and a TTFT of 0.3–0.8 s on one thread without SIMD. Try several
       workers, each with its own 17 MB model, to run the beams or the encoder blocks in parallel. A hand-written wasm
       SIMD module for the LUT kernels would leave pure Go; decide first whether it is worth that.
