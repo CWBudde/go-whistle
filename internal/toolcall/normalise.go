@@ -29,6 +29,7 @@ type Normalised struct {
 	names    map[string]string       // the model's tool name -> the caller's
 	args     map[string]*schemaAlias // the model's tool name -> its parameters' renames
 	params   map[string]*object      // the model's tool name -> its parameters as rendered
+	tools    []string                // the model's tool names, in declaration order
 	triggers []toolTriggers          // in declaration order
 }
 
@@ -94,6 +95,7 @@ func Normalise(raw []byte) (*Normalised, error) {
 
 		if model != "" {
 			n.addTriggers(model, tool.vals["triggers"])
+			n.tools = append(n.tools, model)
 		}
 
 		tool = tool.without("triggers")

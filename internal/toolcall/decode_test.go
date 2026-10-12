@@ -77,8 +77,9 @@ type turnOut struct {
 }
 
 // decodeTurns decodes the conversation inputs (a query, then tool results)
-// over the tools raw as the engine does, each answer's shipped calls
-// deciding whether the next input is a tool result (docs/FINDINGS.md F-051).
+// over the tools raw as the engine does, each answer under the grammar of
+// its input (docs/FINDINGS.md F-055) and its shipped calls deciding whether
+// the next input is a tool result (docs/FINDINGS.md F-051).
 func decodeTurns(t *testing.T, d *Decoder, m *text.Model, p *spm.Processor, system string, raw []byte,
 	inputs []string, maxNew int,
 ) []turnOut {
@@ -104,7 +105,7 @@ func decodeTurns(t *testing.T, d *Decoder, m *text.Model, p *spm.Processor, syst
 			ids = append(StaticPrefix(p, system, n.JSON), ids...)
 		}
 
-		a, err := d.Decode(s, ids, maxNew)
+		a, err := d.Decode(s, ids, maxNew, n.GrammarFor(in))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -240,17 +241,17 @@ var (
 	// The reasoning differs at a near-tie: float activations against the
 	// engine's int8 ones (11.5).
 	reasoningNearTie = map[string]bool{"alarm_morning": true, "event_no_year": true, "catalogue_reminder": true}
-	// The reasoning is the engine's, the token count is not: the engine's
-	// schema grammar (11.4) keeps keys outside the schema out
-	// (lights_and_lock, catalogue_lock) and, on the same call, ends one
-	// token later (thermostat_decimal).
-	countGrammar = map[string]bool{"lights_and_lock": true, "catalogue_lock": true, "thermostat_decimal": true}
+	// The reasoning and the call are the engine's, the token count is not:
+	// the engine ends the same call one token later, which neither the
+	// schema grammar nor a near-tie explains (docs/FINDINGS.md F-055).
+	countOff = map[string]bool{"thermostat_decimal": true}
 )
 
 // TestDecodeMatchesEngine decodes every turn of the engine corpus with the
-// dequantised needle3.cact as the engine does (docs/FINDINGS.md F-052): the
-// forced "<think>\n", greedy, </tool_call> counted, <|im_end|> not, --max
-// counting the forced tokens, and the history closed with <|im_end|>. Each
+// dequantised needle3.cact as the engine does (docs/FINDINGS.md F-052,
+// F-055): the forced "<think>\n", greedy, the call block under the schema
+// grammar, </tool_call> counted, <|im_end|> not, --max counting the forced
+// tokens, and the history closed with <|im_end|>. Each
 // turn's reasoning is the engine's and its generated-token count is
 // needle_complete's, but on the turns listed above; the truncated turn ends
 // at the budget as the engine's.
@@ -309,9 +310,8 @@ func TestDecodeMatchesEngine(t *testing.T) {
 				}
 			case !think:
 				t.Errorf("%s turn %d: reasoning %q, engine %q", c.ID, i, thinkOf(a.Text), reasoning)
-			case countGrammar[c.ID] == (len(a.Tokens) == want):
-				t.Errorf("%s turn %d: %d tokens, engine %d (listed under the grammar: %v)",
-					c.ID, i, len(a.Tokens), want, countGrammar[c.ID])
+			case countOff[c.ID] == (len(a.Tokens) == want):
+				t.Errorf("%s turn %d: %d tokens, engine %d (listed: %v)", c.ID, i, len(a.Tokens), want, countOff[c.ID])
 			}
 		}
 	}
@@ -367,6 +367,16 @@ func TestFloatGreedyAgainstEngine(t *testing.T) {
 			t.Errorf("%s: %v in %q", c.ID, err, a.Text)
 
 			continue
+		}
+
+		// The engine's calls carry the caller's tool names (F-050).
+		n, err := Normalise(corpus.Toolsets[c.Toolset])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for i := range got {
+			got[i].Name = n.CallerName(got[i].Name)
 		}
 
 		verdict, key := "equal", "equal"
