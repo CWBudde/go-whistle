@@ -14,6 +14,7 @@ import (
 	"github.com/cwbudde/go-whistle/internal/cact"
 	"github.com/cwbudde/go-whistle/internal/hub"
 	"github.com/cwbudde/go-whistle/whistle"
+	"golang.org/x/sys/cpu"
 )
 
 func TestRootHasDoctor(t *testing.T) {
@@ -154,8 +155,17 @@ func TestKernels(t *testing.T) {
 			t.Errorf("arm64: %q", got)
 		}
 	case runtime.GOARCH == "amd64":
-		if !strings.Contains(got, "AVX2") && !strings.Contains(got, "no AVX2") {
-			t.Errorf("amd64: %q", got)
+		want := "pure Go (no AVX2 on this CPU)"
+
+		switch {
+		case cpu.X86.HasAVX2 && cpu.X86.HasFMA:
+			want = "AVX2: CQ LUT GEMV; AVX2+FMA: GEMM, dot, axpy, softmax exp"
+		case cpu.X86.HasAVX2:
+			want = "AVX2: CQ LUT GEMV; GEMM in Go"
+		}
+
+		if got != want {
+			t.Errorf("amd64: %q, want %q", got, want)
 		}
 	}
 }

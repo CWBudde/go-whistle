@@ -364,8 +364,10 @@ func kernels() string {
 			parts = append(parts, "AVX2: CQ LUT GEMV")
 		}
 
+		// algo-tensor v0.4.0 runs MatMulTransB in assembly on the same
+		// AVX2 + FMA check as dot and axpy (PR #60 review).
 		if cpu.X86.HasAVX2 && cpu.X86.HasFMA {
-			parts = append(parts, "AVX2+FMA: dot, axpy, softmax exp")
+			return strings.Join(append(parts, "AVX2+FMA: GEMM, dot, axpy, softmax exp"), "; ")
 		}
 
 		if len(parts) == 0 {
