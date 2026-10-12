@@ -395,3 +395,51 @@ func TestCallerArgsBranches(t *testing.T) {
 		t.Errorf("CallerArgs = %s, want %s", out, want)
 	}
 }
+
+// TestCallerArgsComposition: allOf branches all apply; an anyOf or oneOf
+// branch is chosen by its own names, not the schema's common ones, and the
+// common properties come before a chosen branch's additionalProperties
+// (post-merge review of PR #62).
+func TestCallerArgsComposition(t *testing.T) {
+	for name, c := range map[string]struct{ tools, args, want string }{
+		"allOf combines": {
+			`[{"name":"t","parameters":{"properties":{"o":{"allOf":[{"properties":{"firstKey":{}}},` +
+				`{"properties":{"secondKey":{}}}]}}}}]`,
+			`{"o":{"first_key":1,"second_key":2}}`,
+			`{"o":{"firstKey":1,"secondKey":2}}`,
+		},
+		"common keys do not choose": {
+			`[{"name":"t","parameters":{"properties":{"o":{"properties":{"c1":{},"c2":{},"c3":{}},` +
+				`"anyOf":[{"properties":{"alphaKey":{},"betaKey":{}}},{"properties":{"foreignKey":{}}}]}}}}]`,
+			`{"o":{"c1":1,"c2":2,"c3":3,"alpha_key":4,"beta_key":5,"foreign_key":6}}`,
+			`{"o":{"alphaKey":4,"betaKey":5,"c1":1,"c2":2,"c3":3,"foreign_key":6}}`,
+		},
+		"common before branch extras": {
+			`[{"name":"t","parameters":{"properties":{"o":{"properties":{"commonObj":{"properties":{"innerKey":{}}}},` +
+				`"oneOf":[{"properties":{"alphaKey":{}},"additionalProperties":{}}]}}}}]`,
+			`{"o":{"common_obj":{"inner_key":1},"alpha_key":2}}`,
+			`{"o":{"alphaKey":2,"commonObj":{"innerKey":1}}}`,
+		},
+		"repeated declarations combine": {
+			`[{"name":"t","parameters":{"properties":{"o":{"allOf":[` +
+				`{"properties":{"sharedObj":{"properties":{"firstKey":{}}}}},` +
+				`{"properties":{"sharedObj":{"properties":{"secondKey":{}}}}}]}}}}]`,
+			`{"o":{"shared_obj":{"first_key":1,"second_key":2}}}`,
+			`{"o":{"sharedObj":{"firstKey":1,"secondKey":2}}}`,
+		},
+	} {
+		n, err := Normalise([]byte(c.tools))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+
+		out, err := n.CallerArgs("t", []byte(c.args))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+
+		if string(out) != c.want {
+			t.Errorf("%s: CallerArgs = %s, want %s", name, out, c.want)
+		}
+	}
+}
