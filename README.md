@@ -273,7 +273,10 @@ On the page:
 - **Microphone:** an AudioWorklet resamples the input to 16 kHz mono and the stream API commits words live, with the
   pending ones in grey; a slow pass makes the next call longer rather than the queue.
 
-The worker calls `globalThis.whistle`: `load(bytes)`, `decodeWAV(bytes)`, `transcribe(pcm, {language, keywords,
+Served over plain http from another machine (a LAN IP), the page still loads and checks the model, hashing it in Go
+instead of Web Crypto, but it cannot cache it, and the microphone needs https or localhost.
+
+The worker calls `globalThis.whistle`: `load(bytes)`, `sha256(bytes)`, `decodeWAV(bytes)`, `transcribe(pcm, {language, keywords,
 word_timestamps, depth})` with the engine JSON as its result, and `streamStart({language, keywords})`,
 `streamProcess(pcm)` and `streamStop()` with the stream JSON; every call returns a promise, and an error rejects it.
 The Go side loads the model with `whistle.LoadBytes`.
