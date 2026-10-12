@@ -322,4 +322,76 @@ func TestNormaliseUniqueNames(t *testing.T) {
 			t.Errorf("CallerName(%s) = %s, want %s", model, got, caller)
 		}
 	}
+
+	// Two collision groups whose suffixes meet: every tool keeps a name of
+	// its own.
+	n, err = Normalise([]byte(`[{"name":"x"},{"name":"X"},{"name":"x_1"},{"name":"x-1"},{"name":"X"}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `[{"name":"x_1_1"},{"name":"x_2"},{"name":"x_1_1_1"},{"name":"x_1_2"},{"name":"x_2"}]`; n.JSON != want {
+		t.Errorf("got  %s\nwant %s", n.JSON, want)
+	}
+
+	for model, caller := range map[string]string{"x_1_1": "x", "x_2": "X", "x_1_1_1": "x_1", "x_1_2": "x-1"} {
+		if got := n.CallerName(model); got != caller {
+			t.Errorf("CallerName(%s) = %s, want %s", model, got, caller)
+		}
+	}
+}
+
+// TestCallerArgsBranches: additionalProperties inside a branch, and items
+// from more than one array branch, map back (PR #61 review).
+func TestCallerArgsBranches(t *testing.T) {
+	n, err := Normalise([]byte(`[{"name":"t","parameters":{"properties":{` +
+		`"bag":{"anyOf":[{"type":"string"},{"additionalProperties":{"properties":{"innerKey":{}}}}]},` +
+		`"rows":{"anyOf":[{"type":"array","items":{"properties":{"firstKey":{}}}},` +
+		`{"type":"array","items":{"properties":{"secondKey":{}}}}]}}}}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := n.CallerArgs("t", []byte(`{"bag":{"anyName":{"inner_key":1}},"rows":[{"second_key":2},{"first_key":3}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `{"bag":{"anyName":{"innerKey":1}},"rows":[{"secondKey":2},{"firstKey":3}]}`; string(out) != want {
+		t.Errorf("CallerArgs = %s, want %s", out, want)
+	}
+
+	// Branches that suffix one name differently: the branch that names the
+	// whole object decides (PR #62 review).
+	n, err = Normalise([]byte(`[{"name":"t","parameters":{"properties":{"rows":{"anyOf":[` +
+		`{"type":"array","items":{"properties":{"fooBar":{}}}},` +
+		`{"type":"array","items":{"properties":{"foo_bar":{},"fooBar":{}}}}]}}}}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = n.CallerArgs("t", []byte(`{"rows":[{"foo_bar":1,"foo_bar_1":2},{"foo_bar":3}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `{"rows":[{"fooBar":2,"foo_bar":1},{"fooBar":3}]}`; string(out) != want {
+		t.Errorf("CallerArgs = %s, want %s", out, want)
+	}
+
+	// A key the chosen branch does not name is not renamed by a sibling.
+	n, err = Normalise([]byte(`[{"name":"t","parameters":{"properties":{"obj":{"anyOf":[` +
+		`{"properties":{"alphaKey":{},"betaKey":{}}},{"properties":{"foreignKey":{}}}]}}}}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = n.CallerArgs("t", []byte(`{"obj":{"alpha_key":1,"beta_key":2,"foreign_key":3}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `{"obj":{"alphaKey":1,"betaKey":2,"foreign_key":3}}`; string(out) != want {
+		t.Errorf("CallerArgs = %s, want %s", out, want)
+	}
 }
