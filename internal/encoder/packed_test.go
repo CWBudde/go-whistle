@@ -9,11 +9,13 @@ import (
 
 // TestBestPackedMatchesFloat runs Best on whistle.cact packed and in float
 // mode over the corpus (docs/FINDINGS.md F-037): the packed embeddings
-// match needle_embed as well as the float ones (mean frame cosine 0.999827
-// against 0.999828 on all 32 clips, arm64 and amd64), and the float ones
-// at a mean frame 1 − cos of 4.8e-8 on all 32 clips and 2.3e-7 on the
-// -short ones (arm64; amd64 7.0e-8 and 4.5e-7) and a worst frame cosine of
-// 0.999945 (arm64; amd64 0.999893, against its AVX2+FMA float GEMM). That is the lut kernel's table
+// match needle_embed as well as the float ones (mean frame cosine 0.999828
+// against 0.999828 on all 32 clips on arm64, 0.999827 against 0.999828 on
+// amd64), and the float ones at a mean frame 1 − cos of 2.3e-8 on all 32
+// clips and 7.9e-8 on the -short ones (arm64 since algo-tensor v0.3.1,
+// before 4.8e-8 and 2.3e-7; amd64 7.0e-8 and 4.5e-7) and a worst frame
+// cosine of 0.999984 (arm64, before 0.999945; amd64 0.999893, against its
+// AVX2+FMA float GEMM). That is the lut kernel's table
 // rounding (F-034); under purego the two agree to 1.0000000. The floors
 // sit just below the worst architecture.
 func TestBestPackedMatchesFloat(t *testing.T) {

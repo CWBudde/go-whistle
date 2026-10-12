@@ -50,8 +50,8 @@ var int8WordFloors = struct{ both, prob float64 }{both: 96.5, prob: 88}
 // TestInt8MatchesEngine runs the corpus with WithInt8: every transcript but
 // int8Misses equals the engine's (30 of 32 measured), and Embed's mean
 // frame cosine against needle_embed stays at least 0.9995 per corpus and
-// 0.99 per clip; measured 0.999719 and 0.994891 (float32 0.999827 and
-// 0.999034). The worst clip is low because of one fragile frame, which
+// 0.99 per clip; measured 0.999716 and 0.994790 on arm64 (float32 0.999828
+// and 0.999038; with algo-tensor v0.1.0 0.999719 and 0.994891). The worst clip is low because of one fragile frame, which
 // the int8 rounding moves to cosine 0.63 (F-041), so its bound leaves
 // room for another architecture's rounding. Embed also differs from the
 // float32 run, so the option takes effect.
