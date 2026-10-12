@@ -88,52 +88,16 @@ const serveTimeout = 30 * time.Second
 // each turn is one POST /complete on the same session, and the answers come back with the timing fields dropped.
 // The single-shot --prompt mode answers one turn only.
 func serveTurns(ctx context.Context, needle string, args, turns []string) ([]node, error) {
-	port, err := freePort(ctx)
+	s, err := startServe(ctx, needle, args)
 	if err != nil {
 		return nil, err
 	}
+	defer s.close()
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	cmd := command(ctx, needle, append(append([]string{}, args...), "--serve", "--port", strconv.Itoa(port)))
-
-	// The server announces itself on stderr; its errors go there too, so the banner wait keeps what it read.
-	errPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("needle --serve: %w", err)
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return nil, fmt.Errorf("needle --serve: %w", err)
-	}
-
-	defer func() {
-		cancel()
-
-		_ = cmd.Wait()
-	}()
-
-	var stderr strings.Builder
-
-	err = awaitServing(errPipe, &stderr)
-	if err != nil {
-		return nil, fmt.Errorf("needle --serve: %w: %s", err, strings.TrimSpace(stderr.String()))
-	}
-
-	go func() { _, _ = io.Copy(io.Discard, errPipe) }()
-
-	base := "http://127.0.0.1:" + strconv.Itoa(port)
 	answers := make([]node, 0, len(turns))
 
 	for i, t := range turns {
-		js, err := post(ctx, base+"/complete", map[string]string{"input": t})
-		if err != nil {
-			return nil, fmt.Errorf("turn %d: %w", i+1, err)
-		}
-
-		n, err := normaliseResponse(js)
+		n, err := s.complete(ctx, t)
 		if err != nil {
 			return nil, fmt.Errorf("turn %d: %w", i+1, err)
 		}
@@ -142,6 +106,79 @@ func serveTurns(ctx context.Context, needle string, args, turns []string) ([]nod
 	}
 
 	return answers, nil
+}
+
+// serveSession is one running `needle --serve`: a conversation that POST /complete extends and POST /reset clears.
+type serveSession struct {
+	base   string
+	cancel context.CancelFunc
+	cmd    *exec.Cmd
+}
+
+// startServe starts `needle --serve` with args on a free port and waits until it listens.
+func startServe(ctx context.Context, needle string, args []string) (*serveSession, error) {
+	port, err := freePort(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	cmd := command(ctx, needle, append(append([]string{}, args...), "--serve", "--port", strconv.Itoa(port)))
+
+	// The server announces itself on stderr; its errors go there too, so the banner wait keeps what it read.
+	errPipe, err := cmd.StderrPipe()
+	if err != nil {
+		cancel()
+
+		return nil, fmt.Errorf("needle --serve: %w", err)
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		cancel()
+
+		return nil, fmt.Errorf("needle --serve: %w", err)
+	}
+
+	s := &serveSession{base: "http://127.0.0.1:" + strconv.Itoa(port), cancel: cancel, cmd: cmd}
+
+	var stderr strings.Builder
+
+	err = awaitServing(errPipe, &stderr)
+	if err != nil {
+		s.close()
+
+		return nil, fmt.Errorf("needle --serve: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+
+	go func() { _, _ = io.Copy(io.Discard, errPipe) }()
+
+	return s, nil
+}
+
+// complete answers one turn of the session with the timing fields dropped.
+func (s *serveSession) complete(ctx context.Context, input string) (node, error) {
+	js, err := post(ctx, s.base+"/complete", map[string]string{"input": input})
+	if err != nil {
+		return node{}, err
+	}
+
+	return normaliseResponse(js)
+}
+
+// reset starts a new conversation on the session.
+func (s *serveSession) reset(ctx context.Context) error {
+	_, err := post(ctx, s.base+"/reset", map[string]string{})
+
+	return err
+}
+
+// close stops the server.
+func (s *serveSession) close() {
+	s.cancel()
+
+	_ = s.cmd.Wait()
 }
 
 // freePort asks the kernel for a free local TCP port.

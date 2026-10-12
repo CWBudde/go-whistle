@@ -1,0 +1,2945 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "needle --model needle3.cact --tools <assistant> --system <system file> --threads 4 --max <max> [--fail-input-overflow] --serve; POST /complete per turn, POST /reset",
+  "system": "date: 2026-10-11 Sun 09:30",
+  "toolset": "assistant",
+  "context": 8192,
+  "scenarios": [
+    {
+      "id": "first_plain",
+      "covers": "the first turn continues the open user message",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 100
+          },
+          "sha256": "a49d7d2e073216acd43017f764c3f3189a8423ac678af6a806d5f0d190e4914e",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1407 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "first_json",
+      "covers": "JSON as the first turn is a user turn",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\":\"ok\",\"note\":\"fine\"},",
+            "repeat": 120,
+            "tail": "{\"status\":\"ok\"}]"
+          },
+          "sha256": "201601d68c8693c6d0d227c41b9c2ad731c128fedaad67b299ee908391cd59cf",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1091 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "later_plain",
+      "covers": "a later turn opens its own user message",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 100
+          },
+          "sha256": "a49d7d2e073216acd43017f764c3f3189a8423ac678af6a806d5f0d190e4914e",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1410 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "after_reset",
+      "covers": "reset starts over: the first turn again",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "reset": true
+          }
+        },
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 100
+          },
+          "sha256": "a49d7d2e073216acd43017f764c3f3189a8423ac678af6a806d5f0d190e4914e",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1407 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "after_refused_first",
+      "covers": "a refused first turn still counts as the first",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 100
+          },
+          "sha256": "a49d7d2e073216acd43017f764c3f3189a8423ac678af6a806d5f0d190e4914e",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1407 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        },
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 100
+          },
+          "sha256": "a49d7d2e073216acd43017f764c3f3189a8423ac678af6a806d5f0d190e4914e",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1410 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_compact",
+      "covers": "JSON after a call is a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\":\"ok\",\"note\":\"fine\"},",
+            "repeat": 120,
+            "tail": "{\"status\":\"ok\"}]"
+          },
+          "sha256": "201601d68c8693c6d0d227c41b9c2ad731c128fedaad67b299ee908391cd59cf",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1096 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_default",
+      "covers": "a tool result keeps its layout (or not)",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\": \"ok\", \"note\": \"fine\"}, ",
+            "repeat": 100,
+            "tail": "{\"status\": \"ok\"}]"
+          },
+          "sha256": "b779c768e8e533e3771867096564f3caefcf13801826022ce8d4a655352b0708",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (916 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_pretty",
+      "covers": "a pretty-printed tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[\n",
+            "unit": "  {\n    \"status\": \"ok\",\n    \"note\": \"fine\"\n  },\n",
+            "repeat": 150,
+            "tail": "  {\n    \"status\": \"ok\"\n  }\n]"
+          },
+          "sha256": "cd4d5fb81612a932b3164935d8e38a28f9557022a84bbb4f1a67ae867113cc95",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1366 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_padded",
+      "covers": "a tool result with white space around it",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "  \n[",
+            "unit": "{\"status\": \"ok\", \"note\": \"fine\"}, ",
+            "repeat": 100,
+            "tail": "{\"status\": \"ok\"}]\n  "
+          },
+          "sha256": "4a107abb69a5f7784ed904900d22757b01411deb44365c0fd2754bf7f439d0c4",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (916 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_object",
+      "covers": "an object as the tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "{\"results\": [",
+            "unit": "{\"status\": \"ok\", \"note\": \"fine\"}, ",
+            "repeat": 100,
+            "tail": "{\"status\": \"ok\"}]}"
+          },
+          "sha256": "5af765f90e004ed749d9a0b03fc0c5de5a8f1df70d7c3a40081ec23e195fb770",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (919 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_string",
+      "covers": "a JSON string as the tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "\"",
+            "unit": "the weather was nice ",
+            "repeat": 200,
+            "tail": "\""
+          },
+          "sha256": "235817bf51ba6c35f0f84b60a40ce26e8eafdaec753a3927232dc0beb7b90856",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1013 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_number",
+      "covers": "a JSON number as the tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "1",
+            "unit": "0123456789",
+            "repeat": 300
+          },
+          "sha256": "d0a5a5595ceef165e7e5ae8296871bbf8ce4dd3450e05e68b2b52094fda06327",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1212 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_true",
+      "covers": "a JSON literal as the tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "true",
+            "unit": "\n",
+            "repeat": 1000
+          },
+          "sha256": "d301ae930ddf9a639b2b01bcab37f8af6666211afaa0a02f40cada307708fe30",
+          "answer": {
+            "type": "respond",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": "Timer set; user asked for timer, not action.",
+            "confidence": 0.4898
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_invalid",
+      "covers": "invalid JSON after a call is a user turn",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\": \"ok\", \"note\": \"fine\"}, ",
+            "repeat": 100,
+            "tail": "{\"status\": \"ok\"}"
+          },
+          "sha256": "191ea4f5b83aed251b43a5779367bfc6465d09936a7ce189f430f168b8067a11",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1616 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_float",
+      "covers": "float spelling in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": 1.50, \"w\": 2.0, \"x\": 0.1, \"y\": -0.0}, ",
+            "repeat": 50,
+            "tail": "{\"v\": 1.0}]"
+          },
+          "sha256": "77f5c1562f0dcc905fa058ac3fba6f10c3271ca2982178c3637077232d183485",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (916 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_exp",
+      "covers": "exponent spelling in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": 1e2, \"w\": 1E-7, \"x\": 2.5e+3, \"y\": 1.0e20}, ",
+            "repeat": 40,
+            "tail": "{\"v\": 1e0}]"
+          },
+          "sha256": "b0d77ef57c28223d44addfe471dd2543728ee7703712c917d4dba6ca363b75d6",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (977 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_unicode",
+      "covers": "escaped non-ASCII in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"Grüße été naïve\"}, ",
+            "repeat": 60,
+            "tail": "{\"v\": \"é\"}]"
+          },
+          "sha256": "4b2288c4d99f9ab14c2e2cd1a210e48708b3432b27fd1234c2583346bdaebc39",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (976 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_raw_utf8",
+      "covers": "raw non-ASCII in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"Grüße été naïve\"}, ",
+            "repeat": 60,
+            "tail": "{\"v\": \"é\"}]"
+          },
+          "sha256": "4b2288c4d99f9ab14c2e2cd1a210e48708b3432b27fd1234c2583346bdaebc39",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (976 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_escape",
+      "covers": "escapes in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\/b A \\t \\\" \\\\ <&>\"}, ",
+            "repeat": 60,
+            "tail": "{\"v\": \"\\/\"}]"
+          },
+          "sha256": "736bde82e857ce968501b77cca18b5ccde211ff4acd7926f5395d1a076a68522",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1517 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_bigint",
+      "covers": "large integers and -0 in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": 123456789012345678901234567890, \"w\": -0}, ",
+            "repeat": 90,
+            "tail": "{\"v\": 1}]"
+          },
+          "sha256": "da89205c16e50ea1c37a6693c5218d0aedde6492fa3de5d8dfb18fc78ac01955",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1725 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_dupkey",
+      "covers": "repeated keys in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"a\": 1, \"b\": 2, \"a\": \"three\"}, ",
+            "repeat": 80,
+            "tail": "{\"a\": 1}]"
+          },
+          "sha256": "ba3e85e458b5bd02eeed201c42e8bd4022708ff50c41fb943ff0c14100f3f685",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (895 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "after_two_calls",
+      "covers": "JSON after two calls",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "text Anna that I'm running late and set a timer for 20 minutes"
+          },
+          "sha256": "11d34de3ee322fde80b1c201222dd2133b738009a0aa828f32b987fdb6c5bc4a",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "send_message",
+                "arguments": {
+                  "recipient": "Anna",
+                  "message": "Running late"
+                }
+              },
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 20
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'Anna' -> recipient 'Anna'; 'running late' -> message 'running late'; '20 minutes' -> minutes 20",
+            "confidence": 0.6448,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\":\"ok\",\"note\":\"fine\"},",
+            "repeat": 120,
+            "tail": "{\"status\":\"ok\"}]"
+          },
+          "sha256": "201601d68c8693c6d0d227c41b9c2ad731c128fedaad67b299ee908391cd59cf",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1096 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "after_refusal",
+      "covers": "JSON after a refusal (a call with no calls)",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "order a large pepperoni pizza"
+          },
+          "sha256": "d9caa71815a3e014ab33446ae9be76a410a013fd2aaa835833e99113ecee4e8c",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": "No shopping or ordering tool available.",
+            "confidence": 0.801
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\":\"ok\",\"note\":\"fine\"},",
+            "repeat": 120,
+            "tail": "{\"status\":\"ok\"}]"
+          },
+          "sha256": "201601d68c8693c6d0d227c41b9c2ad731c128fedaad67b299ee908391cd59cf",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1094 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "after_suppressed",
+      "covers": "JSON after a suppressed call",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "wake me up at 6:45 tomorrow"
+          },
+          "sha256": "bbb04660a8c8ffbd39283cb327128b4144ad6e3843d37d3194e25f9237de4c70",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [],
+            "suppressed_calls": [
+              {
+                "name": "set_alarm",
+                "arguments": {
+                  "time": "06:45"
+                }
+              }
+            ],
+            "reasoning": "'6:45' -> time '06:45'; 'tomorrow' -> date '2026-10-12' (tomorrow relative to system date 2026-10-11); label omitted.",
+            "confidence": 0.092,
+            "validation": {
+              "ungrounded": ["set_alarm.time"],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\":\"ok\",\"note\":\"fine\"},",
+            "repeat": 120,
+            "tail": "{\"status\":\"ok\"}]"
+          },
+          "sha256": "201601d68c8693c6d0d227c41b9c2ad731c128fedaad67b299ee908391cd59cf",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1094 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "after_tool_result",
+      "covers": "JSON after the answer to a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "tail": "[{\"status\": \"ok\", \"timer_id\": 7}]"
+          },
+          "sha256": "0957735e712e9aa521ed1fae09daddc830951076dfe729a54be87038a729301d",
+          "answer": {
+            "type": "respond",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": "Timer set; confirm.",
+            "confidence": 0.7271
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\":\"ok\",\"note\":\"fine\"},",
+            "repeat": 120,
+            "tail": "{\"status\":\"ok\"}]"
+          },
+          "sha256": "201601d68c8693c6d0d227c41b9c2ad731c128fedaad67b299ee908391cd59cf",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1094 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "after_refused_tool",
+      "covers": "JSON after a refused tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\":\"ok\",\"note\":\"fine\"},",
+            "repeat": 120,
+            "tail": "{\"status\":\"ok\"}]"
+          },
+          "sha256": "201601d68c8693c6d0d227c41b9c2ad731c128fedaad67b299ee908391cd59cf",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1096 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\":\"ok\",\"note\":\"fine\"},",
+            "repeat": 120,
+            "tail": "{\"status\":\"ok\"}]"
+          },
+          "sha256": "201601d68c8693c6d0d227c41b9c2ad731c128fedaad67b299ee908391cd59cf",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1094 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "after_refused_user",
+      "covers": "JSON after a refused user turn that followed a call",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 100
+          },
+          "sha256": "a49d7d2e073216acd43017f764c3f3189a8423ac678af6a806d5f0d190e4914e",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1410 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"status\":\"ok\",\"note\":\"fine\"},",
+            "repeat": 120,
+            "tail": "{\"status\":\"ok\"}]"
+          },
+          "sha256": "201601d68c8693c6d0d227c41b9c2ad731c128fedaad67b299ee908391cd59cf",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1094 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "three_turns",
+      "covers": "a third user turn",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "tail": "order a large pepperoni pizza"
+          },
+          "sha256": "d9caa71815a3e014ab33446ae9be76a410a013fd2aaa835833e99113ecee4e8c",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [],
+            "suppressed_calls": [
+              {
+                "name": "send_message",
+                "arguments": {
+                  "recipient": "order",
+                  "message": "Large pepperoni pizza"
+                }
+              }
+            ],
+            "reasoning": "timer set for pasta; now needs to order food, not timer",
+            "confidence": 0.0235,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 100
+          },
+          "sha256": "a49d7d2e073216acd43017f764c3f3189a8423ac678af6a806d5f0d190e4914e",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1410 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "budget_512",
+      "covers": "the budget at the default --max",
+      "max": 512,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 700
+          },
+          "sha256": "1c504350f5ffad6dbc6bf637b2f99dbbb5c4b6a4bf823843899dcf46760561f3",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (9807 tokens, 7366 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "budget_100",
+      "covers": "the budget at --max 100",
+      "max": 100,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 750
+          },
+          "sha256": "8191ded7ab9b5c9e333a648d2f67967cdb20c6ad6d5bf25f2605ba0d2611bb1f",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (10507 tokens, 7778 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "trim_request_last",
+      "covers": "without the flag an oversized turn is trimmed: the request at its end",
+      "max": 7000,
+      "fail_input_overflow": false,
+      "steps": [
+        {
+          "input": {
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 150,
+            "tail": "Set a timer for 25 minutes for the eggs."
+          },
+          "sha256": "72a90f2fdd55e6662a606c1f87cb529f19bd613153b8f748c2a7dadcfe361e56",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 25,
+                  "label": "Eggs"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "User wants a timer for 25 minutes for eggs. set_timer with minutes=25 and label='eggs'.",
+            "confidence": 0.2948,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "trim_request_first",
+      "covers": "without the flag an oversized turn is trimmed: the request at its start",
+      "max": 7000,
+      "fail_input_overflow": false,
+      "steps": [
+        {
+          "input": {
+            "head": "Set a timer for 25 minutes for the eggs. ",
+            "unit": "the weather was nice and we walked along the river. ",
+            "repeat": 150
+          },
+          "sha256": "d031e1802687f55e29658bc0509d6e6e6945698e0f1e290e74f5f1a86ab75a91",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [],
+            "suppressed_calls": [
+              {
+                "name": "get_weather",
+                "arguments": {
+                  "location": "Mumbai"
+                }
+              }
+            ],
+            "reasoning": "User wants weather for Mumbai. Use get_weather with location 'Mumbai'.",
+            "confidence": 0.269,
+            "validation": {
+              "ungrounded": ["get_weather.location"],
+              "negation": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_slash",
+      "covers": "the spelling of / in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a/b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "1ebd74904030549ad8e9960deaba3c516210e970135d2e1cfb02a577c9620819",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (916 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_slash_escaped",
+      "covers": "the spelling of \\/ in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\/b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "318dcfff8514e065a761a97521b6b170422f0f95d1364194bcf412de115769d0",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1066 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_tab",
+      "covers": "the spelling of \\t in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\tb\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "d64d5b15c0dbc675b19f4cfbaf2122c2b99be7c445a0e5779839da830440a45c",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1066 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_newline",
+      "covers": "the spelling of \\n in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\nb\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "cad1c074f5002e365bde0dc4621c23cf3acf4f4f8248ff77817dd03a9c33523c",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1066 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_quote",
+      "covers": "the spelling of \\\" in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\\"b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "caec60b7c0bdbffce485836513d99abc31fd8a8f0524b8ed2fcd9ffb599ea88c",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (916 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_backslash",
+      "covers": "the spelling of \\\\ in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\\\b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "799f885948c7e48a8b16bfb1b4c40a0b120b190b56affef81aa8bed4b3e8c2ae",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1066 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_lt",
+      "covers": "the spelling of < in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a<b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "5688790be8c39e4e19bda61fc0d726ff94a454ba295249e8aa11543b5374ff0b",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1216 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_amp",
+      "covers": "the spelling of & in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a&b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "ca069b85b0ae75032494a9f2a4bf8ab64e82815e9ba278aed00b869708b4d222",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1216 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_gt",
+      "covers": "the spelling of > in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a>b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "f2c984a32f26a3b0fceb2ef89ca42b528ccdf8c27133d4693138e97072c5439f",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1216 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_u_nonascii",
+      "covers": "the spelling of \\u00fc in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\u00fcb\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "fca20c89ccc70e0fb7a26b3c8c0608049190f419ebdeeeef2f4c66f67dcecae6",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1516 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_u_ascii",
+      "covers": "the spelling of \\u0041 in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\u0041b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "65a3525e81dc93567e6243ec5280517d8bebf5af2f2089f20b46b261363683a3",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1516 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_u_control",
+      "covers": "the spelling of \\u0001 in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\u0001b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "d22595648935d7601763b1c3d22190adb3d42998684de68e2390fcc9cee4fccd",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1366 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_u_upper",
+      "covers": "the spelling of \\u00FC in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\u00FCb\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "e7ae7fc390e65ad08502873b813053d72406bacafb188c7e65b6b8012e489003",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1516 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_lt_amp_gt",
+      "covers": "the spelling of <&> in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a<&>b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "5e498ad656aa68ea12c16eece4ff8a2d8223055aa9b6dea20774f7193eae587b",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (2416 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_space_lt",
+      "covers": "the spelling of  < in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a <b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "ffda6a7a54a61534efabbee77ca55c9cbefc4844b8b8dd5a47630c500b17e769",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1366 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_lt_space",
+      "covers": "the spelling of <  in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a< b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "bb0aaeade1fef981d53269268355de5b41b356b8c5fb055f818aa1dd3baec1a2",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1216 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_space_amp_space",
+      "covers": "the spelling of  &  in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a & b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "e073b8ed6e5bdf777ccb2ee06976e8961e38da61afae40dc093fbc8e70d1fac3",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1366 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_backslash_space_lt",
+      "covers": "the spelling of \\\\ < in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\\\ <b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "db46c407359380b56412c82657b125fece06b6c6ad895c8286de86d89b88549b",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1666 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_quote_space_lt",
+      "covers": "the spelling of \\\" < in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\\" <b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "a59e1b5e8a810d356d21add3d29504972002e0ebcbdf3f6c8e95fe40ddcb74e1",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1516 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_tab_space_lt",
+      "covers": "the spelling of \\t < in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a\\t <b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "f4fb9e8b8ee952a6e395f78d02442acaf934cd9b49953ae2ade1c11cc9faf36d",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1666 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "escape_lt_slash",
+      "covers": "the spelling of </ in a tool result",
+      "max": 7000,
+      "fail_input_overflow": true,
+      "steps": [
+        {
+          "input": {
+            "tail": "set a timer for 10 minutes for the pasta"
+          },
+          "sha256": "be9f58c4e9645d940c89da7f478ade794d6a6cb85ad1881268b52b2d93087655",
+          "answer": {
+            "type": "call",
+            "success": true,
+            "error": null,
+            "error_code": null,
+            "reason": null,
+            "function_calls": [
+              {
+                "name": "set_timer",
+                "arguments": {
+                  "minutes": 10,
+                  "label": "Pasta"
+                }
+              }
+            ],
+            "suppressed_calls": [],
+            "reasoning": "'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.",
+            "confidence": 0.9324,
+            "validation": {
+              "ungrounded": [],
+              "negation": false
+            }
+          }
+        },
+        {
+          "input": {
+            "head": "[",
+            "unit": "{\"v\": \"a</b\"}, ",
+            "repeat": 150,
+            "tail": "{\"v\": \"a\"}]"
+          },
+          "sha256": "bd3dc80ccddb3693174f226decbe76f034dc68b0142de7451e78f063e3157d26",
+          "answer": {
+            "type": "call",
+            "success": false,
+            "error": "input exceeds the context window (1366 tokens, 878 available)",
+            "error_code": "context_overflow",
+            "reason": "runtime_failure",
+            "function_calls": [],
+            "suppressed_calls": [],
+            "reasoning": null,
+            "confidence": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}
