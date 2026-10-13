@@ -45,36 +45,16 @@ var (
 	}
 )
 
-// The calls differ from the engine's, by its repair after decoding (the
-// capitalisation, an empty optional dropped, an optional the request never
-// states dropped, a date re-resolved, a polarity flipped); PLAN.md 11.4.
-var callsDiffer = map[string]string{
-	"timer_pasta/0":            "capitalisation",
-	"timer_then_result/0":      "capitalisation",
-	"timer_triggered/0":        "capitalisation",
-	"message_and_timer/0":      "capitalisation",
-	"event_tomorrow/0":         "capitalisation",
-	"event_explicit/0":         "capitalisation",
-	"french_message/0":         "capitalisation",
-	"catalogue_email/0":        "capitalisation",
-	"weather_to_timer/0":       "capitalisation",
-	"alarm_morning/0":          "empty optional",
-	"alarm_untriggered/0":      "empty optional",
-	"alarm_triggered/0":        "empty optional",
-	"alarm_invalid/0":          "empty optional",
-	"alarm_no_match/0":         "empty optional",
-	"pizza_to_lights/0":        "unstated optional",
-	"weather_friday/0":         "date",
-	"event_no_year/0":          "date, capitalisation",
-	"negation_door/0":          "polarity",
-	"negation_triggered/0":     "polarity",
-	"negation_two_triggered/0": "polarity",
-}
+// callsDiffer are the turns whose calls differ from the engine's, and why.
+// None does: the repair after decoding (repair.go) closed the 20 turns the
+// engine's capitalisation, dropped optionals, dates and polarity changed
+// (docs/FINDINGS.md F-056).
+var callsDiffer = map[string]string{}
 
 // ungroundedDiffers are the turns whose ungrounded list differs from the
-// engine's, which lists the calls after its repair: pizza_to_lights'
-// brightness, which the repair drops (PLAN.md 11.4).
-var ungroundedDiffers = map[string]bool{"pizza_to_lights/0": true}
+// engine's. None does: the engine lists the repaired calls, and so does
+// Envelope (pizza_to_lights' brightness, docs/FINDINGS.md F-056).
+var ungroundedDiffers = map[string]bool{}
 
 // reasoningDiffers are the turns decoded differently from the engine at a
 // near-tie (decode_test.go).
@@ -200,7 +180,8 @@ func TestEnvelopeMatchesEngine(t *testing.T) {
 func TestEnvelope(t *testing.T) {
 	tools := `[{"name":"setAlarm","description":"Set an alarm","parameters":{"type":"object","properties":{` +
 		`"time":{"type":"string"},"mode":{"type":"string","enum":["loud","soft"]},"day":{"type":"string",` +
-		`"format":"date"},"minutes":{"type":"integer"},"on":{"type":"boolean"}}},"triggers":["WAKE me","("]}]`
+		`"format":"date"},"minutes":{"type":"integer"},"on":{"type":"boolean"}},"required":["minutes"]},` +
+		`"triggers":["WAKE me","("]}]`
 
 	n, err := Normalise([]byte(tools))
 	if err != nil {
@@ -266,7 +247,7 @@ func TestEnvelope(t *testing.T) {
 				`"validation":{"ungrounded":[],"negation":true}}`,
 		},
 	} {
-		e, err := n.Envelope(c.a, c.input, c.conf)
+		e, err := n.Envelope(c.a, c.input, "", c.conf)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -281,7 +262,7 @@ func TestEnvelope(t *testing.T) {
 		}
 	}
 
-	_, err = n.Envelope(answer("<tool_call>[{]</tool_call>"), "x", 1)
+	_, err = n.Envelope(answer("<tool_call>[{]</tool_call>"), "x", "", 1)
 	if err == nil {
 		t.Error("a broken call block parsed")
 	}

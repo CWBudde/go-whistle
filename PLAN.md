@@ -600,6 +600,10 @@ shows (multi-turn, tool results, retrieval).
       engine's on 7 of 19 cases; the other 12 differ where the engine works after or around the decode, not at
       near-ties: it capitalises strings (5), re-resolves dates (2), rewrites a message (1), holds the arguments to the
       schema (3) and suppresses calls below confidence 0.1 (2; F-048).
+      (2026-10-13) — partial: with the grammar and the repair, the float model's calls after the envelope equal the
+      engine's on 20 of 24 cases (`TestFloatGreedyAgainstEngine`). Of the other 4 only `negation_door` (margin 0.018)
+      is a near-tie; `alarm_morning` (0.080, a label), `message_and_timer` (0.088, "I'm running late" kept) and
+      `catalogue_email` (0.241, one recipient) are not (F-056).
 
 ### 11.4 Decoding and the response envelope (new `internal/toolcall`; needs 11.2, 11.3, the engine corpus)
 
@@ -650,6 +654,18 @@ Engine-only: fitted against `testdata/text/engine/`.
 - [ ] The engine's post-decode repair (llms.txt:110: capitalisation, date re-resolution, enum/polarity flips,
       dropping unevidenced optionals, duplicate and negation drops, rewrites), which F-048's 7 of the 12 differences
       come from.
+      (2026-10-13) — partial: `toolcall` repairs the calls after parsing and before suppression and validation, one
+      function per rule (`repair.go`; `Envelope` takes the system facts for the `date:` fact).
+      `just oracle-text repair` (`repair.json`, 90 probes, each rule firing and held back, byte-identical on a re-run)
+      gives the engine's calls on 85 (`TestRepairMatchesEngine`); every repair difference of the corpus and the
+      grammar probes is gone (`callsDiffer` empty, `TestEnvelopeMatchesEngine`, `TestGrammarMatchesEngine`), with
+      model-free tests per rule (`TestRepair*`). Pinned and implemented: the name split, phone completion, quoted titles, a place's following
+      address, weekday and `March 4th` dates, polar booleans and enums in the call's own clause, `from X to Y`, the
+      paired tool, `by N`, unstated optional numbers, empty optional strings, duplicates, excluded and negated calls,
+      and the capitalisation of seven keys (F-056). Remains: the invented required slot's refill (not identified),
+      a required number's default (never fires in the probes), unstated optional strings and a place query's dropped
+      words (not pinned), the enum's named option (the probes still differ, the engine adds `oscillate: true`), and a
+      boolean flipped from another clause.
 - [ ] **Accept:** on the engine corpus, `type` and `function_calls` (name and arguments, as parsed JSON) equal the
       engine's on ≥ 95 % of the cases with every miss explained by a log-probability margin, `reasoning` equal on
       ≥ 90 %, `confidence` within 0.02.

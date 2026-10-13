@@ -115,7 +115,7 @@ func decodeTurns(t *testing.T, d *Decoder, m *text.Model, p *spm.Processor, syst
 			t.Fatal(err)
 		}
 
-		env, err := n.Envelope(a, in, conf)
+		env, err := n.Envelope(a, in, system, conf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,26 +159,6 @@ func thinkOf(answer string) string {
 	r, _, _ := strings.Cut(rest, "\n</think>")
 
 	return r
-}
-
-// parseCalls is the <tool_call>[…]</tool_call> block of a completion; no
-// block is no calls.
-func parseCalls(completion string) ([]call, error) {
-	_, body, ok := strings.Cut(completion, "<tool_call>")
-	if !ok {
-		return nil, nil
-	}
-
-	body, _, ok = strings.Cut(body, toolCallEnd)
-	if !ok {
-		return nil, errors.New("no </tool_call>")
-	}
-
-	var calls []call
-
-	err := json.Unmarshal([]byte(body), &calls)
-
-	return calls, err
 }
 
 // diffCalls names how got differs from want: "" when equal, else the
@@ -320,11 +300,10 @@ func TestDecodeMatchesEngine(t *testing.T) {
 // TestFloatGreedyAgainstEngine is the decode half of PLAN.md 11.3's
 // Accept, recorded rather than asserted (the user's decision of
 // 2026-10-12): each engine case's first turn rendered and decoded greedily
-// by the float model, its calls set against the engine's function_calls
-// and suppressed_calls. The engine rewrites its calls after decoding and
-// suppresses those below confidence 0.1 (11.4's envelope), so the log
-// names the differences; the test requires only that every completion
-// parses (docs/FINDINGS.md F-048).
+// by the float model, and the calls of its envelope (repaired as the
+// engine does, dispatched and suppressed) set against the engine's. The
+// log names the differences; the test requires only that every answer
+// builds an envelope (docs/FINDINGS.md F-048, F-056).
 func TestFloatGreedyAgainstEngine(t *testing.T) {
 	if testing.Short() {
 		t.Skip("decodes the engine corpus with the float model")
@@ -350,44 +329,37 @@ func TestFloatGreedyAgainstEngine(t *testing.T) {
 
 	for _, c := range corpus.Cases {
 		c.Results = nil // the first turn only
-		a := decodeCase(t, d, m, p, &corpus, c)[0].a
-		eng := responses[c.ID][0]
+		turn := decodeCase(t, d, m, p, &corpus, c)[0]
+		a, eng := turn.a, responses[c.ID][0]
 		margin := minMargin(a, 0, len(a.Tokens))
 
-		got, err := parseCalls(a.Text)
-		if err != nil {
-			if eng.ErrorCode == "truncated" && a.Truncated {
-				tally["equal"]++
-
-				t.Logf("%-20s margin %6.3f  truncated at %d tokens, as the engine", c.ID, margin, len(a.Tokens))
-
-				continue
+		if a.Truncated {
+			verdict, key := "truncated at the budget, as the engine", "equal"
+			if eng.ErrorCode != "truncated" {
+				verdict, key = "truncated, the engine is not", "differs"
 			}
 
-			t.Errorf("%s: %v in %q", c.ID, err, a.Text)
+			tally[key]++
+
+			t.Logf("%-20s margin %6.3f  %s (%d tokens)", c.ID, margin, verdict, len(a.Tokens))
 
 			continue
 		}
 
-		// The engine's calls carry the caller's tool names (F-050).
-		n, err := Normalise(corpus.Toolsets[c.Toolset])
+		js, err := json.Marshal(turn.env)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		for i := range got {
-			got[i].Name = n.CallerName(got[i].Name)
+		var got engineEnvelope
+
+		err = json.Unmarshal(js, &got)
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		verdict, key := "equal", "equal"
-
-		switch d := diffCalls(got, eng.Calls); {
-		case d == "":
-		case len(eng.Calls) == 0 && len(eng.Suppressed) > 0 && diffCalls(got, eng.Suppressed) == "":
-			verdict, key = "equal to the suppressed calls", verdict
-		case len(eng.Calls) == 0 && len(eng.Suppressed) > 0:
-			verdict, key = "against the suppressed calls: "+diffCalls(got, eng.Suppressed), "differs"
-		default:
+		if d := diffCalls(append(got.Calls, got.Suppressed...), append(eng.Calls, eng.Suppressed...)); d != "" {
 			verdict, key = d, "differs"
 		}
 
