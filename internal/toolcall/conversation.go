@@ -3,6 +3,7 @@ package toolcall
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -40,13 +41,15 @@ func (e *OverflowError) Unwrap() error { return ErrContextOverflow }
 // turn has at most context − static prefix − the answer's token limit
 // tokens; a longer one is refused (with the engine's --fail-input-overflow)
 // or loses its start. A refused turn still ends the first turn and the call
-// before it.
+// before it. Inputs keeps the inputs of the turns, which ground the values
+// of later calls (docs/FINDINGS.md F-057).
 type Conversation struct {
 	p         *spm.Processor
 	static    int
 	context   int
 	started   bool
 	afterCall bool
+	inputs    []string
 }
 
 // NewConversation starts a conversation over the static prefix of system
@@ -86,15 +89,23 @@ func (c *Conversation) Turn(input string, maxNew int, refuse bool) ([]int, error
 		b = b[len(b)-(room-len(h)-len(t)):]
 	}
 
+	c.inputs = append(c.inputs, input)
+
 	return append(append(h, b...), t...), nil
 }
+
+// Inputs are the inputs of the turns since the start or the last Reset, as
+// given, the last one included: the user turns and tool results the engine
+// grounds a call's values in (Envelope's earlier inputs are all but the
+// last; docs/FINDINGS.md F-057). A refused turn is not one of them.
+func (c *Conversation) Inputs() []string { return slices.Clone(c.inputs) }
 
 // Answered records the model's answer to the last turn: calls is the
 // number of function calls it made, suppressed ones left out.
 func (c *Conversation) Answered(calls int) { c.afterCall = calls > 0 }
 
 // Reset starts a new conversation over the same static prefix.
-func (c *Conversation) Reset() { c.started, c.afterCall = false, false }
+func (c *Conversation) Reset() { c.started, c.afterCall, c.inputs = false, false, nil }
 
 // render splits a turn into its markers before the input, the input as the
 // model sees it, and the markers after.

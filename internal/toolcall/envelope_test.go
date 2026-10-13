@@ -247,7 +247,7 @@ func TestEnvelope(t *testing.T) {
 				`"validation":{"ungrounded":[],"negation":true}}`,
 		},
 	} {
-		e, err := n.Envelope(c.a, c.input, "", c.conf)
+		e, err := n.Envelope(c.a, c.input, "", nil, c.conf)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -262,7 +262,7 @@ func TestEnvelope(t *testing.T) {
 		}
 	}
 
-	_, err = n.Envelope(answer("<tool_call>[{]</tool_call>"), "x", "", 1)
+	_, err = n.Envelope(answer("<tool_call>[{]</tool_call>"), "x", "", nil, 1)
 	if err == nil {
 		t.Error("a broken call block parsed")
 	}
@@ -317,7 +317,8 @@ func TestContainsNumber(t *testing.T) {
 }
 
 // TestUngroundedComposed: a field's schemas include the allOf, anyOf and
-// oneOf branches that declare it, so their enums exempt it (PR #64 review).
+// oneOf branches that declare it, so their enums exempt it (PR #64 review);
+// fields inside objects and arrays are not checked (docs/FINDINGS.md F-057).
 func TestUngroundedComposed(t *testing.T) {
 	tools := `[{"name":"t","parameters":{"type":"object","properties":{"o":{"allOf":[{"properties":{` +
 		`"mode":{"enum":["fast","slow"]},"name":{"type":"string"}}}]},"list":{"type":"array","items":{"oneOf":[` +
@@ -333,7 +334,7 @@ func TestUngroundedComposed(t *testing.T) {
 		`"list":[{"day":"next week"}],"other":"elsewhere"}`)}}
 
 	got := n.ungrounded(calls, "x")
-	if want := []string{"t.o.name", "t.other"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"t.other"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("ungrounded = %v, want %v", got, want)
 	}
 }

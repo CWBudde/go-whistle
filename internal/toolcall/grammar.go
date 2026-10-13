@@ -44,13 +44,14 @@ func (n *Normalised) Grammar() *Grammar {
 }
 
 // GrammarFor is the grammar of the answer to input: Grammar, unless a
-// trigger matches input and the request is not negated. Then the engine
-// routes the request (docs/FINDINGS.md F-054, F-055): the grammar holds
-// only the triggered tools and requires a call, and the answer must open
-// one right after the reasoning.
+// trigger matches input and the request is not negated (negated, the cues
+// of docs/FINDINGS.md F-057). Then the engine routes the request
+// (docs/FINDINGS.md F-054, F-055): the grammar holds only the triggered
+// tools and requires a call, and the answer must open one right after the
+// reasoning.
 func (n *Normalised) GrammarFor(input string) *Grammar {
 	tools := n.Triggered(input)
-	if len(tools) == 0 || negation.MatchString(input) {
+	if len(tools) == 0 || negated(input) {
 		return n.Grammar()
 	}
 
