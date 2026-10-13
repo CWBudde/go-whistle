@@ -31,7 +31,9 @@ import (
 // model was trained for.
 var ErrTooLong = errors.New("text: sequence longer than max_seq_len")
 
-// Model is the float32 text model.
+// Model is the text model in float32 activations, on float32 weights or,
+// from a packed source, on the CQ records as stored (docs/FINDINGS.md
+// F-059).
 type Model struct {
 	cfg   Config
 	emb   needle.Linear // [vocab, dim], the input table and the tied head
@@ -75,7 +77,11 @@ func checkConfig(cfg Config) error {
 // Load builds the model from src, which serves the cact.TextNames names
 // (Source does), with the geometry cfg. The blocks outside
 // cfg.GlobalLayers get the window cfg.SlidingWindow (0 for none). The
-// ConfidenceHead is loaded when src carries it (HasConfidence).
+// ConfidenceHead is loaded when src carries it (HasConfidence). Where src
+// serves a CQ tensor packed (weights.Packer, Source with
+// OpenOptions.Packed), the model multiplies by it and gathers its rows
+// without a float32 copy, and is valid only while src is open
+// (docs/FINDINGS.md F-059).
 func Load(src weights.Source, cfg Config) (*Model, error) {
 	err := checkConfig(cfg)
 	if err != nil {

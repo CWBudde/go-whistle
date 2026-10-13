@@ -29,7 +29,7 @@ var forwardCases = []string{"timer_en", "message_de", "lights_two_calls", longCa
 
 const longCase = "long_tools"
 
-func requireFile(t *testing.T, path string) {
+func requireFile(t testing.TB, path string) {
 	t.Helper()
 
 	_, err := os.Stat(path)
@@ -71,7 +71,7 @@ type fixture struct {
 	store *safetensors.Store
 }
 
-func openFixture(t *testing.T) fixture {
+func openFixture(t testing.TB) fixture {
 	t.Helper()
 
 	store, err := safetensors.OpenStore(forwardFixture, safetensors.StoreOptions{})
@@ -84,7 +84,7 @@ func openFixture(t *testing.T) fixture {
 	return fixture{store}
 }
 
-func (f fixture) floats(t *testing.T, name string) []float32 {
+func (f fixture) floats(t testing.TB, name string) []float32 {
 	t.Helper()
 
 	tensor, err := f.store.Tensor(name)
@@ -97,7 +97,7 @@ func (f fixture) floats(t *testing.T, name string) []float32 {
 
 // ints reads an I64 tensor; the store widens it to float32, exact for
 // token ids.
-func (f fixture) ints(t *testing.T, name string) []int {
+func (f fixture) ints(t testing.TB, name string) []int {
 	t.Helper()
 
 	data := f.floats(t, name)
