@@ -38,7 +38,9 @@ func runRepair(t *testing.T, cases []repairCase) {
 
 		b.WriteByte('[')
 
-		for i, rc := range n.repair(calls, c.input, c.system) {
+		repaired, _ := n.repair(calls, c.input, c.system)
+
+		for i, rc := range repaired {
 			if i > 0 {
 				b.WriteByte(',')
 			}
@@ -442,6 +444,18 @@ func TestRepairDropCalls(t *testing.T) {
 		{
 			"the only call: kept", home, "the lights everywhere except the bedroom", "", list(lights("bedroom")),
 			list(lights("bedroom")),
+		},
+		{
+			"except a phrase holding the value", home, "turn off the kitchen and hallway lights except the hallway lights",
+			"", list(lights("kitchen"), lights("hallway")), list(lights("kitchen")),
+		},
+		{
+			"except a phrase holding the verb's object", home, "turn off the kitchen lights and except lock the front door",
+			"", list(lights("kitchen"), lock("front door")), list(lights("kitchen")),
+		},
+		{
+			"the value inside a longer word: kept", home, "turn off the kitchen and hall lights except the hallways", "",
+			list(lights("kitchen"), lights("hall")), list(lights("kitchen"), lights("hall")),
 		},
 		{
 			"inside a value: kept", home, "lock all the doors but not the garage", "",

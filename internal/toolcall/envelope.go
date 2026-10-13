@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -65,8 +66,10 @@ func NoTools() *Envelope {
 
 // Envelope is the engine's answer built from a decoded answer a to the
 // request input over the tools n, with the system facts system (whose
-// date: fact the repair resolves dates against) and the confidence conf
-// (Decoder.Confidence) (docs/FINDINGS.md F-054, F-056):
+// date: fact the repair resolves dates against), the conversation's earlier
+// inputs earlier (user turns and tool results, Conversation.Inputs) and the
+// confidence conf (Decoder.Confidence) (docs/FINDINGS.md F-054, F-056,
+// F-057):
 //
 //   - a truncated answer fails with error_code "truncated" and no reasoning;
 //   - the reasoning is the text between "<think>\n" and "\n</think>";
@@ -74,14 +77,17 @@ func NoTools() *Envelope {
 //     empty list is a refusal), any other a "respond" without calls;
 //   - the calls are repaired as the engine does after decoding (repair):
 //     values grounded in the request, dates, polarity, capitalisation, and
-//     dropped arguments and calls; an answer whose calls are all dropped is
-//     a refusal;
-//   - the calls are suppressed below SuppressBelow, unless a trigger of the
-//     tools matches input and the request is not negated;
-//   - validation, when there are calls: the fields whose value input does
-//     not contain (strings case-insensitively, numbers as written; booleans,
-//     enum and const values and dates exempt) and whether input negates.
-func (n *Normalised) Envelope(a *Decoded, input, system string, conf float64) (*Envelope, error) {
+//     dropped arguments and calls; calls the request negates or excludes
+//     are dropped, and when that would drop them all they are kept and
+//     withheld;
+//   - the calls are suppressed when withheld, or below SuppressBelow unless
+//     a trigger of the tools matches input and the request is not negated;
+//   - validation, when there are calls: the top-level fields of each call
+//     whose value neither input nor the earlier inputs contain (strings
+//     case-insensitively, numbers as written; booleans, enum and const
+//     values and dates exempt; objects and arrays unchecked; the system
+//     facts ground nothing) and whether input negates.
+func (n *Normalised) Envelope(a *Decoded, input, system string, earlier []string, conf float64) (*Envelope, error) {
 	e := &Envelope{Type: "call", Success: true, Confidence: conf}
 
 	if a.Truncated {
@@ -108,7 +114,7 @@ func (n *Normalised) Envelope(a *Decoded, input, system string, conf float64) (*
 
 	// The engine lists the ungrounded fields of the repaired calls
 	// (docs/FINDINGS.md F-056: pizza_to_lights).
-	calls = n.repair(calls, input, system)
+	calls, withheld := n.repair(calls, input, system)
 	if len(calls) == 0 {
 		return e, nil
 	}
@@ -124,21 +130,95 @@ func (n *Normalised) Envelope(a *Decoded, input, system string, conf float64) (*
 		out[i] = Call{Name: n.CallerName(c.name), Arguments: args}
 	}
 
-	negated := negation.MatchString(input)
-	if conf >= SuppressBelow || len(n.Triggered(input)) > 0 && !negated {
+	neg := negated(input)
+	if !withheld && (conf >= SuppressBelow || len(n.Triggered(input)) > 0 && !neg) {
 		e.FunctionCalls = out
 	} else {
 		e.SuppressedCalls = out
 	}
 
-	e.Validation = &Validation{Ungrounded: n.ungrounded(calls, input), Negation: negated}
+	said := strings.Join(append(slices.Clone(earlier), input), "\n")
+	e.Validation = &Validation{Ungrounded: n.ungrounded(calls, said), Negation: neg}
 
 	return e, nil
 }
 
-// negation finds a negated request (docs/FINDINGS.md F-054: "don't" in the
-// corpus; "do not" and "never" are the port's).
-var negation = regexp.MustCompile(`(?i)\b(?:don['’]?t|do not|never)\b`)
+// negationCue finds the spellings the engine reads as a negation
+// (docs/FINDINGS.md F-057): anywhere in the text, inside words too
+// ("nevertheless", "xdon't"), in any case, with the ASCII apostrophe only
+// (not "don’t") and one space inside ("do  not" is none); "dont" only
+// before a space ("dont," and "dontx" are none).
+var negationCue = regexp.MustCompile(`(?i)don't|dont |do not|never|shouldn't|should not|mustn't|must not`)
+
+// cancelling are the words that, at the start of what follows a cue and its
+// spaces, make the cue no negation, in any case and as the start of a longer
+// word too ("never mind", "nevermind", "don't forgetting"; but "don't
+// worries", "don't hesitating" and "never-mind" are negations)
+// (docs/FINDINGS.md F-057).
+var cancelling = []string{"forget", "worry", "hesitate", "mind", "disturb"}
+
+// negated reports whether s is negated as the engine reads it: a cue the
+// words after it leave a negation. It is the request's
+// validation.negation, which also keeps a trigger from routing the request
+// and its calls from shipping below the floor (docs/FINDINGS.md F-054,
+// F-055, F-057).
+func negated(s string) bool {
+	for _, m := range negationCue.FindAllStringIndex(s, -1) {
+		rest := strings.ToLower(strings.TrimLeft(s[m[1]:], " "))
+
+		if !slices.ContainsFunc(cancelling, func(w string) bool { return strings.HasPrefix(rest, w) }) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Negation cues for the repair's drop of negated calls, as whitespace
+// tokens: one token, or two ("do not"), matched whole in any case, so that
+// "don't!", "(don't)", "do not," and "please,don't" are none, unlike for
+// negated; the curly "don’t", "won't", "can't", "cannot" and "not" are none
+// either (docs/FINDINGS.md F-057).
+var (
+	dropCues     = []string{"don't", "dont", "never", "shouldn't", "mustn't"}
+	dropCuePairs = []string{"do not", "should not", "must not"}
+)
+
+// dropReach is how many tokens after a cue the verb it negates may be:
+// "don't wait, guys, lock" negates lock, "don't be so slow lock" does not
+// (docs/FINDINGS.md F-057).
+const dropReach = 3
+
+// negatesVerb reports whether s negates the verb (lower-case): it is one of
+// the dropReach whitespace tokens after a drop cue that a cancelling word
+// does not follow ("don't forget to lock" negates nothing).
+func negatesVerb(s, verb string) bool {
+	toks := strings.Fields(strings.ToLower(s))
+
+	for i := range toks {
+		var n int
+
+		switch {
+		case slices.Contains(dropCues, toks[i]):
+			n = 1
+		case i+1 < len(toks) && slices.Contains(dropCuePairs, toks[i]+" "+toks[i+1]):
+			n = 2
+		default:
+			continue
+		}
+
+		rest := toks[i+n:]
+		if len(rest) > 0 && slices.ContainsFunc(cancelling, func(w string) bool { return strings.HasPrefix(rest[0], w) }) {
+			continue
+		}
+
+		if slices.Contains(rest[:min(dropReach, len(rest))], verb) {
+			return true
+		}
+	}
+
+	return false
+}
 
 // splitThink is the reasoning between "<think>\n" and "\n</think>" and what
 // follows it.
@@ -195,39 +275,20 @@ func parseBlock(block string) ([]modelCall, error) {
 	return calls, nil
 }
 
-// ungrounded are the "tool.field" paths of calls whose value input does not
-// contain, in the calls' and the arguments' order, each once.
-func (n *Normalised) ungrounded(calls []modelCall, input string) []string {
+// ungrounded are the "tool.field" paths of the top-level arguments of calls
+// whose value the text said does not contain, in the calls' and the
+// arguments' order, once per call that has one: the engine lists a field
+// twice for two calls, and never a field inside an object or an array
+// (docs/FINDINGS.md F-057).
+func (n *Normalised) ungrounded(calls []modelCall, said string) []string {
 	out := []string{}
-	seen := map[string]bool{}
-	lower := strings.ToLower(input)
-
-	var walk func(path string, v any, schemas []*object)
-
-	walk = func(path string, v any, schemas []*object) {
-		switch t := v.(type) {
-		case *object:
-			for _, k := range t.keys {
-				walk(path+"."+k, t.vals[k], under(schemas, "properties", k))
-			}
-		case []any:
-			items := under(schemas, "items", "")
-			for _, x := range t {
-				walk(path, x, items)
-			}
-		default:
-			if !grounded(t, schemas, lower) && !seen[path] {
-				seen[path] = true
-				out = append(out, path)
-			}
-		}
-	}
+	lower := strings.ToLower(said)
 
 	for _, c := range calls {
-		p := &pyParser{s: c.args}
+		v, err := (&pyParser{s: c.args}).value()
 
-		v, err := p.value()
-		if err != nil {
+		args, ok := v.(*object)
+		if err != nil || !ok {
 			continue
 		}
 
@@ -236,7 +297,16 @@ func (n *Normalised) ungrounded(calls []modelCall, input string) []string {
 			params = composed(ps)
 		}
 
-		walk(c.name, v, params)
+		for _, k := range args.keys {
+			switch args.vals[k].(type) {
+			case *object, []any:
+				continue
+			}
+
+			if !grounded(args.vals[k], under(params, k), lower) {
+				out = append(out, c.name+"."+k)
+			}
+		}
 	}
 
 	return out
@@ -271,18 +341,12 @@ func composed(s *object) []*object {
 	return out
 }
 
-// under are the composed schemas of key under schemas: of property k of
-// their "properties", or of their "items" when k is "".
-func under(schemas []*object, key, k string) []*object {
+// under are the composed schemas of property k of schemas.
+func under(schemas []*object, k string) []*object {
 	var out []*object
 
 	for _, s := range schemas {
-		sub := member(s, key)
-		if k != "" {
-			sub = member(sub, k)
-		}
-
-		if sub != nil {
+		if sub := member(member(s, "properties"), k); sub != nil {
 			out = append(out, composed(sub)...)
 		}
 	}

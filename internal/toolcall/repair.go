@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // The engine's deterministic repair of the decoded calls (llms.txt:
@@ -44,8 +46,10 @@ type repairer struct {
 // (phone numbers, quoted titles, names, places, pickup and destination,
 // "by N", a defaulted number), then dates, the paired tool, polarity and
 // named enum options, capitalisation, and last the dropped arguments and
-// calls.
-func (n *Normalised) repair(calls []modelCall, input, system string) []modelCall {
+// calls. withheld reports calls kept because the request negates or
+// excludes every one of them, which the engine suppresses
+// (docs/FINDINGS.md F-057).
+func (n *Normalised) repair(calls []modelCall, input, system string) (_ []modelCall, withheld bool) {
 	r := &repairer{n: n, input: input, lower: strings.ToLower(input)}
 	r.fact, r.hasFact = dateFactOf(system)
 
@@ -73,14 +77,14 @@ func (n *Normalised) repair(calls []modelCall, input, system string) []modelCall
 		}
 	}
 
-	cs = r.dropCalls(cs)
+	cs, withheld = r.dropCalls(cs)
 
 	out := make([]modelCall, len(cs))
 	for i, c := range cs {
 		out[i] = modelCall{name: c.name, args: c.bytes()}
 	}
 
-	return out
+	return out, withheld
 }
 
 // bytes are c's arguments as JSON: as the model wrote them unless the
@@ -655,7 +659,7 @@ func (r *repairer) paired(c *repairCall) {
 	}
 
 	clause := r.clauseOf(c)
-	if negation.MatchString(clause) {
+	if clauseNegation.MatchString(clause) {
 		return
 	}
 
@@ -669,6 +673,14 @@ func (r *repairer) paired(c *repairCall) {
 		c.name = base
 	}
 }
+
+// clauseNegation is a negated clause for the paired tool and polarity:
+// the spelling of F-054 the probes of F-056 were fitted with. It is not
+// validation.negation (negated): the probes of docs/FINDINGS.md F-057 show
+// these two rules looking for other cues ("not", "dont"; not "shouldn't"
+// or "mustn't") in the 13 bytes before the verb rather than in the clause,
+// which is not ported here.
+var clauseNegation = regexp.MustCompile(`(?i)\b(?:don['’]?t|do not|never)\b`)
 
 // Polar phrases: the request verbs llms.txt names ("turn on, unlock,
 // louder, turn down") and their opposites.
@@ -695,7 +707,7 @@ var polarKeys = []string{"on"}
 // F-056: bool_own_clause, enum_louder).
 func (r *repairer) polarity(c *repairCall) {
 	clause := r.clauseOf(c)
-	if negation.MatchString(clause) {
+	if clauseNegation.MatchString(clause) {
 		return
 	}
 
@@ -841,18 +853,17 @@ func (r *repairer) dropArguments(c *repairCall) {
 // exclude_apart_from).
 var exclusion = regexp.MustCompile(`(?i)\b(?:except|but not|apart from)\s+`)
 
-// negatedVerb is a negation, spelled as the envelope's (F-054), and the
-// word after it.
-var negatedVerb = regexp.MustCompile(`(?i)\b(?:don['’]?t|do not|never)\s+(\w+)`)
-
 // dropCalls drops the calls for something the request excludes ("except
-// the hallway": a call with that value, unless it is the only call) or
-// negates ("don't lock": a call to a tool whose name starts with that
-// verb), and duplicate calls (docs/FINDINGS.md F-056). A negated verb drops
-// its calls from every clause, not only its own: the engine drops the jazz
-// of "play jazz in the kitchen and don't play anything in the bedroom"
-// (negated_verb).
-func (r *repairer) dropCalls(cs []*repairCall) []*repairCall {
+// the hallway lights": a call with a value the excluded phrase holds as
+// words) or negates ("don't lock": a call to a tool whose name starts with
+// a verb negatesVerb finds), and duplicate calls (docs/FINDINGS.md F-056,
+// F-057). A negated verb drops its calls from every clause, not only its
+// own: the engine drops the jazz of "play jazz in the kitchen and don't play
+// anything in the bedroom" (negated_verb). When the request negates or
+// excludes every call, the engine keeps them and suppresses them, whatever
+// the confidence and the triggers (docs/FINDINGS.md F-057:
+// drop_only_do_not, drop_only_except); withheld reports it.
+func (r *repairer) dropCalls(cs []*repairCall) (_ []*repairCall, withheld bool) {
 	links := exclusion.FindAllStringIndex(r.input, -1)
 	excluded := make([]string, 0, len(links))
 
@@ -861,37 +872,32 @@ func (r *repairer) dropCalls(cs []*repairCall) []*repairCall {
 		excluded = append(excluded, strings.ToLower(withoutThe(rest[:clauseEnd(rest)])))
 	}
 
-	if len(cs) > 1 && len(excluded) > 0 {
-		cs = slices.DeleteFunc(slices.Clone(cs), func(c *repairCall) bool {
-			if c.args == nil {
-				return false
-			}
+	kept := slices.DeleteFunc(slices.Clone(cs), func(c *repairCall) bool {
+		verb, _, _ := strings.Cut(c.name, "_")
+		if negatesVerb(r.input, verb) {
+			return true
+		}
 
-			for _, v := range c.stringArgs {
-				if slices.Contains(excluded, strings.ToLower(v)) {
-					return true
-				}
-			}
-
+		if c.args == nil {
 			return false
-		})
-	}
+		}
 
-	negations := negatedVerb.FindAllStringSubmatch(r.input, -1)
-	verbs := make([]string, 0, len(negations))
+		for _, v := range c.stringArgs {
+			if slices.ContainsFunc(excluded, func(x string) bool { return containsWords(x, strings.ToLower(v)) }) {
+				return true
+			}
+		}
 
-	for _, m := range negations {
-		verbs = append(verbs, strings.ToLower(m[1]))
+		return false
+	})
+
+	if len(kept) == 0 && len(cs) > 0 {
+		kept, withheld = cs, true
 	}
 
 	seen := map[string]bool{}
 
-	return slices.DeleteFunc(cs, func(c *repairCall) bool {
-		verb, _, _ := strings.Cut(c.name, "_")
-		if slices.Contains(verbs, verb) {
-			return true
-		}
-
+	return slices.DeleteFunc(kept, func(c *repairCall) bool {
 		key := c.name + "\x00" + c.identity()
 		if seen[key] {
 			return true
@@ -900,7 +906,35 @@ func (r *repairer) dropCalls(cs []*repairCall) []*repairCall {
 		seen[key] = true
 
 		return false
-	})
+	}), withheld
+}
+
+// containsWords reports whether s holds the non-empty w with no letter or
+// digit on either side.
+func containsWords(s, w string) bool {
+	for i := 0; w != "" && i <= len(s)-len(w); i++ {
+		j := strings.Index(s[i:], w)
+		if j < 0 {
+			return false
+		}
+
+		j += i
+		before, _ := utf8.DecodeLastRuneInString(s[:j])
+		after, _ := utf8.DecodeRuneInString(s[j+len(w):])
+
+		if !isWordRune(before) && !isWordRune(after) {
+			return true
+		}
+
+		i = j
+	}
+
+	return false
+}
+
+// isWordRune reports a letter or digit; utf8.RuneError (no rune) is none.
+func isWordRune(r rune) bool {
+	return r != utf8.RuneError && (unicode.IsLetter(r) || unicode.IsDigit(r))
 }
 
 // identity is c's arguments in an order-free form: two calls with the same

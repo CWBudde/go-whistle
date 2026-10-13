@@ -115,7 +115,9 @@ func decodeTurns(t *testing.T, d *Decoder, m *text.Model, p *spm.Processor, syst
 			t.Fatal(err)
 		}
 
-		env, err := n.Envelope(a, in, system, conf)
+		said := conv.Inputs()
+
+		env, err := n.Envelope(a, in, system, said[:len(said)-1], conf)
 		if err != nil {
 			t.Fatal(err)
 		}
