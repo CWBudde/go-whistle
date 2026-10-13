@@ -14,7 +14,9 @@ const engineValidation = "../../testdata/text/engine/validation.json"
 // Validation probe turns that differ from the engine's, and why
 // (docs/FINDINGS.md F-057). Keys are "probe/turn"; a margin is the smallest
 // top-1 margin of the reasoning or, where the reasoning is the engine's, of
-// the call block.
+// the call block. The seven paired probes the clause rule got wrong, and
+// trigger_must_not, have the engine's calls since the paired tool reads the
+// window before its verb (F-058).
 var (
 	// validationCallsDiffer are the turns whose calls (dispatched or
 	// suppressed) differ from the engine's.
@@ -27,7 +29,6 @@ var (
 		"trigger_cant/0":          "reasoning at a near-tie (0.034)",
 		"trigger_cannot/0":        "reasoning at a near-tie (0.023)",
 		"trigger_doesnt/0":        "reasoning at a near-tie (0.025)",
-		"trigger_must_not/0":      "reasoning at a near-tie (0.102)",
 		"drop_wont/0":             "reasoning at a near-tie (0.010); the engine decodes one call",
 		"ground_nested_and_top/0": "reasoning (0.098) and block at a near-tie (0.018)",
 		// Routed to play_music, the call block writes free-text queries
@@ -36,15 +37,6 @@ var (
 		"trigger_not/0":        "routed block (0.445)",
 		"trigger_no/0":         "routed block (0.157)",
 		"trigger_stop/0":       "routed block (0.184)",
-		// The paired tool reads a negation in the 13 bytes before the verb,
-		// which repair.go does not port (outside this item).
-		"paired_dont_curly/0":  "paired tool: the curly don’t does not keep lock_door",
-		"paired_not/0":         "paired tool: not keeps lock_door",
-		"paired_nothing/0":     "paired tool: not inside a word keeps lock_door",
-		"paired_dont_wait/0":   "paired tool: don't 12 bytes before the verb keeps lock_door",
-		"paired_dont_delay/0":  "paired tool: don't 13 bytes before the verb keeps lock_door",
-		"paired_never_mind/0":  "paired tool: never mind keeps lock_door",
-		"paired_dont_forget/0": "paired tool: don't forget does not keep lock_door",
 	}
 
 	// validationSplitDiffers are the turns with the engine's calls whose

@@ -30,27 +30,49 @@ type repairCall struct {
 	changed bool
 }
 
-// repairer holds what the rules read: the tools, the request and the date
+// repairer holds what the rules read: the tools, the request, the
+// conversation's inputs said (earlier ones and the request) and the date
 // fact.
 type repairer struct {
-	n       *Normalised
-	input   string
-	lower   string
-	fact    time.Time
-	hasFact bool
+	n         *Normalised
+	input     string
+	lower     string
+	saidLower string
+	fact      time.Time
+	hasFact   bool
 }
 
+// withholding is whether, and how, the engine withholds an answer's calls
+// in suppressed_calls whatever their confidence (llms.txt: "a grounding
+// gate fired"; docs/FINDINGS.md F-057, F-058).
+type withholding int
+
+const (
+	// notWithheld: no gate fired.
+	notWithheld withholding = iota
+	// guessWithheld: a guess gate fired; a trigger that matches the
+	// request still ships the calls, as it ships them below the floor.
+	guessWithheld
+	// contradictionWithheld: a contradiction gate fired; the calls are
+	// withheld whatever the triggers.
+	contradictionWithheld
+)
+
 // repair is the engine's repair of the calls the model wrote for input,
-// with the system facts system, in the order the probes show
-// (docs/FINDINGS.md F-056): the values grounded in the request first
-// (phone numbers, quoted titles, names, places, pickup and destination,
-// "by N", a defaulted number), then dates, the paired tool, polarity and
-// named enum options, capitalisation, and last the dropped arguments and
-// calls. withheld reports calls kept because the request negates or
-// excludes every one of them, which the engine suppresses
-// (docs/FINDINGS.md F-057).
-func (n *Normalised) repair(calls []modelCall, input, system string) (_ []modelCall, withheld bool) {
-	r := &repairer{n: n, input: input, lower: strings.ToLower(input)}
+// with the system facts system and the conversation's earlier inputs
+// earlier, in the order the probes show (docs/FINDINGS.md F-056): the
+// values grounded in the request first (phone numbers, quoted titles,
+// names, places, pickup and destination, "by N", a defaulted number),
+// then dates, the paired tool, polarity and named enum options,
+// capitalisation, and last the dropped arguments and calls. held reports
+// calls the engine withholds: those kept because the request negates or
+// excludes every one of them (docs/FINDINGS.md F-057), and those a
+// grounding gate holds (withhold, F-058).
+func (n *Normalised) repair(calls []modelCall, input, system string, earlier []string) (_ []modelCall, held withholding) {
+	r := &repairer{
+		n: n, input: input, lower: strings.ToLower(input),
+		saidLower: strings.ToLower(strings.Join(append(slices.Clone(earlier), input), "\n")),
+	}
 	r.fact, r.hasFact = dateFactOf(system)
 
 	cs := make([]*repairCall, len(calls))
@@ -77,14 +99,19 @@ func (n *Normalised) repair(calls []modelCall, input, system string) (_ []modelC
 		}
 	}
 
-	cs, withheld = r.dropCalls(cs)
+	cs, withheld := r.dropCalls(cs)
+
+	held = r.withhold(cs)
+	if withheld {
+		held = contradictionWithheld
+	}
 
 	out := make([]modelCall, len(cs))
 	for i, c := range cs {
 		out[i] = modelCall{name: c.name, args: c.bytes()}
 	}
 
-	return out, withheld
+	return out, held
 }
 
 // bytes are c's arguments as JSON: as the model wrote them unless the
@@ -458,8 +485,8 @@ func (r *repairer) defaultNumber(c *repairCall) {
 	}
 }
 
-// namesQuantity reports whether the request lowered has a digit or a number
-// word.
+// namesQuantity reports whether the text lowered has a digit, a number word
+// or another word the engine reads as a quantity (quantityWords).
 func namesQuantity(lowered string) bool {
 	if strings.ContainsFunc(lowered, func(r rune) bool { return r >= '0' && r <= '9' }) {
 		return true
@@ -468,8 +495,19 @@ func namesQuantity(lowered string) bool {
 	return slices.ContainsFunc(words(lowered), func(w string) bool {
 		_, ok := numberWords[w]
 
-		return ok
+		return ok || slices.Contains(quantityWords, w)
 	})
+}
+
+// quantityWords name a quantity beside the number words, as the probes of
+// the number gate show: amounts ("a couple", "a dozen", "a third") and a
+// unit in the singular ("an hour", "a week"). Plural units ("hours",
+// "minutes"), "a pair", "some", "a while", "a moment", "once", "a fifth",
+// "tenth" and "twentyish" are none (docs/FINDINGS.md F-058: the number_
+// probes). The list may be longer.
+var quantityWords = []string{
+	"none", "couple", "few", "several", "dozen", "quarter", "third", "double", "triple", "halfway",
+	"second", "minute", "hour", "day", "week", "month", "year", "hourly", "weekly",
 }
 
 // numberWords are the English cardinal numbers with their values; "half"
@@ -649,38 +687,97 @@ func (r *repairer) monthDay(month, day, year string) time.Time {
 
 // paired makes a call follow the request's polarity between a tool and its
 // "un" pair (lock_door and unlock_door): the call's clause naming one
-// verb and not the other picks that tool, unless the clause is negated
-// (docs/FINDINGS.md F-056: paired_unlock, paired_second; "don't unlock"
-// keeps lock_door, bool_own_clause).
+// verb and not the other picks that tool, unless a negation starts in the
+// window before that verb (docs/FINDINGS.md F-056: paired_unlock,
+// paired_second; F-057, F-058: "don't delay, unlock" keeps lock_door,
+// "don't linger, unlock" does not).
 func (r *repairer) paired(c *repairCall) {
 	base := strings.TrimPrefix(c.name, "un")
 	if r.n.params[base] == nil || r.n.params["un"+base] == nil {
 		return
 	}
 
-	clause := r.clauseOf(c)
-	if clauseNegation.MatchString(clause) {
-		return
-	}
-
+	clause, at := r.clauseOf(c)
 	verb, _, _ := strings.Cut(base, "_")
-	ws := words(strings.ToLower(clause))
+	lower := lowerASCII(clause)
+	ws := words(lower)
+
+	var name, named string
 
 	switch un := slices.Contains(ws, "un"+verb); {
 	case un && !slices.Contains(ws, verb):
-		c.name = "un" + base
+		name, named = "un"+base, "un"+verb
 	case !un && slices.Contains(ws, verb):
-		c.name = base
+		name, named = base, verb
+	default:
+		return
+	}
+
+	if i := wordIndex(lower, named); i >= 0 && !negatedBefore(r.input, at+i) {
+		c.name = name
 	}
 }
 
-// clauseNegation is a negated clause for the paired tool and polarity:
-// the spelling of F-054 the probes of F-056 were fitted with. It is not
-// validation.negation (negated): the probes of docs/FINDINGS.md F-057 show
-// these two rules looking for other cues ("not", "dont"; not "shouldn't"
-// or "mustn't") in the 13 bytes before the verb rather than in the clause,
-// which is not ported here.
-var clauseNegation = regexp.MustCompile(`(?i)\b(?:don['’]?t|do not|never)\b`)
+// windowCues are the negations the paired tool and polarity read before
+// their verb: as substrings in any case ("nothing to unlock", "dontx"),
+// with no cancelling words ("never mind, unlock" keeps lock_door); the
+// curly "don’t", "shouldn't" and "mustn't" are none (docs/FINDINGS.md
+// F-057, F-058). "do not" holds "not".
+var windowCues = []string{"not", "never", "dont", "don't"}
+
+// negationWindow is how many bytes before the verb a window cue may start:
+// "don't delay, unlock" (13) keeps lock_door, "don't linger, unlock" (14)
+// does not; "don't really turn off" (13) keeps on: true, "don't already
+// turn on" (14) does not (docs/FINDINGS.md F-057, F-058).
+const negationWindow = 13
+
+// negatedBefore reports whether a window cue starts in the negationWindow
+// bytes of s before the byte offset at.
+func negatedBefore(s string, at int) bool {
+	for i := max(0, at-negationWindow); i < at; i++ {
+		for _, cue := range windowCues {
+			if len(s)-i >= len(cue) && strings.EqualFold(s[i:i+len(cue)], cue) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// lowerASCII is s with ASCII letters lower-cased, byte offsets kept.
+func lowerASCII(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 'A' && r <= 'Z' {
+			return r + 'a' - 'A'
+		}
+
+		return r
+	}, s)
+}
+
+// wordIndex is the byte offset of the first w in s with no letter or digit
+// on either side, -1 when there is none.
+func wordIndex(s, w string) int {
+	for i := 0; w != "" && i <= len(s)-len(w); i++ {
+		j := strings.Index(s[i:], w)
+		if j < 0 {
+			return -1
+		}
+
+		j += i
+		before, _ := utf8.DecodeLastRuneInString(s[:j])
+		after, _ := utf8.DecodeRuneInString(s[j+len(w):])
+
+		if !isWordRune(before) && !isWordRune(after) {
+			return j
+		}
+
+		i = j
+	}
+
+	return -1
+}
 
 // Polar phrases: the request verbs llms.txt names ("turn on, unlock,
 // louder, turn down") and their opposites.
@@ -701,18 +798,23 @@ func phrases(ps ...string) *regexp.Regexp {
 var polarKeys = []string{"on"}
 
 // polarity makes polar booleans and enums follow the verb of the call's
-// clause, unless it is negated: on and off phrases set an on/off boolean
-// and an enum of "on" and "off", raising and lowering phrases an enum of
-// "up" and "down"; of two, the earlier phrase wins (docs/FINDINGS.md
-// F-056: bool_own_clause, enum_louder).
+// clause, unless a negation starts in the window before that verb (as for
+// the paired tool): on and off phrases set an on/off boolean and an enum
+// of "on" and "off", raising and lowering phrases an enum of "up" and
+// "down"; of two, the earlier phrase wins (docs/FINDINGS.md F-056:
+// bool_own_clause, enum_louder; F-058: the polarity probes).
 func (r *repairer) polarity(c *repairCall) {
-	clause := r.clauseOf(c)
-	if clauseNegation.MatchString(clause) {
-		return
+	clause, at := r.clauseOf(c)
+
+	on, onAt := earlier(clause, onPhrases, offPhrases)
+	if on != 0 && negatedBefore(r.input, at+onAt) {
+		on = 0
 	}
 
-	on := earlier(clause, onPhrases, offPhrases)
-	up := earlier(clause, upPhrases, downPhrases)
+	up, upAt := earlier(clause, upPhrases, downPhrases)
+	if up != 0 && negatedBefore(r.input, at+upAt) {
+		up = 0
+	}
 
 	for _, k := range r.properties(c.name) {
 		if _, ok := c.args.vals[k]; !ok {
@@ -747,18 +849,18 @@ func setOption(c *repairCall, k string, polarity int, yes, no string) {
 }
 
 // earlier is +1 when pos matches s before neg does, -1 when neg matches
-// first, 0 when neither matches.
-func earlier(s string, pos, neg *regexp.Regexp) int {
+// first, 0 when neither matches, with the offset of the match.
+func earlier(s string, pos, neg *regexp.Regexp) (int, int) {
 	p, n := pos.FindStringIndex(s), neg.FindStringIndex(s)
 
 	switch {
 	case p != nil && (n == nil || p[0] <= n[0]):
-		return 1
+		return 1, p[0]
 	case n != nil:
-		return -1
+		return -1, n[0]
 	}
 
-	return 0
+	return 0, 0
 }
 
 // hasOptions reports whether a schema's enum holds every option.
@@ -779,9 +881,13 @@ func hasOptions(s *object, options ...string) bool {
 }
 
 // enumNamed moves a string enum to the one option the request names as a
-// word (docs/FINDINGS.md F-056: enum_named_high, enum_named_low; two named
-// or none keep the model's).
+// word, or as the start of a word for an option of minPrefixOption letters
+// or more (docs/FINDINGS.md F-056: enum_named_high, enum_named_low; F-058:
+// "wash the shirts quickly" moves wool to quick; two named or none keep the
+// model's).
 func (r *repairer) enumNamed(c *repairCall) {
+	ws := words(r.lower)
+
 	for _, k := range r.properties(c.name) {
 		var enum []any
 		if s := r.property(c.name, k); s != nil {
@@ -791,7 +897,7 @@ func (r *repairer) enumNamed(c *repairCall) {
 		var named []string
 
 		for _, o := range enum {
-			if s, ok := o.(string); ok && s != "" && phrases(regexp.QuoteMeta(s)).MatchString(r.input) {
+			if s, ok := o.(string); ok && s != "" && namedAsWord(r.input, ws, s) {
 				named = append(named, s)
 			}
 		}
@@ -909,6 +1015,270 @@ func (r *repairer) dropCalls(cs []*repairCall) (_ []*repairCall, withheld bool) 
 	}), withheld
 }
 
+// withhold applies the grounding gates the probes pin to the repaired
+// calls cs (upstream's confidence guide: "the same withholding happens when
+// a grounding gate fires regardless of the score"; docs/FINDINGS.md F-058):
+// a quote reported by someone else is a contradiction gate; an enum, a
+// control word, a place, a number and an origin are guess gates, which a
+// matching trigger overrides. One call a gate holds withholds the whole
+// answer.
+func (r *repairer) withhold(cs []*repairCall) withholding {
+	if len(cs) == 0 {
+		return notWithheld
+	}
+
+	if r.reportedQuote() {
+		return contradictionWithheld
+	}
+
+	gates := []func(*repairCall) bool{
+		r.unnamedEnum, r.controlWord, r.unmentionedPlace, r.missingQuantity, r.originIsDestination,
+	}
+
+	for _, c := range cs {
+		if c.args != nil && slices.ContainsFunc(gates, func(g func(*repairCall) bool) bool { return g(c) }) {
+			return guessWithheld
+		}
+	}
+
+	return notWithheld
+}
+
+// reportingWords mark a quote as someone's report, as the probes show; any
+// case and inside words ("unsaid", "saidx"). "says", "tells", "asked",
+// "told us", "sent", "typed", "replied" and more do not (docs/FINDINGS.md
+// F-058: the quote_ probes). The list may be longer.
+var reportingWords = []string{"said", "told me", "wrote", "texted", "mentioned", "messaged", "emailed", "posted"}
+
+// quoteMarks open or close a quote, the apostrophe included: "my wife told
+// me it's late" is a report (docs/FINDINGS.md F-058: quote_told_me_apostrophe).
+const quoteMarks = `"'“”‘’`
+
+// reportedQuote is the contradiction gate of a quoted command reported by
+// someone else: a reporting word with a quote mark anywhere after it. The
+// speaker is not checked ("I said …" is withheld), nor what the quote holds
+// (`my wife said "hi", now turn off …` is), and a quote before the word
+// ships (docs/FINDINGS.md F-058).
+func (r *repairer) reportedQuote() bool {
+	for _, w := range reportingWords {
+		if i := strings.Index(r.lower, w); i >= 0 && strings.ContainsAny(r.lower[i+len(w):], quoteMarks) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// unnamedEnumExempt are the words whose keys an unnamed enum option does not
+// gate (a "mode", "fan_mode", "speed_level", "units"): the probes find the
+// gate on speed, setting, program, cycle, colour, style, size, state and
+// more, and not on these (docs/FINDINGS.md F-058: the enum_ probes).
+var unnamedEnumExempt = []string{"mode", "level", "unit", "type", "kind", "priority", "category", "status", "format"}
+
+// Polar words that name the high and the low end of an enum (an option
+// "high" or "up", "low" or "down"), as the probes show (docs/FINDINGS.md
+// F-058: enum_up, enum_quieter …).
+var (
+	raisingWords  = []string{optionUp, "higher", "faster", "louder", "raise", "increase", "boost"}
+	loweringWords = []string{optionDown, "lower", "slower", "quieter", "softer", "reduce"}
+)
+
+// minPrefixOption is the shortest option a longer word names by starting
+// with it: "highway" names "high", "quickest" "quick", "lowest" not "low"
+// (docs/FINDINGS.md F-058).
+const minPrefixOption = 4
+
+// unnamedEnum is the guess gate of a required string enum the call fills
+// with an option the conversation never names: not as a word, not as the
+// start of a word (options of minPrefixOption letters or more), not by a
+// polar word; an optional enum and a key holding an exempt word pass
+// (docs/FINDINGS.md F-058).
+func (r *repairer) unnamedEnum(c *repairCall) bool {
+	ws := words(r.saidLower)
+
+	for k, v := range c.stringArgs {
+		s := r.property(c.name, k)
+		if s == nil || !r.required(c.name, k) || !hasOptions(s, v) {
+			continue
+		}
+
+		if slices.ContainsFunc(unnamedEnumExempt, func(w string) bool { return strings.Contains(k, w) }) {
+			continue
+		}
+
+		if !namedAsWord(r.saidLower, ws, v) && !namedByPolarity(ws, strings.ToLower(v)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// namedAsWord reports whether the text s, with its lower-cased words ws,
+// names the enum option o as a word, or as the start of a word for an
+// option of minPrefixOption letters or more ("highway" names "high"). The
+// word test is containsWords', not \b's, so that options starting or
+// ending in punctuation ("C++", ".NET") are named too (PR #69 review).
+func namedAsWord(s string, ws []string, o string) bool {
+	lo := strings.ToLower(o)
+
+	if containsWords(strings.ToLower(s), lo) {
+		return true
+	}
+
+	return len(lo) >= minPrefixOption && slices.ContainsFunc(ws, func(w string) bool { return strings.HasPrefix(w, lo) })
+}
+
+// The polar options a raising or a lowering word names.
+const (
+	optionHigh = "high"
+	optionUp   = "up"
+	optionLow  = "low"
+	optionDown = "down"
+)
+
+// namedByPolarity reports whether one of the words ws is a polar word that
+// names the option o: a raising word "high" or "up", a lowering word "low"
+// or "down".
+func namedByPolarity(ws []string, o string) bool {
+	switch o {
+	case optionHigh, optionUp:
+		return slices.ContainsFunc(ws, func(w string) bool { return slices.Contains(raisingWords, w) })
+	case optionLow, optionDown:
+		return slices.ContainsFunc(ws, func(w string) bool { return slices.Contains(loweringWords, w) })
+	}
+
+	return false
+}
+
+// controlWords are values that operate a device rather than name a slot's
+// value: the whole value, in any case ("UP", "Off"). "it", "there",
+// "that", "yes", "true", "all", "enable", "high" and more are none
+// (docs/FINDINGS.md F-058: the slot_control_ probes). The list may be
+// longer.
+var controlWords = []string{"on", "off", optionUp, optionDown, "stop", "lock", "unlock", "open", "close", "pause", "raise", "mute"}
+
+// controlWord is the guess gate of a required string slot filled with a
+// control word ("music up": query "up"); an enum or const slot passes, its
+// options are the schema's own (port-side, docs/FINDINGS.md F-058).
+func (r *repairer) controlWord(c *repairCall) bool {
+	for k, v := range c.stringArgs {
+		s := r.property(c.name, k)
+		if s == nil || !r.required(c.name, k) || hasKey(s, "enum") || hasKey(s, "const") {
+			continue
+		}
+
+		if slices.Contains(controlWords, strings.ToLower(v)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// hasKey reports whether the schema s has key.
+func hasKey(s *object, key string) bool {
+	_, ok := s.vals[key]
+
+	return ok
+}
+
+// placeKeys are words of the keys that hold a place, as the probes show
+// ("location", "city_name", "room"); "where", "address", "destination",
+// "country", "town", "position", "locale" and "door" are none
+// (docs/FINDINGS.md F-058: the slot_place_ probes).
+var placeKeys = []string{"location", "city", "place", "area", "region", "venue", "zone", "site", "room"}
+
+// unmentionedPlace is the guess gate of a required place slot filled with a
+// place the conversation's inputs never mention (as ungrounded reads them;
+// a place only the system facts name is unmentioned); the slot's default
+// passes (docs/FINDINGS.md F-058).
+func (r *repairer) unmentionedPlace(c *repairCall) bool {
+	for k, v := range c.stringArgs {
+		s := r.property(c.name, k)
+		if s == nil || !r.required(c.name, k) || !slices.ContainsFunc(placeKeys, func(w string) bool { return strings.Contains(k, w) }) {
+			continue
+		}
+
+		if d, ok := s.vals["default"].(string); ok && d == v {
+			continue
+		}
+
+		if !grounded(v, composed(s), r.saidLower) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// missingQuantity is the guess gate of a required number with no default
+// when the conversation names no quantity (namesQuantity): "set a timer
+// for the pasta" is withheld, "for an hour" and "the same timer" after "10
+// minutes" are not (docs/FINDINGS.md F-058). Only a number the call holds
+// was guessed: an anyOf or oneOf branch the call did not take requires
+// none. A property whose number type sits in an anyOf or oneOf child counts
+// when the call holds a number there (PR #69 review).
+func (r *repairer) missingQuantity(c *repairCall) bool {
+	if namesQuantity(r.saidLower) {
+		return false
+	}
+
+	for _, k := range r.properties(c.name) {
+		v, ok := c.args.vals[k]
+		if !ok {
+			continue
+		}
+
+		s := r.property(c.name, k)
+		if s == nil {
+			continue
+		}
+
+		_, isNum := v.(json.Number)
+		number := isNumberType(s) || isNum && slices.ContainsFunc(composed(s), isNumberType)
+
+		if number && r.required(c.name, k) && !hasKey(s, "default") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// The keys of an origin and of a destination the gate compares, as the
+// probes show; "pickup_location", "dropoff_location", "start_point",
+// "pickup_address" and "location" are none (docs/FINDINGS.md F-058: the
+// origin_ probes).
+var (
+	originKeys = []string{
+		"origin", "from", "start", "source", "pickup", "departure", "start_location", "from_location",
+	}
+	destinationGateKeys = []string{
+		"destination", "to", "end", "target", "dropoff", "arrival", "end_location", "to_location",
+	}
+)
+
+// originIsDestination is the guess gate of a destination copied into an
+// origin: an origin and a destination argument with the same string,
+// whatever the tool ("copy notes.txt to notes.txt" too) and whether the
+// request says so (docs/FINDINGS.md F-058).
+func (r *repairer) originIsDestination(c *repairCall) bool {
+	for ok, ov := range c.stringArgs {
+		if !slices.Contains(originKeys, ok) {
+			continue
+		}
+
+		for dk, dv := range c.stringArgs {
+			if slices.Contains(destinationGateKeys, dk) && dv == ov {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // containsWords reports whether s holds the non-empty w with no letter or
 // digit on either side.
 func containsWords(s, w string) bool {
@@ -1015,10 +1385,22 @@ func clauseEnd(s string) int {
 	return len(s)
 }
 
-// clauseOf is the clause of the request a call belongs to: the first that
-// contains one of its string arguments, else the whole request.
-func (r *repairer) clauseOf(c *repairCall) string {
-	cls := clauses(r.input)
+// clauseOf is the clause of the request a call belongs to, with its byte
+// offset in the request: the first that contains one of its string
+// arguments, else the whole request.
+func (r *repairer) clauseOf(c *repairCall) (string, int) {
+	type clause struct {
+		s  string
+		at int
+	}
+
+	var cls []clause
+
+	for _, m := range clauseSplitBounds(r.input) {
+		if s := strings.TrimSpace(r.input[m[0]:m[1]]); s != "" {
+			cls = append(cls, clause{s, m[0] + strings.Index(r.input[m[0]:m[1]], s)})
+		}
+	}
 
 	for _, v := range c.stringArgs {
 		if v == "" {
@@ -1026,11 +1408,26 @@ func (r *repairer) clauseOf(c *repairCall) string {
 		}
 
 		for _, cl := range cls {
-			if strings.Contains(strings.ToLower(cl), strings.ToLower(v)) {
-				return cl
+			if strings.Contains(strings.ToLower(cl.s), strings.ToLower(v)) {
+				return cl.s, cl.at
 			}
 		}
 	}
 
-	return r.input
+	return r.input, 0
+}
+
+// clauseSplitBounds are the [start, end) byte ranges of the request's
+// clauses as clauses splits them, empty ones included.
+func clauseSplitBounds(s string) [][2]int {
+	var out [][2]int
+
+	from := 0
+
+	for _, m := range clauseSplit.FindAllStringIndex(s, -1) {
+		out = append(out, [2]int{from, m[0]})
+		from = m[1]
+	}
+
+	return append(out, [2]int{from, len(s)})
 }
