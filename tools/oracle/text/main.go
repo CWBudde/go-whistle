@@ -17,6 +17,8 @@
 //	go run -tags oracle ./tools/oracle/text triggers  # triggers.json: answers over tools with triggers, without tools
 //	go run -tags oracle ./tools/oracle/text grammar  # grammar.json: answers whose free decode would break the schema
 //	go run -tags oracle ./tools/oracle/text repair  # repair.json: answers that exercise the repair of the calls
+//	go run -tags oracle ./tools/oracle/text validation  # validation.json: negation cues, triggers, negated calls,
+//	                                                    # grounding of nested fields, system facts and earlier turns
 //	go run -tags oracle ./tools/oracle/text all    # every subcommand above
 //	go run -tags oracle ./tools/oracle/text fetch  # download the pinned text model into models/needle3 (-dir)
 //
@@ -54,9 +56,10 @@ var subcommands = []struct {
 	{"triggers", cmdTriggers},
 	{"grammar", cmdGrammar},
 	{"repair", cmdRepair},
+	{"validation", cmdValidation},
 }
 
-const usage = "usage: oracle/text cases|date|depth|audio|embed|retrieval|normalise|turns|triggers|grammar|repair|all " +
+const usage = "usage: oracle/text cases|date|depth|audio|embed|retrieval|normalise|turns|triggers|grammar|repair|validation|all " +
 	"[-out dir] [-cases file] [-needle3 dir] [-whistle dir] [-engine dir] [-audio dir]\n" +
 	"       oracle/text fetch [-dir models/needle3]"
 
