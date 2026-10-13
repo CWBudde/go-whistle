@@ -4710,9 +4710,10 @@ without the model.
 **Open.**
 
 - **Routing** a triggered request to its tool (with the grammar, PLAN.md 11.4). Closed by F-055.
-- **Negation** beyond "don't": "do not" and "never" are the port's guesses; other languages are untested.
+- **Negation** beyond "don't": "do not" and "never" are the port's guesses; other languages are untested. Closed by
+  F-057.
 - **Grounding** of nested objects and arrays (one path per field, arrays under the field's path) and against the
-  system facts and earlier turns, which the corpus does not show.
+  system facts and earlier turns, which the corpus does not show. Closed by F-057.
 - **The repair** of the calls after decoding (capitalisation, dates, dropped optionals; PLAN.md 11.4). Closed by
   F-056 for the corpus: every call and `ungrounded` list is the engine's.
 
@@ -4928,3 +4929,144 @@ unchanged. The `TestRepair*` unit tests cover each rule without the model, cases
   (`enum_named_high`, `enum_named_low`), which the model leaves out; the port's two calls are then duplicates.
 - **Dropped words of a place query**, **unstated optional strings**, `tomorrow`-style dates and the message rewrite
   of F-048 (above), and any phrase, key or number word beyond those the probes show.
+- **Negated clauses and exclusions:** F-057 pins the drop's cues and reach, an excluded phrase that holds the value,
+  and the calls withheld when the request negates or excludes every one; it records the paired tool's own reading of
+  a negation (13 bytes before the verb), which is not ported.
+
+## F-057 — Validation: the negation cues, the drop of negated calls, and grounding (PLAN.md 11.4) (2026-10-13)
+
+**Question.** F-054 left `validation` half open: which spellings set `negation` beyond "don't", whether they also
+keep a triggered request's calls suppressed and drop a negated verb's calls (F-056), and what `ungrounded` reads for
+nested objects, arrays, the system facts and earlier turns.
+
+**The oracle.** `just oracle-text validation` (`testdata/text/engine/validation.json`, 163 probes and 171 answers,
+recorded twice and byte-identical) over the corpus's `home`, `assistant` and `catalogue` tools and probe tools with a
+nested object (`schedule_call.slot`, `set_alarm.snooze`) and arrays (`set_alarms.times`, `log_prices.prices`). Kinds:
+`negation` (69: spellings, words that contain a cue, the words after a cue that cancel it, quoted titles, German,
+Spanish and French), `trigger` (26: each cue with a trigger on `play_music` that routes the request unless it is
+negated, and three on `set_lights` below the floor), `drop` (42: each cue before `lock`, the reach after the cue, the
+request whose only call is negated or excluded), `paired` (12) and `grounding` (14, six of them two or three turns
+over `--serve`). Upstream ships no engine-side logic for either half: `needle/__init__.py` only adds date-year checks
+to `ungrounded` and refuses negated or ungrounded extractions, and the environments' "negation" test cases ("don't
+reply…", "do not start…", "never dismiss…") expect a refusal. Nothing is translated. **Method:** as F-056, the `.cact`
+decode under the grammar writes the calls before the repair; where its reasoning is the engine's, a difference is the
+engine's rule. The engine's confidence scores the answer as decoded, not as repaired: on the six drop probes with the
+engine's reasoning it is within 0.017 of the port's over the two-call block and 0.08 to 0.19 below its score over the
+repaired one-call block, so it also tells which block the engine decoded (`drop_wont`: 0.189 against 0.092 for two
+calls and 0.168 for one; the engine decoded one call). About 450 exploratory requests, run on the engine and decoded
+side by side, chose the probes.
+
+**`validation.negation`** (the request's, never an earlier turn's: `turn_negation_earlier`):
+
+| Cue                                                                                                 | `negation` | Probes                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `don't`, `DON'T`, `do not`, `DO NOT`, `never`, `NEVER`                                              | yes        | `neg_dont`, `neg_dont_upper`, `neg_do_not(_upper)`, `neg_never`                                                                                          |
+| `shouldn't`, `should not`, `mustn't`, `must not`                                                    | yes        | `neg_shouldnt`, `neg_should_not`, `neg_mustnt`, `neg_must_not`                                                                                           |
+| `dont` before a space                                                                               | yes        | `neg_dont_bare`                                                                                                                                          |
+| a cue inside a word: `nevertheless`, `whenever`, `xdon't`, `don'tx`                                 | yes        | `neg_never_inside(_end)`, `neg_dont_inside`, `neg_dont_before_letters`                                                                                   |
+| a cue in a quoted title (`"Don't panic"`, `"Never again"`), in another clause                       | yes        | `neg_quoted_dont`, `neg_quoted_never`, `neg_other_clause`                                                                                                |
+| the curly `don’t` and `shouldn’t`, `don´t`, `shouldnt`                                              | no         | `neg_dont_curly`, `neg_shouldnt_curly`, `neg_dont_acute`, …                                                                                              |
+| `dont,`, `dont` at the end, `dontx`, `dont't`, `do  not`, `do-not`, `donot`                         | no         | `neg_dont_bare_comma`, `…_end`, `…_before_letters`, …                                                                                                    |
+| `not`, `no`, `stop`, `cancel`, `won't`, `can't`, `cannot`, `doesn't`, `wouldn't`, `didn't`, `isn't` | no         | `neg_not` … `neg_isnt`                                                                                                                                   |
+| `without`, `instead of`, `except`                                                                   | no         | `neg_without`, `neg_instead_of`, `neg_except`                                                                                                            |
+| German `nicht`, `niemals`; Spanish `no`, `nunca`; French `ne … pas`, `jamais`                       | no         | `neg_german_*`, `neg_spanish_*`, `neg_french_*`                                                                                                          |
+| a cue whose next word starts with `forget`, `worry`, `hesitate`, `mind`, `disturb`                  | no         | `neg_never_mind`, `neg_nevermind`, `neg_dont_forget`, `neg_do_not_worry`, `neg_never_hesitate`, `neg_dont_mind`, `neg_dont_disturb`, `neg_quoted_do_not` |
+
+The cancelling word is read after the cue's spaces, in any case and as a prefix (`neg_dont_forgetting`,
+`neg_dont_forget_upper`, `neg_dont_forget_two_spaces`), but not across other characters (`never-mind` and "don't,
+forget" are negations, as are `don't worries` and `don't hesitating`); one uncancelled cue suffices
+(`neg_dont_forget_and_touch`). Hypotheses tried against the 171 answers: the old word-bounded `don't|do not|never`
+(wrong on the curly apostrophe, the cues inside words, the modal ones and the cancelled ones), the model's reasoning
+("Prohibition …": `nevermind` has it and is no negation, `whenever` lacks it and is one), a word list of
+contractions (`won't`, `can't` are none) and the winner, substrings plus the cancelling words: equal on all 171. The
+cancelling list holds the five words the probes found among about 40 verbs tried after the cue; it may be longer.
+
+**Triggers.** A cue that sets `negation` keeps a matching trigger from routing the request and its calls from
+shipping below 0.1, as "don't" does (F-054): `trigger_dont`, `_do_not`, `_dont_bare`, `_dont_upper`, `_never`,
+`_shouldnt`, `_should_not`, `_mustnt`, `_must_not` are not routed to `play_music`; every cue that does not set it is
+(`trigger_dont_curly`, `_not`, `_no`, `_wont`, `_will_not`, `_cant`, `_cannot`, `_doesnt`, `_stop`, `_cancel`,
+`_without`, `_instead_of`, `_except`, `_dont_forget`), and `trigger_lights_dont_curly` and `trigger_lights_cannot`
+ship at 0.0048 and 0.0947. One reading of negation serves `validation.negation`, routing and the floor.
+
+**The drop of negated calls** (F-056's negated clause) reads the request otherwise:
+
+| Cue before the verb                                                                                                                      | Drops the verb's calls | Probes                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------------------------------------------------------- |
+| `don't`, `DON'T`, `do not`, `never`, `shouldn't`, `should not`, `must not`                                                               | yes                    | `drop_dont`, `drop_dont_upper`, `drop_do_not`, `drop_never`, …       |
+| `dont`, `mustn't` (the only call, withheld)                                                                                              | yes                    | `drop_only_dont_bare`, `paired_mustnt`                               |
+| the curly `don’t`, `not`, `no`, `won't`, `will not`, `wouldn't`, `can't`, `cannot`, `doesn't`, `stop`, `cancel`, `without`, `instead of` | no                     | `drop_dont_curly`, `drop_not`, …, `drop_wont_play`, `drop_wont_only` |
+| `don't forget to lock`                                                                                                                   | no                     | `drop_dont_forget`                                                   |
+| the verb two words after the cue (`don't wait, guys, lock`, `don't wait-up-now lock`)                                                    | yes                    | `drop_reach_two`, `drop_reach_hyphen`, `paired_dont_linger`          |
+| the verb three words after (`don't be so slow lock`, `don't wait 5 min, lock`)                                                           | no                     | `drop_reach_three`, `drop_reach_digit`                               |
+| a cue glued to punctuation or a word (`don't,`, `please,don't`, `xdon't`)                                                                | no                     | `drop_cue_comma`, `drop_cue_glued`, `drop_cue_inside`                |
+
+So the drop splits the request at white space: a cue is a whole token (`don't`, `dont`, `never`, `shouldn't`,
+`mustn't`) or two (`do not`, `should not`, `must not`), in any case, not followed by a cancelling word, and a tool
+whose name starts with one of the next three tokens loses its calls (`don't wait-up-now lock`: one token). Tried: the
+word right after the cue (the old port: misses `don't wait, guys, lock`, `don't linger, unlock`), the `negation` matcher
+with the verb anywhere after it (wrong on `please,don't lock`, `xdon't lock`, `don't be so slow lock`), and a byte
+window (`don't wait, guys, lock` at 18 bytes drops, `don't be so slow lock` at 17 does not).
+
+**Withheld calls.** When the request negates or excludes every call, the engine keeps them and suppresses them at any
+confidence and with a matching trigger: `drop_only_do_not` (0.187), `drop_only_dont_bare` (0.198), `drop_only_except`
+and `drop_only_except_trigger` (0.171), `drop_only_do_not_trigger`, `paired_mustnt` (0.365); llms.txt's "a grounding
+gate fired". F-056's "unless it is the only call" was this. **Exclusions** drop a call whose string value the excluded
+phrase holds as words, not only one equal to it: `drop_except` ("except lock the front door" drops the front door's
+call) and `drop_except_phrase` ("except the hallway lights" drops `room: "hallway"`); `exclude_other_value` (F-056)
+still keeps `garage door` for "but not the garage".
+
+**The paired tool and polarity** (F-056) read a negation a third way, which the `paired` probes show and the port
+does not take over: `not`, `never`, `dont` and `don't`, as substrings (`nothing to unlock`, `dontx unlock`) and with
+no cancelling words (`never mind, unlock`), keep `lock_door` when they start within the 13 bytes before `unlock`
+(`don't delay, unlock`: 13 bytes, kept; `don't linger, unlock` and `not tomorrow, unlock`: 14, flipped); `shouldn't`,
+`mustn't` and the curly `don’t` do not. Tried: the clause regex of F-056 (wrong on `not`, the curly `don’t`, the
+distance), the `negation` matcher (wrong on `mustn't`, `shouldn't`, `not`), a word count (in the exploration,
+`it's not cold and unlock` keeps and `do not worry and unlock` flips, both three words). `dont't turn on` keeping `on: false`
+(`neg_dont_bare_apostrophe`) fits it for polarity. The port keeps F-056's clause regex (`clauseNegation`): the rule
+is outside this item, and the probes it gets wrong are listed.
+
+**`validation.ungrounded`:**
+
+| Case                                                        | Engine                      | Probe                                                                    |
+| ----------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------ |
+| a nested field (`slot.time` "15:00" for "3pm")              | not listed                  | `ground_nested_time`                                                     |
+| array items (`"06:45"` for "6:45", 1200.00 for "$1,200.00") | not listed                  | `ground_array_strings`, `ground_array_numbers`                           |
+| the same top-level field ungrounded in two calls            | listed twice, once per call | `ground_two_calls`                                                       |
+| a value only the system facts hold (a place, a number)      | listed                      | `ground_system_string`, `ground_system_number`                           |
+| a value only an earlier user turn holds (a name, a number)  | not listed                  | `ground_turn_user_string`, `ground_turn_user_number`                     |
+| a value only the model's own earlier answer holds (`06:45`) | listed                      | `ground_turn_answer_only`                                                |
+| a value the tool result being answered holds                | not listed                  | `ground_turn_tool_result`, 2nd answer                                    |
+| a value only an earlier tool result holds                   | not listed                  | `ground_turn_tool_result`, 3rd answer; `ground_turn_tool_result_address` |
+
+So the engine checks the top-level scalar arguments of each call, against the conversation's inputs (user turns and
+tool results, the current one included) and neither the system facts nor its answers. Tried: F-054's port-side walk
+into objects and arrays with one path per field (lists `schedule_call.slot.time`, once for two calls), and grounding
+against the request alone (lists the carried-over 10 minutes and the earlier tool result's name).
+
+**Port.** `envelope.go`: `negated` (the cue regex `negationCue` and `cancelling`) is `validation.negation`, routing
+(`GrammarFor`) and the floor; `negatesVerb` (`dropCues`, `dropCuePairs`, `dropReach`) is the drop; `ungrounded`
+checks top-level scalars once per call against `strings.Join(earlier, input)`. `Envelope` takes the earlier inputs,
+which `Conversation.Inputs` keeps (a refused turn is none). `repair.go`: `dropCalls` drops negated and excluded calls
+(`containsWords`) and reports them withheld when none would remain; `Envelope` suppresses withheld calls. The paired
+tool and polarity keep F-056's `clauseNegation`.
+
+**Against the engine** (the `.cact` weights): `TestValidationMatchesEngine` checks `negation` on all 171 answers
+(equal on all); the calls equal the engine's on 151 and, of those, `ungrounded` on 151 and the split into dispatched
+and suppressed calls on 150; it lists the other 20 turns (nine near-ties of the reasoning or the block, four routed
+`play_music` blocks, seven `paired` probes) and the split of `ground_nested_time` (the engine's 0.0000), and checks
+they still differ. `TestEnvelopeMatchesEngine`, `TestRepairMatchesEngine` (85 of 90), `TestGrammarMatchesEngine`,
+`TestDecodeMatchesEngine` and `TestFloatGreedyAgainstEngine` (20 of 24) are unchanged. `TestNegated`,
+`TestNegatesVerb`, `TestUngroundedRules`, `TestEnvelopeWithheld` and `TestRepairDropCalls` cover the rules without
+the model, cases that must not fire included.
+
+**Open.**
+
+- **The paired tool's and polarity's negation** (above): pinned for the paired tool by 12 probes, not ported; whether
+  polarity reads the same window rests on one probe.
+- **More cancelling words** and multi-word cues the probes did not try; any language but English (none of the six
+  German, Spanish and French cues is one).
+- **The confidence 0.0000** of every call with an object-valued argument (`schedule_call`, `set_alarm` with
+  `snooze`, also `{}`, a `book_table` tried in the exploration; about a dozen requests and both recorded probes), where
+  arrays of strings, numbers and objects score as usual; it belongs with F-055's open 0.0000.
+- **Grounding** of a turn the engine trimmed or dropped for room (F-051), of `date` years (upstream's client adds
+  those), and of the earlier turns' inputs as the engine renders them (tool results compacted) rather than as given.
