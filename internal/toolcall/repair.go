@@ -1217,19 +1217,28 @@ func (r *repairer) unmentionedPlace(c *repairCall) bool {
 // for the pasta" is withheld, "for an hour" and "the same timer" after "10
 // minutes" are not (docs/FINDINGS.md F-058). Only a number the call holds
 // was guessed: an anyOf or oneOf branch the call did not take requires
-// none (PR #69 review).
+// none. A property whose number type sits in an anyOf or oneOf child counts
+// when the call holds a number there (PR #69 review).
 func (r *repairer) missingQuantity(c *repairCall) bool {
 	if namesQuantity(r.saidLower) {
 		return false
 	}
 
 	for _, k := range r.properties(c.name) {
-		if _, ok := c.args.vals[k]; !ok {
+		v, ok := c.args.vals[k]
+		if !ok {
 			continue
 		}
 
 		s := r.property(c.name, k)
-		if s != nil && isNumberType(s) && r.required(c.name, k) && !hasKey(s, "default") {
+		if s == nil {
+			continue
+		}
+
+		_, isNum := v.(json.Number)
+		number := isNumberType(s) || isNum && slices.ContainsFunc(composed(s), isNumberType)
+
+		if number && r.required(c.name, k) && !hasKey(s, "default") {
 			return true
 		}
 	}
