@@ -325,6 +325,9 @@ func TestGateMissingQuantity(t *testing.T) {
 	call := `{"name":"set_timer","arguments":{"minutes":15,"label":"Pasta"}}`
 	defaulted := oneTool("set_timer", `"minutes":{"type":"integer","default":15}`, `"minutes"`)
 	optional := oneTool("set_timer", `"minutes":{"type":"integer"},"label":{"type":"string"}`, `"label"`)
+	// Either branch: a number, or a label (PR #69 review).
+	either := `[{"name":"set_timer","parameters":{"type":"object","properties":{"minutes":{"type":"integer"},` +
+		`"label":{"type":"string"}},"anyOf":[{"required":["minutes"]},{"required":["label"]}]}}]`
 
 	cases := []gateCase{
 		{"no quantity", timer, "set a timer for the pasta", nil, []string{call}, 0, 1},
@@ -332,6 +335,7 @@ func TestGateMissingQuantity(t *testing.T) {
 		{"a pair", timer, "set a timer for a pair of minutes", nil, []string{call}, 0, 1},
 		{"a number inside a word", timer, "set a timer for tennis", nil, []string{call}, 0, 1},
 		{"twentyish", timer, "set a timer for twentyish minutes", nil, []string{call}, 0, 1},
+		{"the number's branch", either, "set a timer for the pasta", nil, []string{call}, 0, 1},
 
 		// Not withheld.
 		{"digits", timer, "set a timer for 15 minutes", nil, []string{call}, 1, 0},
@@ -342,6 +346,11 @@ func TestGateMissingQuantity(t *testing.T) {
 		{"an earlier turn", timer, "set the same timer for the rice", []string{"a timer for 15 minutes"}, []string{call}, 1, 0},
 		{"a default", defaulted, "set a timer", nil, []string{`{"name":"set_timer","arguments":{"minutes":15}}`}, 1, 0},
 		{"optional", optional, "set a timer for the pasta", nil, []string{call}, 1, 0},
+		{
+			"the other branch", either, "set a timer for the pasta", nil,
+			[]string{`{"name":"set_timer","arguments":{"label":"Pasta"}}`},
+			1, 0,
+		},
 		{"a trigger ships it", withTrigger(timer, "timer"), "set a timer for the pasta", nil, []string{call}, 1, 0},
 	}
 

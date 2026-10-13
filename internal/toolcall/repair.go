@@ -1215,13 +1215,19 @@ func (r *repairer) unmentionedPlace(c *repairCall) bool {
 // missingQuantity is the guess gate of a required number with no default
 // when the conversation names no quantity (namesQuantity): "set a timer
 // for the pasta" is withheld, "for an hour" and "the same timer" after "10
-// minutes" are not (docs/FINDINGS.md F-058).
+// minutes" are not (docs/FINDINGS.md F-058). Only a number the call holds
+// was guessed: an anyOf or oneOf branch the call did not take requires
+// none (PR #69 review).
 func (r *repairer) missingQuantity(c *repairCall) bool {
 	if namesQuantity(r.saidLower) {
 		return false
 	}
 
 	for _, k := range r.properties(c.name) {
+		if _, ok := c.args.vals[k]; !ok {
+			continue
+		}
+
 		s := r.property(c.name, k)
 		if s != nil && isNumberType(s) && r.required(c.name, k) && !hasKey(s, "default") {
 			return true
