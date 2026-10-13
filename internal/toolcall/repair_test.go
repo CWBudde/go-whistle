@@ -38,7 +38,7 @@ func runRepair(t *testing.T, cases []repairCase) {
 
 		b.WriteByte('[')
 
-		repaired, _ := n.repair(calls, c.input, c.system)
+		repaired, _ := n.repair(calls, c.input, c.system, nil)
 
 		for i, rc := range repaired {
 			if i > 0 {
@@ -240,6 +240,22 @@ func TestRepairPolarity(t *testing.T) {
 			lights("kitchen", "true"), lights("kitchen", "true"),
 		},
 		{"no verb: kept", home, "the kitchen lights to 20", "", lights("kitchen", "false"), lights("kitchen", "false")},
+		{
+			"don't 13 bytes before the verb: kept", home, "don't really turn off the bedroom lights", "",
+			lights("bedroom", "true"), lights("bedroom", "true"),
+		},
+		{
+			"don't 14 bytes before the verb", home, "don't already turn on the bedroom lights", "",
+			lights("bedroom", "false"), lights("bedroom", "true"),
+		},
+		{
+			"not inside a word: kept", home, "nothing turn on the bedroom lights", "", lights("bedroom", "false"),
+			lights("bedroom", "false"),
+		},
+		{
+			"not inside a word 15 bytes before", home, "nothing really turn on the bedroom lights", "",
+			lights("bedroom", "false"), lights("bedroom", "true"),
+		},
 		{"louder", volume, "make it louder by 4", "", vol("down"), vol("up")},
 		{"down", volume, "turn it down", "", vol("up"), vol("down")},
 		{"neither", volume, "change the volume by 4", "", vol("down"), vol("down")},
@@ -277,6 +293,26 @@ func TestRepairPairedTool(t *testing.T) {
 			"negated: kept", tools, "turn on the lights but don't unlock the front door", "",
 			"[" + call("lock_door", "front door") + "]", "[" + call("lock_door", "front door") + "]",
 		},
+		{
+			"don't 13 bytes before the verb: kept", tools, "don't delay, unlock the front door", "",
+			"[" + call("lock_door", "front door") + "]", "[" + call("lock_door", "front door") + "]",
+		},
+		{
+			"don't 14 bytes before the verb", tools, "don't linger, unlock the front door", "",
+			"[" + call("lock_door", "front door") + "]", "[" + call("unlock_door", "front door") + "]",
+		},
+		{
+			"not inside a word: kept", tools, "nothing to unlock the front door", "",
+			"[" + call("lock_door", "front door") + "]", "[" + call("lock_door", "front door") + "]",
+		},
+		{
+			"the curly don’t", tools, "don’t unlock the front door", "",
+			"[" + call("lock_door", "front door") + "]", "[" + call("unlock_door", "front door") + "]",
+		},
+		{
+			"mustn't", tools, "you mustn't unlock the front door", "",
+			"[" + call("lock_door", "front door") + "]", "[" + call("unlock_door", "front door") + "]",
+		},
 		{"no pair", oneTool("lock_safe", `"safe":{"type":"string"}`, ""), "unlock the safe", "", safe, safe},
 	}
 
@@ -292,7 +328,9 @@ func TestRepairEnumNamed(t *testing.T) {
 		{"case-insensitive", fan, "fan LOW", "", call("medium"), call("low")},
 		{"two named", fan, "set the fan to medium or high", "", call("high"), call("high")},
 		{"none named", fan, "turn the fan up to max", "", call("high"), call("high")},
-		{"a longer word", fan, "the fan is too highly set", "", call("low"), call("low")},
+		{"a longer word that starts with the option", fan, "the fan is too highly set", "", call("low"), call("high")},
+		{"a short option at the start of a longer word: kept", fan, "the fan lowest", "", call("medium"), call("medium")},
+		{"the option inside a word: kept", fan, "fan thigh", "", call("low"), call("low")},
 	}
 
 	runRepair(t, cases)

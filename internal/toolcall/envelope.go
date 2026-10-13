@@ -80,8 +80,12 @@ func NoTools() *Envelope {
 //     dropped arguments and calls; calls the request negates or excludes
 //     are dropped, and when that would drop them all they are kept and
 //     withheld;
-//   - the calls are suppressed when withheld, or below SuppressBelow unless
-//     a trigger of the tools matches input and the request is not negated;
+//   - the calls are suppressed when withheld or a grounding gate fires (a
+//     reported quote, an unnamed enum option, a control word or unmentioned
+//     place in a required slot, no quantity for a required number, the
+//     destination as the origin), or below SuppressBelow; a trigger of the
+//     tools that matches input, when the request is not negated, ships them
+//     past the floor and every gate but the withheld calls and the quote;
 //   - validation, when there are calls: the top-level fields of each call
 //     whose value neither input nor the earlier inputs contain (strings
 //     case-insensitively, numbers as written; booleans, enum and const
@@ -114,7 +118,7 @@ func (n *Normalised) Envelope(a *Decoded, input, system string, earlier []string
 
 	// The engine lists the ungrounded fields of the repaired calls
 	// (docs/FINDINGS.md F-056: pizza_to_lights).
-	calls, withheld := n.repair(calls, input, system)
+	calls, held := n.repair(calls, input, system, earlier)
 	if len(calls) == 0 {
 		return e, nil
 	}
@@ -130,8 +134,13 @@ func (n *Normalised) Envelope(a *Decoded, input, system string, earlier []string
 		out[i] = Call{Name: n.CallerName(c.name), Arguments: args}
 	}
 
+	// A trigger that matches a request that is not negated ships the calls
+	// past the floor and the guess gates, not past a contradiction gate
+	// (docs/FINDINGS.md F-054, F-058).
 	neg := negated(input)
-	if !withheld && (conf >= SuppressBelow || len(n.Triggered(input)) > 0 && !neg) {
+	triggered := len(n.Triggered(input)) > 0 && !neg
+
+	if held == notWithheld && conf >= SuppressBelow || held != contradictionWithheld && triggered {
 		e.FunctionCalls = out
 	} else {
 		e.SuppressedCalls = out
