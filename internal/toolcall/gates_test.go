@@ -213,6 +213,8 @@ func TestGateUnnamedEnum(t *testing.T) {
 	optional := oneTool("set_fan", `"speed":{"type":"string","enum":["low","medium","high"]}`, "")
 	defaulted := oneTool("set_fan", `"speed":{"type":"string","enum":["low","medium","high"],"default":"medium"}`,
 		`"speed"`)
+	lang := oneTool("compile", `"language":{"type":"string","enum":["C++","C#",".NET","Go"]}`, `"language"`)
+	compile := func(v string) string { return `{"name":"compile","arguments":{"language":"` + v + `"}}` }
 
 	cases := []gateCase{
 		{"never named", fan("speed"), "set the fan", nil, []string{call("speed", "medium")}, 0, 1},
@@ -234,6 +236,12 @@ func TestGateUnnamedEnum(t *testing.T) {
 		{"key mode", fan("mode"), "set the fan", nil, []string{call("mode", "medium")}, 1, 0},
 		{"a key holding level", fan("speed_level"), "set the fan", nil, []string{call("speed_level", "medium")}, 1, 0},
 		{"key units", fan("units"), "set the fan", nil, []string{call("units", "medium")}, 1, 0},
+		// Options that start or end in punctuation are named as words too
+		// (PR #69 review); "c" alone does not name "C++".
+		{"named with punctuation", lang, "compile it as c++ please", nil, []string{compile("C++")}, 1, 0},
+		{"named with a trailing #", lang, "build the C# project", nil, []string{compile("C#")}, 1, 0},
+		{"named with a leading dot", lang, "target .NET", nil, []string{compile(".NET")}, 1, 0},
+		{"a prefix of a punctuated option", lang, "compile it as c", nil, []string{compile("C++")}, 0, 1},
 		{
 			"a trigger ships it", withTrigger(fan("speed"), "fan"), "set the fan", nil,
 			[]string{call("speed", "medium")},

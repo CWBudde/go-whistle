@@ -1116,13 +1116,15 @@ func (r *repairer) unnamedEnum(c *repairCall) bool {
 
 // namedAsWord reports whether the text s, with its lower-cased words ws,
 // names the enum option o as a word, or as the start of a word for an
-// option of minPrefixOption letters or more ("highway" names "high").
+// option of minPrefixOption letters or more ("highway" names "high"). The
+// word test is containsWords', not \b's, so that options starting or
+// ending in punctuation ("C++", ".NET") are named too (PR #69 review).
 func namedAsWord(s string, ws []string, o string) bool {
-	if phrases(regexp.QuoteMeta(o)).MatchString(s) {
+	lo := strings.ToLower(o)
+
+	if containsWords(strings.ToLower(s), lo) {
 		return true
 	}
-
-	lo := strings.ToLower(o)
 
 	return len(lo) >= minPrefixOption && slices.ContainsFunc(ws, func(w string) bool { return strings.HasPrefix(w, lo) })
 }
