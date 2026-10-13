@@ -4425,7 +4425,7 @@ What ranks the tools, when `needle3.cact` has no embedding head?
 by a built-in contrastive head" and "each turn embeds the query". The porting notes
 (cactuscompute.com/blog/porting-needle) say when: "That path switches on only when the archive carries an embedding
 head, and this release does not ship one", so "every declared tool goes into the prefix"; "If your port sees no head
-with code 1 in the manifest, retrieval is off." The engine binary's only trace of retrieval is the budget error below.
+with code 1 in the manifest, retrieval is off." Of the engine's answers, only the budget error below mentions retrieval.
 
 **Measured.** `just oracle-text retrieval` writes `testdata/text/engine/retrieval.json`:
 
@@ -4678,8 +4678,8 @@ invalid regex, no match), the CLI's stderr, and the answer over an empty tool li
 - **Truncated** (the budget runs out): `success` false, `error` "tool call truncated: token budget exhausted",
   `error_code` "truncated", `reason` "runtime_failure", no calls, `reasoning` null, the confidence as usual.
 - **No tools:** `{"type":"call","success":true,"error":null,"function_calls":[],"suppressed_calls":[],"reasoning":"no
-tools declared, returning the empty call","confidence":1.0000}`, without `error_code` and `reason`, as a string in
-  the binary.
+tools declared, returning the empty call","confidence":1.0000}`, without `error_code` and `reason`, as `triggers.json`
+  records it (`no_tools`).
 - **Suppression.** All calls go to `suppressed_calls` below confidence 0.1 (`alarm_morning` 0.092, `negation_door`
   0.0315), unless a trigger matched and the request is not negated: `alarm_triggered` ships at 0.092; with the request
   negated (`negation_triggered`, `negation_two_triggered`) the calls stay suppressed.
