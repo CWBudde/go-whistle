@@ -694,7 +694,15 @@ Engine-only: fitted against `testdata/text/engine/`.
 
 ### 11.5 Native quantised path (`internal/text`, `internal/weights` or a packed `text.Source`, `internal/cq`; needs 11.2)
 
-- [ ] Serve the 122 CQ records packed (`cq.Matrix`) and run the model on them, as 9.2 does for Whistle.
+- [x] Serve the 122 CQ records packed (`cq.Matrix`) and run the model on them, as 9.2 does for Whistle.
+      (2026-10-14) — `text.OpenWith(path, text.OpenOptions{Packed: true})` serves all 122 CQ records as `cq.Matrix`
+      with no float32 copy (`TestSourcePacked`, `TestLoadPackedNoFloatCopy`); `text.Open` stays float. On exact
+      kernels (`cq.Matrix.Exact`, the default packed mode) the logits are within 1 − cos 8.4e-14 of the dequantised
+      model with top-1 equal at 1732 of 1732 positions and the confidence within 3.7e-6 (`TestForwardCactPacked`,
+      `TestExtendCactPacked`); the weights take 37.2–38.3 MiB by run (`TestPackedMemory`; F-059 records 38.252 MiB,
+      under 40 MiB and 0.3 % over 40 × 10⁶ bytes). Whistle's lut kernel (`LUT: true`) is 3.5× faster on a 120-token
+      forward but moves the confidence by up to 3.5e-4 and adds 15 MiB; the exact path is 3.4× slower than float32
+      (F-059).
 - [ ] The engine's int8 activations and KV (`act_bits` 8, `kv_bits` 8, `Int8` of F-041) and its KV window of 256.
 - [ ] **Accept:** with the `.cact` weights, `function_calls` equal the engine's at least as often as with the float
       weights; memory and speed against the engine (`just bench`-style), packed weights under 40 MB.

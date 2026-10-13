@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/cwbudde/go-whistle/internal/cact"
+	"github.com/cwbudde/go-whistle/internal/cq"
 	"github.com/cwbudde/go-whistle/internal/safetensors"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
@@ -17,40 +18,83 @@ import (
 // from either format, both in the .cact layout, so that internal/needle's
 // loaders read it as they read Whistle's weights.Source. Tensors are
 // decoded, and CQ tensors dequantised, on first use and cached
-// (docs/FINDINGS.md F-045). It never serves CQ tensors packed: the native
-// quantised path is PLAN.md 11.5.
+// (docs/FINDINGS.md F-045).
+//
+// Opened with OpenOptions.Packed, a .cact source is also a weights.Packer:
+// Matrix serves the CQ records as cq.Matrix values that multiply straight
+// from the stored indices, and the needle loaders then take those instead
+// of a float32 copy (docs/FINDINGS.md F-059).
 type Source struct {
 	cfg   Config
 	names []cact.Entry
 	index map[string]int
 
-	file  *cact.File         // .cact backend
-	store *safetensors.Store // safetensors backend
+	file   *cact.File         // .cact backend
+	store  *safetensors.Store // safetensors backend
+	packed bool               // Matrix serves the CQ records (OpenOptions.Packed)
+	lut    bool               // their products run the lut kernel (OpenOptions.LUT)
 
 	mu     sync.Mutex
 	cache  map[string][]float32
+	mats   map[string]*cq.Matrix // the packed matrices, as cache (F-059)
 	closed bool
 }
 
-var _ weights.Source = (*Source)(nil)
+var (
+	_ weights.Source = (*Source)(nil)
+	_ weights.Packer = (*Source)(nil)
+)
+
+// OpenOptions configure OpenWith and OpenCactWith; the zero value is Open's
+// float32 source.
+type OpenOptions struct {
+	// Packed makes a .cact source serve its CQ records packed (Matrix), so
+	// that Load runs the model on them without a float32 copy, as
+	// whistle.Load does for Whistle (docs/FINDINGS.md F-037, F-059). The
+	// matrices alias the file data. The safetensors backend has no packed
+	// form and ignores it.
+	//
+	// The products run internal/cq's nibble kernels (cq.Matrix.Exact),
+	// which sum the codebook levels in float32: the packed model then gives
+	// the dequantised float model's logits and confidence up to the float32
+	// summation order, and holds no lut copy (F-059).
+	Packed bool
+	// LUT runs the packed products on the lut kernel instead, as Whistle
+	// does (F-034): faster than float32 where its assembly runs, but its
+	// tables round to 14 bits, which moves the confidence logit by up to
+	// 3.5e-4, and the blocked copies add 15 MiB (F-059). It needs Packed.
+	LUT bool
+}
 
 // Open reads a text .cact (recognised by its tag) or a text safetensors
-// checkpoint into memory and serves it.
+// checkpoint into memory and serves it in float32.
 func Open(path string) (*Source, error) {
+	return OpenWith(path, OpenOptions{})
+}
+
+// OpenWith is Open with options: OpenWith(path, OpenOptions{Packed: true})
+// serves a .cact's CQ records packed.
+func OpenWith(path string, opts OpenOptions) (*Source, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("text: %w", err)
 	}
 
 	if len(data) >= 4 && binary.LittleEndian.Uint32(data) == cact.Tag {
-		return OpenCact(data)
+		return OpenCactWith(data, opts)
 	}
 
 	return OpenSafetensors(data)
 }
 
-// OpenCact serves a text .cact held in data.
+// OpenCact serves a text .cact held in data in float32.
 func OpenCact(data []byte) (*Source, error) {
+	return OpenCactWith(data, OpenOptions{})
+}
+
+// OpenCactWith serves a text .cact held in data with options. Packed
+// matrices alias data, which must not change while the source is in use.
+func OpenCactWith(data []byte, opts OpenOptions) (*Source, error) {
 	f, err := cact.Parse(data)
 	if err != nil {
 		return nil, err
@@ -61,7 +105,10 @@ func OpenCact(data []byte) (*Source, error) {
 		return nil, err
 	}
 
-	return newSource(ConfigFromHeader(f.Header()), names, f, nil), nil
+	s := newSource(ConfigFromHeader(f.Header()), names, f, nil)
+	s.packed, s.lut = opts.Packed, opts.LUT
+
+	return s, nil
 }
 
 // OpenSafetensors serves a text safetensors checkpoint held in data, under
@@ -143,7 +190,7 @@ func storeHead(store *safetensors.Store, code int, cfg Config) (cact.HeadShape, 
 func newSource(cfg Config, names []cact.Entry, f *cact.File, store *safetensors.Store) *Source {
 	s := &Source{
 		cfg: cfg, names: names, index: make(map[string]int, len(names)), file: f, store: store,
-		cache: map[string][]float32{},
+		cache: map[string][]float32{}, mats: map[string]*cq.Matrix{},
 	}
 
 	for i, e := range names {
@@ -240,6 +287,58 @@ func (s *Source) Tensor(name string) ([]float32, []int, error) {
 	return v, slices.Clone(e.Shape), nil
 }
 
+// Matrix serves CQ record name packed when the source was opened with
+// OpenOptions.Packed (weights.Packer, docs/FINDINGS.md F-059):
+// cq.NewGather on the record as stored, an Exact view unless
+// OpenOptions.LUT, built on the first call and cached until Release or
+// Close, with no float32 copy. Its indices alias the file data. Other records, CQ widths internal/cq has no kernel for (it has 2
+// and 4 bits, all needle3.cact uses), every record in float mode and the
+// safetensors backend give nil and false.
+func (s *Source) Matrix(name string) (*cq.Matrix, bool, error) {
+	i, ok := s.index[name]
+	if !ok {
+		return nil, false, fmt.Errorf("text: %s: %w", name, weights.ErrNotFound)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed {
+		return nil, false, fmt.Errorf("text: %s: %w", name, weights.ErrClosed)
+	}
+
+	if !s.packed || s.file == nil {
+		return nil, false, nil
+	}
+
+	if m, ok := s.mats[name]; ok {
+		return m, true, nil
+	}
+
+	rec, err := s.file.Record(i)
+	if err != nil || rec.DType != cact.CQ || rec.Bits != 2 && rec.Bits != 4 {
+		return nil, false, err
+	}
+
+	p, err := s.file.CQPacked(i)
+	if err != nil {
+		return nil, false, fmt.Errorf("text: %s: %w", name, err)
+	}
+
+	m, err := cq.NewGather(p)
+	if err != nil {
+		return nil, false, fmt.Errorf("text: %s: %w", name, err)
+	}
+
+	if !s.lut {
+		m = m.Exact()
+	}
+
+	s.mats[name] = m
+
+	return m, true, nil
+}
+
 // Raw returns a copy of the tokenizer blob; the safetensors checkpoint has
 // none.
 func (s *Source) Raw(name string) ([]byte, error) {
@@ -281,16 +380,17 @@ func (s *Source) Config() weights.Config {
 	}
 }
 
-// Release drops a name's cached values.
+// Release drops a name's cached values and packed matrix.
 func (s *Source) Release(name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	delete(s.cache, name)
+	delete(s.mats, name)
 }
 
-// Close drops the cache; Tensor and Raw then fail with weights.ErrClosed.
-// Closing twice is a no-op.
+// Close drops the caches; Tensor, Raw and Matrix then fail with
+// weights.ErrClosed. Closing twice is a no-op.
 func (s *Source) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -299,7 +399,7 @@ func (s *Source) Close() error {
 		return nil
 	}
 
-	s.closed, s.cache = true, nil
+	s.closed, s.cache, s.mats = true, nil, nil
 
 	if s.store != nil {
 		s.store.Close()

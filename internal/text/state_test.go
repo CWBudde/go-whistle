@@ -113,6 +113,49 @@ func TestExtendMatchesForward(t *testing.T) {
 	}
 }
 
+// TestExtendCactPacked is TestForwardCactPacked for Extend: on every
+// fixture case, the packed model fed the prompt in one call and the
+// completion a token at a time, and in uneven chunks, gives the
+// dequantised float model's Forward logits at every position within
+// minCosExtend and the same top-1 (docs/FINDINGS.md F-059).
+func TestExtendCactPacked(t *testing.T) {
+	requireFile(t, forwardFixture)
+
+	packed, _ := loadPacked(t)
+	float := loadDequantised(t)
+	fx := openFixture(t)
+	v := packed.cfg.OutVocab
+
+	for _, name := range forwardCases {
+		t.Run(name, func(t *testing.T) {
+			tokens := fx.ints(t, name+".tokens")
+			prompt := fx.ints(t, name+".prompt_len")[0]
+			n := len(tokens)
+
+			want, err := float.Forward(tokens, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			uneven := []int{7, 50, n - 57}
+			if name == longCase {
+				uneven = []int{1000, 30, n - 1030}
+			}
+
+			for _, sp := range []struct {
+				name  string
+				sizes []int
+			}{
+				{"prompt, then per token", append([]int{prompt}, ones(n-prompt)...)},
+				{fmt.Sprint(uneven), uneven},
+			} {
+				got := extendRows(t, packed, packed.NewState(), tokens, sp.sizes)
+				checkLogits(t, sp.name, got, want.Logits, v)
+			}
+		})
+	}
+}
+
 func ones(n int) []int {
 	s := make([]int, n)
 	for i := range s {

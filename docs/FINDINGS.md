@@ -5179,3 +5179,138 @@ included.
   unstated optional number, optional strings the conversation never states dropped (F-056's open half: the engine
   drops an optional `location` it only knows from the system facts, `place_*` exploration), a high/low enum following
   a raising or lowering word, and a value respelled as the request writes it (`place_named`).
+
+## F-059 — The packed text model: the 122 CQ records of `needle3.cact` as `cq.Matrix`, on exact kernels (PLAN.md 11.5) (2026-10-13)
+
+**Question.** Can the text model run on the CQ records of `needle3.cact` as stored, as F-037 does for Whistle, with
+the logits and confidence of the dequantised float model and the packed weights under 40 MB? This is 11.5's first item.
+The engine's int8 activations and KV (its second item) and the comparison with the engine (its Accept) are not part of
+this finding.
+
+### Design
+
+**Source.** `text.OpenWith(path, text.OpenOptions{Packed: true})` and `text.OpenCactWith(data, opts)` are an opt-in next
+to `Open` and `OpenCact`, which stay as they were (they now call the new functions with the zero options). A packed
+`.cact` source is a `weights.Packer`: `Matrix(name)` builds a `*cq.Matrix` with `cq.NewGather` on `cact.File.CQPacked`
+once per name, caches it as `Tensor` caches values, drops it on `Release`, and fails with `weights.ErrClosed` after
+`Close`. Other records, the source in float mode and the safetensors backend (which ignores the option) give no matrix.
+The file is still read into memory, so the matrices alias a heap buffer and cannot fault after `Close`, unlike F-037's
+mapping. `needle3.cact` has **122 CQ records** (115 CQ2, 7 CQ4; F-045), as PLAN.md says, and `TestSourcePacked`
+counts them from the file:
+
+| site                                           | tensors                                               | CQ  | call            |
+| ---------------------------------------------- | ----------------------------------------------------- | --- | --------------- |
+| token embedding and tied head                  | `embedding`                                           | 4   | `Row`, `Apply`  |
+| self-attention, 20 layers (`needle.Attention`) | `q_proj`, `k_proj`, `v_proj`, `gate_proj`, `out_proj` | 2   | `Apply`         |
+| mHC (`needle.MHC`), stacked over the layers    | `mhc_phi_pre`, `mhc_phi_post`, `mhc_phi_res`          | 4   | `Rows`, `Apply` |
+| engram, 5 sites (`needle.Engram`)              | `tables`                                              | 2   | `Row`           |
+| engram                                         | `key_proj`, `value_proj`                              | 2   | `Apply`         |
+| confidence head (`text.probeHead`)             | `confidence_head.probes`, `.query`, `.proj`           | 4   | `Row`           |
+
+**Model.** `text.Load` already built every trunk site through `needle.LoadLinear`, `LoadBlock`, `LoadMHC` and
+`LoadEngram`, which keep a tensor packed when the source serves it so. Only the confidence head read its matrices with
+`Tensor`. It now holds `probes`, `query` and `proj` as `needle.Linear`, loaded with the new `needle.LoadTable`
+(`LoadLinear` without `Prepare`, for row-only use), and reads one row at a time with `Row`. For a float32 source that
+copies the row; for a packed one it dequantises the row as `cact.CQ` does, bit for bit. The head runs once per turn on
+84 probes, so a GEMM in the rotated domain would gain nothing, and `Row` keeps the packed head equal to the dequantised
+head on the same cells. The float path gives the same bits as before: a throwaway test hashed the logits, the
+confidence over both spans and three `Extend` steps on all five fixture cases, from `needle3.safetensors` and from the
+dequantised `needle3.cact`, and both hashes equal `main`'s (`4a9d28a`).
+
+**No float copy.** After `Load` on the packed source the float cache holds 457 tensors, none of them CQ, and all 122
+CQ records were built as packed matrices (`TestLoadPackedNoFloatCopy`; the embedding, the tied head and the three
+confidence matrices report `Packed()`).
+
+**The kernel.** By default the packed products run on `cq.Matrix.Exact`, a new view that runs F-028's `nibble4` kernel,
+which sums the codebook levels in float32, instead of F-034's `lut` kernel, which rounds its tables to 14-bit integers.
+`OpenOptions.LUT` runs the `lut` kernel instead, as Whistle does. The default flips F-037's choice because of the
+confidence head. On the lut kernel the logits stay within 1 − cos 3.6e-9 of the dequantised model, but the raw
+confidence logit moves by up to 3.5e-4. With exact kernels on some matrices only, it moves further:
+
+| products on the exact kernel   | largest confidence \|Δ\| | top-1 equal |
+| ------------------------------ | ------------------------ | ----------- |
+| none (`lut` everywhere)        | 3.5e-4                   | 1731/1732   |
+| the three mHC φ                | 1.1e-3                   | 1731/1732   |
+| the embedding and tied head    | 3.5e-4                   | 1732/1732   |
+| the mHC φ and the embedding    | 1.1e-3                   | 1732/1732   |
+| the engram tables, projections | 1.0e-3                   | 1732/1732   |
+| all (the default)              | 3.7e-6                   | 1732/1732   |
+
+The head pools 21 cells over every position, and the stream grows to 1e7 before `final_norm` (F-045), so any rounding
+in the trunk reaches it. No subset of the matrices brings it under 1e-4; only exact sums everywhere do. That also drops
+the lut copies (15.2 MiB, below).
+
+### Parity
+
+The packed model against the dequantised float model on the same `needle3.cact` and the inputs of
+`TestForwardCactDequantised` (the four forward cases and `tiny`, 1732 positions). M5 Pro, arm64:
+
+| check                                           | packed (exact)               | packed, `LUT`                                  |
+| ----------------------------------------------- | ---------------------------- | ---------------------------------------------- |
+| logits, worst row 1 − cos                       | 8.4e-14                      | 3.6e-9 (`message_de` at 142)                   |
+| top-1 equal                                     | 1732/1732                    | 1731/1732: `long_tools` at 1186, margin 1.0e-3 |
+| confidence logit, both spans of every case      | \|Δ\| ≤ 3.7e-6               | \|Δ\| ≤ 3.5e-4                                 |
+| `Extend`, 4 cases, prompt then per token/uneven | 1 − cos < 5e-13, top-1 equal | —                                              |
+
+The lut kernel's miss is a near-tie: the dequantised model's two best logits there are 1.0e-3 apart. Under `-tags purego`
+the lut assembly is off, both modes run `nibble4`, and both tests pass.
+
+### Memory
+
+`TestPackedMemory` counts, per group, what the packed matrices hold (`cq.Matrix.Bytes`: the index, which aliases the
+file, the float32 norms and codebook, and the lut copy once built) and every float32 tensor the source caches. It adds
+what the loaders derive from those (the live Go heap after `Load` less the counted heap bytes: the norm gains, the
+Hadamard MLP's transposed factors and `cond_v`, the permutations as `[]int`, the structs). MiB:
+
+| group         | exact      | `LUT`      | of which (exact)                                 |
+| ------------- | ---------- | ---------- | ------------------------------------------------ |
+| embedding     | 3.188      | 6.375      | index 3.000, norms 0.188                         |
+| blocks        | 11.945     | 21.569     | index 8.555, norms 1.071, FP16 records 2.319     |
+| mHC           | 0.749      | 1.546      | index 0.703, norms 0.044                         |
+| engram tables | 18.984     | 18.984     | index 16.875, norms 2.109                        |
+| engram        | 1.641      | 3.223      | index 1.406, norms 0.176, taps 0.059             |
+| heads         | 0.038      | 0.038      | index 0.034, norms 0.002                         |
+| other         | 0.011      | 0.011      | `final_norm`, the permutations, `heads.manifest` |
+| loaders       | 1.696      | 1.778      | derived copies                                   |
+| **weights**   | **38.252** | **53.529** | 40,109,936 bytes (exact)                         |
+
+The test bounds the exact mode's weights at 40 MiB, reading PLAN.md's 40 MB as F-037 reads 9.2's 64 MB. In decimal
+bytes, 40.11 × 10⁶ is 0.3 % over 40 × 10⁶. The file buffer holds a further 3.126 MiB that no index aliases: the FP16
+records and norms as stored, the tokenizer and the directory. Counted too, the exact mode's total is 41.378 MiB. The
+float model holds the 122 CQ records dequantised, 120.4 M weights or 459 MiB in float32.
+
+### Speed
+
+`BenchmarkForward` (the 120 tokens of `timer_en`) and `BenchmarkExtendStep` (one token after them), M5 Pro, 15
+threads, median of three 2 s runs while other sessions kept the load average at 4.4–5.8. `Load` is the best of three
+`OpenCactWith` + `Load` on the bytes in memory:
+
+| median                | float (dequantised) | packed (exact) | packed, `LUT`   |
+| --------------------- | ------------------- | -------------- | --------------- |
+| `Load`                | 351 ms              | 4.5 ms         | 10.9 ms         |
+| `Forward`, 120 tokens | 61.4 ms             | 207 ms (3.4×)  | 58.4 ms (0.95×) |
+| `Extend`, one token   | 4.44 ms             | 9.18 ms (2.1×) | 2.39 ms (0.54×) |
+
+The exact kernel is F-028's scalar Go `nibble4`, 5–7× slower than the lut assembly (F-034), and has no assembly of its
+own. So the default trades speed for the dequantised model's numerics.
+
+### Tests
+
+`TestSourcePacked`, `TestSourcePackedLifecycle`, `TestLoadPackedNoFloatCopy`, `TestForwardCactPacked` (logits cosine
+≥ 0.99999 and top-1 at every position, confidence within 1e-4), `TestForwardCactPackedLUT` (cosine ≥ 0.9999999,
+confidence within 1e-3, a top-1 may change only at a dequantised margin below 1e-2), `TestPackedMemory` (exact mode
+under 40 MiB, lut logged), `TestExtendCactPacked` (`internal/text`) and `TestExact` (`internal/cq`: the view's products
+equal `nibble4`'s bit for bit, through `Rows` and `GEMMs`, with no lut copy, and leave the matrix it came from on its
+kernel). No existing test bound or fixture changed (the fixture helpers now take a `testing.TB`, for the benchmarks). `Exact` defaults to off, so Whistle's packed path and the `weights`,
+`needle`, `cq` and `whistle` tests are unchanged.
+
+### Open
+
+- **Speed or numerics.** 11.5's Accept compares speed with the engine. The default exact path is 2–3× slower than
+  float32, while `LUT` is faster than float32 but misses this finding's bound on the confidence. The engine's own
+  numerics (W2A8, F-041) are much coarser than either. Levers: an assembly `nibble4` (NEON/AVX2 float lookups), wider
+  lut tables (F-034: 14 bits is the widest that adds two lookups per byte), or `LUT` as the default once 11.5's
+  engine comparison shows that the confidence moves no `function_calls`.
+- **Under 40 × 10⁶ bytes.** The largest lever is the engram tables' norms, widened to float32 although the tables are
+  only gathered (2.1 MiB). Keeping them as FP16 would need `cq` to widen lazily, which touches every kernel. The file
+  buffer's unaliased 3.1 MiB could go with a mapping (F-037), at the cost of F-037's fault-after-`Close` hazard.

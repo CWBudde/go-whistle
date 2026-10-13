@@ -43,6 +43,16 @@ func LoadLinear(src weights.Source, name string, out, in int) (Linear, error) {
 	return w, l.err
 }
 
+// LoadTable is LoadLinear for a matrix that is read by rows (Row) only: a
+// packed one is not prepared for products, so it gets no lut copy unless
+// a product needs it (cq.NewGather, docs/FINDINGS.md F-037, F-059).
+func LoadTable(src weights.Source, name string, out, in int) (Linear, error) {
+	l := &loader{src: src}
+	w := l.table(name, out, in)
+
+	return w, l.err
+}
+
 // Out is the number of rows, the output width.
 func (l Linear) Out() int { return l.out }
 

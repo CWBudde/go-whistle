@@ -6,6 +6,7 @@ import (
 	"math"
 	"slices"
 
+	"github.com/cwbudde/go-whistle/internal/needle"
 	"github.com/cwbudde/go-whistle/internal/weights"
 )
 
@@ -20,16 +21,24 @@ const confidenceKey = "confidence_head"
 // of export.py, in float32: k probes and a gain per cell row (the scaled
 // embedding, then every block), q queries with a bias per row and probe,
 // and the projection of the q pooled vectors to out values.
+//
+// The three matrices are read by rows: a copy of the float32 values, or
+// from a packed source (CQ4 in needle3.cact) the row dequantised as
+// cact.CQ does it, bit for bit, one row at a time (docs/FINDINGS.md F-059).
 type probeHead struct {
 	rows, k, q, out, dim int
 
-	probes  []float32 // (rows·k, dim): probes[l, j]
-	gain    []float32 // (rows, k)
-	query   []float32 // (q, dim)
-	rowBias []float32 // (q, rows, k)
-	proj    []float32 // (out, q·dim): HeadProjection's kernel transposed
-	bias    []float32 // (out)
+	probes  needle.Linear // (rows·k, dim): probes[l, j]
+	gain    []float32     // (rows, k)
+	query   needle.Linear // (q, dim)
+	rowBias []float32     // (q, rows, k)
+	proj    needle.Linear // (out, q·dim): HeadProjection's kernel transposed
+	bias    []float32     // (out)
 }
+
+// probeTensors are a probe head's names after its key, in the order
+// loadProbeHead checks their shapes.
+var probeTensors = [...]string{"probes", "gain", "query", "row_bias", "proj", "bias"}
 
 // loadProbeHead loads the head key from src, or returns nil when src does
 // not carry it. rows is the number of cell rows, Layers + 1.
@@ -38,19 +47,15 @@ func loadProbeHead(src weights.Source, key string, rows, dim int) (*probeHead, e
 		return nil, nil //nolint:nilnil // no head is not an error
 	}
 
-	h := &probeHead{rows: rows, dim: dim}
+	var shapes [len(probeTensors)][]int
 
-	var shapes [6][]int
-
-	for i, p := range []*[]float32{&h.probes, &h.gain, &h.query, &h.rowBias, &h.proj, &h.bias} {
-		name := key + "." + [...]string{"probes", "gain", "query", "row_bias", "proj", "bias"}[i]
-
-		v, shape, err := src.Tensor(name)
+	for i, name := range probeTensors {
+		shape, err := src.Shape(key + "." + name)
 		if err != nil {
 			return nil, fmt.Errorf("text: %w", err)
 		}
 
-		*p, shapes[i] = v, shape
+		shapes[i] = shape
 	}
 
 	probes, query, proj := shapes[0], shapes[2], shapes[4]
@@ -58,13 +63,39 @@ func loadProbeHead(src weights.Source, key string, rows, dim int) (*probeHead, e
 		return nil, fmt.Errorf("text: %s shapes %v", key, shapes)
 	}
 
-	h.k, h.q, h.out = probes[0]/rows, query[0], proj[0]
+	h := &probeHead{rows: rows, dim: dim, k: probes[0] / rows, q: query[0], out: proj[0]}
 
-	want := [6][]int{{rows * h.k, dim}, {rows, h.k}, {h.q, dim}, {h.q, rows, h.k}, {h.out, h.q * dim}, {h.out}}
+	want := [len(probeTensors)][]int{
+		{rows * h.k, dim}, {rows, h.k}, {h.q, dim}, {h.q, rows, h.k}, {h.out, h.q * dim}, {h.out},
+	}
 	for i := range shapes {
 		if !slices.Equal(shapes[i], want[i]) {
 			return nil, fmt.Errorf("text: %s shapes %v, want %v", key, shapes, want)
 		}
+	}
+
+	var err error
+
+	table := func(dst *needle.Linear, i int) {
+		if err == nil {
+			*dst, err = needle.LoadTable(src, key+"."+probeTensors[i], want[i][0], want[i][1])
+		}
+	}
+	vector := func(dst *[]float32, i int) {
+		if err == nil {
+			*dst, _, err = src.Tensor(key + "." + probeTensors[i])
+		}
+	}
+
+	table(&h.probes, 0)
+	vector(&h.gain, 1)
+	table(&h.query, 2)
+	vector(&h.rowBias, 3)
+	table(&h.proj, 4)
+	vector(&h.bias, 5)
+
+	if err != nil {
+		return nil, fmt.Errorf("text: %w", err)
 	}
 
 	return h, nil
@@ -86,12 +117,14 @@ func (h *probeHead) pool(cells [][]float32, keep int) []float32 {
 	r := make([]float32, m*d)
 	scores := make([]float64, keep)
 	acc := make([]float64, d)
+	probe := make([]float32, d)
 
 	for l := range h.rows {
 		cell := cells[l]
 
 		for j := range h.k {
-			probe := h.probes[(l*h.k+j)*d : (l*h.k+j+1)*d]
+			h.probes.Row(probe, l*h.k+j)
+
 			for t := range keep {
 				scores[t] = dot(cell[t*d:(t+1)*d], probe) * inv
 			}
@@ -112,9 +145,11 @@ func (h *probeHead) pool(cells [][]float32, keep int) []float32 {
 
 	out := make([]float32, h.q*d)
 	u := make([]float64, m)
+	query := probe
 
 	for q := range h.q {
-		query := h.query[q*d : (q+1)*d]
+		h.query.Row(query, q)
+
 		for i := range m {
 			u[i] = dot(r[i*d:(i+1)*d], query)*inv + float64(h.rowBias[q*m+i])
 		}
@@ -139,10 +174,11 @@ func (h *probeHead) pool(cells [][]float32, keep int) []float32 {
 // project is HeadProjection: pooled · kernel + bias.
 func (h *probeHead) project(pooled []float32) []float32 {
 	out := make([]float32, h.out)
+	row := make([]float32, len(pooled))
 
 	for o := range out {
-		n := len(pooled)
-		out[o] = float32(dot(pooled, h.proj[o*n:(o+1)*n]) + float64(h.bias[o]))
+		h.proj.Row(row, o)
+		out[o] = float32(dot(pooled, row) + float64(h.bias[o]))
 	}
 
 	return out
