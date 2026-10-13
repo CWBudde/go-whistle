@@ -2,6 +2,7 @@ package toolcall
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"slices"
 	"strconv"
@@ -117,9 +118,21 @@ func (c *repairCall) stringArgs(yield func(key, v string) bool) {
 }
 
 // property is the schema of the tool's top-level property key, nil when the
-// tool does not declare it.
+// tool does not declare it: from the parameters' own properties, else from
+// the first allOf, anyOf or oneOf branch that declares it (PR #66 review).
 func (r *repairer) property(tool, key string) *object {
-	return member(member(r.n.params[tool], "properties"), key)
+	p := r.n.params[tool]
+	if p == nil {
+		return nil
+	}
+
+	for _, s := range composed(p) {
+		if m := member(member(s, "properties"), key); m != nil {
+			return m
+		}
+	}
+
+	return nil
 }
 
 // required reports whether key is a required argument of tool: required by
@@ -140,13 +153,27 @@ func (r *repairer) required(tool, key string) bool {
 	return false
 }
 
-// properties are the names of the tool's top-level properties.
+// properties are the names of the tool's top-level properties, those of
+// the parameters first, then those only its branches declare.
 func (r *repairer) properties(tool string) []string {
-	if p := member(r.n.params[tool], "properties"); p != nil {
-		return p.keys
+	p := r.n.params[tool]
+	if p == nil {
+		return nil
 	}
 
-	return nil
+	var out []string
+
+	for _, s := range composed(p) {
+		if ps := member(s, "properties"); ps != nil {
+			for _, k := range ps.keys {
+				if !slices.Contains(out, k) {
+					out = append(out, k)
+				}
+			}
+		}
+	}
+
+	return out
 }
 
 // typeOf is a schema's "type" when it is one name.
@@ -238,11 +265,14 @@ func (r *repairer) quoted(c *repairCall) {
 
 	for k, v := range c.stringArgs {
 		for _, q := range spans {
-			if v == "" || v == q || !strings.HasPrefix(strings.ToLower(q), strings.ToLower(v)) {
+			// The offsets are the folded strings': folding may change the
+			// length in bytes (PR #66 review).
+			lv, lq := strings.ToLower(v), strings.ToLower(q)
+			if v == "" || v == q || !strings.HasPrefix(lq, lv) {
 				continue
 			}
 
-			if len(v) == len(q) || q[len(v)] == ' ' {
+			if len(lv) == len(lq) || lq[len(lv)] == ' ' {
 				c.set(k, q)
 
 				break
@@ -869,7 +899,7 @@ func (r *repairer) dropCalls(cs []*repairCall) []*repairCall {
 			return true
 		}
 
-		key := c.name + "\x00" + string(c.bytes())
+		key := c.name + "\x00" + c.identity()
 		if seen[key] {
 			return true
 		}
@@ -878,6 +908,58 @@ func (r *repairer) dropCalls(cs []*repairCall) []*repairCall {
 
 		return false
 	})
+}
+
+// identity is c's arguments in an order-free form: two calls with the same
+// arguments in another key order are duplicates (PR #66 review).
+func (c *repairCall) identity() string {
+	if c.args == nil {
+		return string(c.bytes())
+	}
+
+	var b strings.Builder
+
+	canonical(&b, c.args)
+
+	return b.String()
+}
+
+// canonical writes v with every object's keys sorted.
+func canonical(b *strings.Builder, v any) {
+	switch t := v.(type) {
+	case *object:
+		keys := slices.Sorted(slices.Values(t.keys))
+
+		b.WriteByte('{')
+
+		for i, k := range keys {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+
+			b.WriteString(strconv.Quote(k))
+			b.WriteByte(':')
+			canonical(b, t.vals[k])
+		}
+
+		b.WriteByte('}')
+	case []any:
+		b.WriteByte('[')
+
+		for i, e := range t {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+
+			canonical(b, e)
+		}
+
+		b.WriteByte(']')
+	case string:
+		b.WriteString(strconv.Quote(t))
+	default:
+		fmt.Fprint(b, t)
+	}
 }
 
 // clauseSplit separates the clauses of a request: punctuation, a full stop

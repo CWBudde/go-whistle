@@ -187,6 +187,7 @@ func TestRepairQuoted(t *testing.T) {
 		{"not a word prefix", tool, `a note titled "Anna's plan"`, "", call("Anna"), call("Anna")},
 		{"no quotes", tool, `a note titled the quick brown fox`, "", call("the quick"), call("The quick")},
 		{"an apostrophe is no quote", tool, `Gino's note and Ann's`, "", call("note"), call("Note")},
+		{"a fold that shortens: no panic", tool, `a note titled "k"`, "", call("\u212a"), call("K")},
 	}
 
 	runRepair(t, cases)
@@ -383,6 +384,13 @@ func TestRepairDropArguments(t *testing.T) {
 			`[{"name":"set_lights","arguments":{"room":"","on":false}}]`,
 		},
 		{
+			"an enum declared in an allOf branch: kept",
+			`[{"name":"set_lights","parameters":{"type":"object","allOf":[{"properties":{"mode":` +
+				`{"type":"integer","enum":[1,2]}}}]}}]`,
+			"the lights", "", `[{"name":"set_lights","arguments":{"mode":2}}]`,
+			`[{"name":"set_lights","arguments":{"mode":2}}]`,
+		},
+		{
 			"required in an allOf branch: kept",
 			`[{"name":"set_lights","parameters":{"type":"object","properties":{"room":{"type":"string"},` +
 				`"brightness":{"type":"integer"}},"allOf":[{"required":["room","brightness"]}]}}]`,
@@ -409,6 +417,11 @@ func TestRepairDropCalls(t *testing.T) {
 		{
 			"a duplicate", home, "turn off the kitchen lights and turn off the kitchen lights", "",
 			list(lights("kitchen"), lights("kitchen")), list(lights("kitchen")),
+		},
+		{
+			"a duplicate in another key order", home, "turn off the kitchen lights and turn off the kitchen lights", "",
+			list(lights("kitchen"), `{"name":"set_lights","arguments":{"on":false,"room":"kitchen"}}`),
+			list(lights("kitchen")),
 		},
 		{
 			"different: kept", home, "the kitchen and the bedroom lights", "", list(lights("kitchen"), lights("bedroom")),
