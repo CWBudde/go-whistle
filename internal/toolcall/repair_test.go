@@ -242,7 +242,7 @@ func TestRepairPolarity(t *testing.T) {
 		{"down", volume, "turn it down", "", vol("up"), vol("down")},
 		{"neither", volume, "change the volume by 4", "", vol("down"), vol("down")},
 		{
-			"an on/off enum", power, "switch on the fan", "", `[{"name":"set_power","arguments":{"device":"fan","state":"off"}}]`,
+			"an on/off enum", power, "turn on the fan", "", `[{"name":"set_power","arguments":{"device":"fan","state":"off"}}]`,
 			`[{"name":"set_power","arguments":{"device":"fan","state":"on"}}]`,
 		},
 	}
@@ -298,9 +298,9 @@ func TestRepairEnumNamed(t *testing.T) {
 
 func TestRepairFromTo(t *testing.T) {
 	nav := oneTool("navigate", `"destination":{"type":"string"},"origin":{"type":"string"}`, `"destination"`)
-	ride := oneTool("book_ride", `"pickup":{"type":"string"},"dropoff":{"type":"string"}`, "")
+	ride := oneTool("book_ride", `"pickup":{"type":"string"},"destination":{"type":"string"}`, "")
 	office := `[{"name":"navigate","arguments":{"destination":"the office"}}]`
-	zoo := `[{"name":"book_ride","arguments":{"pickup":"the zoo","dropoff":"the beach"}}]`
+	zoo := `[{"name":"book_ride","arguments":{"pickup":"the zoo","destination":"the beach"}}]`
 
 	cases := []repairCase{
 		{
@@ -314,7 +314,7 @@ func TestRepairFromTo(t *testing.T) {
 		},
 		{
 			"both missing", ride, "a taxi from the zoo to the beach", "", `[{"name":"book_ride","arguments":{}}]`,
-			`[{"name":"book_ride","arguments":{"pickup":"zoo","dropoff":"beach"}}]`,
+			`[{"name":"book_ride","arguments":{"pickup":"zoo","destination":"beach"}}]`,
 		},
 		{"given: kept", ride, "a taxi from the zoo to the beach", "", zoo, zoo},
 		{"no from", nav, "navigate to the office", "", office, office},
@@ -478,7 +478,7 @@ func TestWordNumber(t *testing.T) {
 		{"a hundred", 100, true},
 		{"half", 50, true},
 		{"half", 0.5, true},
-		{"a dozen eggs", 12, true},
+		{"twelve eggs", 12, true},
 		{"fifty", 15, false},
 		{"fifteen", 50, false},
 		{"none", 0, false},

@@ -279,9 +279,9 @@ doubt.
   | unpatched                       | the normal transcript                                 |
 
   So the engine finds the manifest by content, as the FP32 `(13,)` record with the magic and a 16 kHz rate. `[1]` is
-  a format version it accepts only as 1, and the geometry must agree with the tensors. A static look at
-  `libneedle3.dylib`'s `needle_load` with `objdump` had shown the same comparisons (3246.0f, 1.0f, 16000.0f) and led
-  to the experiment; no engine code was copied.
+  a format version it accepts only as 1, and the geometry must agree with the tensors. This result rests
+  on the patched files alone. An earlier static look at the engine's library had pointed to the experiment; it broke
+  AGENTS.md (the engine is a black-box oracle) and is withdrawn.
 
 - `tokenizer` parses with `internal/tokenizer` (8199 pieces = header `vocab` = `text` + 7, pad/eos/bos 0/1/2 = the
   config). Its sha256 equals the `blob_sha256` of F-005's sentencepiece fixture.
@@ -4830,10 +4830,11 @@ F-048). Which of them can the engine be shown to apply, exactly how, and in whic
 **The oracle.** `just oracle-text repair` (`testdata/text/engine/repair.json`, 90 probes, byte-identical on a
 re-run): each probe is one request over one tool or a corpus tool set, labelled with its rule, with cases where the
 rule fires and where it must not. Upstream ships no Python for the repair (`needle/__init__.py` only adds year checks
-to `ungrounded`), so nothing is translated. The engine's word lists are strings of `libneedle3.dylib`: the polar
-verbs, the pickup and destination keys, the place links (" located at ", " which is at ", …), the exclusion phrases
-("except for", "but not", "apart from", …), the negations, weekdays, months and number words; the rules below use
-them as listed. **Method:** the `.cact` decode under the grammar (F-052, F-055) writes the calls before the repair;
+to `ungrounded`), so nothing is translated. Every word list of the port holds only what llms.txt names, what a probe
+shows the engine to act on, or plain English (weekdays, months, cardinal numbers). The first draft of this finding
+also took word lists from the engine's library; that broke AGENTS.md (the engine is a black-box oracle) and is
+withdrawn: no list entry rests on it. Some probes (the `cap_*` keys, `which is at`) were chosen with that knowledge;
+their answers are the engine's output to requests we sent, so they stay as evidence. **Method:** the `.cact` decode under the grammar (F-052, F-055) writes the calls before the repair;
 where its reasoning is the engine's (77 of the 90 probes), a difference between its calls and the engine's is the
 repair. About 300 exploratory requests, run on the engine and decoded side by side, chose the probes.
 
@@ -4853,7 +4854,7 @@ before the repair and equals it after):
   coming Friday, `fri` is no weekday); a month and day (`March 4th`, `4 March`, `the 4th of March`) is on or after the
   fact's day (`October 11th` on the 11th stays, `October 10th` is next year) or in the year written. A date with a time
   (`2026-10-03 09:00` for "Friday at 9:00") stays. Rejected: "on or after" for weekdays (Sunday → the 18th), only
-  `format: date` fields (a `start` string is rewritten too). `tomorrow` and other words of the engine's list are not
+  `format: date` fields (a `start` string is rewritten too). `tomorrow` and other relative words are not
   pinned: the model resolves them itself in every probe.
 - **Name split** (fires on 4, 2 must not): a full name in the first key of a first/last pair (`first_name`, `first`,
   `given_name`) keeps its first word; the last key is not filled (`given_name` "Ravi Kumar" → "Ravi", no
@@ -4868,18 +4869,18 @@ before the repair and equals it after):
   " which is at " and an address starting with a house number gets the address (`Cafe Central 14 Herrengasse`);
   " which is located at " leaves it (`place_which_is_located_at`), " at " the model writes itself. "Place queries
   recover dropped words" is not pinned: `get me to the airport, I'm driving` gives the destination `airport, I'm`.
-- **Polarity** (fires on 3, 2 must not): a boolean `on` (port-side: also `power`, `enabled`, `active`) follows the
-  first on or off phrase of the call's clause (the clause holding one of its string values, split at punctuation,
+- **Polarity** (fires on 3, 2 must not): a boolean `on` follows the first on or off phrase of the call's clause (the clause holding one of its string values, split at punctuation,
   "and", "but", "then"), unless the clause is negated (`bool_own_clause`: "turn on the living room lights but don't
   unlock …" → `on: true`; "don't turn off" stays); an enum of `up` and `down` follows the raising or lowering phrases
-  (`louder` → `up`), one of `on` and `off` the on/off phrases.
+  (`louder` → `up`), one of `on` and `off` the on/off phrases. The phrases are llms.txt's ("turn on", "louder",
+  "turn down") and their opposites ("turn off", "turn up"); no probe needs more.
 - **Paired tool** (fires on 2 and in both `bool_other_clause` probes, 1 must not): a call to a tool or its `un` pair
   (`lock_door`, `unlock_door`) takes the one whose verb its clause names; a negated clause keeps it ("don't unlock" →
   `lock_door`, the corpus's `negation_door`).
 - **Named enum option** (2 must not): an enum moves to the one option the request names as a word (`fan on high and
 oscillating`: `low` → `high`). Both probes where it fires still differ: see Open.
-- **Pickup and destination** (fires on 2, 1 must not): from "from X to Y", a pickup or destination key (the engine's
-  lists: `origin`, `pickup`, `start_location`, …) the call leaves out takes X or Y without a leading "the"
+- **Pickup and destination** (fires on 2, 1 must not): from "from X to Y", a pickup or destination key (llms.txt's
+  `pickup` and `destination`, the probes' `origin`) the call leaves out takes X or Y without a leading "the"
   (`origin: "hotel"`); a slot the model filled stays (`the zoo`).
 - **by N** (fires on 1, 1 must not): a tool's only number argument takes N ("by 2 to 23 degrees": 23 → 2).
 - **A required number with a default** takes it when the request names no quantity (digits or a number word):
@@ -4892,7 +4893,7 @@ oscillating`: `low` → `high`). Both probes where it fires still differ: see Op
   are dropped (`label: ""`).
 - **Duplicate calls** (fires on 2 with `phone_split`, 1 must not): the second of two equal calls is dropped.
 - **Exclusions** (fires on 3, 1 must not, 1 unit case): a call with a string value equal to what follows "except",
-  "but not", "apart from" and the engine's other phrases (up to the clause's end, without "the") is dropped, unless it
+  "but not" or "apart from", the phrases the probes show (up to the clause's end, without "the") is dropped, unless it
   is the only call ("the lights everywhere except the bedroom"); `garage door` for "but not the garage" stays.
 - **Negated clauses** (fires on 1 at equal reasoning, 1 more at a different one, 1 must not): a call to a tool whose
   name starts with the verb after a negation is dropped ("don't play anything" drops `play_music`, "don't lock" drops
@@ -4926,5 +4927,4 @@ unchanged. The `TestRepair*` unit tests cover each rule without the model, cases
 - **A boolean the request names:** "fan on high and oscillating" gets `oscillate: true` on the second call
   (`enum_named_high`, `enum_named_low`), which the model leaves out; the port's two calls are then duplicates.
 - **Dropped words of a place query**, **unstated optional strings**, `tomorrow`-style dates and the message rewrite
-  of F-048 (above). The engine's lists hold more phrases (" instead", " only ", "no longer", "must not", "forget",
-  "hesitate", …) whose use no probe shows.
+  of F-048 (above), and any phrase, key or number word beyond those the probes show.

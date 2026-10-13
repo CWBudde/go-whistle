@@ -50,7 +50,8 @@ type Validation struct {
 // calls in suppressed_calls (llms.txt).
 const SuppressBelow = 0.1
 
-// Engine strings of libneedle3 3.2.0.
+// The engine's texts as its answers write them (testdata/text/engine:
+// responses.json, triggers.json).
 const (
 	truncatedError  = "tool call truncated: token budget exhausted"
 	noToolsResponse = "no tools declared, returning the empty call"

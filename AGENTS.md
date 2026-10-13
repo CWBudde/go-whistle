@@ -18,6 +18,10 @@ The engine itself is only used as a black-box test oracle. See `PLAN.md` for the
   there is always a pure-Go fallback (`*_noasm.go`) and a test that compares both.
 - **Oracle code is separated.** Anything that loads `libneedle3`, runs the `needle` binary or Python lives under
   `tools/oracle/` or `scripts/`, behind the build tag `oracle`, and never ships with the library or CLI.
+- **The engine is a black box.** Use only what it answers to inputs we send, plus upstream's public docs and code.
+  Never look inside its binaries (`libneedle3`, `needle`): no `strings`, no symbol tables, no disassembly or
+  decompilation, and no word lists, constants or logic taken from them. When the oracle cannot pin a behaviour, leave
+  it open in `docs/FINDINGS.md`.
 - **Never commit weights or engine binaries.** `models/`, `engine/` and `original/` are git-ignored. Tests that need
   them skip with a clear message when they are missing.
 - **Every reverse-engineered decision goes into `docs/FINDINGS.md`**: the hypothesis, the alternatives tried, the

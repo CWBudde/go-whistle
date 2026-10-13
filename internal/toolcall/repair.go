@@ -13,8 +13,10 @@ import (
 // The engine's deterministic repair of the decoded calls (llms.txt:
 // "Arguments arrive after the engine's deterministic repair step, which
 // grounds them in the request text"), as far as the repair probes pin it
-// (docs/FINDINGS.md F-056). The word lists are the engine's own: they are
-// strings of libneedle3 3.2.0.
+// (docs/FINDINGS.md F-056). Every word list holds only what llms.txt names,
+// what a recorded probe shows the engine to act on, or plain English
+// (weekdays, months, cardinal numbers); nothing is taken from the engine's
+// binaries (AGENTS.md).
 
 // repairCall is one call under repair: the model's tool name and its
 // arguments, parsed; args is nil when they are no object, and such a call
@@ -281,10 +283,11 @@ func (r *repairer) quoted(c *repairCall) {
 	}
 }
 
-// The first and last keys of a name pair, as the model names them.
+// The first and last keys of a name pair the probes show split
+// (docs/FINDINGS.md F-056: name_given, name_first, name_first_name).
 var (
-	firstKeys = []string{"first_name", "first", "given_name", "firstname", "forename"}
-	lastKeys  = []string{"last_name", "last", "family_name", "lastname", "surname"}
+	firstKeys = []string{"first_name", "first", "given_name"}
+	lastKeys  = []string{"last_name", "last", "family_name"}
 )
 
 // nameSplit splits a full name in the first of a first/last pair: the
@@ -306,10 +309,10 @@ func (r *repairer) nameSplit(c *repairCall) {
 	}
 }
 
-// placeLinks join a place to its street address in the request. The
-// engine also lists " which is located at " and others; the probes show
-// those leave the place alone (docs/FINDINGS.md F-056).
-var placeLinks = []string{" located at ", " which is at ", " that is at "}
+// placeLinks join a place to its street address in the request, as the
+// probes show (docs/FINDINGS.md F-056: place_located_at, place_which_is_at;
+// " which is located at " and a bare " at " leave the place alone).
+var placeLinks = []string{" located at ", " which is at "}
 
 // place recovers a following street address: a string argument that the
 // request writes right before a place link and an address starting with a
@@ -339,20 +342,12 @@ func (r *repairer) place(c *repairCall) {
 	}
 }
 
-// The engine's keys of a pickup and of a destination slot.
+// The keys of a pickup and of a destination slot: llms.txt's "pickup and
+// destination", and the probes' origin (docs/FINDINGS.md F-056:
+// from_to_missing, from_to_article).
 var (
-	pickupKeys = []string{
-		"pickup", "origin", "from", "start", "start_location", "departure", "from_location", "pickup_city",
-		"pickup_location", "pickup_address", "pickup_point", "origin_location", "origin_city", "origin_address",
-		"from_address", "from_city", "start_address", "start_point", "departure_location", "departure_city",
-		"departure_airport", "starting_point", "start_place",
-	}
-	destinationKeys = []string{
-		"destination", "to", "end", "end_location", "arrival", "dropoff", "to_location", "dropoff_city",
-		"destination_location", "destination_city", "destination_address", "dropoff_location", "dropoff_address",
-		"dropoff_point", "drop_off", "drop_off_location", "to_address", "to_city", "end_address", "end_point",
-		"arrival_location", "arrival_city", "arrival_airport", "ending_point", "end_place",
-	}
+	pickupKeys      = []string{"pickup", "origin"}
+	destinationKeys = []string{"destination"}
 )
 
 // fromToWords is "from X to Y" in the request.
@@ -473,17 +468,15 @@ func namesQuantity(lowered string) bool {
 	})
 }
 
-// numberWords are the number words of the engine's list, with their
-// values; "half" and "quarter" also stand for 50 and 25 (of a percentage),
-// a port-side reading pinned for "half" (docs/FINDINGS.md F-056:
-// optional_number_half).
+// numberWords are the English cardinal numbers with their values; "half"
+// also stands for 50 (of a percentage), a reading the probes pin
+// (docs/FINDINGS.md F-056: optional_number_half).
 var numberWords = map[string][]float64{
 	"zero": {0}, "one": {1}, "two": {2}, "three": {3}, "four": {4}, "five": {5}, "six": {6}, "seven": {7},
 	"eight": {8}, "nine": {9}, "ten": {10}, "eleven": {11}, "twelve": {12}, "thirteen": {13}, "fourteen": {14},
 	"fifteen": {15}, "sixteen": {16}, "seventeen": {17}, "eighteen": {18}, "nineteen": {19}, "twenty": {20},
 	"thirty": {30}, "forty": {40}, "fifty": {50}, "sixty": {60}, "seventy": {70}, "eighty": {80}, "ninety": {90},
 	"hundred": {100}, "thousand": {1000}, "million": {1e6}, "billion": {1e9}, "half": {0.5, 50},
-	"quarter": {0.25, 25}, "dozen": {12}, "couple": {2}, "twice": {2}, "single": {1}, "triple": {3},
 }
 
 // wordNumber reports whether the request lowered states v in words: a
@@ -677,16 +670,13 @@ func (r *repairer) paired(c *repairCall) {
 	}
 }
 
-// Polar phrases of the engine's lists.
+// Polar phrases: the request verbs llms.txt names ("turn on, unlock,
+// louder, turn down") and their opposites.
 var (
-	onPhrases = phrases("turn on", "switch on", "enable", "power on", "activate", "turn back on", "turn it on",
-		"back on")
-	offPhrases = phrases("turn off", "switch off", "disable", "power off", "deactivate", "turn back off",
-		"turn it off", "back off")
-	upPhrases = phrases("increase", "raise", "turn up", "crank up", "pump up", "bump up", "louder", "higher",
-		"boost", "brighter", "warmer", "hotter", "faster", "bigger", "more")
-	downPhrases = phrases("decrease", "lower", "turn down", "bring down", "quieter", "softer", "reduce", "dimmer",
-		"cooler", "colder", "slower", "smaller", "down", "quiet", "less", "soften")
+	onPhrases   = phrases("turn on")
+	offPhrases  = phrases("turn off")
+	upPhrases   = phrases("louder", "turn up")
+	downPhrases = phrases("turn down")
 )
 
 // phrases is a case-insensitive pattern for any of the phrases as words.
@@ -694,9 +684,9 @@ func phrases(ps ...string) *regexp.Regexp {
 	return regexp.MustCompile(`(?i)\b(?:` + strings.Join(ps, "|") + `)\b`)
 }
 
-// polarKeys are the boolean arguments that follow an on or off verb
-// (port-side beyond "on", which the probes pin).
-var polarKeys = []string{"on", "power", "enabled", "active"}
+// polarKeys are the boolean arguments that follow an on or off verb: "on",
+// which the probes pin.
+var polarKeys = []string{"on"}
 
 // polarity makes polar booleans and enums follow the verb of the call's
 // clause, unless it is negated: on and off phrases set an on/off boolean
@@ -800,7 +790,8 @@ func (r *repairer) enumNamed(c *repairCall) {
 	}
 }
 
-// capitalKeys are the arguments whose value the engine capitalises.
+// capitalKeys are the arguments whose value the engine capitalises, each
+// shown by a probe (docs/FINDINGS.md F-056: cap_*).
 var capitalKeys = []string{"label", "title", "message", "subject", "note", "event_title", "event_name"}
 
 // capitalise upper-cases the first byte of a top-level string argument
@@ -845,11 +836,13 @@ func (r *repairer) dropArguments(c *repairCall) {
 	}
 }
 
-// exclusion is a phrase that excludes what follows it.
-var exclusion = regexp.MustCompile(`(?i)\b(?:except for|except|but not|but leave|leave out|apart from|other than|` +
-	`excluding|but skip|skip)\s+`)
+// exclusion is a phrase that excludes what follows it, as the probes show
+// (docs/FINDINGS.md F-056: exclude_except, exclude_but_not,
+// exclude_apart_from).
+var exclusion = regexp.MustCompile(`(?i)\b(?:except|but not|apart from)\s+`)
 
-// negatedVerb is a negation and the word after it.
+// negatedVerb is a negation, spelled as the envelope's (F-054), and the
+// word after it.
 var negatedVerb = regexp.MustCompile(`(?i)\b(?:don['’]?t|do not|never)\s+(\w+)`)
 
 // dropCalls drops the calls for something the request excludes ("except
