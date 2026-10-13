@@ -87,9 +87,10 @@ func (m *Matrix) GEMM(dst, x []float32, rows int) {
 }
 
 // best is the fastest kernel measured on Whistle's shapes: lut where the
-// assembly runs it (F-034), else nibble4 (F-028).
+// assembly runs it (F-034), else nibble4 (F-028). An Exact view always
+// runs nibble4.
 func (m *Matrix) best() kernel {
-	if lutAsm && m.groupBytes <= lutMaxGroupBytes {
+	if !m.exact && lutAsm && m.groupBytes <= lutMaxGroupBytes {
 		return kernelLUT
 	}
 

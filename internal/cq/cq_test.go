@@ -509,6 +509,55 @@ func TestNewGather(t *testing.T) {
 	}
 }
 
+// TestExact: an Exact view multiplies with the nibble kernels, the same
+// bits as nibble4 on the matrix itself, through its Rows views and in
+// GEMMs; it builds no lut copy, and the matrix it came from keeps its
+// kernel.
+func TestExact(t *testing.T) {
+	rng := rand.New(rand.NewPCG(19, 20))
+	p := randomPacked(rng, 70, 384, 128, 2)
+
+	m, err := NewGather(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exact := m.Exact()
+	exact.Prepare()
+
+	if got, packed := exact.Bytes(), len(p.Index)+4*70*3+4*4; got != packed {
+		t.Errorf("Bytes %d after Prepare, want %d without a lut copy", got, packed)
+	}
+
+	if exact.best() == kernelLUT || exact.Rows(3, 40).best() == kernelLUT {
+		t.Error("an Exact view runs the lut kernel")
+	}
+
+	for _, rows := range []int{1, 3, 5} {
+		x := make([]float32, rows*384)
+		for i := range x {
+			x[i] = float32(rng.NormFloat64())
+		}
+
+		want := make([]float32, rows*37)
+		m.Rows(3, 40).gemm(kernelNibble4, want, x, rows)
+
+		got := make([]float32, len(want))
+		exact.Rows(3, 40).GEMM(got, x, rows)
+
+		shared := make([]float32, len(want))
+		GEMMs([]*Matrix{exact.Rows(3, 40), exact}, [][]float32{shared, make([]float32, rows*70)}, x, rows)
+
+		if !slices.Equal(got, want) || !slices.Equal(shared, want) {
+			t.Errorf("%d rows: the Exact product differs from nibble4's", rows)
+		}
+	}
+
+	if m.best() != kernelLUT && lutAsm {
+		t.Error("Exact changed the matrix it came from")
+	}
+}
+
 func TestNewErrors(t *testing.T) {
 	rng := rand.New(rand.NewPCG(7, 8))
 	good := randomPacked(rng, 2, 128, 128, 2)

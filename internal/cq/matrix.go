@@ -37,6 +37,7 @@ type Matrix struct {
 	lut        *lutLayout // the lut kernel's blocked rows, shared with Rows views
 	row0       int        // first row in lut: non-zero for a Rows view
 	scratch    *sync.Pool // *scratch, shared by every Matrix of the same row layout
+	exact      bool       // products skip the lut kernel (Exact)
 }
 
 // New builds a Matrix from a packed CQ tensor. Index stays shared with p;
@@ -139,6 +140,18 @@ func (m *Matrix) Rows(lo, hi int) *Matrix {
 	v.row0 = m.row0 + lo
 	v.index = m.index[lo*m.rowBytes : hi*m.rowBytes : hi*m.rowBytes]
 	v.norms = m.norms[lo*m.groups : hi*m.groups : hi*m.groups]
+
+	return &v
+}
+
+// Exact returns a view of m, sharing its storage, whose products run the
+// nibble kernels (F-028), which sum the codebook levels in float32,
+// instead of the lut kernel, which rounds its tables to 14-bit integers
+// (F-034): the same bits as the purego build, without the lut copy, at
+// several times the lut kernel's time. Rows views keep the setting.
+func (m *Matrix) Exact() *Matrix {
+	v := *m
+	v.exact = true
 
 	return &v
 }
