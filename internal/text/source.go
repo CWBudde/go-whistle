@@ -300,15 +300,15 @@ func (s *Source) Matrix(name string) (*cq.Matrix, bool, error) {
 		return nil, false, fmt.Errorf("text: %s: %w", name, weights.ErrNotFound)
 	}
 
-	if !s.packed || s.file == nil {
-		return nil, false, nil
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.closed {
 		return nil, false, fmt.Errorf("text: %s: %w", name, weights.ErrClosed)
+	}
+
+	if !s.packed || s.file == nil {
+		return nil, false, nil
 	}
 
 	if m, ok := s.mats[name]; ok {

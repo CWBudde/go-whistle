@@ -230,6 +230,23 @@ func TestSourcePackedLifecycle(t *testing.T) {
 	if !errors.Is(err, weights.ErrClosed) {
 		t.Errorf("Matrix after Close: %v, want ErrClosed", err)
 	}
+
+	// A float-mode source reports the closure too, not "not packed" (PR #70
+	// review).
+	fl, err := Open(needle3Cact)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = fl.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err = fl.Matrix(name)
+	if !errors.Is(err, weights.ErrClosed) {
+		t.Errorf("Matrix after Close in float mode: %v, want ErrClosed", err)
+	}
 }
 
 // TestLoadPackedNoFloatCopy loads the model on the packed source: no CQ
