@@ -631,7 +631,7 @@ Engine-only: fitted against `testdata/text/engine/`.
       float greedy calls go from 10 to 14 of 24 (F-055). Remains: `thermostat_decimal` is one token short of the
       engine's count, and four probes the engine truncates at 512 tokens, which show nothing of how its grammar
       traps the model there.
-- [ ] Parse the call block into `function_calls`; the envelope's `type` (`call`, `respond`, refusal as an empty
+- [x] Parse the call block into `function_calls`; the envelope's `type` (`call`, `respond`, refusal as an empty
       call), `success`/`error`/`error_code`/`reason`, `suppressed_calls` below confidence 0.1, `validation`
       (`ungrounded`, `negation`), `triggers` regexes.
       (2026-10-12) — partial: `toolcall.Normalised.Envelope`, `NoTools`, `Triggered`. `just oracle-text triggers`
@@ -644,6 +644,14 @@ Engine-only: fitted against `testdata/text/engine/`.
       (`GrammarFor`); `capital_upper` has the engine's call, `weather_to_timer` and `pizza_to_lights` differ only
       where the repair step works (a capital, an unstated optional), with confidence within 0.002 on all three
       (`TestEnvelopeMatchesEngine`; F-055). Remains: negation cues beyond "don't".
+      (2026-10-13) — `validation` done: `just oracle-text validation` (`validation.json`, 163 probes and 171 answers,
+      byte-identical on a re-run) pins the cues and the grounding. `negation` reads `don't`, `dont `, `do not`, `never`,
+      `shouldn't`, `should not`, `mustn't` and `must not` in any case, not the curly `don’t`, `not`, `won't`, `can't` or
+      German, Spanish and French, and not before `forget`, `worry`, `hesitate`, `mind` or `disturb`; the drop of negated
+      calls takes whole tokens and the verb within three; calls that are all negated or excluded are suppressed, not
+      dropped. `ungrounded` lists top-level scalars once per call, grounded in the conversation's user turns and tool
+      results, not in the system facts (`Conversation.Inputs`). `negation` equals the engine's on all 171 answers,
+      `ungrounded` on all 151 whose calls are the engine's (`TestValidationMatchesEngine`; F-057).
 - [ ] `confidence`: `ConfidenceHead` (`probe_pool` over the embedding and the 20 block outputs, a translation) and
       the min with the call's decode probability (engine).
       (2026-10-12) — partial: `text.Model.Confidence` equals JAX within 8.2e-6 (`TestConfidenceMatchesJAX`);
@@ -651,6 +659,8 @@ Engine-only: fitted against `testdata/text/engine/`.
       turn whose decode is the engine's but `event_tomorrow` (0.026) and the `respond` turn (0.927 against 0.637)
       (`TestEnvelopeMatchesEngine`; F-053). Remains: the `respond` turn, and the min with the decode probability,
       never binding in the corpus.
+      Note (2026-10-13): the engine scores 0.0000 on every call with an object-valued argument
+      (`ground_nested_time` and exploratory requests, F-057), which the head does not reproduce.
 - [ ] The engine's post-decode repair (llms.txt:110: capitalisation, date re-resolution, enum/polarity flips,
       dropping unevidenced optionals, duplicate and negation drops, rewrites), which F-048's 7 of the 12 differences
       come from.
@@ -666,6 +676,9 @@ Engine-only: fitted against `testdata/text/engine/`.
       a required number's default (never fires in the probes), unstated optional strings and a place query's dropped
       words (not pinned), the enum's named option (the probes still differ, the engine adds `oscillate: true`), and a
       boolean flipped from another clause.
+      Note (2026-10-13): the paired tool keeps its tool when `not`, `never`, `dont` or `don't` start within 13 bytes
+      before the verb, a third reading of negation; the port's clause rule gets 7 of 12 `paired` probes of
+      `validation.json` wrong (F-057).
 - [ ] **Accept:** on the engine corpus, `type` and `function_calls` (name and arguments, as parsed JSON) equal the
       engine's on ≥ 95 % of the cases with every miss explained by a log-probability margin, `reasoning` equal on
       ≥ 90 %, `confidence` within 0.02.
