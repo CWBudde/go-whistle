@@ -679,6 +679,15 @@ Engine-only: fitted against `testdata/text/engine/`.
       Note (2026-10-13): the paired tool keeps its tool when `not`, `never`, `dont` or `don't` start within 13 bytes
       before the verb, a third reading of negation; the port's clause rule gets 7 of 12 `paired` probes of
       `validation.json` wrong (F-057).
+      (2026-10-14) — partial: the grounding gates of upstream's confidence guide withhold calls as the engine does,
+      one function per gate (`repair.go`): a reported quote, an unnamed required enum, a control word or an
+      unmentioned place in a required slot, no quantity for a required number, the destination copied into the
+      origin. `just oracle-text gates` (`gates.json`, 200 probes, byte-identical on a re-run) gives the engine's calls
+      and split on 193 of 204 answers (`TestGatesMatchesEngine`, the 11 others listed with a reason). Under a matching
+      trigger only the quote gate (with negated and excluded calls) still withholds. The paired tool and polarity read
+      the 13-byte window instead of the clause rule: all 12 `paired` probes equal (`TestValidationMatchesEngine`).
+      Remains as before, less the required number (now the quantity gate); `place_named`'s lower-cased `hamburg` is
+      a repair not identified (F-058).
 - [ ] **Accept:** on the engine corpus, `type` and `function_calls` (name and arguments, as parsed JSON) equal the
       engine's on ≥ 95 % of the cases with every miss explained by a log-probability margin, `reasoning` equal on
       ≥ 90 %, `confidence` within 0.02.
