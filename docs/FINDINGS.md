@@ -4931,7 +4931,7 @@ unchanged. The `TestRepair*` unit tests cover each rule without the model, cases
   of F-048 (above), and any phrase, key or number word beyond those the probes show.
 - **Negated clauses and exclusions:** F-057 pins the drop's cues and reach, an excluded phrase that holds the value,
   and the calls withheld when the request negates or excludes every one; it records the paired tool's own reading of
-  a negation (13 bytes before the verb), which is not ported.
+  a negation (13 bytes before the verb), which is not ported. Closed by F-058, which ports it for the paired tool and polarity.
 
 ## F-057 — Validation: the negation cues, the drop of negated calls, and grounding (PLAN.md 11.4) (2026-10-13)
 
@@ -5062,7 +5062,7 @@ the model, cases that must not fire included.
 **Open.**
 
 - **The paired tool's and polarity's negation** (above): pinned for the paired tool by 12 probes, not ported; whether
-  polarity reads the same window rests on one probe.
+  polarity reads the same window rests on one probe. Closed by F-058: the polarity probes show the same window, and both rules read it.
 - **More cancelling words** and multi-word cues the probes did not try; any language but English (none of the six
   German, Spanish and French cues is one).
 - **The confidence 0.0000** of every call with an object-valued argument (`schedule_call`, `set_alarm` with
@@ -5070,3 +5070,112 @@ the model, cases that must not fire included.
   arrays of strings, numbers and objects score as usual; it belongs with F-055's open 0.0000.
 - **Grounding** of a turn the engine trimmed or dropped for room (F-051), of `date` years (upstream's client adds
   those), and of the earlier turns' inputs as the engine renders them (tool results compacted) rather than as given.
+
+## F-058 — The grounding gates that withhold calls, and the negation window of the paired tool and polarity (PLAN.md 11.4) (2026-10-13)
+
+**Question.** Upstream's confidence guide (https://cactuscompute.com/blog/needle-confidence, linked from llms.txt)
+says "the same withholding happens when a grounding gate fires regardless of the score", when the request "negates
+the called tool's verb, quotes a command reported by someone else, fills a required enum with an option it never
+names, fills a required slot with a control word or a place the conversation never mentions, names no quantity for a
+required number with no default, copies the destination into an origin, or targets only what the request excludes",
+and that a matching trigger ships a call "past the floor and the guess gates; only the contradiction gates still
+withhold it". F-057 ported the negated verb and the exclusion. What do the other five gates read, do they withhold,
+drop or rewrite, per call or for the answer, and which are guess and which contradiction gates? And does polarity read
+the paired tool's negation window (F-057)?
+
+**The oracle.** `just oracle-text gates` (`testdata/text/engine/gates.json`, 200 probes and 204 answers, recorded
+twice and byte-identical): for each gate requests where it fires and where it is held back, each with a trigger that
+matches, over two calls, and two multi-turn probes; and the polarity rule's cues 12, 13 and 14 bytes before "turn off",
+with six requests where the model writes the polarity the verb does not. Upstream ships no Python for the gates
+(`needle/__init__.py` only refuses negated or ungrounded extractions); nothing is translated. **Method:** as F-056, the
+`.cact` decode under the grammar writes the calls; where its reasoning is the engine's, a call the engine moves to
+`suppressed_calls` at a confidence of 0.1 or more is a gate. About 1030 exploratory requests (the probes' tools, about
+40 more key names, about 60 request words), run on the engine and decoded side by side, chose the probes. Every word
+and key list below holds what a probe shows the engine to act on, or not to.
+
+**What a gate does.** Every gate the probes show withholds: the calls go to `suppressed_calls` as decoded and repaired,
+none is dropped or rewritten, and a gate on one call withholds the whole answer (`quote_two_calls`,
+`quantity_two_calls`, `control_two_calls`, `place_two_calls`, `origin_two_calls`; the other call holds nothing). With a
+trigger that matches, the quote stays withheld (`quote_trigger`, `quote_trigger_lock`): a contradiction gate, as the
+negated and excluded calls of F-057. The enum, control-word, place, quantity and origin gates ship with the trigger
+(`*_trigger`), at their confidence: guess gates. No gate adds a field to the answer.
+
+| Gate                         | Fires on (probes)                                                                                                                                                                                                                                                                        | Held back on (probes)                                                                                                                                                                                                         | Under a trigger |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Reported quote               | `said`, `told me`, `wrote`, `texted`, `mentioned`, `messaged`, `emailed`, `posted`, in any case and inside words (`saidx`, `unsaid`), with `"`, `'`, `“ ”` or `‘ ’` anywhere after it, the apostrophe too (`quote_told_me_apostrophe`); `I said`; `said "hi", now …`                     | `says`, `tells me`, `asked`, `told`, `told us`, `sent`, `shouted` (`quote_says` …); the quote before `said` (`quote_said_after`); no quote mark after it (`quote_said_no_apostrophe`); backticks; a quote alone               | withholds       |
+| Unnamed required enum        | an option the conversation names neither as a word nor at a word's start (options of 4 letters or more) nor by a polar word: `medium` for "set the fan", `high` for "max", "fast", "full speed", "thigh", `low` for "lowest", a default option (`enum_default`)                          | the option as a word in any case, `highway`, `quickly`, `mediumish`; raising words for `high` (`up`, `louder`), lowering ones for `low` (`down`, `quieter`, `lower`); an optional enum; the keys below                        | ships           |
+| Control word                 | a required string slot whose whole value is `on`, `off`, `up`, `down`, `stop`, `lock`, `unlock`, `open`, `close`, `pause`, `raise` or `mute`, any case (`control_on_upper`)                                                                                                              | `true`, `yes`, `high`, `enable`, `halt`, `everything`, `it`, `there`; `music on`; an enum option `on` (`control_enum_state`)                                                                                                  | ships           |
+| Unmentioned place            | a required slot under `location`, `city`, `place`, `area`, `region`, `venue`, `zone`, `site`, `room` (also inside a key: `city_name`) whose value the conversation's inputs do not hold, the system facts' place included (`place_system`)                                               | the place named in another case (`place_named`); an earlier tool result's address; keys `where`, `address`, `town`, `country`, `destination`, `door`; the slot's default                                                      | ships           |
+| No quantity, required number | a required `integer` or `number` without a default, and the conversation names no quantity: `hours`, `minutes`, `a pair`, `some`, `a moment`, `a fifth`, `tenth`, `twentyish`, `tennis`, `my phone`; a temperature for "turn up the heat"                                                | digits; number words; `couple`, `few`, `several`, `dozen`, `half`, `quarter`, `third`, `none`, `halfway`; a unit in the singular (`an hour`, `a week`, `a second`), `hourly`, `weekly`; an earlier turn's quantity; a default | ships           |
+| Origin is the destination    | the same string under an origin key (`origin`, `from`, `start`, `source`, `pickup`, `departure`, `from_location`) and a destination key (`destination`, `to`, `end`, `target`, `dropoff`, `arrival`, `to_location`), whatever the tool (`origin_copy`) and the request (`origin_stated`) | different strings (`the train station` against `train station`); `pickup_location`, `dropoff_location`, `start_point`, `end_point`, `location`                                                                                | ships           |
+
+Details and alternatives:
+
+- **Reported quote.** The speaker is not checked (`quote_i_said`), nor the quote's content (`quote_said_other_quote`,
+  `quote_said_in_title`: "Said" inside a quoted title, a closing quote after it). Tried: the model's reasoning ("Quote
+  is reported speech, ignored" also on `quote_says`, which ships), any communication verb (`shouted`, `replied`,
+  `stated` ship), a quote mark right after the verb (`said yesterday evening "…"` fires). The list is the probes';
+  it may be longer.
+- **Unnamed enum.** Exempt are keys that hold `mode`, `level`, `unit`, `type`, `kind`, `priority`, `category`,
+  `status` or `format` (`enum_key_mode`, `enum_key_fan_mode`, `enum_key_speed_level`, `enum_key_units` …); `speed`,
+  `setting`, `state`, `modal`, `program`, `color` and about 15 more keys are gated. Tried and rejected: the call
+  block's token probabilities (1.00 on both sides), the option's place in the enum, the reasoning quoting the option,
+  substrings (`thigh`, `lowest`, `downstairs` do not name), the model's tokens (`lowest` is `▁low est`). The raising
+  and lowering words are the probes' (`raise`, `increase`, `boost`, `faster`, `slower`, `softer`, `reduce` too); the
+  repair's named option (F-056) reads the same word-or-start rule: "wash the shirts quickly" moves `wool` to `quick`
+  (`enum_prefix_quick`). Whether a gated enum withholds the whole answer is not pinned: `enum_two_calls` falls below
+  the floor.
+- **Control word.** Only the whole value and only a required slot; an optional slot was not filled with one in any
+  probe. `mute` rests on one exploratory request at 0.1026; `start`, `next`, `toggle`, `resume`, `skip` and `louder`
+  fell below the floor and are not listed.
+- **Unmentioned place.** "Mentions" reads as `ungrounded` does (F-057): the user turns and tool results, not the
+  system facts, strings case-insensitively. Required slots only: an optional place was never filled.
+- **Quantity.** "Names" reads the conversation's inputs, not the value: after "10 minutes", "set a timer for the
+  rice" ships 20 minutes (`quantity_earlier_turn_other`). The words are a lexicon, not a rule: `hourly` and `halfway`
+  name a quantity, `hours`, `minutely` and `halftime` do not; prefixes (`twentyish`), substrings and the model's
+  tokens (`tennis` is `▁ten nis`) are rejected. The repair's defaulted number (F-056) shares the reading.
+- **Origin.** Exact equality, and any tool. The key lists are the probes'; `pickup_location` and `start_point` are
+  none although `pickup` and `start` are. Case-insensitive equality is not pinned.
+
+**The negation window.** The polarity probes show what F-057 found for the paired tool: `don't` 13 bytes before
+"turn off" keeps the model's `on: true` (`polarity_dont_13_kept`), 14 bytes before "turn on" lets the verb set it
+(`polarity_dont_14_flipped`); `nothing` 8 bytes before keeps (`polarity_nothing_8_kept`, which the clause rule of
+F-056 got wrong), 15 bytes before does not; `dont` at 12 and `never` right before keep. Where the model follows the
+verb (the cues at 12, 13 and 14 bytes, `shouldn't`, `mustn't` and the curly `don’t` among them), both rules agree, so
+those cues are pinned for polarity only by the paired probes. Both rules now read the window: `not`, `never`, `dont`,
+`don't` as substrings, in any case, starting at most 13 bytes before the verb ("turn on", "turn off", "louder",
+"turn up", "turn down", or the paired tool's verb).
+
+**Port.** `repair.go`: `repair` takes the conversation's earlier inputs and returns a `withholding`; after
+`dropCalls` (whose withheld calls are contradictions), `withhold` applies `reportedQuote` (contradiction) and
+`unnamedEnum`, `controlWord`, `unmentionedPlace`, `missingQuantity` and `originIsDestination` (guess gates), one
+function per gate, each on every call. `namesQuantity` gains `quantityWords`; `namedAsWord` and `namedByPolarity` name
+an option for the gate, `namedAsWord` for `enumNamed` too. `paired` and `polarity` read `negatedBefore` (the window)
+instead of F-056's `clauseNegation`, which is gone. `Envelope` dispatches the calls when nothing is withheld and the
+confidence is at the floor or above, or when a trigger matches an un-negated request and no contradiction gate fired.
+
+**Against the engine** (the `.cact` weights): `TestGatesMatchesEngine` has the engine's calls and split on 193 of the
+204 answers; of the 11 it lists, ten decode differently (near-ties of the reasoning, one call block the port does not
+write), and `place_named` has the engine's reasoning but the engine spells `hamburg` as the request does where the
+model writes the system facts' `Hamburg`, a repair outside the gates, not identified. Over the exploration's 760
+requests whose reasoning is the engine's, 27 differ, none in a gate: confidences on the other side of the floor,
+`brightness: 0` the engine keeps for "nothing … turn off" (14 requests; the unstated optional number reads "nothing"
+as 0, F-056), optional places the engine drops (3), a high/low enum the engine moves after "reduce" and "crank … up"
+(2). `TestValidationMatchesEngine` loses the seven `paired` exceptions and `trigger_must_not` (calls now equal on 159
+of 171); `TestRepairMatchesEngine` (85 of 90), `TestEnvelopeMatchesEngine`, `TestGrammarMatchesEngine` and
+`TestDecodeMatchesEngine` are unchanged, `TestFloatGreedyAgainstEngine` stays at 20 of 24. `TestGateReportedQuote`,
+`TestGateUnnamedEnum`, `TestGateControlWord`, `TestGateUnmentionedPlace`, `TestGateMissingQuantity`,
+`TestGateOriginIsDestination` and `TestNegatedBefore` cover the rules without the model, cases that must not fire
+included.
+
+**Open.**
+
+- **The lists**: reporting words, exempt enum keys, polar words, control words, place keys, quantity words and origin
+  and destination keys hold what the probes show and may be longer; the quantity words in particular follow no rule.
+- **The scope** of the enum gate over two calls and over earlier turns (the port reads the conversation, as the
+  quantity gate does), a control word or place in an optional slot, the gates on a tool-result turn, and
+  case-insensitive origin equality: no probe pins them.
+- **Repairs the exploration shows and this finding does not port** (outside the gates): "nothing" as 0 for an
+  unstated optional number, optional strings the conversation never states dropped (F-056's open half: the engine
+  drops an optional `location` it only knows from the system facts, `place_*` exploration), a high/low enum following
+  a raising or lowering word, and a value respelled as the request writes it (`place_named`).
