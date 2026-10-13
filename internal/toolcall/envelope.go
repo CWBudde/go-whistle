@@ -50,7 +50,8 @@ type Validation struct {
 // calls in suppressed_calls (llms.txt).
 const SuppressBelow = 0.1
 
-// Engine strings of libneedle3 3.2.0.
+// The engine's texts as its answers write them (testdata/text/engine:
+// responses.json, triggers.json).
 const (
 	truncatedError  = "tool call truncated: token budget exhausted"
 	noToolsResponse = "no tools declared, returning the empty call"
@@ -63,22 +64,24 @@ func NoTools() *Envelope {
 }
 
 // Envelope is the engine's answer built from a decoded answer a to the
-// request input over the tools n, with the confidence conf
-// (Decoder.Confidence) (docs/FINDINGS.md F-054):
+// request input over the tools n, with the system facts system (whose
+// date: fact the repair resolves dates against) and the confidence conf
+// (Decoder.Confidence) (docs/FINDINGS.md F-054, F-056):
 //
 //   - a truncated answer fails with error_code "truncated" and no reasoning;
 //   - the reasoning is the text between "<think>\n" and "\n</think>";
 //   - an answer with a <tool_call>[…]</tool_call> block is a "call" (an
 //     empty list is a refusal), any other a "respond" without calls;
+//   - the calls are repaired as the engine does after decoding (repair):
+//     values grounded in the request, dates, polarity, capitalisation, and
+//     dropped arguments and calls; an answer whose calls are all dropped is
+//     a refusal;
 //   - the calls are suppressed below SuppressBelow, unless a trigger of the
 //     tools matches input and the request is not negated;
 //   - validation, when there are calls: the fields whose value input does
 //     not contain (strings case-insensitively, numbers as written; booleans,
 //     enum and const values and dates exempt) and whether input negates.
-//
-// The engine's repair of the calls after decoding (capitalisation, dates,
-// dropped optionals; PLAN.md 11.4) is not applied.
-func (n *Normalised) Envelope(a *Decoded, input string, conf float64) (*Envelope, error) {
+func (n *Normalised) Envelope(a *Decoded, input, system string, conf float64) (*Envelope, error) {
 	e := &Envelope{Type: "call", Success: true, Confidence: conf}
 
 	if a.Truncated {
@@ -103,6 +106,9 @@ func (n *Normalised) Envelope(a *Decoded, input string, conf float64) (*Envelope
 		return nil, err
 	}
 
+	// The engine lists the ungrounded fields of the repaired calls
+	// (docs/FINDINGS.md F-056: pizza_to_lights).
+	calls = n.repair(calls, input, system)
 	if len(calls) == 0 {
 		return e, nil
 	}
