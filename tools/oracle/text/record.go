@@ -33,6 +33,8 @@ var fixtureFiles = []string{
 	"normalise.json: normalise, needle_init on OpenAI-style, camelCase and colliding tools, answers naming the caller's tools",
 	"turns.json: turns, conversations over needle --serve with --fail-input-overflow probes",
 	"triggers.json: triggers, answers over tools with triggers and over no tools",
+	"confidence.json: confidence, answers that exercise the envelope's confidence (respond turns, object arguments, " +
+		"forced and guessed values, relative dates, the catalogue tools)",
 }
 
 // textManifest is testdata/text/engine/manifest.json: what produced responses.json, what the checks found, and the

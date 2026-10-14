@@ -29,7 +29,8 @@
     "depth.json: depth, the --depth ladder",
     "audio.json: audio, answers to speech (needle3.cact + whistle.cact)",
     "embed.json, embed.safetensors: embed, needle_embed of short texts",
-    "retrieval.json: retrieval, needle_init past 5 tools and up to the context budget, the tool index"
+    "retrieval.json: retrieval, needle_init past 5 tools and up to the context budget, the tool index",
+    "confidence.json: confidence, answers that exercise the envelope's confidence (respond turns, object arguments, forced and guessed values, relative dates, the catalogue tools)"
   ],
   "cases": 24,
   "turns": 25,
