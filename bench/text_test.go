@@ -85,6 +85,15 @@ func sampleTextSet(ttft, decode, wall float64) TextSet {
 	}
 }
 
+// sampleTextCases are two cases with their prefill token counts, the same
+// on both sides.
+func sampleTextCases() []TextCase {
+	return []TextCase{
+		{ID: "timer_pasta", PrefillTokens: 330, Generated: 30, TTFTMS: 100, DecodeTPS: 1400, WallMS: 50},
+		{ID: "catalogue_email", PrefillTokens: 1049, Generated: 60, TTFTMS: 280, DecodeTPS: 1300, WallMS: 300},
+	}
+}
+
 func sampleText() (*TextGoResults, *TextEngineResults) {
 	machine := Machine{CPU: "CPU X", Cores: 8, OS: "os", Arch: "arm64"}
 	g := &TextGoResults{
@@ -92,10 +101,22 @@ func sampleText() (*TextGoResults, *TextEngineResults) {
 		Safetensors: "5a1e7e750a0c3d2b", Tokenizer: "70e1c3a2b9d84f06", Responses: "4e5f6a7b8c9d0e1f", GOMAXPROCS: 8,
 		WarmUp: 1,
 		Modes: []TextGoMode{
-			{Mode: TextModeSafetensors, Answers: sampleTextSet(200, 100, 1000), FunctionCallsEqual: 20, MaxRSSLoadMiB: 700},
-			{Mode: TextModePacked, Answers: sampleTextSet(400, 110, 2000), FunctionCallsEqual: 24, HeapLoadMiB: 41.4},
-			{Mode: TextModeInt8, Answers: sampleTextSet(420, 130, 2100), FunctionCallsEqual: 23, MaxRSSPeakMiB: 90},
-			{Mode: TextModeInt8LUT, Answers: sampleTextSet(140, 300, 700), FunctionCallsEqual: 23},
+			{
+				Mode: TextModeSafetensors, Answers: sampleTextSet(200, 100, 1000), FunctionCallsEqual: 20, MaxRSSLoadMiB: 700,
+				Cases: sampleTextCases(),
+			},
+			{
+				Mode: TextModePacked, Answers: sampleTextSet(400, 110, 2000), FunctionCallsEqual: 24, HeapLoadMiB: 41.4,
+				Cases: sampleTextCases(),
+			},
+			{
+				Mode: TextModeInt8, Answers: sampleTextSet(420, 130, 2100), FunctionCallsEqual: 23, MaxRSSPeakMiB: 90,
+				Cases: sampleTextCases(),
+			},
+			{
+				Mode: TextModeInt8LUT, Answers: sampleTextSet(140, 300, 700), FunctionCallsEqual: 23,
+				Cases: sampleTextCases(),
+			},
 		},
 	}
 	e := &TextEngineResults{
@@ -108,7 +129,7 @@ func sampleText() (*TextGoResults, *TextEngineResults) {
 		},
 		Library: TextEngineLibrary{
 			Load: Summary{N: 5, Median: 2.5, P90: 3}, Answers: sampleTextSet(100, 1400, 50), FunctionCallsEqual: 24,
-			Cached: sampleTextSet(10, 1450, 40), CachedFunctionCallsEqual: 22,
+			Cached: sampleTextSet(10, 1450, 40), CachedFunctionCallsEqual: 22, Cases: sampleTextCases(),
 		},
 	}
 
@@ -158,6 +179,9 @@ func TestRenderTextNotComparable(t *testing.T) {
 		func(e *TextEngineResults) { e.Run.Inputs.Clips = "fedcba9876543210" },
 		func(e *TextEngineResults) { e.Responses = "f1e0d9c8b7a6f5e4" },
 		func(e *TextEngineResults) { e.Responses = "" },
+		func(e *TextEngineResults) { e.Library.Cases[1].PrefillTokens = 1050 }, // another tokenizer
+		func(e *TextEngineResults) { e.Library.Cases = e.Library.Cases[:1] },
+		func(e *TextEngineResults) { e.Library.Cases = nil },
 	} {
 		g, e := sampleText()
 		change(e)

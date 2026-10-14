@@ -5681,7 +5681,10 @@ beside it. The CLI's process time cannot be split.
 `bench/RESULTS-text.md` has every row. M5 Pro (5 Super + 10 Performance cores, 48 GiB), macOS 27.0.1, Go 1.27.1, engine
 3.2.0, the Go side at commit `924f8366ed`, the engine's at `4624c83f75` (the Go results committed on it); both
 fingerprint the model, the cases and the recorded answers (`responses.json`), the Go side also its tokenizer, and the
-report compares the sides only when these agree. Go ran with GOMAXPROCS 15, the engine with 4 threads. Other sessions
+report compares the sides only when these agree and every Go mode fed each case the engine side's prefill token count.
+The Go side's `tokenizer.model` and the tokenizer inside `needle3.cact` are different bytes (126,520 against 109,140),
+so the tokenizers are compared by what they tokenize to; the engine side's static prefix is pinned by `needle_init`'s
+own count. Go ran with GOMAXPROCS 15, the engine with 4 threads. Other sessions
 moved the load average from 2.4 to 9.5 during the Go run (1232 s) and kept it between 5.7 and 9.5 during the engine's
 (68 s). Medians over 24 cases × 5 passes; the prefills are 126–1049 tokens (median 332), the answers 8–103 tokens:
 

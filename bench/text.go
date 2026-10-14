@@ -332,7 +332,36 @@ func FileSHA256(path string) (string, error) { return fileSHA256(path) }
 
 // SameTextInputs reports whether the text bench's two sides answered the
 // same inputs: the model, the cases and the recorded answers both count
-// function_calls against (docs/FINDINGS.md F-061).
+// function_calls against, and the same prompts. The Go side's tokenizer
+// is a file of its own (the engine's is inside needle3.cact, in another
+// encoding), so the prompts are compared by what they tokenize to: every
+// Go mode must feed each case the prefill token count the engine side
+// fed, whose static prefix the engine's own needle_init count pins
+// (docs/FINDINGS.md F-061).
 func SameTextInputs(g *TextGoResults, e *TextEngineResults) bool {
-	return SameInputs(g.Run.Inputs, e.Run.Inputs) && g.Responses != "" && g.Responses == e.Responses
+	return SameInputs(g.Run.Inputs, e.Run.Inputs) && g.Responses != "" && g.Responses == e.Responses &&
+		samePrefills(g, e)
+}
+
+// samePrefills reports whether every Go mode has a prefill token count for
+// each case of the engine library's, equal to it.
+func samePrefills(g *TextGoResults, e *TextEngineResults) bool {
+	if len(e.Library.Cases) == 0 || len(g.Modes) == 0 {
+		return false
+	}
+
+	for _, m := range g.Modes {
+		if len(m.Cases) != len(e.Library.Cases) {
+			return false
+		}
+
+		for _, c := range e.Library.Cases {
+			i := slices.IndexFunc(m.Cases, func(gc TextCase) bool { return gc.ID == c.ID })
+			if i < 0 || m.Cases[i].PrefillTokens != c.PrefillTokens {
+				return false
+			}
+		}
+	}
+
+	return true
 }
