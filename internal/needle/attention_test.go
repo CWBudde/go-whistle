@@ -125,6 +125,17 @@ func (ta tinyAttention) refAttention(prefix string, x []float64, t int, causal b
 func (ta tinyAttention) refAttentionBand(prefix string, x []float64, t int, causal bool, window int,
 	rope *Rope,
 ) []float64 {
+	visible := func(i, j int) bool { return !causal || j <= i && (window == 0 || i-j < window) }
+
+	return ta.refAttentionMask(prefix, x, t, visible, rope)
+}
+
+// refAttentionMask is refAttention with query i seeing key j where
+// visible(i, j), such as upstream's hidden_cells mask causal & band &
+// (recent | sink) (docs/FINDINGS.md F-060). The taps are not masked.
+func (ta tinyAttention) refAttentionMask(prefix string, x []float64, t int, visible func(i, j int) bool,
+	rope *Rope,
+) []float64 {
 	qW, kW, vW, oW := ta.heads*ta.qk, ta.kvHeads*ta.qk, ta.kvHeads*ta.v, ta.heads*ta.v
 	q := refLinear(x, t, ta.dim, ta.w(prefix, "q_proj"), qW)
 	k := refLinear(x, t, ta.dim, ta.w(prefix, "k_proj"), kW)
@@ -173,7 +184,7 @@ func (ta tinyAttention) refAttentionBand(prefix string, x []float64, t int, caus
 			m := math.Inf(-1)
 
 			for j := range t {
-				if causal && (j > i || window > 0 && i-j >= window) {
+				if !visible(i, j) {
 					w[j] = math.Inf(-1)
 
 					continue
@@ -560,8 +571,8 @@ func TestAttendGEMMMatchesRows(t *testing.T) {
 
 		rowTr := &attnTrace{probs: make([]float32, a.heads*c.rows*keys)}
 		gemmTr := &attnTrace{probs: make([]float32, a.heads*c.rows*keys)}
-		want := a.attendRows(q, k, v, c.rows, c.off, c.mask, rowTr)
-		got := a.attendGEMM(q, k, v, c.rows, c.off, c.mask, gemmTr)
+		want := a.attendRows(q, k, v, c.rows, c.off, 0, c.mask, rowTr)
+		got := a.attendGEMM(q, k, v, c.rows, c.off, 0, c.mask, gemmTr)
 
 		name := fmt.Sprintf("%d rows at %d, %v, window %d", c.rows, c.off, c.mask, c.window)
 		if d := maxAbsDiff64(got, toFloat64(want)); d > 1e-5 {

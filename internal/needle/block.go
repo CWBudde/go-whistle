@@ -72,6 +72,18 @@ func (b *Block) SetInt8(q Int8) { b.attn.SetInt8(q) }
 // before b is used.
 func (b *Block) SetWindow(w int) error { return b.attn.SetWindow(w) }
 
+// SetKVWindow narrows the block's causal self-attention to the engine's KV
+// window of w positions and the cache's sink (Attention.SetKVWindow,
+// docs/FINDINGS.md F-060). Call it before b is used.
+func (b *Block) SetKVWindow(w int) error { return b.attn.SetKVWindow(w) }
+
+// Window is the self-attention's band (Attention.Window), 0 without.
+func (b *Block) Window() int { return b.attn.Window() }
+
+// KVWindow is the self-attention's KV window (Attention.KVWindow), 0
+// without.
+func (b *Block) KVWindow() int { return b.attn.KVWindow() }
+
 // Dim is the model width of the input and the output.
 func (b *Block) Dim() int { return b.dim }
 

@@ -46,6 +46,7 @@ type Attention struct {
 	outProj             Linear    // [dim, heads·v]
 	int8                Int8      // SetInt8
 	window              int       // SetWindow, 0 without
+	kvWindow            int       // SetKVWindow, 0 without
 }
 
 // LoadAttention loads the attention with the names prefix+"q_proj", …
@@ -117,6 +118,28 @@ func (a *Attention) SetWindow(w int) error {
 // Window is the causal band set by SetWindow, 0 without.
 func (a *Attention) Window() int { return a.window }
 
+// SetKVWindow narrows the causal attention to the last w positions as the
+// engine's KV window does (needle3.cact's kv_window of 256), except for a
+// cache's sink (KVCache.SetSink), which stays in view: the query at
+// position p sees the keys max(0, p−w+1) … p and the sink's keys, all
+// within SetWindow's band where that is set. That is upstream's
+// hidden_cells mask, causal & (recent | sink), with the band on the local
+// layers (docs/FINDINGS.md F-060). Forward has no sink. Like SetWindow it
+// rejects a window narrower than the taps and a negative one; 0 is none.
+// Call it before the attention is used.
+func (a *Attention) SetKVWindow(w int) error {
+	if w < 0 || w > 0 && w < a.taps {
+		return fmt.Errorf("needle: KV window %d with %d taps, want 0 or at least the taps", w, a.taps)
+	}
+
+	a.kvWindow = w
+
+	return nil
+}
+
+// KVWindow is the KV window set by SetKVWindow, 0 without.
+func (a *Attention) KVWindow() int { return a.kvWindow }
+
 // Dim is the model width of the input and the output.
 func (a *Attention) Dim() int { return a.dim }
 
@@ -187,8 +210,9 @@ func (a *Attention) check(x []float32, t int, mask Mask, rope *Rope) error {
 		return fmt.Errorf("needle: unknown attention mask %v", mask)
 	}
 
-	if a.window > 0 && mask != MaskCausal {
-		return fmt.Errorf("needle: a window of %d on the attention with %v", a.window, mask)
+	if (a.window > 0 || a.kvWindow > 0) && mask != MaskCausal {
+		return fmt.Errorf("needle: a window of %d (KV window %d) on the attention with %v", a.window, a.kvWindow,
+			mask)
 	}
 
 	if rope != nil && (rope.HeadDim() != a.qk || rope.Len() < t) {
@@ -209,7 +233,7 @@ func (a *Attention) forward(x []float32, t int, mask Mask, rope *Rope, tr *attnT
 	a.normRotate(q, k, t, 0, rope, tr)
 	a.quantQKV(q, k, v)
 
-	return a.output(t, a.attend(q, k, v, t, 0, mask, tr), gate, tr), nil
+	return a.output(t, a.attend(q, k, v, t, 0, 0, mask, tr), gate, tr), nil
 }
 
 // output is the sigmoid gate σ(gate) on the attention result out, t rows
@@ -326,10 +350,11 @@ const attendGEMMRows = 8
 
 // attend is softmax(q kᵀ / √qk) v per query head with its KV head, the
 // heads concatenated per row, for t query rows at positions off … off+t−1
-// against the keys and values of k and v (off + t rows when causal).
-// Masked logits are left out, which equals upstream's float32-min fill:
-// their weights are exactly 0.
-func (a *Attention) attend(q, k, v []float32, t, off int, mask Mask, tr *attnTrace) []float32 {
+// against the keys and values of k and v (off + t rows when causal), the
+// first sink of which stay in view past the KV window (keySpans). Masked
+// logits are left out, which equals upstream's float32-min fill: their
+// weights are exactly 0.
+func (a *Attention) attend(q, k, v []float32, t, off, sink int, mask Mask, tr *attnTrace) []float32 {
 	keys := len(k) / (a.kvHeads * a.qk)
 
 	if tr != nil {
@@ -338,9 +363,9 @@ func (a *Attention) attend(q, k, v []float32, t, off int, mask Mask, tr *attnTra
 
 	var out []float32
 	if t >= attendGEMMRows {
-		out = a.attendGEMM(q, k, v, t, off, mask, tr)
+		out = a.attendGEMM(q, k, v, t, off, sink, mask, tr)
 	} else {
-		out = a.attendRows(q, k, v, t, off, mask, tr)
+		out = a.attendRows(q, k, v, t, off, sink, mask, tr)
 	}
 
 	if tr != nil {
@@ -354,25 +379,44 @@ func (a *Attention) attend(q, k, v []float32, t, off int, mask Mask, tr *attnTra
 // divides by it.
 func (a *Attention) attendScale() float32 { return float32(math.Sqrt(float64(a.qk))) }
 
-// keySpan is the keys [lo, hi) query row i at position off + i sees: all
-// of them unmasked, 0 … off+i causal, and the last Window of those with a
-// window.
-func (a *Attention) keySpan(keys, off, i int, mask Mask) (lo, hi int) {
+// Span is the key rows [Lo, Hi) of a query row's band; Lo = Hi is empty.
+type Span struct{ Lo, Hi int }
+
+// Len is the number of key rows.
+func (s Span) Len() int { return s.Hi - s.Lo }
+
+// keySpans are the keys query row i at position off + i sees, two
+// ascending, disjoint spans, the first empty without a sink: all keys
+// unmasked; causal, 0 … off+i, within the last Window of those with a
+// window, and within the last KVWindow of those but for the first sink
+// keys with a KV window (docs/FINDINGS.md F-045, F-060).
+func (a *Attention) keySpans(keys, off, i, sink int, mask Mask) [2]Span {
 	if mask != MaskCausal {
-		return 0, keys
+		return [2]Span{{}, {0, keys}}
 	}
 
-	hi = off + i + 1
+	hi := off + i + 1
+
+	var band, lo int
 	if a.window > 0 {
-		lo = max(0, hi-a.window)
+		band = max(0, hi-a.window)
 	}
 
-	return lo, hi
+	lo = band
+	if a.kvWindow > 0 {
+		lo = max(lo, hi-a.kvWindow)
+	}
+
+	if sinkHi := min(sink, lo); sinkHi > band {
+		return [2]Span{{band, sinkHi}, {lo, hi}}
+	}
+
+	return [2]Span{{lo, lo}, {lo, hi}}
 }
 
 // attendRows is attend one query row at a time: a dot product per key for
 // the logits and an axpy per key for the weighted values.
-func (a *Attention) attendRows(q, k, v []float32, t, off int, mask Mask, tr *attnTrace) []float32 {
+func (a *Attention) attendRows(q, k, v []float32, t, off, sink int, mask Mask, tr *attnTrace) []float32 {
 	qW, kW, vW, oW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v, a.heads*a.v
 	keys := len(k) / kW
 	out := make([]float32, t*oW)
@@ -384,11 +428,20 @@ func (a *Attention) attendRows(q, k, v []float32, t, off int, mask Mask, tr *att
 
 		for i := range t {
 			qi := q[i*qW+h*a.qk : i*qW+(h+1)*a.qk]
-			lo, hi := a.keySpan(keys, off, i, mask)
-			s := scores[:hi-lo]
+			sp := a.keySpans(keys, off, i, sink, mask)
+			s := scores[:sp[0].Len()+sp[1].Len()]
+
+			// The keys of both spans in order, s[j] for key key(j).
+			key := func(j int) int {
+				if j < sp[0].Len() {
+					return sp[0].Lo + j
+				}
+
+				return sp[1].Lo + j - sp[0].Len()
+			}
 
 			for j := range s {
-				kj := (lo + j) * kW
+				kj := key(j) * kW
 				s[j] = tensor.DotProduct(qi, k[kj+kv*a.qk:kj+(kv+1)*a.qk]) / scale
 			}
 
@@ -397,12 +450,14 @@ func (a *Attention) attendRows(q, k, v []float32, t, off int, mask Mask, tr *att
 			o := out[i*oW+h*a.v : i*oW+(h+1)*a.v]
 
 			for j, p := range s {
-				vj := (lo + j) * vW
+				vj := key(j) * vW
 				tensor.Axpy(o, p, v[vj+kv*a.v:vj+(kv+1)*a.v])
 			}
 
 			if tr != nil {
-				copy(tr.probs[(h*t+i)*keys+lo:], s)
+				for j, p := range s {
+					tr.probs[(h*t+i)*keys+key(j)] = p
+				}
 			}
 		}
 	}
@@ -422,7 +477,7 @@ func (a *Attention) attendRows(q, k, v []float32, t, off int, mask Mask, tr *att
 // rows that start at multiples of 4 within a head: there the GEMMs' 4-row
 // blocks stay as in one call per head, and every output is the same bit
 // for bit for any worker count (docs/FINDINGS.md F-038).
-func (a *Attention) attendGEMM(q, k, v []float32, t, off int, mask Mask, tr *attnTrace) []float32 {
+func (a *Attention) attendGEMM(q, k, v []float32, t, off, sink int, mask Mask, tr *attnTrace) []float32 {
 	qW, kW, vW, oW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v, a.heads*a.v
 	keys := len(k) / kW
 	out := make([]float32, t*oW)
@@ -441,8 +496,9 @@ func (a *Attention) attendGEMM(q, k, v []float32, t, off int, mask Mask, tr *att
 		}
 	}
 
-	// rows runs query head h on rows [r0, r1) with scratch qh and probs.
-	rows := func(h, r0, r1 int, qh, probs []float32) {
+	// rows runs query head h on rows [r0, r1) with scratch qh, probs and
+	// gather.
+	rows := func(h, r0, r1 int, qh, probs, gather []float32) {
 		kv := a.kvHead(h)
 		khv, vTv := kh[kv*keys*a.qk:(kv+1)*keys*a.qk], vT[kv*a.v*keys:(kv+1)*a.v*keys]
 		m := r1 - r0
@@ -456,15 +512,8 @@ func (a *Attention) attendGEMM(q, k, v []float32, t, off int, mask Mask, tr *att
 
 		for i := range m {
 			row := probs[i*keys : (i+1)*keys]
-			lo, n := a.keySpan(keys, off, r0+i, mask)
-
-			for j := range row[lo:n] {
-				row[lo+j] /= scale
-			}
-
-			softmaxInPlace(row[lo:n])
-			clear(row[:lo])
-			clear(row[n:])
+			sp := a.keySpans(keys, off, r0+i, sink, mask)
+			softmaxSpans(row, sp, scale, gather)
 
 			if tr != nil {
 				copy(tr.probs[(h*t+r0+i)*keys:], row)
@@ -483,14 +532,14 @@ func (a *Attention) attendGEMM(q, k, v []float32, t, off int, mask Mask, tr *att
 	grain := ((attendPieceFMAs+perRow-1)/perRow + 3) &^ 3
 
 	tensor.Parallel(a.heads*tp, grain, func(lo, hi int) {
-		qh, probs := make([]float32, (hi-lo)*a.qk), make([]float32, (hi-lo)*keys)
+		qh, probs, gather := make([]float32, (hi-lo)*a.qk), make([]float32, (hi-lo)*keys), make([]float32, keys)
 
 		for p := lo; p < hi; {
 			h, r0 := p/tp, p%tp
 			r1 := min(tp, r0+hi-p)
 
 			if r0 < t {
-				rows(h, r0, min(r1, t), qh, probs)
+				rows(h, r0, min(r1, t), qh, probs, gather)
 			}
 
 			p += r1 - r0
@@ -503,6 +552,39 @@ func (a *Attention) attendGEMM(q, k, v []float32, t, off int, mask Mask, tr *att
 // attendPieceFMAs is the least work of one piece of attendGEMM, some
 // 20 µs on one core.
 const attendPieceFMAs = 1 << 19
+
+// softmaxSpans divides the logits of row in the spans sp by scale,
+// replaces them by their softmax over both spans and zeroes every other
+// key. With the first span empty it is one contiguous softmax; otherwise
+// the two spans are gathered into scratch (at least len(row) values) and
+// scattered back (docs/FINDINGS.md F-060).
+func softmaxSpans(row []float32, sp [2]Span, scale float32, scratch []float32) {
+	if sp[0].Len() == 0 {
+		lo, n := sp[1].Lo, sp[1].Hi
+
+		for j := range row[lo:n] {
+			row[lo+j] /= scale
+		}
+
+		softmaxInPlace(row[lo:n])
+		clear(row[:lo])
+		clear(row[n:])
+
+		return
+	}
+
+	g := append(append(scratch[:0], row[sp[0].Lo:sp[0].Hi]...), row[sp[1].Lo:sp[1].Hi]...)
+	for j := range g {
+		g[j] /= scale
+	}
+
+	softmaxInPlace(g)
+	clear(row)
+
+	n0 := sp[0].Len()
+	copy(row[sp[0].Lo:], g[:n0])
+	copy(row[sp[1].Lo:], g[n0:])
+}
 
 // applyTaps is the causal tap conv Σ_j taps[j] · shift_right(z, d·j) over
 // t rows of width values, summed in upstream's order j = 0, 1, …, with

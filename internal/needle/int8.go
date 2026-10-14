@@ -190,6 +190,20 @@ func (r Int8Rows) Bytes() int { return len(r.Q) + 4*len(r.S) }
 func AttendInt8(q []float32, t, heads int, k, v Int8Rows, keys func(i int) int, scale float32, quantQ bool,
 	probs []float32,
 ) []float32 {
+	spans := func(i int) [2]Span { return [2]Span{{}, {0, keys(i)}} }
+
+	return AttendInt8Spans(q, t, heads, k, v, spans, scale, quantQ, probs)
+}
+
+// AttendInt8Spans is AttendInt8 with query row i seeing the key rows of
+// the two ascending, disjoint spans(i) instead of the first keys(i): the
+// band of a sliding window and of a KV window with its sink on the int8 KV
+// cache (Attention.SetWindow, SetKVWindow, docs/FINDINGS.md F-060). probs
+// is written at the spans' keys only. With the first span empty and the
+// second from 0 it is AttendInt8 bit for bit.
+func AttendInt8Spans(q []float32, t, heads int, k, v Int8Rows, spans func(i int) [2]Span, scale float32,
+	quantQ bool, probs []float32,
+) []float32 {
 	qk, vd := k.Width, v.Width
 	kvHeads := k.Cols / qk
 	n := k.Len()
@@ -201,38 +215,69 @@ func AttendInt8(q []float32, t, heads int, k, v Int8Rows, keys func(i int) int, 
 		kv := h / (heads / kvHeads)
 
 		for i := range t {
-			qi, s := q[(i*heads+h)*qk:(i*heads+h+1)*qk], w[:keys(i)]
+			sp := spans(i)
+			qi, s := q[(i*heads+h)*qk:(i*heads+h+1)*qk], w[:sp[0].Len()+sp[1].Len()]
 
+			var sq float32
 			if quantQ {
-				sq := QuantizeRow(q8, qi)
-				dotsI8(dots[:len(s)], q8, k.Q[kv*qk:], k.Cols)
+				sq = QuantizeRow(q8, qi)
+			}
 
-				for j := range s {
-					s[j] = float32(dots[j]) * (sq * k.S[j*kvHeads+kv]) / scale
+			// The logits of each span's keys, s[o:] from key sp[p].Lo on.
+			o := 0
+
+			for _, p := range sp {
+				sj := s[o : o+p.Len()]
+				o += p.Len()
+
+				if quantQ {
+					int8Logits(sj, dots, q8, sq, k, p.Lo, kv, scale)
+
+					continue
 				}
-			} else {
-				dotsF32I8(s, qi, k.Q[kv*qk:], k.Cols)
 
-				for j := range s {
-					s[j] = s[j] * k.S[j*kvHeads+kv] / scale
+				dotsF32I8(sj, qi, k.Q[p.Lo*k.Cols+kv*qk:], k.Cols)
+
+				for j := range sj {
+					sj[j] = sj[j] * k.S[(p.Lo+j)*kvHeads+kv] / scale
 				}
 			}
 
 			softmaxInPlace(s)
 
-			if probs != nil {
-				copy(probs[(i*heads+h)*n:], s)
-			}
+			o = 0
 
-			for j := range s {
-				s[j] *= v.S[j*kvHeads+kv]
-			}
+			for _, p := range sp {
+				sj, vs := s[o:o+p.Len()], v.S[p.Lo*kvHeads:]
 
-			axpysI8(out[(i*heads+h)*vd:(i*heads+h+1)*vd], s, v.Q[kv*vd:], v.Cols)
+				if probs != nil {
+					copy(probs[(i*heads+h)*n+p.Lo:], sj)
+				}
+
+				for j := range sj {
+					sj[j] *= vs[j*kvHeads+kv]
+				}
+
+				axpysI8(out[(i*heads+h)*vd:(i*heads+h+1)*vd], sj, v.Q[p.Lo*v.Cols+kv*vd:], v.Cols)
+				o += p.Len()
+			}
 		}
 	}
 
 	return out
+}
+
+// int8Logits sets s[j] to the logit of the int8 query q8 with scale sq
+// against key row lo + j of k's KV head kv: the exact int32 dot product
+// times the two scales, over scale (AttendInt8Spans). dots is scratch of
+// at least len(s).
+func int8Logits(s []float32, dots []int32, q8 []int8, sq float32, k Int8Rows, lo, kv int, scale float32) {
+	qk, kvHeads := k.Width, k.Cols/k.Width
+	dotsI8(dots[:len(s)], q8, k.Q[lo*k.Cols+kv*qk:], k.Cols)
+
+	for j := range s {
+		s[j] = float32(dots[j]) * (sq * k.S[(lo+j)*kvHeads+kv]) / scale
+	}
 }
 
 // dotsF32I8 sets dst[j] = Σ_i q[i] · k[j·stride + i], the float32 query

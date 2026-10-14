@@ -13,6 +13,7 @@ import (
 // an empty cache.
 type KVCache struct {
 	n                   int       // positions so far
+	sink                int       // SetSink
 	qHist, kHist, vHist []float32 // raw projections of the last Taps − 1 positions, oldest first
 	k, v                []float32 // all positions, row layout
 	k8, v8              Int8Rows  // all positions with Int8.KV instead of k and v
@@ -20,6 +21,28 @@ type KVCache struct {
 
 // Len is the number of positions in the cache.
 func (c *KVCache) Len() int { return c.n }
+
+// SetSink keeps the first n positions of the sequence in view of an
+// attention with a KV window (Attention.SetKVWindow): the engine keeps the
+// static prefix, the rendering up to </tools> that needle_init caches,
+// while the rest of the conversation slides through its window of 256
+// (docs/FINDINGS.md F-060). It applies to the Extend calls after it; a
+// fork keeps it. n must not be negative; 0 is none.
+func (c *KVCache) SetSink(n int) {
+	if n < 0 {
+		panic(fmt.Sprintf("needle: a sink of %d positions", n))
+	}
+
+	c.sink = n
+}
+
+// Sink is the number of positions SetSink keeps in view.
+func (c *KVCache) Sink() int { return c.sink }
+
+// Bytes is the memory the cached keys and values take: float32, or with
+// Int8.KV the int8 codes and their scales (docs/FINDINGS.md F-041, F-060).
+// The tap history, at most Taps − 1 rows, is left out.
+func (c *KVCache) Bytes() int { return 4*(len(c.k)+len(c.v)) + c.k8.Bytes() + c.v8.Bytes() }
 
 // Fork returns a cache with c's positions that extends independently of c
 // (docs/FINDINGS.md F-026). The two share the keys and values so far
@@ -29,7 +52,7 @@ func (c *KVCache) Len() int { return c.n }
 // never written, on every Extend, so it is shared as is.
 func (c *KVCache) Fork() KVCache {
 	return KVCache{
-		n: c.n, qHist: c.qHist, kHist: c.kHist, vHist: c.vHist,
+		n: c.n, sink: c.sink, qHist: c.qHist, kHist: c.kHist, vHist: c.vHist,
 		k: slices.Clip(c.k), v: slices.Clip(c.v), k8: c.k8.Clip(), v8: c.v8.Clip(),
 	}
 }
@@ -38,10 +61,11 @@ func (c *KVCache) Fork() KVCache {
 // positions Len() … Len()+t−1, appends their keys and values to c and
 // returns t rows of Dim values. On an empty cache it equals Forward with
 // MaskCausal, and any split of a sequence into Extend calls gives the same
-// rows as one call, up to float32 summation order. With SetWindow the
-// cache keeps every position and each row attends to its band; the int8
-// cache takes no window. rope is nil for no
-// rotary embedding; otherwise it must cover Len()+t positions.
+// rows as one call, up to float32 summation order. With SetWindow and
+// SetKVWindow the cache, float32 or int8, keeps every position and each
+// row attends to its band and the cache's sink (docs/FINDINGS.md F-045,
+// F-060). rope is nil for no rotary embedding; otherwise it must cover
+// Len()+t positions.
 func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float32, error) {
 	err := a.check(x, t, MaskCausal, nil)
 	if err != nil {
@@ -51,10 +75,6 @@ func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float3
 	if rope != nil && (rope.HeadDim() != a.qk || rope.Len() < c.n+t) {
 		return nil, fmt.Errorf("needle: RoPE tables for head width %d and %d positions, want %d and %d",
 			rope.HeadDim(), rope.Len(), a.qk, c.n+t)
-	}
-
-	if a.window > 0 && a.int8.KV {
-		return nil, fmt.Errorf("needle: a window of %d on the int8 KV cache", a.window)
 	}
 
 	qW, kW, vW := a.heads*a.qk, a.kvHeads*a.qk, a.kvHeads*a.v
@@ -74,7 +94,7 @@ func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float3
 	} else {
 		a.quantQKV(q, k, v)
 		c.k, c.v = append(c.k, k...), append(c.v, v...)
-		out = a.attend(q, c.k, c.v, t, c.n, MaskCausal, nil)
+		out = a.attend(q, c.k, c.v, t, c.n, c.sink, MaskCausal, nil)
 	}
 
 	c.n += t
@@ -84,9 +104,10 @@ func (a *Attention) Extend(x []float32, t int, c *KVCache, rope *Rope) ([]float3
 
 // extendInt8 appends the t new keys and values to c's int8 cache and
 // attends to it (Int8.KV, docs/FINDINGS.md F-041). Decoding steps (t below
-// attendGEMMRows) run AttendInt8 on the codes. A longer block, such as the
-// teacher-forced pass of the word timestamps, runs attend's GEMMs on the
-// values the codes stand for, with the queries quantised as quantQKV does.
+// attendGEMMRows) run AttendInt8Spans on the codes, over each row's band
+// (F-060). A longer block, such as the teacher-forced pass of the word
+// timestamps, runs attend's GEMMs on the values the codes stand for, with
+// the queries quantised as quantQKV does.
 func (a *Attention) extendInt8(q, k, v []float32, t int, c *KVCache) []float32 {
 	if c.k8.Cols == 0 {
 		c.k8, c.v8 = NewInt8Rows(a.kvHeads*a.qk, a.qk), NewInt8Rows(a.kvHeads*a.v, a.v)
@@ -95,16 +116,17 @@ func (a *Attention) extendInt8(q, k, v []float32, t int, c *KVCache) []float32 {
 	c.k8, c.v8 = c.k8.Append(k), c.v8.Append(v)
 
 	if t < attendGEMMRows {
-		keys := func(i int) int { return c.n + i + 1 }
+		n := c.k8.Len()
+		spans := func(i int) [2]Span { return a.keySpans(n, c.n, i, c.sink, MaskCausal) }
 
-		return AttendInt8(q, t, a.heads, c.k8, c.v8, keys, a.attendScale(), a.int8.Act, nil)
+		return AttendInt8Spans(q, t, a.heads, c.k8, c.v8, spans, a.attendScale(), a.int8.Act, nil)
 	}
 
 	if a.int8.Act {
 		fakeQuant(q, q, a.qk)
 	}
 
-	return a.attend(q, c.k8.Floats(), c.v8.Floats(), t, c.n, MaskCausal, nil)
+	return a.attend(q, c.k8.Floats(), c.v8.Floats(), t, c.n, c.sink, MaskCausal, nil)
 }
 
 // extendTaps applies the causal taps to t new raw rows z of width values,
