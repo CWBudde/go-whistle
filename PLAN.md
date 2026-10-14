@@ -661,6 +661,18 @@ Engine-only: fitted against `testdata/text/engine/`.
       never binding in the corpus.
       Note (2026-10-13): the engine scores 0.0000 on every call with an object-valued argument
       (`ground_nested_time` and exploratory requests, F-057), which the head does not reproduce.
+      (2026-10-14) — partial: `just oracle-text confidence` (`confidence.json`, 199 probes and 258 answers,
+      byte-identical on a re-run) pins the min. The envelope's `confidence` is min(head, `Decoded.Probability`): for a
+      leading call block the smallest probability of a block token among the tokens the grammar allows (it binds on
+      probes from far off, e.g. 0.507 against the engine's 0.506 where the head says 0.84; never in the corpus), for a
+      `respond` answer the geometric mean of every token's probability with its stop token (the head never sets it);
+      suppression reads the min. The `respond` turn is now within 0.02. Of the turns decoded as the engine's,
+      confidence is within 0.02 on 106 of 135 probes and 19 of 22 corpus turns in float32, 128 of 148 and 20 of 22
+      under int8 (`TestConfidenceMatchesEngine`, `TestEnvelopeMatchesEngine`; F-062). Remains: the 0.0000, which is
+      not an envelope rule but comes from the engine's own decode inside objects and cut integers and is not pinned;
+      a decimal for an integer (the port's grammar forbids the fraction, so the min binds on three answers the
+      engine scores by the head); `event_tomorrow` (−0.043) and `catalogue_lock` (+0.067) under int8, traced to the
+      weight path's implementation noise of F-060.
 - [ ] The engine's post-decode repair (llms.txt:110: capitalisation, date re-resolution, enum/polarity flips,
       dropping unevidenced optionals, duplicate and negation drops, rewrites), which F-048's 7 of the 12 differences
       come from.
@@ -691,6 +703,12 @@ Engine-only: fitted against `testdata/text/engine/`.
 - [ ] **Accept:** on the engine corpus, `type` and `function_calls` (name and arguments, as parsed JSON) equal the
       engine's on ≥ 95 % of the cases with every miss explained by a log-probability margin, `reasoning` equal on
       ≥ 90 %, `confidence` within 0.02.
+      (2026-10-14) — partial, read by the user's decisions: the engine's numerics (packed + int8 + the KV window,
+      `NEEDLE_TEST_NUMERICS=int8`), "the engine corpus" the 25 turns of `cases.json`, the confidence on every turn
+      decoded as the engine's. `TestEnvelopeMatchesEngine` under `NEEDLE_TEST_NUMERICS=int8`: `type` and
+      `function_calls` equal on 24 of 25 (96 %; the miss, `message_and_timer`, at a margin of 0.005), met; `reasoning`
+      equal on 22 of 25 (88 %; misses at margins 0.005, 0.014 and 0.076), not met; confidence within 0.02 on 20 of
+      the 22 turns decoded as the engine's, not met (`event_tomorrow`, `catalogue_lock`; F-062).
 
 ### 11.5 Native quantised path (`internal/text`, `internal/weights` or a packed `text.Source`, `internal/cq`; needs 11.2) — ✅ DONE (2026-10-14)
 
