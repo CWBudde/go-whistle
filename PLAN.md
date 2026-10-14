@@ -692,7 +692,7 @@ Engine-only: fitted against `testdata/text/engine/`.
       engine's on ≥ 95 % of the cases with every miss explained by a log-probability margin, `reasoning` equal on
       ≥ 90 %, `confidence` within 0.02.
 
-### 11.5 Native quantised path (`internal/text`, `internal/weights` or a packed `text.Source`, `internal/cq`; needs 11.2)
+### 11.5 Native quantised path (`internal/text`, `internal/weights` or a packed `text.Source`, `internal/cq`; needs 11.2) — ✅ DONE (2026-10-14)
 
 - [x] Serve the 122 CQ records packed (`cq.Matrix`) and run the model on them, as 9.2 does for Whistle.
       (2026-10-14) — `text.OpenWith(path, text.OpenOptions{Packed: true})` serves all 122 CQ records as `cq.Matrix`
@@ -716,8 +716,18 @@ Engine-only: fitted against `testdata/text/engine/`.
       against float32 (`NEEDLE_TEST_NUMERICS=int8`): reasoning 33 against 29 and confidence within 0.02 on 31 against
       26 of 36 envelope turns, validation calls 162 against 159, gates 194 against 193, grammar 9 against 10. Open:
       past 1024 positions, the window's edge, prompts without `</tools>` (F-060).
-- [ ] **Accept:** with the `.cact` weights, `function_calls` equal the engine's at least as often as with the float
+- [x] **Accept:** with the `.cact` weights, `function_calls` equal the engine's at least as often as with the float
       weights; memory and speed against the engine (`just bench`-style), packed weights under 40 MB.
+      (2026-10-14) — met, read by the user's decisions: the `.cact` side is the engine's numerics (packed + int8 + the
+      KV window), the float side `needle3.safetensors`, the count summed over the engine test sets; "40 MB" is 40 MiB
+      as in F-059. `NEEDLE_TEST_NUMERICS=safetensors` against `int8` over the six disjoint sets (538 answers):
+      `function_calls` equal on 507 against 426, at or above safetensors in every set (envelope 35/23, validation
+      162/127, gates 197/177, repair 84/76, grammar 9/7, window 20/16); the first turns alone 23 against 20. The
+      packed weights take 38.25 MiB (`TestPackedMemory`). `just bench-text` and `just oracle-text bench`
+      (`bench/RESULTS-text.md`, the 24 first turns): the engine-numerics mode on the lut kernel reaches a TTFT of 113
+      against the engine's 73 ms cold (5.7 ms with its prefix cached), decode 412 against 1739 tok/s, an answer 429
+      against 109 ms, peak RSS 493 against 107 MiB; on the exact kernel TTFT 342 ms and decode 119 tok/s. Speed and
+      memory are reported, not bounded; the levers are in F-061's Open.
 
 ### 11.6 Depth ladder (`internal/text`; needs 11.4)
 
