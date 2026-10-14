@@ -82,7 +82,7 @@ func TestValidationMatchesEngine(t *testing.T) {
 
 	readJSON(t, engineValidation, &fx)
 
-	var negations, calls, ungrounded, split, total int
+	var negations, calls, fc, ungrounded, split, total int
 
 	for _, pr := range fx.Probes {
 		system := fx.System
@@ -127,6 +127,10 @@ func TestValidationMatchesEngine(t *testing.T) {
 
 			diff := diffCalls(append(got.Calls, got.Suppressed...), append(want.Calls, want.Suppressed...))
 			think := reflect.DeepEqual(got.Reasoning, want.Reasoning)
+
+			if functionCallsEqual(got.Calls, want.Calls) {
+				fc++
+			}
 
 			block := slices.Index(turn.a.Tokens, d.open)
 			if block < 0 {
@@ -175,6 +179,7 @@ func TestValidationMatchesEngine(t *testing.T) {
 		total, negations, calls, ungrounded, split)
 	int8Floor(t, "calls equal", calls, total, int8ValidationCalls)
 	int8Floor(t, "calls and split equal", split, total, int8ValidationSplit)
+	logCount(t, "function_calls equal", fc, total)
 }
 
 // TestNegated covers the negation cues without the model: the spellings

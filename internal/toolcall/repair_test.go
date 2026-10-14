@@ -597,7 +597,7 @@ func TestRepairMatchesEngine(t *testing.T) {
 
 	readJSON(t, engineRepair, &fx)
 
-	equal, reasoning := 0, 0
+	equal, fc, reasoning := 0, 0, 0
 
 	for _, pr := range fx.Probes {
 		system := fx.System
@@ -627,6 +627,10 @@ func TestRepairMatchesEngine(t *testing.T) {
 			equal++
 		}
 
+		if functionCallsEqual(got.Calls, want.Calls) {
+			fc++
+		}
+
 		if think {
 			reasoning++
 		}
@@ -641,4 +645,5 @@ func TestRepairMatchesEngine(t *testing.T) {
 	t.Logf("%d probes: calls equal on %d, reasoning equal on %d", len(fx.Probes), equal, reasoning)
 	int8Floor(t, "calls equal", equal, len(fx.Probes), int8RepairCalls)
 	int8Floor(t, "reasoning equal", reasoning, len(fx.Probes), int8RepairReasoning)
+	logCount(t, "function_calls equal", fc, len(fx.Probes))
 }

@@ -68,7 +68,7 @@ func TestGatesMatchesEngine(t *testing.T) {
 
 	readJSON(t, engineGates, &fx)
 
-	var equal, total int
+	var equal, fc, total int
 
 	for _, pr := range fx.Probes {
 		system := fx.System
@@ -116,6 +116,10 @@ func TestGatesMatchesEngine(t *testing.T) {
 				equal++
 			}
 
+			if functionCallsEqual(got.Calls, want.Calls) {
+				fc++
+			}
+
 			if why, isListed := gatesDiffer[key]; isListed == (diff == "") {
 				listedf(t, "%s: calls %q (listed: %q)", key, diff, why)
 			}
@@ -124,6 +128,7 @@ func TestGatesMatchesEngine(t *testing.T) {
 
 	t.Logf("%d turns: calls and split equal on %d", total, equal)
 	int8Floor(t, "calls and split equal", equal, total, int8GatesEqual)
+	logCount(t, "function_calls equal", fc, total)
 }
 
 // gateCase is one model-free case of a grounding gate: the model's calls

@@ -22,12 +22,19 @@ import (
 //     so a turn that differs from them is logged, not an error (listedf),
 //     and each test holds floors on its counts instead (int8Floor), as
 //     Whistle's WHISTLE_TEST_INT8 does (F-041).
+//   - "safetensors": every test on the float needle3.safetensors in
+//     float32, the window test with the KV window and its sink added as
+//     under "float". This is the float weights' side of 11.5's Accept
+//     (docs/FINDINGS.md F-061): a turn that differs from the lists is
+//     logged as under int8, and no floor applies, since the run measures
+//     the float weights against the int8 run rather than holding a bound.
 const numericsEnv = "NEEDLE_TEST_NUMERICS"
 
 const (
-	numericsFloat  = "float"
-	numericsPacked = "packed"
-	numericsInt8   = "int8"
+	numericsFloat       = "float"
+	numericsPacked      = "packed"
+	numericsInt8        = "int8"
+	numericsSafetensors = "safetensors"
 )
 
 // testNumerics is the numerics numericsEnv selects.
@@ -37,19 +44,24 @@ func testNumerics(t *testing.T) string {
 	switch v := os.Getenv(numericsEnv); v {
 	case "", numericsFloat:
 		return numericsFloat
-	case numericsPacked, numericsInt8:
+	case numericsPacked, numericsInt8, numericsSafetensors:
 		return v
 	default:
-		t.Fatalf("%s=%q: want float, packed or int8", numericsEnv, v)
+		t.Fatalf("%s=%q: want float, packed, int8 or safetensors", numericsEnv, v)
 
 		return ""
 	}
 }
 
 // loadNumerics loads the packed needle3.cact for the packed and int8
-// numerics; the float numerics keep loadModel's path.
+// numerics and needle3.safetensors for the safetensors numerics; the float
+// numerics keep loadModel's path.
 func loadNumerics(t *testing.T, numerics string) *text.Model {
 	t.Helper()
+
+	if numerics == numericsSafetensors {
+		return loadFloat(t, needle3Safetensors)
+	}
 
 	requireModel(t, needle3Cact)
 
@@ -80,13 +92,13 @@ func loadNumerics(t *testing.T, numerics string) *text.Model {
 }
 
 // listedf reports a turn whose outcome differs from what a test lists for
-// it: an error, but a log line under the int8 numerics, whose tests hold
-// floors on their counts instead.
+// it: an error, but a log line under the int8 and the safetensors
+// numerics, whose tests hold floors on their counts or only report them.
 func listedf(t *testing.T, format string, args ...any) {
 	t.Helper()
 
-	if testNumerics(t) == numericsInt8 {
-		t.Logf("int8, unlike the float32 list: "+format, args...)
+	if n := testNumerics(t); n == numericsInt8 || n == numericsSafetensors {
+		t.Logf(n+", unlike the float32 list: "+format, args...)
 
 		return
 	}
@@ -94,12 +106,28 @@ func listedf(t *testing.T, format string, args ...any) {
 	t.Errorf(format, args...)
 }
 
+// logCount logs a count of total under the numerics of the run, the line
+// the numerics comparisons are read from (docs/FINDINGS.md F-060, F-061).
+func logCount(t *testing.T, name string, got, total int) {
+	t.Helper()
+
+	t.Logf("%s numerics: %s on %d of %d", testNumerics(t), name, got, total)
+}
+
+// functionCallsEqual reports whether an envelope dispatches the engine's
+// function_calls, names and arguments, whatever it suppresses: the count
+// 11.5's Accept compares (docs/FINDINGS.md F-061). The tests' own "calls
+// equal" counts compare the dispatched and the suppressed calls together.
+func functionCallsEqual(got, want []call) bool {
+	return diffCalls(got, want) == ""
+}
+
 // int8Floor logs a count and, under the int8 numerics, requires at least
 // floor of total.
 func int8Floor(t *testing.T, name string, got, total, floor int) {
 	t.Helper()
 
-	t.Logf("%s numerics: %s on %d of %d", testNumerics(t), name, got, total)
+	logCount(t, name, got, total)
 
 	if testNumerics(t) == numericsInt8 && got < floor {
 		t.Errorf("int8: %s on %d of %d, want at least %d", name, got, total, floor)

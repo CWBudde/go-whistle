@@ -65,8 +65,9 @@ var reasoningDiffers = map[string]bool{
 
 // envelopeTurn checks one turn's envelope against the engine's: every field,
 // the calls and the reasoning but on the turns listed. It returns whether
-// the calls, the reasoning and the confidence (within 0.02) agree.
-func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) (calls, reasoning, conf bool) {
+// the calls (dispatched and suppressed), the function_calls alone, the
+// reasoning and the confidence (within 0.02) agree.
+func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) (calls, fc, reasoning, conf bool) {
 	t.Helper()
 
 	e := got.env
@@ -127,7 +128,7 @@ func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) (c
 		listedf(t, "%s: confidence %.4f, engine %.4f (listed: %q)", key, g.Confidence, want.Confidence, why)
 	}
 
-	return d == "", same, off <= 0.02
+	return d == "", functionCallsEqual(g.Calls, want.Calls), same, off <= 0.02
 }
 
 // TestEnvelopeMatchesEngine builds the envelope of every turn of the engine
@@ -167,15 +168,15 @@ func TestEnvelopeMatchesEngine(t *testing.T) {
 	readJSON(t, engineResponse, &responses)
 	readJSON(t, engineTriggers, &triggers)
 
-	var calls, reasoning, conf, total int
+	var calls, fc, reasoning, conf, total int
 
-	count := func(c, r, f bool) {
+	count := func(c, d, r, f bool) {
 		total++
 
 		for _, x := range []struct {
 			ok bool
 			n  *int
-		}{{c, &calls}, {r, &reasoning}, {f, &conf}} {
+		}{{c, &calls}, {d, &fc}, {r, &reasoning}, {f, &conf}} {
 			if x.ok {
 				*x.n++
 			}
@@ -196,6 +197,7 @@ func TestEnvelopeMatchesEngine(t *testing.T) {
 	int8Floor(t, "calls equal", calls, total, int8EnvelopeCalls)
 	int8Floor(t, "reasoning equal", reasoning, total, int8EnvelopeReasoning)
 	int8Floor(t, "confidence within 0.02", conf, total, int8EnvelopeConfidence)
+	logCount(t, "function_calls equal", fc, total)
 }
 
 // TestEnvelope covers the envelope's rules without the model.

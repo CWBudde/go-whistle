@@ -737,7 +737,7 @@ func TestGrammarMatchesEngine(t *testing.T) {
 
 	readJSON(t, engineGrammar, &fx)
 
-	equal := 0
+	equal, fc := 0, 0
 
 	for _, pr := range fx.Probes {
 		turn := decodeTurns(t, d, m, p, fx.System, []byte(pr.Tools), []string{pr.Query}, 512)[0]
@@ -766,6 +766,10 @@ func TestGrammarMatchesEngine(t *testing.T) {
 			equal++
 		}
 
+		if functionCallsEqual(got.Calls, want.Calls) {
+			fc++
+		}
+
 		if why, isListed := grammarCallsDiffer[pr.ID]; isListed == (diff == "") {
 			listedf(t, "%s: calls %q (listed: %q)", pr.ID, diff, why)
 		}
@@ -778,4 +782,5 @@ func TestGrammarMatchesEngine(t *testing.T) {
 	}
 
 	int8Floor(t, "calls equal", equal, len(fx.Probes), int8GrammarCalls)
+	logCount(t, "function_calls equal", fc, len(fx.Probes))
 }

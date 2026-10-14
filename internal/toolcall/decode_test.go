@@ -25,14 +25,21 @@ type call struct {
 
 // loadModel loads the text model at path, skipping without it. The
 // switch NEEDLE_TEST_NUMERICS loads the packed needle3.cact instead, in
-// float32 or the engine's int8 numerics (numericsEnv, docs/FINDINGS.md
-// F-060).
+// float32 or the engine's int8 numerics, or needle3.safetensors
+// (numericsEnv, docs/FINDINGS.md F-060, F-061).
 func loadModel(t *testing.T, path string) *text.Model {
 	t.Helper()
 
 	if n := testNumerics(t); n != numericsFloat {
 		return loadNumerics(t, n)
 	}
+
+	return loadFloat(t, path)
+}
+
+// loadFloat loads the text model at path in float32, skipping without it.
+func loadFloat(t *testing.T, path string) *text.Model {
+	t.Helper()
 
 	requireModel(t, path)
 
@@ -352,6 +359,7 @@ func TestFloatGreedyAgainstEngine(t *testing.T) {
 	readJSON(t, engineResponse, &responses)
 
 	tally := map[string]int{}
+	fc := 0
 
 	for _, c := range corpus.Cases {
 		c.Results = nil // the first turn only
@@ -366,6 +374,11 @@ func TestFloatGreedyAgainstEngine(t *testing.T) {
 			}
 
 			tally[key]++
+
+			// A truncated answer dispatches nothing.
+			if functionCallsEqual(nil, eng.Calls) {
+				fc++
+			}
 
 			t.Logf("%-20s margin %6.3f  %s (%d tokens)", c.ID, margin, verdict, len(a.Tokens))
 
@@ -391,8 +404,14 @@ func TestFloatGreedyAgainstEngine(t *testing.T) {
 
 		tally[key]++
 
+		if functionCallsEqual(got.Calls, eng.Calls) {
+			fc++
+		}
+
 		t.Logf("%-20s margin %6.3f  %s", c.ID, margin, verdict)
 	}
 
 	t.Logf("%d cases: %v", len(corpus.Cases), tally)
+	logCount(t, "calls equal", tally["equal"], len(corpus.Cases))
+	logCount(t, "function_calls equal", fc, len(corpus.Cases))
 }
