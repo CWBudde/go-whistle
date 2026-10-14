@@ -60,7 +60,7 @@ func (a *Decoded) Probability() float64 {
 		return 1
 	}
 
-	if a.block < 0 {
+	if a.block < 0 || !a.leadingCall() {
 		var sum float64
 		for _, p := range a.Probs {
 			sum += math.Log(p)
@@ -81,6 +81,16 @@ func (a *Decoded) Probability() float64 {
 	}
 
 	return p
+}
+
+// leadingCall reports whether the answer has the leading call block
+// Envelope parses: a <tool_call> elsewhere in the text, or in the
+// reasoning, makes it a respond answer.
+func (a *Decoded) leadingCall() bool {
+	_, rest := splitThink(a.Text)
+	_, ok := callBlock(rest)
+
+	return ok
 }
 
 // take appends the chosen token best of the logits row, with its
@@ -188,7 +198,7 @@ func (d *Decoder) Decode(s *text.State, input []int, maxNew int, g *Grammar) (*D
 			break
 		}
 
-		out.take(row, best, second, allowed, best == d.open)
+		out.take(row, best, second, allowed, best == d.open && c.phase == afterThink)
 
 		if best == d.call {
 			break

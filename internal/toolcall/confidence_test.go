@@ -49,6 +49,16 @@ func TestConfidenceDecodeProbability(t *testing.T) {
 			},
 			math.Sqrt(math.Sqrt(0.25 * 0.64)),
 		},
+		"respond: a <tool_call> that does not lead the text is no call block": {
+			&Decoded{
+				Text:    thinkOpen + "r\n</think>\nSay <tool_call> to call.",
+				Tokens:  []int{10, 11, 12, 13},
+				Probs:   []float64{1, 1, 0.25, 0.64},
+				Allowed: []float64{1, 1, 0.25, 0.01},
+				block:   3,
+			},
+			math.Sqrt(math.Sqrt(0.25 * 0.64)),
+		},
 		"respond: the stop token counts": {
 			&Decoded{
 				Text:    thinkOpen + "r\n</think>\nDone.",
