@@ -24,6 +24,8 @@
 //	go run -tags oracle ./tools/oracle/text window  # window.json: facts far behind the answer, for the KV window
 //	go run -tags oracle ./tools/oracle/text all    # every subcommand above
 //	go run -tags oracle ./tools/oracle/text fetch  # download the pinned text model into models/needle3 (-dir)
+//	go run -tags oracle ./tools/oracle/text bench  # bench/results/text-engine.json: the engine's speed and memory on
+//	                                              # the first turns of cases.json, then bench/RESULTS-text.md
 //
 // It runs the closed-source Needle 3 engine (the needle CLI, and libneedle3 through purego), always with
 // NEEDLE_TELEMETRY=0 and DO_NOT_TRACK=1, so it lives behind the oracle build tag and never ships with the library or
@@ -66,7 +68,8 @@ var subcommands = []struct {
 
 const usage = "usage: oracle/text cases|date|depth|audio|embed|retrieval|normalise|turns|triggers|grammar|repair|validation|gates|window|all " +
 	"[-out dir] [-cases file] [-needle3 dir] [-whistle dir] [-engine dir] [-audio dir]\n" +
-	"       oracle/text fetch [-dir models/needle3]"
+	"       oracle/text fetch [-dir models/needle3]\n" +
+	"       oracle/text bench [-out file] [-go file] [-report file] [-warmup n] [-passes n] [-loads n]"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -86,8 +89,11 @@ func dispatch(ctx context.Context, args []string, log io.Writer) error {
 		return errors.New(usage)
 	}
 
-	if args[0] == "fetch" {
+	switch args[0] {
+	case "fetch":
 		return cmdFetch(ctx, args[1:], log)
+	case "bench":
+		return cmdBenchArgs(ctx, args[1:], log)
 	}
 
 	plat, err := platformDir()
