@@ -5679,27 +5679,30 @@ beside it. The CLI's process time cannot be split.
 ### Numbers
 
 `bench/RESULTS-text.md` has every row. M5 Pro (5 Super + 10 Performance cores, 48 GiB), macOS 27.0.1, Go 1.27.1, engine
-3.2.0, commit `fc77d28a18` on both sides. Go ran with GOMAXPROCS 15, the engine with 4 threads. Other sessions moved the
-load average from 2.5 to 8.4 during the Go run (1177 s) and kept it between 6.0 and 8.4 during the engine's (67 s).
-Medians over 24 cases × 5 passes; the prefills are 126–1049 tokens (median 332), the answers 8–103 tokens:
+3.2.0, the Go side at commit `dc29920b28`, the engine's at `267eea9065` (the Go results committed on it). Go ran with
+GOMAXPROCS 15, the engine with 4 threads. Other sessions kept the load average between 5.2 and 7.0 during the Go run
+(1109 s) and between 3.9 and 6.5 during the engine's (67 s). Medians over 24 cases × 5 passes; the prefills are
+126–1049 tokens (median 332), the answers 8–103 tokens:
 
 | median                     | Go safetensors | Go packed exact | Go packed + int8 + window | Go LUT + int8 + window | engine library | engine, prefix cached | engine CLI |
 | -------------------------- | -------------- | --------------- | ------------------------- | ---------------------- | -------------- | --------------------- | ---------- |
-| TTFT (ms)                  | 112.2          | 340.7           | 343.7                     | 113.2                  | 72.2           | 5.4                   | —          |
-| TTFT p90 (ms)              | 321.7          | 997.8           | 1010.3                    | 338.3                  | 281.5          | 8.7                   | —          |
-| prefill (tok/s)            | 2939           | 974             | 966                       | 2938                   | 4599           | —                     | —          |
-| decode (tok/s)             | 187            | 103             | 118                       | 410                    | 1811           | 1833                  | 1704       |
-| answer (ms)                | 594.7          | 1330.1          | 1246.7                    | 433.4                  | 105.8          | 38.5                  | 130.1      |
-| load (ms)                  | 986.0          | 8.5             | 8.2                       | 13.5                   | 4.4            | —                     | —          |
-| peak RSS after the load    | 981.2          | 52.2            | 52.1                      | 67.7                   | —              | —                     | —          |
-| peak RSS after the answers | 1277.5         | 487.3           | 492.3                     | 500.6                  | —              | —                     | 103.4      |
+| TTFT (ms)                  | 111.8          | 337.3           | 341.6                     | 113.0                  | 73.0           | 5.7                   | —          |
+| TTFT p90 (ms)              | 318.0          | 989.2           | 1002.7                    | 338.5                  | 286.3          | 8.7                   | —          |
+| prefill (tok/s)            | 2971           | 985             | 973                       | 2934                   | 4526           | —                     | —          |
+| decode (tok/s)             | 189            | 107             | 119                       | 412                    | 1739           | 1746                  | 1804       |
+| answer (ms)                | 593.2          | 1313.2          | 1239.4                    | 429.3                  | 109.2          | 40.2                  | 122.0      |
+| load (ms)                  | 929.7          | 8.3             | 8.2                       | 13.2                   | 4.3            | —                     | —          |
+| peak RSS after the load    | 925.9          | 52.2            | 52.3                      | 67.5                   | —              | —                     | —          |
+| peak RSS after the answers | 1264.9         | 486.0           | 486.0                     | 492.9                  | —              | —                     | 107.4      |
 | Go heap after the load     | 464.9          | 42.9            | 42.9                      | 58.2                   | —              | —                     | —          |
 | `function_calls` equal     | 20/24          | 24/24           | 23/24                     | 23/24                  | 24/24          | 24/24                 | 24/24      |
 
-(MiB for memory; the engine CLI's `peak_ram_mb` is 94.4 at the median and 103.4 at most, its `ru_maxrss` the same.) A
-first Go run at a load average of 5.8–10 gave the same numbers within 4 %: TTFT 110.8 / 338.1 / 342.3 / 112.4 ms, decode
-187 / 107 / 117 / 409 tok/s. A first engine run, whose library answers mixed cold and cached, is the one the clock
-reading above comes from.
+(MiB for memory; the engine CLI's `peak_ram_mb` is 94.5 at the median and 107.4 at most, its `ru_maxrss` the same.)
+The memory child answers through the decode path alone (`respond`), without the replay that times the prefill and the
+decode, which would add its own allocations to the high-water mark. A first run that replayed in the child too gave
+487.3 / 492.3 / 500.6 MiB after the answers, so the replay's share is at most 8 MiB. Two earlier Go runs, at load
+averages of 2.5–8.4 and 5.8–10, gave the same speeds within 4 %. A first engine run, whose library answers mixed cold
+and cached, is the one the clock reading above comes from.
 
 **The packed weights** take **38.252 MiB** on exact kernels, as `TestPackedMemory` counts them (F-059's 40,109,936
 bytes; this session's run gave 40,109,664, the loaders' heap varying by a few hundred bytes). That is under 40 MiB, the
@@ -5709,25 +5712,25 @@ live Go heap after the packed load is 42.9 MiB, the weights and the 3.1 MiB of t
 
 ### Where the gaps are
 
-- **TTFT**: the engine-numerics mode on the lut kernel is 1.57× the engine's cold TTFT. The gap is mostly fixed per
-  answer: 2.0× at 126 prefill tokens (51.5 against 25.6 ms), 1.6× at 332, 1.19× at 1038 (333.9 against 279.9 ms). The
+- **TTFT**: the engine-numerics mode on the lut kernel is 1.55× the engine's cold TTFT. The gap is mostly fixed per
+  answer (an earlier run): 2.0× at 126 prefill tokens (51.5 against 25.6 ms), 1.6× at 332, 1.19× at 1038 (333.9 against 279.9 ms). The
   exact kernel, the default packed mode, is 3× slower than the lut kernel (F-059, F-060). One cost the engine does not
   show: `Model.Extend` returns a logits row for every position it feeds, so the prefill runs the tied 8192 × 768 head on
   all 332 positions where the decoder reads one row.
-- **The prefix cache**: with the static prefix kept, the engine answers in 5.4 ms to the first token and 38.5 ms in all.
+- **The prefix cache**: with the static prefix kept, the engine answers in 5.7 ms to the first token and 40.2 ms in all.
   The Go decoder prefills the static prefix on every answer. A state with the prefix fed once and forked per answer
   (`text.State.Fork`) would be the same cache.
-- **Decode**: 410 tok/s against 1811 (0.23×) on the lut kernel, 0.06–0.07× on the exact kernel. One `Extend` step is 2.4
+- **Decode**: 412 tok/s against 1739 (0.24×) on the lut kernel, 0.06–0.07× on the exact kernel. One `Extend` step is 2.4
   ms against the engine's 0.55 ms, the engine's W2A8 kernels against Go's float32 activations into the lut GEMV.
-- **The answer**: 433 ms against 106 ms (4.1×). Beyond the prefill and the decode, `Decoder.Confidence` runs a second
+- **The answer**: 429 ms against 109 ms (3.9×). Beyond the prefill and the decode, `Decoder.Confidence` runs a second
   full `Forward` over the whole conversation for the confidence head, about one more prefill. The engine's confidence
   costs nothing visible: a cached answer spends 4–11 ms outside its decode clock, prefill of the turn included.
 - **Memory**: 52 MiB after the packed load, in line with the 38.3 MiB of weights and the Go runtime. A pass over the 24
-  answers takes the peak to 487–501 MiB, 4.7× the engine CLI's 103 MiB with its model load. The likely parts are the
+  answers takes the peak to 486–493 MiB, 4.5× the engine CLI's 107 MiB with its model load. The likely parts are the
   transient buffers: the per-position logits (1049 × 8192 float32 = 34 MiB at the catalogue prefix), the confidence
   pass's hidden states, and GC headroom over them. This was not split further.
-- **Load**: 8.2–8.5 ms packed, which reads the 35 MB file, against `needle_load`'s 4.4 ms on bytes in memory.
-  `needle3.safetensors` takes 986 ms and 981 MiB: bfloat16 widened to float32, besides the file buffer.
+- **Load**: 8.2–8.3 ms packed, which reads the 35 MB file, against `needle_load`'s 4.3 ms on bytes in memory.
+  `needle3.safetensors` takes 930 ms and 926 MiB: bfloat16 widened to float32, besides the file buffer.
 
 ### Tests
 
