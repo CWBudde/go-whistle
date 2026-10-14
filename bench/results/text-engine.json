@@ -1,7 +1,7 @@
 {
   "run": {
-    "date": "2026-10-14T17:51:40+02:00",
-    "commit": "267eea9065",
+    "date": "2026-10-14T18:28:12+02:00",
+    "commit": "4624c83f75",
     "machine": {
       "cpu": "Apple M5 Pro",
       "cores": 15,
@@ -15,13 +15,14 @@
       "model_sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38",
       "clips_sha256": "698aee1811a234af84dfc727a04e12240c23b65c73478ad41ce8893f0641eff0"
     },
-    "load_avg_start": "3.88 6.06 6.47",
-    "load_avg_end": "4.44 5.81 6.35",
-    "seconds": 67
+    "load_avg_start": "7.83 9.50 9.06",
+    "load_avg_end": "5.73 8.50 8.71",
+    "seconds": 68
   },
   "version": "3.2.0",
   "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67",
   "threads": "4",
+  "responses_sha256": "6a39b8ece0a5e2b71326b67d1864989d69d06f277401890d7d4b07e5b64a6f85",
   "warm_up": 1,
   "cli": {
     "answers": {
@@ -57,24 +58,24 @@
       },
       "reported_prefill_tps": {
         "n": 120,
-        "median": 3948.15,
-        "p90": 4305.1,
-        "min": 2223.2,
-        "max": 4975.6
+        "median": 3647.95,
+        "p90": 3944.2,
+        "min": 2164.9,
+        "max": 4651.7
       },
       "decode_tps": {
         "n": 120,
-        "median": 1803.95,
-        "p90": 1911.1,
-        "min": 1175.9,
-        "max": 1972.5
+        "median": 1673.9,
+        "p90": 1753,
+        "min": 1270.3,
+        "max": 1855.6
       },
       "wall_ms": {
         "n": 120,
-        "median": 122.02654150000001,
-        "p90": 335.279459,
-        "min": 80.733709,
-        "max": 359.065792
+        "median": 132.46212450000002,
+        "p90": 358.455167,
+        "min": 87.192916,
+        "max": 388.677916
       }
     },
     "cases": [
@@ -83,231 +84,231 @@
         "prefill_tokens": 332,
         "generated_tokens": 42,
         "ttft_ms": 0,
-        "decode_tps": 1814.3,
-        "wall_ms": 110.397125
+        "decode_tps": 1712.9,
+        "wall_ms": 121.326959
       },
       {
         "id": "alarm_morning",
         "prefill_tokens": 330,
         "generated_tokens": 60,
         "ttft_ms": 0,
-        "decode_tps": 1764.3,
-        "wall_ms": 120.45925
+        "decode_tps": 1650.5,
+        "wall_ms": 130.989833
       },
       {
         "id": "message_and_timer",
         "prefill_tokens": 338,
         "generated_tokens": 66,
         "ttft_ms": 0,
-        "decode_tps": 1791.7,
-        "wall_ms": 126.219167
+        "decode_tps": 1720.8,
+        "wall_ms": 134.895583
       },
       {
         "id": "lights_and_lock",
         "prefill_tokens": 262,
         "generated_tokens": 69,
         "ttft_ms": 0,
-        "decode_tps": 1912.8,
-        "wall_ms": 108.491833
+        "decode_tps": 1709.3,
+        "wall_ms": 119.593542
       },
       {
         "id": "thermostat_decimal",
         "prefill_tokens": 261,
         "generated_tokens": 44,
         "ttft_ms": 0,
-        "decode_tps": 1779.3,
-        "wall_ms": 96.957291
+        "decode_tps": 1674,
+        "wall_ms": 105.115292
       },
       {
         "id": "weather_friday",
         "prefill_tokens": 333,
         "generated_tokens": 59,
         "ttft_ms": 0,
-        "decode_tps": 1748.7,
-        "wall_ms": 121.127875
+        "decode_tps": 1698.9,
+        "wall_ms": 130.678
       },
       {
         "id": "event_tomorrow",
         "prefill_tokens": 330,
         "generated_tokens": 72,
         "ttft_ms": 0,
-        "decode_tps": 1733.8,
-        "wall_ms": 129.016459
+        "decode_tps": 1653.1,
+        "wall_ms": 139.87425
       },
       {
         "id": "event_explicit",
         "prefill_tokens": 346,
         "generated_tokens": 103,
         "ttft_ms": 0,
-        "decode_tps": 1736.5,
-        "wall_ms": 150.363917
+        "decode_tps": 1656,
+        "wall_ms": 161.416834
       },
       {
         "id": "event_no_year",
         "prefill_tokens": 332,
         "generated_tokens": 64,
         "ttft_ms": 0,
-        "decode_tps": 1839.6,
-        "wall_ms": 122.888125
+        "decode_tps": 1701.5,
+        "wall_ms": 132.826583
       },
       {
         "id": "offtopic_capital",
         "prefill_tokens": 259,
         "generated_tokens": 30,
         "ttft_ms": 0,
-        "decode_tps": 1875.9,
-        "wall_ms": 88.924542
+        "decode_tps": 1740.4,
+        "wall_ms": 94.815208
       },
       {
         "id": "no_tool_pizza",
         "prefill_tokens": 262,
         "generated_tokens": 16,
         "ttft_ms": 0,
-        "decode_tps": 1809.6,
-        "wall_ms": 81.479416
+        "decode_tps": 1665.9,
+        "wall_ms": 88.178584
       },
       {
         "id": "negation_door",
         "prefill_tokens": 266,
         "generated_tokens": 91,
         "ttft_ms": 0,
-        "decode_tps": 1844.6,
-        "wall_ms": 122.168333
+        "decode_tps": 1710.1,
+        "wall_ms": 133.755084
       },
       {
         "id": "negation_only",
         "prefill_tokens": 261,
         "generated_tokens": 63,
         "ttft_ms": 0,
-        "decode_tps": 1898.5,
-        "wall_ms": 105.431958
+        "decode_tps": 1761.6,
+        "wall_ms": 113.374
       },
       {
         "id": "german_timer",
         "prefill_tokens": 346,
         "generated_tokens": 44,
         "ttft_ms": 0,
-        "decode_tps": 1840.9,
-        "wall_ms": 114.3115
+        "decode_tps": 1700.1,
+        "wall_ms": 124.758167
       },
       {
         "id": "french_message",
         "prefill_tokens": 351,
         "generated_tokens": 62,
         "ttft_ms": 0,
-        "decode_tps": 1822.2,
-        "wall_ms": 128.101084
+        "decode_tps": 1636.4,
+        "wall_ms": 138.910833
       },
       {
         "id": "spanish_lights_music",
         "prefill_tokens": 283,
         "generated_tokens": 98,
         "ttft_ms": 0,
-        "decode_tps": 1864.9,
-        "wall_ms": 129.928667
+        "decode_tps": 1703.4,
+        "wall_ms": 140.389292
       },
       {
         "id": "extract_invoice",
         "prefill_tokens": 126,
         "generated_tokens": 77,
         "ttft_ms": 0,
-        "decode_tps": 1869.5,
-        "wall_ms": 84.460542
+        "decode_tps": 1841.7,
+        "wall_ms": 87.545083
       },
       {
         "id": "timer_then_result",
         "prefill_tokens": 332,
         "generated_tokens": 42,
         "ttft_ms": 0,
-        "decode_tps": 1869.2,
-        "wall_ms": 112.795542
+        "decode_tps": 1675.2,
+        "wall_ms": 119.48225
       },
       {
         "id": "timer_budget",
         "prefill_tokens": 332,
         "generated_tokens": 8,
         "ttft_ms": 0,
-        "decode_tps": 1856.7,
-        "wall_ms": 93.123916
+        "decode_tps": 1679.1,
+        "wall_ms": 100.051792
       },
       {
         "id": "catalogue_lock",
         "prefill_tokens": 1038,
         "generated_tokens": 36,
         "ttft_ms": 0,
-        "decode_tps": 1473,
-        "wall_ms": 316.651083
+        "decode_tps": 1361,
+        "wall_ms": 344.715
       },
       {
         "id": "catalogue_navigate",
         "prefill_tokens": 1041,
         "generated_tokens": 48,
         "ttft_ms": 0,
-        "decode_tps": 1458.1,
-        "wall_ms": 325.270333
+        "decode_tps": 1383.1,
+        "wall_ms": 355.952792
       },
       {
         "id": "catalogue_translate",
         "prefill_tokens": 1040,
         "generated_tokens": 46,
         "ttft_ms": 0,
-        "decode_tps": 1421.7,
-        "wall_ms": 327.92925
+        "decode_tps": 1362.9,
+        "wall_ms": 357.385
       },
       {
         "id": "catalogue_email",
         "prefill_tokens": 1049,
         "generated_tokens": 74,
         "ttft_ms": 0,
-        "decode_tps": 1399.6,
-        "wall_ms": 353.81675
+        "decode_tps": 1356,
+        "wall_ms": 384.594
       },
       {
         "id": "catalogue_reminder",
         "prefill_tokens": 1048,
         "generated_tokens": 67,
         "ttft_ms": 0,
-        "decode_tps": 1437.3,
-        "wall_ms": 343.392292
+        "decode_tps": 1354.5,
+        "wall_ms": 371.336333
       }
     ],
     "peak_ram_mb": {
       "n": 120,
-      "median": 94.5,
-      "p90": 103.1,
+      "median": 94.4,
+      "p90": 103,
       "min": 90.2,
-      "max": 107.4
+      "max": 103.4
     },
     "max_rss_mib": {
       "n": 120,
-      "median": 94.5,
-      "p90": 103.09375,
-      "min": 90.21875,
-      "max": 107.359375
+      "median": 94.390625,
+      "p90": 102.96875,
+      "min": 90.171875,
+      "max": 103.359375
     },
     "function_calls_equal": 24
   },
   "library": {
     "load_ms": {
       "n": 5,
-      "median": 4.285708,
-      "p90": 6.490625,
-      "min": 3.941625,
-      "max": 6.490625
+      "median": 4.745084,
+      "p90": 8.72375,
+      "min": 4.58025,
+      "max": 8.72375
     },
     "init_ms": {
       "n": 120,
-      "median": 67.27785399999999,
-      "p90": 277.219833,
-      "min": 17.653083,
-      "max": 328.359333
+      "median": 67.7000205,
+      "p90": 277.1205,
+      "min": 18.095209,
+      "max": 285.180875
     },
     "complete_ms": {
       "n": 120,
-      "median": 40.858896,
-      "p90": 60.475,
-      "min": 8.259542,
-      "max": 80.935416
+      "median": 39.3503125,
+      "p90": 61.602458,
+      "min": 8.455083,
+      "max": 71.057417
     },
     "answers": {
       "cases": 24,
@@ -328,38 +329,38 @@
       },
       "ttft_ms": {
         "n": 120,
-        "median": 73.04553026440948,
-        "p90": 286.27727324816874,
-        "min": 25.5003895424576,
-        "max": 335.4721810804137
+        "median": 73.14667570201762,
+        "p90": 284.73497976378064,
+        "min": 26.131766518809865,
+        "max": 294.35423530601093
       },
       "prefill_tps": {
         "n": 120,
-        "median": 4526.012042304079,
-        "p90": 4711.5436665823045,
-        "min": 3094.146276621334,
-        "max": 4941.100989465777
+        "median": 4534.6306134294955,
+        "p90": 4666.519314657209,
+        "min": 3560.3360655249217,
+        "max": 4821.71765576216
       },
       "reported_prefill_tps": {
         "n": 120,
-        "median": 3838.6,
-        "p90": 4168.7,
-        "min": 1830.2,
-        "max": 4668
+        "median": 3838.7,
+        "p90": 4154.5,
+        "min": 2288.3,
+        "max": 4664.7
       },
       "decode_tps": {
         "n": 120,
-        "median": 1738.6,
-        "p90": 1874.1,
-        "min": 709.9,
-        "max": 1943.5
+        "median": 1766.7,
+        "p90": 1854,
+        "min": 1334.4,
+        "max": 1923.9
       },
       "wall_ms": {
         "n": 120,
-        "median": 109.1672495,
-        "p90": 329.323958,
-        "min": 63.680792000000004,
-        "max": 363.532792
+        "median": 107.14820850000001,
+        "p90": 318.035249,
+        "min": 64.405542,
+        "max": 345.858625
       }
     },
     "cases": [
@@ -367,193 +368,193 @@
         "id": "timer_pasta",
         "prefill_tokens": 332,
         "generated_tokens": 42,
-        "ttft_ms": 72.83161631389802,
-        "decode_tps": 1809.6,
-        "wall_ms": 95.212374
+        "ttft_ms": 73.61467080345975,
+        "decode_tps": 1806.8,
+        "wall_ms": 96.717167
       },
       {
         "id": "alarm_morning",
         "prefill_tokens": 330,
         "generated_tokens": 60,
-        "ttft_ms": 75.89699199638711,
-        "decode_tps": 1720.8,
-        "wall_ms": 111.17975000000001
+        "ttft_ms": 72.8831359539656,
+        "decode_tps": 1761.4,
+        "wall_ms": 106.057042
       },
       {
         "id": "message_and_timer",
         "prefill_tokens": 338,
         "generated_tokens": 66,
-        "ttft_ms": 73.80678403046261,
-        "decode_tps": 1769.4,
-        "wall_ms": 110.611042
+        "ttft_ms": 74.58573913171321,
+        "decode_tps": 1811.6,
+        "wall_ms": 110.243208
       },
       {
         "id": "lights_and_lock",
         "prefill_tokens": 262,
         "generated_tokens": 69,
-        "ttft_ms": 56.64394354841934,
-        "decode_tps": 1874.1,
-        "wall_ms": 92.412709
+        "ttft_ms": 57.220594072567046,
+        "decode_tps": 1838.3,
+        "wall_ms": 94.211292
       },
       {
         "id": "thermostat_decimal",
         "prefill_tokens": 261,
         "generated_tokens": 44,
-        "ttft_ms": 57.464595573436206,
-        "decode_tps": 1671.8,
-        "wall_ms": 83.47775
+        "ttft_ms": 57.13124303096082,
+        "decode_tps": 1751.9,
+        "wall_ms": 81.69425
       },
       {
         "id": "weather_friday",
         "prefill_tokens": 333,
         "generated_tokens": 59,
-        "ttft_ms": 72.90462920316473,
-        "decode_tps": 1729.8,
-        "wall_ms": 105.68225
+        "ttft_ms": 72.65216813355346,
+        "decode_tps": 1760.5,
+        "wall_ms": 105.583167
       },
       {
         "id": "event_tomorrow",
         "prefill_tokens": 330,
         "generated_tokens": 72,
-        "ttft_ms": 72.07264711823964,
-        "decode_tps": 1683.3,
-        "wall_ms": 112.21979200000001
+        "ttft_ms": 71.8593567309918,
+        "decode_tps": 1742.7,
+        "wall_ms": 112.540042
       },
       {
         "id": "event_explicit",
         "prefill_tokens": 346,
         "generated_tokens": 103,
-        "ttft_ms": 77.54832345136593,
-        "decode_tps": 1724.1,
-        "wall_ms": 136.70962500000002
+        "ttft_ms": 76.63995114143879,
+        "decode_tps": 1715.3,
+        "wall_ms": 137.45049999999998
       },
       {
         "id": "event_no_year",
         "prefill_tokens": 332,
         "generated_tokens": 64,
-        "ttft_ms": 71.60231228845296,
-        "decode_tps": 1747.5,
-        "wall_ms": 109.109791
+        "ttft_ms": 73.00285415156733,
+        "decode_tps": 1774.4,
+        "wall_ms": 109.17233399999999
       },
       {
         "id": "offtopic_capital",
         "prefill_tokens": 259,
         "generated_tokens": 30,
-        "ttft_ms": 58.462370126700776,
-        "decode_tps": 1837.4,
-        "wall_ms": 73.937667
+        "ttft_ms": 55.97436563162467,
+        "decode_tps": 1841.6,
+        "wall_ms": 71.546209
       },
       {
         "id": "no_tool_pizza",
         "prefill_tokens": 262,
         "generated_tokens": 16,
-        "ttft_ms": 57.2359538470384,
-        "decode_tps": 1843.6,
-        "wall_ms": 65.372209
+        "ttft_ms": 57.83850443043528,
+        "decode_tps": 1786.7,
+        "wall_ms": 66.274001
       },
       {
         "id": "negation_door",
         "prefill_tokens": 266,
         "generated_tokens": 91,
-        "ttft_ms": 59.61399776501757,
-        "decode_tps": 1792.9,
-        "wall_ms": 109.81200100000001
+        "ttft_ms": 57.78316168330708,
+        "decode_tps": 1766.7,
+        "wall_ms": 108.847542
       },
       {
         "id": "negation_only",
         "prefill_tokens": 261,
         "generated_tokens": 63,
-        "ttft_ms": 55.848959659526194,
-        "decode_tps": 1800.4,
-        "wall_ms": 89.83533299999999
+        "ttft_ms": 55.878315347071585,
+        "decode_tps": 1844,
+        "wall_ms": 89.50087500000001
       },
       {
         "id": "german_timer",
         "prefill_tokens": 346,
         "generated_tokens": 44,
-        "ttft_ms": 75.45712859774827,
-        "decode_tps": 1717.3,
-        "wall_ms": 98.958249
+        "ttft_ms": 75.04263476347634,
+        "decode_tps": 1809.4,
+        "wall_ms": 98.776083
       },
       {
         "id": "french_message",
         "prefill_tokens": 351,
         "generated_tokens": 62,
-        "ttft_ms": 77.16407707785626,
-        "decode_tps": 1699.4,
-        "wall_ms": 114.92987600000001
+        "ttft_ms": 76.72176942117378,
+        "decode_tps": 1753.6,
+        "wall_ms": 111.81958300000001
       },
       {
         "id": "spanish_lights_music",
         "prefill_tokens": 283,
         "generated_tokens": 98,
-        "ttft_ms": 61.79320011724215,
-        "decode_tps": 1801.4,
-        "wall_ms": 115.640208
+        "ttft_ms": 61.59563116160282,
+        "decode_tps": 1754.7,
+        "wall_ms": 117.996167
       },
       {
         "id": "extract_invoice",
         "prefill_tokens": 126,
         "generated_tokens": 77,
-        "ttft_ms": 26.0971465743175,
-        "decode_tps": 1880,
-        "wall_ms": 66.249542
+        "ttft_ms": 26.208393694814184,
+        "decode_tps": 1868.7,
+        "wall_ms": 66.801751
       },
       {
         "id": "timer_then_result",
         "prefill_tokens": 332,
         "generated_tokens": 42,
-        "ttft_ms": 72.3105024997236,
-        "decode_tps": 1809,
-        "wall_ms": 94.714833
+        "ttft_ms": 73.8383592614132,
+        "decode_tps": 1749.9,
+        "wall_ms": 97.6825
       },
       {
         "id": "timer_budget",
         "prefill_tokens": 332,
         "generated_tokens": 8,
-        "ttft_ms": 77.94369890152299,
-        "decode_tps": 1792.1,
-        "wall_ms": 82.84425
+        "ttft_ms": 73.9793432035322,
+        "decode_tps": 1857.2,
+        "wall_ms": 77.748458
       },
       {
         "id": "catalogue_lock",
         "prefill_tokens": 1038,
         "generated_tokens": 36,
-        "ttft_ms": 294.4730099603708,
-        "decode_tps": 1413.1,
-        "wall_ms": 319.24125
+        "ttft_ms": 283.79799997372334,
+        "decode_tps": 1411.9,
+        "wall_ms": 308.587291
       },
       {
         "id": "catalogue_navigate",
         "prefill_tokens": 1041,
         "generated_tokens": 48,
-        "ttft_ms": 286.3688362668501,
-        "decode_tps": 1368.9,
-        "wall_ms": 318.810042
+        "ttft_ms": 284.82366723395387,
+        "decode_tps": 1435.1,
+        "wall_ms": 318.035249
       },
       {
         "id": "catalogue_translate",
         "prefill_tokens": 1040,
         "generated_tokens": 46,
-        "ttft_ms": 280.96576258569155,
-        "decode_tps": 1432.2,
-        "wall_ms": 312.10116700000003
+        "ttft_ms": 282.04541797419756,
+        "decode_tps": 1430.1,
+        "wall_ms": 313.511749
       },
       {
         "id": "catalogue_email",
         "prefill_tokens": 1049,
         "generated_tokens": 74,
-        "ttft_ms": 286.27727324816874,
-        "decode_tps": 1451.7,
-        "wall_ms": 337.272625
+        "ttft_ms": 285.1306856027476,
+        "decode_tps": 1402.5,
+        "wall_ms": 337.234583
       },
       {
         "id": "catalogue_reminder",
         "prefill_tokens": 1048,
         "generated_tokens": 67,
-        "ttft_ms": 285.35052807386603,
-        "decode_tps": 1432.9,
-        "wall_ms": 330.765624
+        "ttft_ms": 286.63028752080123,
+        "decode_tps": 1427.8,
+        "wall_ms": 332.85524899999996
       }
     ],
     "cached": {
@@ -575,10 +576,10 @@
       },
       "ttft_ms": {
         "n": 120,
-        "median": 5.749871124518456,
-        "p90": 8.70581955845359,
-        "min": 4.313882578947369,
-        "max": 10.621963693633486
+        "median": 5.575301875841818,
+        "p90": 8.763438544354369,
+        "min": 4.378617280678504,
+        "max": 10.535990215924429
       },
       "prefill_tps": {
         "n": 0,
@@ -589,24 +590,24 @@
       },
       "reported_prefill_tps": {
         "n": 120,
-        "median": 3864.2,
-        "p90": 4282,
-        "min": 2133.4,
-        "max": 4948
+        "median": 3867.3500000000004,
+        "p90": 4240.5,
+        "min": 2299.5,
+        "max": 4735.1
       },
       "decode_tps": {
         "n": 120,
-        "median": 1746.1999999999998,
-        "p90": 1884.3,
-        "min": 1057.9,
-        "max": 1984.6
+        "median": 1788.35,
+        "p90": 1882.4,
+        "min": 1349.6,
+        "max": 1956.6
       },
       "wall_ms": {
         "n": 120,
-        "median": 40.152311999999995,
-        "p90": 60.779958,
-        "min": 8.094,
-        "max": 78.696541
+        "median": 38.824604,
+        "p90": 60.136083,
+        "min": 8.358625,
+        "max": 77.26124899999999
       }
     },
     "function_calls_equal": 24,
