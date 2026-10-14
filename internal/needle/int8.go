@@ -173,6 +173,10 @@ func (r Int8Rows) Floats() []float32 {
 // Bytes is the memory the codes and scales take.
 func (r Int8Rows) Bytes() int { return len(r.Q) + 4*len(r.S) }
 
+// AllocatedBytes is the memory the codes' and scales' backing arrays
+// hold, Append's spare capacity included: at least Bytes.
+func (r Int8Rows) AllocatedBytes() int { return cap(r.Q) + 4*cap(r.S) }
+
 // AttendInt8 is softmax(q kᵀ / scale) v for t query rows against the int8
 // keys k and values v of the same rows (docs/FINDINGS.md F-041). q holds
 // t rows of heads chunks of k.Width values; query head h reads chunk

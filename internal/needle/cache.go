@@ -39,10 +39,19 @@ func (c *KVCache) SetSink(n int) {
 // Sink is the number of positions SetSink keeps in view.
 func (c *KVCache) Sink() int { return c.sink }
 
-// Bytes is the memory the cached keys and values take: float32, or with
+// Bytes is the memory the cached keys and values need: float32, or with
 // Int8.KV the int8 codes and their scales (docs/FINDINGS.md F-041, F-060).
-// The tap history, at most Taps − 1 rows, is left out.
+// It counts the positions, not the spare capacity append keeps behind
+// them; AllocatedBytes counts that too. The tap history, at most
+// Taps − 1 rows, is left out.
 func (c *KVCache) Bytes() int { return 4*(len(c.k)+len(c.v)) + c.k8.Bytes() + c.v8.Bytes() }
+
+// AllocatedBytes is the memory the cache's backing arrays hold, the
+// spare capacity of append's growth included: what the heap retains for
+// the keys and values, at least Bytes.
+func (c *KVCache) AllocatedBytes() int {
+	return 4*(cap(c.k)+cap(c.v)) + c.k8.AllocatedBytes() + c.v8.AllocatedBytes()
+}
 
 // Fork returns a cache with c's positions that extends independently of c
 // (docs/FINDINGS.md F-026). The two share the keys and values so far

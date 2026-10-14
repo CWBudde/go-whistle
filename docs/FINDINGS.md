@@ -5533,8 +5533,10 @@ longer the sequence; the forward pass pays for quantising the queries, keys and 
 attention, sets both: `LUT` is 3× faster.
 
 The int8 caches take 4,800 bytes per position over the 20 layers (2 KV heads of 48 key and 64 value codes and a
-float32 scale each), against 17,920 in float32 (`TestInt8CacheMemory`): 4.6 MiB per 1000 positions against 17.1. The
-caches keep every position; one that dropped what the window and the sink no longer reach would hold at most the
+float32 scale each), against 17,920 in float32 (`TestInt8CacheMemory`): 4.6 MiB per 1000 positions against 17.1. That
+is what the positions need (`KVCache.Bytes`). What the heap retains is more, because `append` grows the backing arrays
+ahead (`KVCache.AllocatedBytes`): after the 1230-token prompt and 64 single-token steps, 1.27× for int8 and 1.20× for
+float32. The caches keep every position; one that dropped what the window and the sink no longer reach would hold at most the
 prefix and 256 positions, as the engine's budget does.
 
 ### Recommendation

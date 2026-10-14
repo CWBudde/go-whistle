@@ -313,7 +313,9 @@ func TestKVWindowSink(t *testing.T) {
 // TestInt8CacheMemory: a state's int8 caches take 4800 bytes per position
 // over the 20 layers (2 KV heads of 48 key and 64 value codes and a scale
 // each), against 17,920 for float32 (docs/FINDINGS.md F-060). The caches
-// keep every position; the KV window narrows what a position reads.
+// keep every position; the KV window narrows what a position reads. What
+// the heap retains, append's spare capacity included, is logged after a
+// prompt and decoding steps one token at a time.
 func TestInt8CacheMemory(t *testing.T) {
 	requireFile(t, forwardFixture)
 
@@ -342,6 +344,26 @@ func TestInt8CacheMemory(t *testing.T) {
 
 		if n != tc.perPosition*len(tokens) {
 			t.Errorf("%s: %d bytes for %d positions, want %d per position", tc.name, n, len(tokens), tc.perPosition)
+		}
+
+		for _, tok := range tokens[:64] {
+			_, err = tc.m.Extend(s, []int{tok})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		var need, held int
+		for _, c := range s.kv {
+			need, held = need+c.Bytes(), held+c.AllocatedBytes()
+		}
+
+		t.Logf("%s: after 64 steps %d bytes needed, %d allocated (%.2f×)", tc.name, need, held,
+			float64(held)/float64(need))
+
+		if need != tc.perPosition*s.Len() || held < need {
+			t.Errorf("%s: %d bytes needed and %d allocated for %d positions, want %d per position and at least that",
+				tc.name, need, held, s.Len(), tc.perPosition)
 		}
 	}
 }
