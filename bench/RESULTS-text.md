@@ -8,8 +8,8 @@ generated from `bench/results/text-go.json` (`just bench-text`) and `bench/resul
 
 | run                         | Go (`just bench-text`)        | engine (`just oracle-text bench`)                          |
 | --------------------------- | ----------------------------- | ---------------------------------------------------------- |
-| date                        | 2026-10-14T17:31:41+02:00     | 2026-10-14T17:51:40+02:00                                  |
-| commit                      | dc29920b28                    | 267eea9065                                                 |
+| date                        | 2026-10-14T18:07:39+02:00     | 2026-10-14T17:51:40+02:00                                  |
+| commit                      | 924f8366ed                    | 267eea9065                                                 |
 | CPU                         | Apple M5 Pro                  | Apple M5 Pro                                               |
 | cores                       | 15 (5 Super + 10 Performance) | 15 (5 Super + 10 Performance)                              |
 | memory                      | 48 GiB                        | 48 GiB                                                     |
@@ -21,9 +21,11 @@ generated from `bench/results/text-go.json` (`just bench-text`) and `bench/resul
 | engine                      | —                             | 3.2.0 (2ae11323dc)                                         |
 | workers                     | GOMAXPROCS 15                 | CLI `--threads 4`, library default (fast cores, at most 4) |
 | passes over the cases       | 1 warm-up + 5 timed           | 1 warm-up + 5 timed                                        |
-| load average, start         | 5.23 5.75 5.39                | 3.88 6.06 6.47                                             |
-| load average, end           | 5.51 6.95 6.80                | 4.44 5.81 6.35                                             |
-| run time                    | 1109 s                        | 67 s                                                       |
+| load average, start         | 2.43 2.83 4.40                | 3.88 6.06 6.47                                             |
+| load average, end           | 7.83 9.50 9.06                | 4.44 5.81 6.35                                             |
+| run time                    | 1232 s                        | 67 s                                                       |
+
+**The Go and the engine results are not comparable**: they come from different machines (CPU, cores, OS or architecture) or answered different inputs (model, cases or recorded answers), so this report does not compare them. Re-run `just bench-text` and `just oracle-text bench` on the same machine and inputs for the ratios.
 
 ## Speed: the 24 first turns
 
@@ -31,32 +33,25 @@ generated from `bench/results/text-go.json` (`just bench-text`) and `bench/resul
 | ----------------------------------------- | ---------------------: | --------------: | ------------------------: | ----------------------------: | -------------: | ----------------------------: | -------------------: |
 | prefill tokens, median                    |                    332 |             332 |                       332 |                           332 |            332 |                           332 |                  332 |
 | generated tokens, median                  |                     58 |              60 |                        59 |                            59 |             61 |                            61 |                   61 |
-| TTFT, median (ms)                         |                  111.8 |           337.3 |                     341.6 |                         113.0 |           73.0 |                           5.7 |                    — |
-| TTFT, p90 (ms)                            |                  318.0 |           989.2 |                    1002.7 |                         338.5 |          286.3 |                           8.7 |                    — |
-| prefill, median (tok/s)                   |                   2971 |             985 |                       973 |                          2934 |           4526 |                             — |                    — |
+| TTFT, median (ms)                         |                  109.6 |           345.6 |                     349.5 |                         110.7 |           73.0 |                           5.7 |                    — |
+| TTFT, p90 (ms)                            |                  329.3 |          1041.3 |                    1054.6 |                         347.9 |          286.3 |                           8.7 |                    — |
+| prefill, median (tok/s)                   |                   3010 |             947 |                       937 |                          2961 |           4526 |                             — |                    — |
 | engine's `prefill_tps` (the turn), median |                      — |               — |                         — |                             — |           3839 |                          3864 |                 3948 |
-| decode, median (tok/s)                    |                    189 |             107 |                       119 |                           412 |           1739 |                          1746 |                 1804 |
-| decode, p90 (tok/s)                       |                    209 |             113 |                       126 |                           451 |           1874 |                          1884 |                 1911 |
-| answer, median (ms)                       |                  593.2 |          1313.2 |                    1239.4 |                         429.3 |          109.2 |                          40.2 |                122.0 |
-| answer, p90 (ms)                          |                 1206.3 |          2689.9 |                    2580.7 |                        1007.6 |          329.3 |                          60.8 |                335.3 |
+| decode, median (tok/s)                    |                    190 |             104 |                       116 |                           411 |           1739 |                          1746 |                 1804 |
+| decode, p90 (tok/s)                       |                    210 |             113 |                       125 |                           448 |           1874 |                          1884 |                 1911 |
+| answer, median (ms)                       |                  591.1 |          1339.0 |                    1286.2 |                         424.9 |          109.2 |                          40.2 |                122.0 |
+| answer, p90 (ms)                          |                 1249.2 |          2869.0 |                    2743.0 |                        1076.1 |          329.3 |                          60.8 |                335.3 |
 | answers timed (cases × passes)            |                 24 × 5 |          24 × 5 |                    24 × 5 |                        24 × 5 |         24 × 5 |                        24 × 5 |               24 × 5 |
 | `function_calls` equal to the recording   |                  20/24 |           24/24 |                     23/24 |                         23/24 |          24/24 |                         24/24 |                24/24 |
 
-| median, Go / engine library   |  TTFT | prefill | decode | answer |
-| ----------------------------- | ----: | ------: | -----: | -----: |
-| Go safetensors float32        | 1.53× |   0.66× |  0.11× |  5.43× |
-| Go packed exact               | 4.62× |   0.22× |  0.06× | 12.03× |
-| Go packed + int8 + window     | 4.68× |   0.22× |  0.07× | 11.35× |
-| Go packed LUT + int8 + window | 1.55× |   0.65× |  0.24× |  3.93× |
-
-A TTFT or answer ratio above 1 is slower than the engine, a prefill or decode ratio below 1 too.
+The Go and the engine columns are not comparable (machine or inputs); compare within a side only.
 
 ## Speed: model load
 
 | model load (ms) | Go safetensors float32 | Go packed exact | Go packed + int8 + window | Go packed LUT + int8 + window | engine library |
 | --------------- | ---------------------: | --------------: | ------------------------: | ----------------------------: | -------------: |
-| median          |                  929.7 |             8.3 |                       8.2 |                          13.2 |            4.3 |
-| p90             |                 1019.0 |             8.5 |                       8.9 |                          13.5 |            6.5 |
+| median          |                 1051.4 |             8.1 |                       8.0 |                          13.1 |            4.3 |
+| p90             |                 1153.9 |             8.3 |                       8.4 |                          13.5 |            6.5 |
 
 The Go load reads the file and builds the tokenizer, the model and the decoder; `needle_load` takes the file's bytes already read into memory. The CLI's load is inside its process time.
 
@@ -64,8 +59,8 @@ The Go load reads the file and builds the tokenizer, the model and the decoder; 
 
 | memory (MiB)                                 | Go safetensors float32 | Go packed exact | Go packed + int8 + window | Go packed LUT + int8 + window | engine CLI |
 | -------------------------------------------- | ---------------------: | --------------: | ------------------------: | ----------------------------: | ---------: |
-| peak RSS after the load                      |                  925.9 |            52.2 |                      52.3 |                          67.5 |          — |
-| peak RSS after the 24 answers, load included |                 1264.9 |           486.0 |                     486.0 |                         492.9 |      107.4 |
+| peak RSS after the load                      |                  982.3 |            52.2 |                      52.3 |                          67.7 |          — |
+| peak RSS after the 24 answers, load included |                 1367.4 |           478.5 |                     500.2 |                         492.3 |      107.4 |
 | Go heap after the load                       |                  464.9 |            42.9 |                      42.9 |                          58.2 |          — |
 | engine's `peak_ram_mb`, median               |                      — |               — |                         — |                             — |       94.5 |
 | engine's `peak_ram_mb`, largest              |                      — |               — |                         — |                             — |      107.4 |
