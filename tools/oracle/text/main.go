@@ -24,6 +24,8 @@
 //	go run -tags oracle ./tools/oracle/text window  # window.json: facts far behind the answer, for the KV window
 //	go run -tags oracle ./tools/oracle/text confidence  # confidence.json: respond turns, object arguments, forced
 //	                                                    # and guessed values, relative dates, the catalogue tools
+//	go run -tags oracle ./tools/oracle/text history  # history.json: the request's escapes, conversations that need
+//	                                                 # earlier turns, --max scans where the engine drops the history
 //	go run -tags oracle ./tools/oracle/text all    # every subcommand above
 //	go run -tags oracle ./tools/oracle/text fetch  # download the pinned text model into models/needle3 (-dir)
 //	go run -tags oracle ./tools/oracle/text bench  # bench/results/text-engine.json: the engine's speed and memory on
@@ -67,9 +69,10 @@ var subcommands = []struct {
 	{"gates", cmdGates},
 	{"window", cmdWindow},
 	{"confidence", cmdConfidence},
+	{"history", cmdHistory},
 }
 
-const usage = "usage: oracle/text cases|date|depth|audio|embed|retrieval|normalise|turns|triggers|grammar|repair|validation|gates|window|confidence|all " +
+const usage = "usage: oracle/text cases|date|depth|audio|embed|retrieval|normalise|turns|triggers|grammar|repair|validation|gates|window|confidence|history|all " +
 	"[-out dir] [-cases file] [-needle3 dir] [-whistle dir] [-engine dir] [-audio dir]\n" +
 	"       oracle/text fetch [-dir models/needle3]\n" +
 	"       oracle/text bench [-out file] [-go file] [-report file] [-warmup n] [-passes n] [-loads n]"
