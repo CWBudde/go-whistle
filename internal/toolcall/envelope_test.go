@@ -24,13 +24,17 @@ type engineEnvelope struct {
 }
 
 // Envelope turns that differ from the engine's, and why (docs/FINDINGS.md
-// F-053, F-054, F-055). Keys are "case/turn".
+// F-053, F-054, F-055, F-062). Keys are "case/turn".
 var (
 	// The confidence is off by more than 0.02: the decode differs at a
-	// near-tie (decode_test.go), the head's score of a respond turn is not
-	// fitted, nor that of three turns decoded as the engine does
-	// (event_tomorrow 0.026; under the grammar lights_and_lock 0.031,
-	// catalogue_lock 0.027; docs/FINDINGS.md F-055).
+	// near-tie (decode_test.go), or the ConfidenceHead's score of a turn
+	// decoded as the engine does is off in float32. Under the engine's int8
+	// numerics lights_and_lock comes within 0.02, and event_tomorrow
+	// (-0.043) and catalogue_lock (+0.067) stay off: on the dequantised
+	// weights with the same int8 numerics both come within 0.02 and two
+	// other turns fall out, the weight path's implementation noise of
+	// F-060 (docs/FINDINGS.md F-062). The respond turn takes the decode
+	// probability, the geometric mean of its tokens, and is within 0.02.
 	confidenceOff = map[string]string{
 		"alarm_morning/0":      "near-tie",
 		"alarm_untriggered/0":  "near-tie",
@@ -38,10 +42,9 @@ var (
 		"alarm_invalid/0":      "near-tie",
 		"alarm_no_match/0":     "near-tie",
 		"catalogue_reminder/0": "near-tie",
-		"timer_then_result/1":  "respond turn",
-		"event_tomorrow/0":     "0.026",
-		"lights_and_lock/0":    "0.031",
-		"catalogue_lock/0":     "0.027",
+		"event_tomorrow/0":     "the head -0.026 (int8 -0.043)",
+		"lights_and_lock/0":    "the head -0.031 (int8 within 0.02)",
+		"catalogue_lock/0":     "the head +0.027 (int8 +0.067)",
 	}
 )
 
@@ -183,11 +186,42 @@ func TestEnvelopeMatchesEngine(t *testing.T) {
 		}
 	}
 
+	// 11.4's Accept, on the 25 corpus turns alone: type and function_calls
+	// equal, reasoning equal, and the confidence within 0.02 among the turns
+	// decoded as the engine's (type, reasoning and every call).
+	var acceptCalls, acceptReasoning, acceptDecoded, acceptConf, corpusTurns int
+
 	for _, c := range corpus.Cases {
 		for i, turn := range decodeCase(t, d, m, p, &corpus, c) {
-			count(envelopeTurn(t, c.ID+"/"+string(rune('0'+i)), turn, responses[c.ID][i]))
+			want := responses[c.ID][i]
+			callsEq, fcEq, reasoningEq, confEq := envelopeTurn(t, c.ID+"/"+string(rune('0'+i)), turn, want)
+			count(callsEq, fcEq, reasoningEq, confEq)
+
+			corpusTurns++
+
+			if fcEq && turn.env.Type == want.Type {
+				acceptCalls++
+			}
+
+			if reasoningEq {
+				acceptReasoning++
+			}
+
+			if callsEq && reasoningEq && turn.env.Type == want.Type {
+				acceptDecoded++
+
+				if confEq {
+					acceptConf++
+				}
+			}
 		}
 	}
+
+	logCount(t, "corpus type and function_calls equal", acceptCalls, corpusTurns)
+	logCount(t, "corpus reasoning equal", acceptReasoning, corpusTurns)
+	logCount(t, "corpus turns decoded as the engine's", acceptDecoded, corpusTurns)
+	t.Logf("%s numerics: corpus confidence within 0.02 on %d of %d turns decoded as the engine's",
+		testNumerics(t), acceptConf, acceptDecoded)
 
 	for _, pr := range triggers.Probes {
 		turn := decodeTurns(t, d, m, p, triggers.System, []byte(pr.Tools), []string{pr.Query}, 512)[0]
