@@ -243,7 +243,8 @@ func parseMemReport(out io.Reader, mode string) (memReport, error) {
 	return memReport{}, fmt.Errorf("%s memory child: no %q line", mode, memLine)
 }
 
-// memChild is the memory child: the load, then one answer to every case,
+// memChild is the memory child: the load, then one answer to every case
+// (respond, without the timing replay; docs/FINDINGS.md F-061),
 // with ru_maxrss after each and the live heap after the load, printed as
 // one memLine. ru_maxrss is a high-water mark, so the model loads before
 // the corpus is read: the sample after the load sees the model alone.
@@ -267,7 +268,7 @@ func memChild(stdout io.Writer, cfg config, mode string) error {
 	}
 
 	for _, c := range cases {
-		_, err := l.answer(c)
+		_, _, _, err := l.respond(c)
 		if err != nil {
 			return err
 		}

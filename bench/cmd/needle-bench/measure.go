@@ -109,24 +109,46 @@ type answered struct {
 	calls json.RawMessage // the envelope's function_calls
 }
 
-// answer answers case c's first turn as the engine does, timed: the
-// tools' normalisation, the prompt, the decode under the grammar, the
-// confidence and the envelope. Then it times the same turn's prefill and
-// decode on a fresh state, replaying the answer's tokens one Extend each,
-// since the decoder does not split its time.
+// answer answers case c's first turn as respond does, then times the
+// same turn's prefill and decode on a fresh state, replaying the answer's
+// tokens one Extend each, since the decoder does not split its time.
 func (l *loaded) answer(c textCase) (answered, error) {
+	a, prefill, generated, err := l.respond(c)
+	if err != nil {
+		return answered{}, err
+	}
+
+	out, err := l.replay(prefill, generated)
+	if err != nil {
+		return answered{}, fmt.Errorf("%s: %w", c.ID, err)
+	}
+
+	out.Generated, out.WallMS = a.Generated, a.WallMS
+	a.TextAnswer = out
+
+	return a, nil
+}
+
+// respond answers case c's first turn as the engine does, timed: the
+// tools' normalisation, the prompt, the decode under the grammar, the
+// confidence and the envelope. It returns the answer's wall time, its
+// token count and function_calls, and the replay's input: the prefill up
+// to the forced <think>\n and the tokens generated after it. The memory
+// child runs it alone, so the bench's replay stays out of the peak RSS
+// (docs/FINDINGS.md F-061).
+func (l *loaded) respond(c textCase) (answered, []int, []int, error) {
 	start := time.Now()
 
 	n, err := toolcall.Normalise(c.Tools)
 	if err != nil {
-		return answered{}, fmt.Errorf("%s: %w", c.ID, err)
+		return answered{}, nil, nil, fmt.Errorf("%s: %w", c.ID, err)
 	}
 
 	conv := toolcall.NewConversation(l.p, c.System, n.JSON, l.m.Config().MaxSeqLen)
 
 	turn, err := conv.Turn(c.Query, c.Max, true)
 	if err != nil {
-		return answered{}, fmt.Errorf("%s: %w", c.ID, err)
+		return answered{}, nil, nil, fmt.Errorf("%s: %w", c.ID, err)
 	}
 
 	ids := append(toolcall.StaticPrefix(l.p, c.System, n.JSON), turn...)
@@ -134,24 +156,24 @@ func (l *loaded) answer(c textCase) (answered, error) {
 
 	a, err := l.d.Decode(s, ids, c.Max, n.GrammarFor(c.Query))
 	if err != nil {
-		return answered{}, fmt.Errorf("%s: %w", c.ID, err)
+		return answered{}, nil, nil, fmt.Errorf("%s: %w", c.ID, err)
 	}
 
 	conf, err := l.d.Confidence(s)
 	if err != nil {
-		return answered{}, fmt.Errorf("%s: %w", c.ID, err)
+		return answered{}, nil, nil, fmt.Errorf("%s: %w", c.ID, err)
 	}
 
 	env, err := n.Envelope(a, c.Query, c.System, nil, conf)
 	if err != nil {
-		return answered{}, fmt.Errorf("%s: %w", c.ID, err)
+		return answered{}, nil, nil, fmt.Errorf("%s: %w", c.ID, err)
 	}
 
 	wall := ms(time.Since(start))
 
 	js, err := json.Marshal(env)
 	if err != nil {
-		return answered{}, fmt.Errorf("%s: %w", c.ID, err)
+		return answered{}, nil, nil, fmt.Errorf("%s: %w", c.ID, err)
 	}
 
 	var e struct {
@@ -160,19 +182,13 @@ func (l *loaded) answer(c textCase) (answered, error) {
 
 	err = json.Unmarshal(js, &e)
 	if err != nil {
-		return answered{}, fmt.Errorf("%s: %w", c.ID, err)
+		return answered{}, nil, nil, fmt.Errorf("%s: %w", c.ID, err)
 	}
 
 	forced := min(len(l.think), c.Max)
+	out := answered{TextAnswer: bench.TextAnswer{Generated: len(a.Tokens), WallMS: wall}, calls: e.Calls}
 
-	out, err := l.replay(append(ids, l.think[:forced]...), a.Tokens[forced:])
-	if err != nil {
-		return answered{}, fmt.Errorf("%s: %w", c.ID, err)
-	}
-
-	out.Generated, out.WallMS = len(a.Tokens), wall
-
-	return answered{TextAnswer: out, calls: e.Calls}, nil
+	return out, append(ids, l.think[:forced]...), a.Tokens[forced:], nil
 }
 
 // replay times prefill, the first forward pass and the pick of the first
