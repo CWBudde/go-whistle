@@ -186,7 +186,7 @@ func (l *loaded) respond(c textCase) (answered, []int, []int, error) {
 	}
 
 	forced := min(len(l.think), c.Max)
-	out := answered{TextAnswer: bench.TextAnswer{Generated: len(a.Tokens), WallMS: wall}, calls: e.Calls}
+	out := answered{Generated: len(a.Tokens), WallMS: wall, calls: e.Calls}
 
 	return out, append(ids, l.think[:forced]...), a.Tokens[forced:], nil
 }
