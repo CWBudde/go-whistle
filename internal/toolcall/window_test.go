@@ -13,9 +13,9 @@ const engineWindow = "../../testdata/text/engine/window.json"
 
 // loadWindowModel is the model the window probes run on: loadModel's
 // under the int8 numerics, which carry the KV window; otherwise the
-// dequantised (float) or packed needle3.cact with the KV window of 256
-// and the static prefix as its sink added, in float32 (docs/FINDINGS.md
-// F-060).
+// dequantised (float) or packed needle3.cact, or needle3.safetensors
+// (safetensors), with the KV window of 256 and the static prefix as its
+// sink added, in float32 (docs/FINDINGS.md F-060, F-061).
 func loadWindowModel(t *testing.T) *text.Model {
 	t.Helper()
 
@@ -24,9 +24,14 @@ func loadWindowModel(t *testing.T) *text.Model {
 		return loadModel(t, needle3Cact)
 	}
 
-	requireModel(t, needle3Cact)
+	path := needle3Cact
+	if n == numericsSafetensors {
+		path = needle3Safetensors
+	}
 
-	src, err := text.OpenWith(needle3Cact, text.OpenOptions{Packed: n == numericsPacked})
+	requireModel(t, path)
+
+	src, err := text.OpenWith(path, text.OpenOptions{Packed: n == numericsPacked})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +94,7 @@ func TestWindowMatchesEngine(t *testing.T) {
 
 	equal := map[string]bool{}
 
-	var calls, reasoning, conf, total int
+	var calls, fc, reasoning, conf, total int
 
 	for _, pr := range fx.Probes {
 		for i, turn := range decodeTurns(t, d, m, p, fx.System, []byte(pr.Tools), pr.Turns, 512) {
@@ -118,7 +123,7 @@ func TestWindowMatchesEngine(t *testing.T) {
 			for _, c := range []struct {
 				ok bool
 				n  *int
-			}{{same, &calls}, {think, &reasoning}, {near, &conf}} {
+			}{{same, &calls}, {functionCallsEqual(got.Calls, want.Calls), &fc}, {think, &reasoning}, {near, &conf}} {
 				if c.ok {
 					*c.n++
 				}
@@ -129,12 +134,23 @@ func TestWindowMatchesEngine(t *testing.T) {
 		}
 	}
 
+	// needle3.safetensors makes up other calls where the window cuts the
+	// fact than the .cact the engine runs: logged, as its lists are
+	// (docs/FINDINGS.md F-061).
+	cutf := t.Errorf
+	if testNumerics(t) == numericsSafetensors {
+		cutf = t.Logf
+	}
+
 	for _, key := range windowCut {
 		if !equal[key] {
-			t.Errorf("%s: the calls differ from the engine's, which the window explains", key)
+			cutf("%s: the calls differ from the engine's, which the window explains", key)
 		}
 	}
 
+	logCount(t, "function_calls equal", fc, total)
+
+	// The safetensors numerics have no entry: no floors (numericsEnv).
 	floors := windowFloors[testNumerics(t)]
 	for _, c := range []struct {
 		name       string

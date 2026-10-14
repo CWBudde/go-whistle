@@ -97,7 +97,7 @@ oracle-librispeech:
 oracle-stream:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle stream
 
-# Record the Needle 3 engine's answers to the tool-calling cases into testdata/text/engine (cases|date|depth|audio|embed|all)
+# Record the Needle 3 engine's answers to the tool-calling cases into testdata/text/engine (cases|date|depth|audio|embed|all), or time it on them (bench: bench/results/text-engine.json, then bench/RESULTS-text.md)
 oracle-text *args="all":
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle/text {{args}}
 
@@ -172,6 +172,10 @@ bench *args:
 # Benchmark the Needle 3 engine (CLI and libneedle3) on the same clips into bench/results/engine.json (-out), then re-render bench/RESULTS.md from it
 oracle-bench *args:
     NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 CGO_ENABLED=0 go run -tags oracle ./tools/oracle bench {{args}}
+
+# Benchmark the Needle 3 text model in Go (safetensors, packed, packed + int8 + window, its LUT variant: load, TTFT, prefill and decode tok/s, peak RSS) into bench/results/text-go.json and bench/RESULTS-text.md; the engine side is `just oracle-text bench`
+bench-text *args:
+    go run ./bench/cmd/needle-bench run {{args}}
 
 # Build the web demo into web/: whistle.wasm (cmd/whistle-wasm) and Go's wasm_exec.js, both git-ignored
 wasm:

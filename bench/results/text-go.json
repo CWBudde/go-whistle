@@ -1,0 +1,1073 @@
+{
+  "run": {
+    "date": "2026-10-14T18:07:39+02:00",
+    "commit": "924f8366ed",
+    "machine": {
+      "cpu": "Apple M5 Pro",
+      "cores": 15,
+      "core_types": "5 Super + 10 Performance",
+      "memory_gib": 48,
+      "os": "macOS 27.0.1 (26A434)",
+      "arch": "arm64",
+      "go_version": "go1.27.1"
+    },
+    "inputs": {
+      "model_sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38",
+      "clips_sha256": "698aee1811a234af84dfc727a04e12240c23b65c73478ad41ce8893f0641eff0"
+    },
+    "load_avg_start": "2.43 2.83 4.40",
+    "load_avg_end": "7.83 9.50 9.06",
+    "seconds": 1232
+  },
+  "safetensors_sha256": "c234c70dccc7a9115e7c41ac2e41d3655fea3b85c245dd898b46179fb90c6c0c",
+  "tokenizer_sha256": "97dfd5666620b19875deba9e55953d312364e7763bd08bee428b94f1b9491b25",
+  "responses_sha256": "6a39b8ece0a5e2b71326b67d1864989d69d06f277401890d7d4b07e5b64a6f85",
+  "gomaxprocs": 15,
+  "warm_up": 1,
+  "modes": [
+    {
+      "mode": "safetensors",
+      "load_ms": {
+        "n": 5,
+        "median": 1051.369,
+        "p90": 1153.929208,
+        "min": 1003.541833,
+        "max": 1153.929208
+      },
+      "answers": {
+        "cases": 24,
+        "passes": 5,
+        "prefill_tokens": {
+          "n": 120,
+          "median": 332,
+          "p90": 1041,
+          "min": 126,
+          "max": 1049
+        },
+        "generated_tokens": {
+          "n": 120,
+          "median": 58,
+          "p90": 80,
+          "min": 8,
+          "max": 94
+        },
+        "ttft_ms": {
+          "n": 120,
+          "median": 109.648979,
+          "p90": 329.307792,
+          "min": 52.024542,
+          "max": 352.287709
+        },
+        "prefill_tps": {
+          "n": 120,
+          "median": 3009.5056807573583,
+          "p90": 3185.003621502612,
+          "min": 862.8989691604717,
+          "max": 3415.4000630004434
+        },
+        "reported_prefill_tps": {
+          "n": 0,
+          "median": 0,
+          "p90": 0,
+          "min": 0,
+          "max": 0
+        },
+        "decode_tps": {
+          "n": 120,
+          "median": 189.7714447839354,
+          "p90": 209.58194498077256,
+          "min": 94.51375909857603,
+          "max": 244.1631406021119
+        },
+        "wall_ms": {
+          "n": 120,
+          "median": 591.0779585,
+          "p90": 1249.239333,
+          "min": 277.143333,
+          "max": 1442.215917
+        }
+      },
+      "cases": [
+        {
+          "id": "timer_pasta",
+          "prefill_tokens": 332,
+          "generated_tokens": 42,
+          "ttft_ms": 111.361625,
+          "decode_tps": 188.46122017767303,
+          "wall_ms": 488.01075
+        },
+        {
+          "id": "alarm_morning",
+          "prefill_tokens": 330,
+          "generated_tokens": 54,
+          "ttft_ms": 110.136666,
+          "decode_tps": 186.39862602721954,
+          "wall_ms": 549.877708
+        },
+        {
+          "id": "message_and_timer",
+          "prefill_tokens": 338,
+          "generated_tokens": 77,
+          "ttft_ms": 111.948917,
+          "decode_tps": 187.41329760661822,
+          "wall_ms": 682.009334
+        },
+        {
+          "id": "lights_and_lock",
+          "prefill_tokens": 262,
+          "generated_tokens": 72,
+          "ttft_ms": 94.177042,
+          "decode_tps": 206.72683673955694,
+          "wall_ms": 593.7805
+        },
+        {
+          "id": "thermostat_decimal",
+          "prefill_tokens": 261,
+          "generated_tokens": 43,
+          "ttft_ms": 90.942209,
+          "decode_tps": 209.20944364315486,
+          "wall_ms": 420.506084
+        },
+        {
+          "id": "weather_friday",
+          "prefill_tokens": 333,
+          "generated_tokens": 60,
+          "ttft_ms": 109.340917,
+          "decode_tps": 191.34507615827764,
+          "wall_ms": 580.088416
+        },
+        {
+          "id": "event_tomorrow",
+          "prefill_tokens": 330,
+          "generated_tokens": 70,
+          "ttft_ms": 109.839667,
+          "decode_tps": 190.92634404459284,
+          "wall_ms": 638.595375
+        },
+        {
+          "id": "event_explicit",
+          "prefill_tokens": 346,
+          "generated_tokens": 94,
+          "ttft_ms": 112.929333,
+          "decode_tps": 185.00644727138362,
+          "wall_ms": 789.791166
+        },
+        {
+          "id": "event_no_year",
+          "prefill_tokens": 332,
+          "generated_tokens": 64,
+          "ttft_ms": 106.409875,
+          "decode_tps": 190.8078821997929,
+          "wall_ms": 601.65125
+        },
+        {
+          "id": "offtopic_capital",
+          "prefill_tokens": 259,
+          "generated_tokens": 17,
+          "ttft_ms": 93.331375,
+          "decode_tps": 209.25205260196034,
+          "wall_ms": 285.674416
+        },
+        {
+          "id": "no_tool_pizza",
+          "prefill_tokens": 262,
+          "generated_tokens": 17,
+          "ttft_ms": 96.490542,
+          "decode_tps": 203.26973894357812,
+          "wall_ms": 291.688209
+        },
+        {
+          "id": "negation_door",
+          "prefill_tokens": 266,
+          "generated_tokens": 56,
+          "ttft_ms": 94.327833,
+          "decode_tps": 203.74157329658073,
+          "wall_ms": 505.209167
+        },
+        {
+          "id": "negation_only",
+          "prefill_tokens": 261,
+          "generated_tokens": 62,
+          "ttft_ms": 91.146208,
+          "decode_tps": 209.2673202811012,
+          "wall_ms": 528.174375
+        },
+        {
+          "id": "german_timer",
+          "prefill_tokens": 346,
+          "generated_tokens": 44,
+          "ttft_ms": 113.7205,
+          "decode_tps": 185.1184346883628,
+          "wall_ms": 503.16075
+        },
+        {
+          "id": "french_message",
+          "prefill_tokens": 351,
+          "generated_tokens": 68,
+          "ttft_ms": 117.964625,
+          "decode_tps": 181.82846033945455,
+          "wall_ms": 670.341625
+        },
+        {
+          "id": "spanish_lights_music",
+          "prefill_tokens": 283,
+          "generated_tokens": 92,
+          "ttft_ms": 101.795208,
+          "decode_tps": 195.82679889742911,
+          "wall_ms": 720.077167
+        },
+        {
+          "id": "extract_invoice",
+          "prefill_tokens": 126,
+          "generated_tokens": 80,
+          "ttft_ms": 54.583542,
+          "decode_tps": 236.96013967624665,
+          "wall_ms": 487.318166
+        },
+        {
+          "id": "timer_then_result",
+          "prefill_tokens": 332,
+          "generated_tokens": 42,
+          "ttft_ms": 111.278208,
+          "decode_tps": 191.30666508938407,
+          "wall_ms": 477.134875
+        },
+        {
+          "id": "timer_budget",
+          "prefill_tokens": 332,
+          "generated_tokens": 8,
+          "ttft_ms": 107.579167,
+          "decode_tps": 181.59834216694256,
+          "wall_ms": 284.924083
+        },
+        {
+          "id": "catalogue_lock",
+          "prefill_tokens": 1038,
+          "generated_tokens": 42,
+          "ttft_ms": 326.39,
+          "decode_tps": 103.89023401139355,
+          "wall_ms": 1166.488541
+        },
+        {
+          "id": "catalogue_navigate",
+          "prefill_tokens": 1041,
+          "generated_tokens": 46,
+          "ttft_ms": 331.097916,
+          "decode_tps": 102.12306125750894,
+          "wall_ms": 1230.026541
+        },
+        {
+          "id": "catalogue_translate",
+          "prefill_tokens": 1040,
+          "generated_tokens": 46,
+          "ttft_ms": 326.13375,
+          "decode_tps": 102.28687475851378,
+          "wall_ms": 1223.355833
+        },
+        {
+          "id": "catalogue_email",
+          "prefill_tokens": 1049,
+          "generated_tokens": 60,
+          "ttft_ms": 332.146125,
+          "decode_tps": 104.4268192166863,
+          "wall_ms": 1363.652334
+        },
+        {
+          "id": "catalogue_reminder",
+          "prefill_tokens": 1048,
+          "generated_tokens": 67,
+          "ttft_ms": 327.699542,
+          "decode_tps": 107.38984780006024,
+          "wall_ms": 1431.405084
+        }
+      ],
+      "function_calls_equal": 20,
+      "max_rss_load_mib": 982.296875,
+      "max_rss_peak_mib": 1367.390625,
+      "heap_load_mib": 464.8585891723633
+    },
+    {
+      "mode": "packed",
+      "load_ms": {
+        "n": 5,
+        "median": 8.056083,
+        "p90": 8.324875,
+        "min": 7.871708,
+        "max": 8.324875
+      },
+      "answers": {
+        "cases": 24,
+        "passes": 5,
+        "prefill_tokens": {
+          "n": 120,
+          "median": 332,
+          "p90": 1041,
+          "min": 126,
+          "max": 1049
+        },
+        "generated_tokens": {
+          "n": 120,
+          "median": 60.5,
+          "p90": 91,
+          "min": 8,
+          "max": 103
+        },
+        "ttft_ms": {
+          "n": 120,
+          "median": 345.6093335,
+          "p90": 1041.27975,
+          "min": 173.810875,
+          "max": 1087.088916
+        },
+        "prefill_tps": {
+          "n": 120,
+          "median": 946.9865186462073,
+          "p90": 1014.7517809802927,
+          "min": 491.53300268636434,
+          "max": 1092.3437388653315
+        },
+        "reported_prefill_tps": {
+          "n": 0,
+          "median": 0,
+          "p90": 0,
+          "min": 0,
+          "max": 0
+        },
+        "decode_tps": {
+          "n": 120,
+          "median": 104.2094660565138,
+          "p90": 113.18413641930032,
+          "min": 69.65173604313765,
+          "max": 123.48635350638666
+        },
+        "wall_ms": {
+          "n": 120,
+          "median": 1339.033167,
+          "p90": 2869.002958,
+          "min": 746.25725,
+          "max": 3278.151625
+        }
+      },
+      "cases": [
+        {
+          "id": "timer_pasta",
+          "prefill_tokens": 332,
+          "generated_tokens": 42,
+          "ttft_ms": 348.770375,
+          "decode_tps": 104.50587812068954,
+          "wall_ms": 1163.785709
+        },
+        {
+          "id": "alarm_morning",
+          "prefill_tokens": 330,
+          "generated_tokens": 66,
+          "ttft_ms": 345.15975,
+          "decode_tps": 104.69919345873741,
+          "wall_ms": 1396.824792
+        },
+        {
+          "id": "message_and_timer",
+          "prefill_tokens": 338,
+          "generated_tokens": 66,
+          "ttft_ms": 352.971458,
+          "decode_tps": 104.15060839247255,
+          "wall_ms": 1395.474791
+        },
+        {
+          "id": "lights_and_lock",
+          "prefill_tokens": 262,
+          "generated_tokens": 69,
+          "ttft_ms": 287.079792,
+          "decode_tps": 112.96944903858292,
+          "wall_ms": 1286.836459
+        },
+        {
+          "id": "thermostat_decimal",
+          "prefill_tokens": 261,
+          "generated_tokens": 43,
+          "ttft_ms": 283.792042,
+          "decode_tps": 113.18413641930032,
+          "wall_ms": 992.431792
+        },
+        {
+          "id": "weather_friday",
+          "prefill_tokens": 333,
+          "generated_tokens": 59,
+          "ttft_ms": 337.034459,
+          "decode_tps": 106.11405679627174,
+          "wall_ms": 1288.312459
+        },
+        {
+          "id": "event_tomorrow",
+          "prefill_tokens": 330,
+          "generated_tokens": 72,
+          "ttft_ms": 341.511,
+          "decode_tps": 103.29214382453793,
+          "wall_ms": 1417.641042
+        },
+        {
+          "id": "event_explicit",
+          "prefill_tokens": 346,
+          "generated_tokens": 103,
+          "ttft_ms": 351.117417,
+          "decode_tps": 105.70804500125091,
+          "wall_ms": 1763.321667
+        },
+        {
+          "id": "event_no_year",
+          "prefill_tokens": 332,
+          "generated_tokens": 58,
+          "ttft_ms": 338.727333,
+          "decode_tps": 104.9372082647828,
+          "wall_ms": 1243.710208
+        },
+        {
+          "id": "offtopic_capital",
+          "prefill_tokens": 259,
+          "generated_tokens": 30,
+          "ttft_ms": 287.250292,
+          "decode_tps": 101.01454141736495,
+          "wall_ms": 890.315875
+        },
+        {
+          "id": "no_tool_pizza",
+          "prefill_tokens": 262,
+          "generated_tokens": 16,
+          "ttft_ms": 297.055584,
+          "decode_tps": 95.07273415200416,
+          "wall_ms": 767.05125
+        },
+        {
+          "id": "negation_door",
+          "prefill_tokens": 266,
+          "generated_tokens": 91,
+          "ttft_ms": 294.632375,
+          "decode_tps": 112.47576738349731,
+          "wall_ms": 1481.759875
+        },
+        {
+          "id": "negation_only",
+          "prefill_tokens": 261,
+          "generated_tokens": 63,
+          "ttft_ms": 291.55975,
+          "decode_tps": 111.28002305811103,
+          "wall_ms": 1195.108833
+        },
+        {
+          "id": "german_timer",
+          "prefill_tokens": 346,
+          "generated_tokens": 44,
+          "ttft_ms": 347.076083,
+          "decode_tps": 104.39416691226879,
+          "wall_ms": 1187.206542
+        },
+        {
+          "id": "french_message",
+          "prefill_tokens": 351,
+          "generated_tokens": 62,
+          "ttft_ms": 364.097833,
+          "decode_tps": 103.02481143215972,
+          "wall_ms": 1389.576375
+        },
+        {
+          "id": "spanish_lights_music",
+          "prefill_tokens": 283,
+          "generated_tokens": 98,
+          "ttft_ms": 325.057459,
+          "decode_tps": 106.72232704102238,
+          "wall_ms": 1663.899583
+        },
+        {
+          "id": "extract_invoice",
+          "prefill_tokens": 126,
+          "generated_tokens": 77,
+          "ttft_ms": 187.917583,
+          "decode_tps": 118.05116673533549,
+          "wall_ms": 1162.265917
+        },
+        {
+          "id": "timer_then_result",
+          "prefill_tokens": 332,
+          "generated_tokens": 42,
+          "ttft_ms": 350.046459,
+          "decode_tps": 104.52116566602882,
+          "wall_ms": 1147.733583
+        },
+        {
+          "id": "timer_budget",
+          "prefill_tokens": 332,
+          "generated_tokens": 8,
+          "ttft_ms": 355.110042,
+          "decode_tps": 97.57160472720375,
+          "wall_ms": 801.744666
+        },
+        {
+          "id": "catalogue_lock",
+          "prefill_tokens": 1038,
+          "generated_tokens": 36,
+          "ttft_ms": 1041.27975,
+          "decode_tps": 76.20977967678795,
+          "wall_ms": 2602.423916
+        },
+        {
+          "id": "catalogue_navigate",
+          "prefill_tokens": 1041,
+          "generated_tokens": 48,
+          "ttft_ms": 1038.31525,
+          "decode_tps": 77.54155926887877,
+          "wall_ms": 2797.30975
+        },
+        {
+          "id": "catalogue_translate",
+          "prefill_tokens": 1040,
+          "generated_tokens": 46,
+          "ttft_ms": 1050.622834,
+          "decode_tps": 76.63965415910481,
+          "wall_ms": 2812.774792
+        },
+        {
+          "id": "catalogue_email",
+          "prefill_tokens": 1049,
+          "generated_tokens": 74,
+          "ttft_ms": 1049.648375,
+          "decode_tps": 77.42391376699834,
+          "wall_ms": 3193.247625
+        },
+        {
+          "id": "catalogue_reminder",
+          "prefill_tokens": 1048,
+          "generated_tokens": 69,
+          "ttft_ms": 1025.682875,
+          "decode_tps": 76.5193806478665,
+          "wall_ms": 3050.454458
+        }
+      ],
+      "function_calls_equal": 24,
+      "max_rss_load_mib": 52.203125,
+      "max_rss_peak_mib": 478.53125,
+      "heap_load_mib": 42.902366638183594
+    },
+    {
+      "mode": "int8",
+      "load_ms": {
+        "n": 5,
+        "median": 7.999458,
+        "p90": 8.357958,
+        "min": 7.95375,
+        "max": 8.357958
+      },
+      "answers": {
+        "cases": 24,
+        "passes": 5,
+        "prefill_tokens": {
+          "n": 120,
+          "median": 332,
+          "p90": 1041,
+          "min": 126,
+          "max": 1049
+        },
+        "generated_tokens": {
+          "n": 120,
+          "median": 59.5,
+          "p90": 91,
+          "min": 8,
+          "max": 103
+        },
+        "ttft_ms": {
+          "n": 120,
+          "median": 349.525104,
+          "p90": 1054.642084,
+          "min": 175.967458,
+          "max": 1141.203166
+        },
+        "prefill_tps": {
+          "n": 120,
+          "median": 937.0350644374697,
+          "p90": 1004.392549137931,
+          "min": 629.3560900503672,
+          "max": 1064.750116457044
+        },
+        "reported_prefill_tps": {
+          "n": 0,
+          "median": 0,
+          "p90": 0,
+          "min": 0,
+          "max": 0
+        },
+        "decode_tps": {
+          "n": 120,
+          "median": 115.8177118050584,
+          "p90": 124.81901243197363,
+          "min": 82.66395626433588,
+          "max": 128.98012805258662
+        },
+        "wall_ms": {
+          "n": 120,
+          "median": 1286.2161664999999,
+          "p90": 2743.027084,
+          "min": 738.526041,
+          "max": 6257.202792
+        }
+      },
+      "cases": [
+        {
+          "id": "timer_pasta",
+          "prefill_tokens": 332,
+          "generated_tokens": 42,
+          "ttft_ms": 358.137417,
+          "decode_tps": 118.06767107298646,
+          "wall_ms": 1122.901916
+        },
+        {
+          "id": "alarm_morning",
+          "prefill_tokens": 330,
+          "generated_tokens": 60,
+          "ttft_ms": 355.362208,
+          "decode_tps": 119.20850770958646,
+          "wall_ms": 1281.705167
+        },
+        {
+          "id": "message_and_timer",
+          "prefill_tokens": 338,
+          "generated_tokens": 72,
+          "ttft_ms": 357.237167,
+          "decode_tps": 119.06780264252868,
+          "wall_ms": 1414.745042
+        },
+        {
+          "id": "lights_and_lock",
+          "prefill_tokens": 262,
+          "generated_tokens": 69,
+          "ttft_ms": 287.968541,
+          "decode_tps": 120.44789271593778,
+          "wall_ms": 1198.229125
+        },
+        {
+          "id": "thermostat_decimal",
+          "prefill_tokens": 261,
+          "generated_tokens": 43,
+          "ttft_ms": 288.554833,
+          "decode_tps": 117.45593383707248,
+          "wall_ms": 945.567792
+        },
+        {
+          "id": "weather_friday",
+          "prefill_tokens": 333,
+          "generated_tokens": 59,
+          "ttft_ms": 336.609041,
+          "decode_tps": 121.2995185654599,
+          "wall_ms": 1284.5455
+        },
+        {
+          "id": "event_tomorrow",
+          "prefill_tokens": 330,
+          "generated_tokens": 72,
+          "ttft_ms": 340.4285,
+          "decode_tps": 119.81549289268561,
+          "wall_ms": 1369.428416
+        },
+        {
+          "id": "event_explicit",
+          "prefill_tokens": 346,
+          "generated_tokens": 103,
+          "ttft_ms": 353.404416,
+          "decode_tps": 119.44314421291946,
+          "wall_ms": 1683.373833
+        },
+        {
+          "id": "event_no_year",
+          "prefill_tokens": 332,
+          "generated_tokens": 58,
+          "ttft_ms": 339.502708,
+          "decode_tps": 119.52797325436855,
+          "wall_ms": 1201.907083
+        },
+        {
+          "id": "offtopic_capital",
+          "prefill_tokens": 259,
+          "generated_tokens": 30,
+          "ttft_ms": 293.7595,
+          "decode_tps": 114.44345248344942,
+          "wall_ms": 884.362125
+        },
+        {
+          "id": "no_tool_pizza",
+          "prefill_tokens": 262,
+          "generated_tokens": 16,
+          "ttft_ms": 295.457541,
+          "decode_tps": 102.67126301164764,
+          "wall_ms": 765.701041
+        },
+        {
+          "id": "negation_door",
+          "prefill_tokens": 266,
+          "generated_tokens": 91,
+          "ttft_ms": 307.6565,
+          "decode_tps": 121.98571969736518,
+          "wall_ms": 1440.80275
+        },
+        {
+          "id": "negation_only",
+          "prefill_tokens": 261,
+          "generated_tokens": 63,
+          "ttft_ms": 296.355875,
+          "decode_tps": 122.69094993212379,
+          "wall_ms": 1151.186375
+        },
+        {
+          "id": "german_timer",
+          "prefill_tokens": 346,
+          "generated_tokens": 44,
+          "ttft_ms": 351.26625,
+          "decode_tps": 115.70811780638574,
+          "wall_ms": 1136.63475
+        },
+        {
+          "id": "french_message",
+          "prefill_tokens": 351,
+          "generated_tokens": 62,
+          "ttft_ms": 361.333167,
+          "decode_tps": 118.09690843351,
+          "wall_ms": 1313.327125
+        },
+        {
+          "id": "spanish_lights_music",
+          "prefill_tokens": 283,
+          "generated_tokens": 98,
+          "ttft_ms": 322.907791,
+          "decode_tps": 116.96145827546178,
+          "wall_ms": 1554.733125
+        },
+        {
+          "id": "extract_invoice",
+          "prefill_tokens": 126,
+          "generated_tokens": 77,
+          "ttft_ms": 188.065166,
+          "decode_tps": 121.96613543992231,
+          "wall_ms": 1047.44275
+        },
+        {
+          "id": "timer_then_result",
+          "prefill_tokens": 332,
+          "generated_tokens": 42,
+          "ttft_ms": 355.825,
+          "decode_tps": 113.29432667765477,
+          "wall_ms": 1111.931041
+        },
+        {
+          "id": "timer_budget",
+          "prefill_tokens": 332,
+          "generated_tokens": 8,
+          "ttft_ms": 369.644125,
+          "decode_tps": 105.74867566703514,
+          "wall_ms": 822.833834
+        },
+        {
+          "id": "catalogue_lock",
+          "prefill_tokens": 1038,
+          "generated_tokens": 36,
+          "ttft_ms": 1025.317125,
+          "decode_tps": 100.48265931925282,
+          "wall_ms": 2521.211542
+        },
+        {
+          "id": "catalogue_navigate",
+          "prefill_tokens": 1041,
+          "generated_tokens": 48,
+          "ttft_ms": 1073.417458,
+          "decode_tps": 100.70149782288956,
+          "wall_ms": 2684.442917
+        },
+        {
+          "id": "catalogue_translate",
+          "prefill_tokens": 1040,
+          "generated_tokens": 46,
+          "ttft_ms": 1061.844625,
+          "decode_tps": 100.4419738833349,
+          "wall_ms": 2714.535833
+        },
+        {
+          "id": "catalogue_email",
+          "prefill_tokens": 1049,
+          "generated_tokens": 74,
+          "ttft_ms": 1054.642084,
+          "decode_tps": 102.18307799266917,
+          "wall_ms": 2985.148166
+        },
+        {
+          "id": "catalogue_reminder",
+          "prefill_tokens": 1048,
+          "generated_tokens": 69,
+          "ttft_ms": 1045.205292,
+          "decode_tps": 104.34287701769085,
+          "wall_ms": 2882.139833
+        }
+      ],
+      "function_calls_equal": 23,
+      "max_rss_load_mib": 52.28125,
+      "max_rss_peak_mib": 500.171875,
+      "heap_load_mib": 42.90221405029297
+    },
+    {
+      "mode": "int8-lut",
+      "load_ms": {
+        "n": 5,
+        "median": 13.109833,
+        "p90": 13.477541,
+        "min": 12.874458,
+        "max": 13.477541
+      },
+      "answers": {
+        "cases": 24,
+        "passes": 5,
+        "prefill_tokens": {
+          "n": 120,
+          "median": 332,
+          "p90": 1041,
+          "min": 126,
+          "max": 1049
+        },
+        "generated_tokens": {
+          "n": 120,
+          "median": 59.5,
+          "p90": 91,
+          "min": 8,
+          "max": 103
+        },
+        "ttft_ms": {
+          "n": 120,
+          "median": 110.69368750000001,
+          "p90": 347.894583,
+          "min": 50.406667,
+          "max": 375.792583
+        },
+        "prefill_tps": {
+          "n": 120,
+          "median": 2960.951033084173,
+          "p90": 3115.0967251607394,
+          "min": 1928.7127519104843,
+          "max": 3233.0455981930004
+        },
+        "reported_prefill_tps": {
+          "n": 0,
+          "median": 0,
+          "p90": 0,
+          "min": 0,
+          "max": 0
+        },
+        "decode_tps": {
+          "n": 120,
+          "median": 410.6893145327904,
+          "p90": 447.8193971837415,
+          "min": 211.50044433359255,
+          "max": 532.3040510381181
+        },
+        "wall_ms": {
+          "n": 120,
+          "median": 424.8652505,
+          "p90": 1076.10225,
+          "min": 241.57825,
+          "max": 1329.567958
+        }
+      },
+      "cases": [
+        {
+          "id": "timer_pasta",
+          "prefill_tokens": 332,
+          "generated_tokens": 40,
+          "ttft_ms": 109.784875,
+          "decode_tps": 399.08121150571844,
+          "wall_ms": 364.120666
+        },
+        {
+          "id": "alarm_morning",
+          "prefill_tokens": 330,
+          "generated_tokens": 60,
+          "ttft_ms": 111.001,
+          "decode_tps": 400.8239167665087,
+          "wall_ms": 428.057583
+        },
+        {
+          "id": "message_and_timer",
+          "prefill_tokens": 338,
+          "generated_tokens": 72,
+          "ttft_ms": 112.302,
+          "decode_tps": 408.83185351410117,
+          "wall_ms": 471.986417
+        },
+        {
+          "id": "lights_and_lock",
+          "prefill_tokens": 262,
+          "generated_tokens": 69,
+          "ttft_ms": 91.531917,
+          "decode_tps": 440.7632550366385,
+          "wall_ms": 400.374167
+        },
+        {
+          "id": "thermostat_decimal",
+          "prefill_tokens": 261,
+          "generated_tokens": 43,
+          "ttft_ms": 91.142917,
+          "decode_tps": 436.61389551010825,
+          "wall_ms": 320.576667
+        },
+        {
+          "id": "weather_friday",
+          "prefill_tokens": 333,
+          "generated_tokens": 59,
+          "ttft_ms": 111.303541,
+          "decode_tps": 415.83939688436044,
+          "wall_ms": 420.505292
+        },
+        {
+          "id": "event_tomorrow",
+          "prefill_tokens": 330,
+          "generated_tokens": 72,
+          "ttft_ms": 111.466459,
+          "decode_tps": 408.9635104915647,
+          "wall_ms": 451.993792
+        },
+        {
+          "id": "event_explicit",
+          "prefill_tokens": 346,
+          "generated_tokens": 103,
+          "ttft_ms": 110.881708,
+          "decode_tps": 412.6851150669272,
+          "wall_ms": 559.535958
+        },
+        {
+          "id": "event_no_year",
+          "prefill_tokens": 332,
+          "generated_tokens": 58,
+          "ttft_ms": 110.467041,
+          "decode_tps": 413.62791161147555,
+          "wall_ms": 415.023333
+        },
+        {
+          "id": "offtopic_capital",
+          "prefill_tokens": 259,
+          "generated_tokens": 30,
+          "ttft_ms": 91.5805,
+          "decode_tps": 442.8773584511063,
+          "wall_ms": 281.122458
+        },
+        {
+          "id": "no_tool_pizza",
+          "prefill_tokens": 262,
+          "generated_tokens": 16,
+          "ttft_ms": 91.780291,
+          "decode_tps": 433.11377352440803,
+          "wall_ms": 250.096792
+        },
+        {
+          "id": "negation_door",
+          "prefill_tokens": 266,
+          "generated_tokens": 91,
+          "ttft_ms": 92.54925,
+          "decode_tps": 435.53018851765836,
+          "wall_ms": 456.897958
+        },
+        {
+          "id": "negation_only",
+          "prefill_tokens": 261,
+          "generated_tokens": 63,
+          "ttft_ms": 91.318541,
+          "decode_tps": 444.09957973820536,
+          "wall_ms": 370.382541
+        },
+        {
+          "id": "german_timer",
+          "prefill_tokens": 346,
+          "generated_tokens": 44,
+          "ttft_ms": 111.678125,
+          "decode_tps": 409.0824648487661,
+          "wall_ms": 384.978541
+        },
+        {
+          "id": "french_message",
+          "prefill_tokens": 351,
+          "generated_tokens": 62,
+          "ttft_ms": 115.197875,
+          "decode_tps": 389.6824426917644,
+          "wall_ms": 450.628625
+        },
+        {
+          "id": "spanish_lights_music",
+          "prefill_tokens": 283,
+          "generated_tokens": 98,
+          "ttft_ms": 98.592792,
+          "decode_tps": 427.5517344011902,
+          "wall_ms": 504.38475
+        },
+        {
+          "id": "extract_invoice",
+          "prefill_tokens": 126,
+          "generated_tokens": 77,
+          "ttft_ms": 54.262416,
+          "decode_tps": 497.3802143938595,
+          "wall_ms": 298.361792
+        },
+        {
+          "id": "timer_then_result",
+          "prefill_tokens": 332,
+          "generated_tokens": 40,
+          "ttft_ms": 109.815584,
+          "decode_tps": 407.2662148558013,
+          "wall_ms": 365.0145
+        },
+        {
+          "id": "timer_budget",
+          "prefill_tokens": 332,
+          "generated_tokens": 8,
+          "ttft_ms": 110.472083,
+          "decode_tps": 393.7563473523193,
+          "wall_ms": 274.481542
+        },
+        {
+          "id": "catalogue_lock",
+          "prefill_tokens": 1038,
+          "generated_tokens": 36,
+          "ttft_ms": 340.533958,
+          "decode_tps": 229.54472363837792,
+          "wall_ms": 958.457166
+        },
+        {
+          "id": "catalogue_navigate",
+          "prefill_tokens": 1041,
+          "generated_tokens": 48,
+          "ttft_ms": 365.043,
+          "decode_tps": 233.4418405592229,
+          "wall_ms": 1045.373417
+        },
+        {
+          "id": "catalogue_translate",
+          "prefill_tokens": 1040,
+          "generated_tokens": 46,
+          "ttft_ms": 347.894583,
+          "decode_tps": 233.21859972569695,
+          "wall_ms": 1032.754041
+        },
+        {
+          "id": "catalogue_email",
+          "prefill_tokens": 1049,
+          "generated_tokens": 74,
+          "ttft_ms": 354.448375,
+          "decode_tps": 241.09467168041712,
+          "wall_ms": 1159.621042
+        },
+        {
+          "id": "catalogue_reminder",
+          "prefill_tokens": 1048,
+          "generated_tokens": 69,
+          "ttft_ms": 345.394042,
+          "decode_tps": 240.18636278239524,
+          "wall_ms": 1121.386083
+        }
+      ],
+      "function_calls_equal": 23,
+      "max_rss_load_mib": 67.6875,
+      "max_rss_peak_mib": 492.34375,
+      "heap_load_mib": 58.18809509277344
+    }
+  ]
+}

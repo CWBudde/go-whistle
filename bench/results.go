@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -179,11 +180,24 @@ func ReadJSON(path string, v any) (bool, error) {
 // enginePath; a side whose file does not exist is left out. Both
 // whistle-bench and `oracle bench` call it with the paths they wrote.
 func WriteReport(goPath, enginePath, reportPath string) error {
-	g, e := new(GoResults), new(EngineResults)
+	g, e, err := readSides[GoResults, EngineResults](goPath, enginePath)
+	if err != nil {
+		return err
+	}
+
+	return writeRendered(reportPath, func(w io.Writer) error {
+		return Render(w, g, e, Paths{Go: goPath, Engine: enginePath, Report: reportPath})
+	})
+}
+
+// readSides reads the Go and the engine results at goPath and enginePath;
+// a side whose file does not exist is nil.
+func readSides[G, E any](goPath, enginePath string) (*G, *E, error) {
+	g, e := new(G), new(E)
 
 	ok, err := ReadJSON(goPath, g)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	if !ok {
@@ -192,16 +206,22 @@ func WriteReport(goPath, enginePath, reportPath string) error {
 
 	ok, err = ReadJSON(enginePath, e)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	if !ok {
 		e = nil
 	}
 
+	return g, e, nil
+}
+
+// writeRendered writes what render produces to reportPath, creating the
+// directory.
+func writeRendered(reportPath string, render func(io.Writer) error) error {
 	var b bytes.Buffer
 
-	err = Render(&b, g, e, Paths{Go: goPath, Engine: enginePath, Report: reportPath})
+	err := render(&b)
 	if err != nil {
 		return err
 	}

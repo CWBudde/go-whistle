@@ -5562,3 +5562,201 @@ layer runs the engine's numerics by default is the Accept's decision.
   between the two weight paths. A larger answer set, or an instrument with less implementation noise, could settle
   it; Whistle's encoder showed it clearly (F-041).
 - **Speed.** The packed path's exact kernel (F-059) dominates the forward pass; the int8 attention adds little.
+
+## F-061 — 11.5's Accept: the `.cact` calls against the float weights, and the text model's speed and memory against the engine (PLAN.md 11.5) (2026-10-14)
+
+**Question.** 11.5's Accept: "with the `.cact` weights, `function_calls` equal the engine's at least as often as with
+the float weights; memory and speed against the engine (`just bench`-style), packed weights under 40 MB." The
+maintainer's reading (2026-10-14): the `.cact` side is the engine's numerics, the packed `needle3.cact` with int8 and
+the KV window with the static prefix as its sink (F-060, `NEEDLE_TEST_NUMERICS=int8`); the float side is
+`needle3.safetensors` in float32. The count is the answers whose `function_calls` equal the engine's, per engine test
+set and summed over the sets. One set may fall below safetensors if the sum does not. "40 MB" is 40 MiB, as F-059 reads
+it. Speed has no threshold.
+
+### The calls
+
+`NEEDLE_TEST_NUMERICS=safetensors` (new, `internal/toolcall`'s test helper) runs every engine test on
+`needle3.safetensors` in float32. The window test adds the KV window and its sink to it, as it does under `float`. As
+under `int8`, a turn that differs from the tests' float32 lists is logged (`listedf`), and no floor applies: the run
+measures the float weights for this comparison rather than holding a bound on them. The window test's check that the
+four cut probes give the engine's made-up calls is logged under `safetensors` too: those calls are the `.cact` weights'
+own (below). Every engine test now also logs `function_calls equal`: the dispatched calls equal the engine's, names and
+arguments as `diffCalls` compares them, whatever the suppressed ones are. The tests' own "calls equal" counts compare
+the dispatched and the suppressed calls together. Unset, the tests are as before.
+
+`go test -count=1 -timeout 60m -run Engine -v ./internal/toolcall/` with each numerics, M5 Pro, arm64. The float32
+column is the default run's dequantised `needle3.cact` (`NEEDLE_TEST_NUMERICS=float`):
+
+| test (answers)                      | count                             | safetensors | float32 (dequantised) | packed       | packed + int8 + window |
+| ----------------------------------- | --------------------------------- | ----------- | --------------------- | ------------ | ---------------------- |
+| `TestEnvelopeMatchesEngine` (36)    | **`function_calls` equal**        | **23**      | **36**                | **36**       | **35**                 |
+|                                     | calls equal (with the suppressed) | 23          | 36                    | 36           | 35                     |
+|                                     | reasoning equal                   | 7           | 29                    | 29           | 33                     |
+|                                     | confidence within 0.02            | 0           | 26                    | 26           | 31                     |
+| `TestValidationMatchesEngine` (171) | **`function_calls` equal**        | **127**     | **158**               | **158**      | **162**                |
+|                                     | calls equal / and the split       | 127 / 124   | 159 / 158             | 159 / 158    | 162 / 161              |
+| `TestGatesMatchesEngine` (204)      | **`function_calls` equal**        | **177**     | **195**               | **195**      | **197**                |
+|                                     | calls and split equal             | 163         | 193                   | 193          | 194                    |
+| `TestRepairMatchesEngine` (90)      | **`function_calls` equal**        | **76**      | **84**                | **84**       | **84**                 |
+|                                     | calls equal / reasoning equal     | 79 / 14     | 85 / 77               | 85 / 77      | 85 / 78                |
+| `TestGrammarMatchesEngine` (15)     | **`function_calls` equal**        | **7**       | **10**                | **10**       | **9**                  |
+| `TestWindowMatchesEngine` (22)      | **`function_calls` equal**        | **16**      | **20**                | **20**       | **20**                 |
+|                                     | calls / reasoning / conf          | 11 / 1 / 0  | 17 / 11 / 13          | 17 / 11 / 13 | 17 / 11 / 12           |
+| **sum over the six sets (538)**     | **`function_calls` equal**        | **426**     | **503**               | **503**      | **507**                |
+| `TestFloatGreedyAgainstEngine` (24) | `function_calls` equal            | 20          | — (runs safetensors)  | 24           | 23                     |
+| `TestDecodeMatchesEngine` (25)      | reasoning equal                   | 5           | 21                    | 21           | 21                     |
+
+The six sets are disjoint: the envelope test's 36 answers are `cases.json`'s 25 turns and `triggers.json`'s 11, and the
+others are their own fixture files. `TestFloatGreedyAgainstEngine` answers 24 of the envelope test's turns again, so it
+is left out of the sum; counted in, the sums are 446 and 530. The int8 and packed counts are F-060's; this run
+reproduced every one of them.
+
+**Verdict: the calls half of the Accept is met.** With the engine's numerics on the `.cact` weights, 507 of 538 answers
+dispatch the engine's `function_calls`, against 426 with `needle3.safetensors`: 81 more. Int8 is at or above safetensors
+in every set, by 2 to 35 answers, and on the first turns alone (23 against 20). The tests' own call counts, which
+include the suppressed calls, agree: 502 against 410 over the same sets.
+
+**Why the float weights are so far off.** The float checkpoint is not the model the engine runs. F-045 found the
+dequantised `.cact` at cosine 0.94 of `needle3.safetensors` (top-1 on 440 of 496 positions): the CQ weights were
+post-trained for W2A8 and are a model of their own. The engine answers with them, so the float checkpoint writes other
+reasoning (5 of 25 first turns, against 21 for any `.cact` path), other confidence (none of 36 within 0.02), and other
+calls where the request leaves room: `alarm_morning` sets an alarm the engine suppresses, the gates and the validation
+probes withhold or keep other calls, and the window probes make up other cities (Portland, Santa Cruz, San Francisco)
+where the engine says Chicago and Mumbai. Against the dequantised `.cact` in float32 (503), the engine's numerics gain
+4: validation +4 and gates +2, envelope and grammar −1 each.
+
+### The bench
+
+**Go**, `just bench-text` (`bench/cmd/needle-bench run`, a command of its own beside `whistle-bench` because it loads
+other models and answers other inputs; it shares `bench`'s statistics, machine description and table layout):
+
+- The 24 first turns of `testdata/text/engine/cases.json`: their tool sets, the corpus's system text with its date fact
+  (or the case's own), and the case's `--max` (512 otherwise, 8 for `timer_budget`).
+- Four modes, all loaded in one process: `needle3.safetensors` in float32; `needle3.cact` packed on exact kernels
+  (F-059); packed with `LoadOptions{Int8, KVWindow, SinkToken}` (F-060); the same on the lut kernel (`OpenOptions.LUT`).
+  The bench changes no numerics.
+- **Load**: the tokenizer, `text.OpenWith` (which reads the file), `text.LoadWith` and `toolcall.NewDecoder`; five loads
+  per mode, rotating which mode goes first.
+- **Answer**: one turn as `decodeTurns` answers it, wall-clocked. That is `toolcall.Normalise`, the static prefix and
+  the turn, `Decoder.Decode` under the grammar, `Decoder.Confidence` and the envelope.
+- **TTFT and decode**: the decoder does not split its time, so the bench replays each answer on a fresh state. It times
+  the first `Extend` over the static prefix, the turn and the forced `<think>\n` together with the pick of the next
+  token (TTFT, the static prefix included), then one `Extend` and pick per generated token after the first (decode).
+  Prefill tok/s is the prefill tokens over the TTFT.
+- One untimed warm-up pass, then five timed passes. Per case and pass the mode that goes first rotates, so all four see
+  the same machine load (F-040). The warm-up pass's `function_calls` are compared with `responses.json`.
+- **Memory**: a fresh child process per mode (`needle-bench child`) loads, reads `ru_maxrss` and the live heap after a
+  GC, answers the 24 cases once and reads `ru_maxrss` again.
+
+**Engine**, `just oracle-text bench` (`tools/oracle/text`, tag `oracle`, `NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1`):
+
+- **The CLI**: one `needle --prompt` process per answer at `--threads 4` (F-047), the same tools, system file and
+  `--max`. It records the process's wall time and `ru_maxrss`, and the answer's `prefill_tps`, `decode_tps` and
+  `peak_ram_mb`.
+- **The library**: `libneedle3` through purego, five `needle_load` calls on the bytes in memory, then per case
+  `needle_init`, `needle_reset` and `needle_complete`, timed apart.
+- The same warm-up and passes. Every answer's `needle_complete` count and `needle_init` count are checked against
+  `library.json`, and the warm-up pass's `function_calls` against `responses.json`: 24 of 24 on every side.
+
+**What the engine's clocks measure.** A first library run timed `needle_init` at 0.2 ms and `needle_complete` at 38 ms,
+while the prefill tokens over `prefill_tps` gave 85 ms, more than the whole call. Per case, the answers whose system
+text and tools differed from the case before took 57–78 ms outside the decode clock (285 ms at the 1025-token catalogue
+prefix), the others 4.5–10 ms. So:
+
+- `needle_init` prefills the static prefix, and keeps it while it gets the same system text and tools. A cold
+  `needle_init` takes 18–279 ms (median 67), a repeated one about 0.2 ms.
+- `needle_complete` prefills the turn only, and `prefill_tps` counts the turn's tokens alone. Cold and cached answers
+  report the same `prefill_tps` (median 3883 and 3944), and the turn's 13–35 tokens over it give the 4–11 ms that a
+  cached call spends outside its decode clock.
+
+The bench therefore answers every library case **cold**: it first answers one token on another system text, so that
+`needle_init` prefills the case's prefix, as the CLI and the Go side do. Then it answers the case again at once,
+**prefix cached**. The engine's TTFT is the cold `needle_init` plus the `needle_complete` call less (n − 1) /
+`decode_tps` for its n tokens. That is an upper bound, since it also holds the confidence and the envelope that follow
+the last token. Its prefill rate is the prefill tokens over that TTFT, as on the Go side; `prefill_tps` is reported
+beside it. The CLI's process time cannot be split.
+
+### Numbers
+
+`bench/RESULTS-text.md` has every row. M5 Pro (5 Super + 10 Performance cores, 48 GiB), macOS 27.0.1, Go 1.27.1, engine
+3.2.0, the Go side at commit `924f8366ed`, the engine's at `4624c83f75` (the Go results committed on it); both
+fingerprint the model, the cases and the recorded answers (`responses.json`), the Go side also its tokenizer, and the
+report compares the sides only when these agree and every Go mode fed each case the engine side's prefill token count.
+The Go side's `tokenizer.model` and the tokenizer inside `needle3.cact` are different bytes (126,520 against 109,140),
+so the tokenizers are compared by what they tokenize to; the engine side's static prefix is pinned by `needle_init`'s
+own count. Go ran with GOMAXPROCS 15, the engine with 4 threads. Other sessions
+moved the load average from 2.4 to 9.5 during the Go run (1232 s) and kept it between 5.7 and 9.5 during the engine's
+(68 s). Medians over 24 cases × 5 passes; the prefills are 126–1049 tokens (median 332), the answers 8–103 tokens:
+
+| median                     | Go safetensors | Go packed exact | Go packed + int8 + window | Go LUT + int8 + window | engine library | engine, prefix cached | engine CLI |
+| -------------------------- | -------------- | --------------- | ------------------------- | ---------------------- | -------------- | --------------------- | ---------- |
+| TTFT (ms)                  | 109.6          | 345.6           | 349.5                     | 110.7                  | 73.1           | 5.6                   | —          |
+| TTFT p90 (ms)              | 329.3          | 1041.3          | 1054.6                    | 347.9                  | 284.7          | 8.8                   | —          |
+| prefill (tok/s)            | 3010           | 947             | 937                       | 2961                   | 4535           | —                     | —          |
+| decode (tok/s)             | 190            | 104             | 116                       | 411                    | 1767           | 1788                  | 1674       |
+| answer (ms)                | 591.1          | 1339.0          | 1286.2                    | 424.9                  | 107.1          | 38.8                  | 132.5      |
+| load (ms)                  | 1051.4         | 8.1             | 8.0                       | 13.1                   | 4.7            | —                     | —          |
+| peak RSS after the load    | 982.3          | 52.2            | 52.3                      | 67.7                   | —              | —                     | —          |
+| peak RSS after the answers | 1367.4         | 478.5           | 500.2                     | 492.3                  | —              | —                     | 103.4      |
+| Go heap after the load     | 464.9          | 42.9            | 42.9                      | 58.2                   | —              | —                     | —          |
+| `function_calls` equal     | 20/24          | 24/24           | 23/24                     | 23/24                  | 24/24          | 24/24                 | 24/24      |
+
+(MiB for memory; the engine CLI's `peak_ram_mb` is 94.4 at the median and 103.4 at most, its `ru_maxrss` the same.)
+The memory child answers through the decode path alone (`respond`), without the replay that times the prefill and the
+decode, which would add its own allocations to the high-water mark. The peaks after the answers move by 10–20 MiB from
+run to run (GC timing): the first run, which replayed in the child too, gave 487.3 / 492.3 / 500.6 MiB, the two runs
+since 486.0 / 486.0 / 492.9 and 478.5 / 500.2 / 492.3, so the replay's share is within that noise. Three Go runs, at load
+averages between 2.4 and 10, gave the same speeds within 4 %. A first engine run, whose library answers mixed cold and
+cached, is the one the clock reading above comes from.
+
+**The packed weights** take **38.252 MiB** on exact kernels, as `TestPackedMemory` counts them (F-059's 40,109,936
+bytes; this session's run gave 40,109,664, the loaders' heap varying by a few hundred bytes). That is under 40 MiB, the
+maintainer's reading of the Accept's "40 MB". On the lut kernel they take 53.5 MiB. The bench's own figure is close: the
+live Go heap after the packed load is 42.9 MiB, the weights and the 3.1 MiB of the file buffer that no index aliases
+(F-059: 41.4 MiB), the tokenizer and the decoder's token mask.
+
+### Where the gaps are
+
+- **TTFT**: the engine-numerics mode on the lut kernel is 1.51× the engine's cold TTFT. The gap is mostly fixed per
+  answer (an earlier run): 2.0× at 126 prefill tokens (51.5 against 25.6 ms), 1.6× at 332, 1.19× at 1038 (333.9 against 279.9 ms). The
+  exact kernel, the default packed mode, is 3× slower than the lut kernel (F-059, F-060). One cost the engine does not
+  show: `Model.Extend` returns a logits row for every position it feeds, so the prefill runs the tied 8192 × 768 head on
+  all 332 positions where the decoder reads one row.
+- **The prefix cache**: with the static prefix kept, the engine answers in 5.6 ms to the first token and 38.8 ms in all.
+  The Go decoder prefills the static prefix on every answer. A state with the prefix fed once and forked per answer
+  (`text.State.Fork`) would be the same cache.
+- **Decode**: 411 tok/s against 1767 (0.23×) on the lut kernel, 0.06–0.07× on the exact kernel. One `Extend` step is 2.4
+  ms against the engine's 0.55 ms, the engine's W2A8 kernels against Go's float32 activations into the lut GEMV.
+- **The answer**: 425 ms against 107 ms (4.0×). Beyond the prefill and the decode, `Decoder.Confidence` runs a second
+  full `Forward` over the whole conversation for the confidence head, about one more prefill. The engine's confidence
+  costs nothing visible: a cached answer spends 4–11 ms outside its decode clock, prefill of the turn included.
+- **Memory**: 52 MiB after the packed load, in line with the 38.3 MiB of weights and the Go runtime. A pass over the 24
+  answers takes the peak to 479–500 MiB, 4.6–4.8× the engine CLI's 103 MiB with its model load. The likely parts are the
+  transient buffers: the per-position logits (1049 × 8192 float32 = 34 MiB at the catalogue prefix), the confidence
+  pass's hidden states, and GC headroom over them. This was not split further.
+- **Load**: 8.0–8.1 ms packed, which reads the 35 MB file, against `needle_load`'s 4.7 ms on bytes in memory.
+  `needle3.safetensors` takes 1051 ms and 982 MiB: bfloat16 widened to float32, besides the file buffer.
+
+### Tests
+
+Model-free: `bench` (`TestTextSamples`, `TestFunctionCallsEqual`, `TestRenderText`, `TestRenderTextNotComparable`,
+`TestRenderTextWithoutResults`, `TestRenderTextPaths`, `TestThousands`, `TestWriteTextReport`, and
+`TestTextReportCommitted`, which re-renders the committed report from the committed JSON byte for byte);
+`bench/cmd/needle-bench` (the committed corpus, its errors, the memory child's line, `argmax`, the command's errors, a
+report without results); `tools/oracle/text` (tag `oracle`: the engine's timing fields, the TTFT from the call, the
+run's counts). `TestAnswer` (needle-bench) answers `timer_pasta` on the packed and the lut model and skips without them.
+`WriteReport` now shares its file handling with `WriteTextReport`; `bench/RESULTS.md` and `bench/RESULTS-linux-amd64.md`
+re-render byte for byte.
+
+### Open
+
+- **Speed.** The bench reports, the Accept sets no bound. The levers, in the order the numbers suggest: the lut kernel
+  or an assembly `nibble4` for the engine-numerics mode (F-059's open item), the static prefix fed once and forked, the
+  head on the last position only during the prefill, the confidence from the decode's own hidden states instead of a
+  second `Forward`, and int8 activations into the products as the engine's W2A8 kernels take them.
+- **The peak RSS** after the answers is not split into its parts.
+- **The engine's clocks** are read from outside: whether `needle_init`'s cache keys on the rendered prefix or on the
+  system text and tools, and what exactly `decode_tps` starts and stops on for text, is not pinned. The TTFT is an upper
+  bound.
+- **The library's threads.** It runs on its default, the fast cores at most 4, which is 4 here (F-047); on a machine
+  with fewer fast cores the library and the CLI at `--threads 4` would differ.
