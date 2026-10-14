@@ -724,9 +724,9 @@ Engine-only: fitted against `testdata/text/engine/`.
       `function_calls` equal on 507 against 426, at or above safetensors in every set (envelope 35/23, validation
       162/127, gates 197/177, repair 84/76, grammar 9/7, window 20/16); the first turns alone 23 against 20. The
       packed weights take 38.25 MiB (`TestPackedMemory`). `just bench-text` and `just oracle-text bench`
-      (`bench/RESULTS-text.md`, the 24 first turns): the engine-numerics mode on the lut kernel reaches a TTFT of 113
-      against the engine's 73 ms cold (5.7 ms with its prefix cached), decode 412 against 1739 tok/s, an answer 429
-      against 109 ms, peak RSS 493 against 107 MiB; on the exact kernel TTFT 342 ms and decode 119 tok/s. Speed and
+      (`bench/RESULTS-text.md`, the 24 first turns): the engine-numerics mode on the lut kernel reaches a TTFT of 111
+      against the engine's 73 ms cold (5.6 ms with its prefix cached), decode 411 against 1767 tok/s, an answer 425
+      against 107 ms, peak RSS 492 against 103 MiB; on the exact kernel TTFT 350 ms and decode 116 tok/s. Speed and
       memory are reported, not bounded; the levers are in F-061's Open.
 
 ### 11.6 Depth ladder (`internal/text`; needs 11.4)
