@@ -572,7 +572,7 @@ func write(t *testing.T, c *websocket.Conn, typ websocket.MessageType, b []byte)
 }
 
 func TestStream(t *testing.T) {
-	_, hs := newTestServer(t, &fakeModel{}, testConfig())
+	s, hs := newTestServer(t, &fakeModel{}, testConfig())
 
 	for _, c := range []struct {
 		query string
@@ -605,11 +605,13 @@ func TestStream(t *testing.T) {
 		if code, _ := readClose(t, ws); code != websocket.StatusNormalClosure {
 			t.Errorf("%q: close %v, want 1000", c.query, code)
 		}
+
+		waitSessions(t, s, 0)
 	}
 }
 
 func TestStreamProtocolErrors(t *testing.T) {
-	_, hs := newTestServer(t, &fakeModel{}, testConfig())
+	s, hs := newTestServer(t, &fakeModel{}, testConfig())
 
 	for _, c := range []struct {
 		name, query string
@@ -633,6 +635,8 @@ func TestStreamProtocolErrors(t *testing.T) {
 		if code, reason := readClose(t, ws); code != c.code {
 			t.Errorf("%s: close %v %q, want %v", c.name, code, reason, c.code)
 		}
+
+		waitSessions(t, s, 0)
 	}
 }
 
@@ -765,11 +769,7 @@ func TestStreamLeaveWhileWaiting(t *testing.T) {
 
 			_ = b.CloseNow()
 
-			for deadline := time.Now().Add(5 * time.Second); s.openSessions() > 1; time.Sleep(10 * time.Millisecond) {
-				if time.Now().After(deadline) {
-					t.Fatalf("%d sessions open after b left, want 1", s.openSessions())
-				}
-			}
+			waitSessions(t, s, 1)
 
 			close(f.block)
 
@@ -887,6 +887,19 @@ func (s *Server) openSessions() int {
 	defer s.mu.Unlock()
 
 	return s.sessions
+}
+
+// waitSessions waits until at most n /stream sessions are open. A session
+// frees its place under MaxStreams only when its handler returns, after the
+// client has read the close, so the next dial can meet a 503 without it.
+func waitSessions(t *testing.T, s *Server, n int) {
+	t.Helper()
+
+	for deadline := time.Now().Add(5 * time.Second); s.openSessions() > n; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("%d sessions open, want at most %d", s.openSessions(), n)
+		}
+	}
 }
 
 // A session still in a pass at Shutdown's deadline is dropped, and Shutdown
