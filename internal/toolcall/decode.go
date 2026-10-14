@@ -27,11 +27,84 @@ type Decoded struct {
 	// Probs is each token's softmax probability where the model chose it
 	// (1 for the forced tokens).
 	Probs []float64
+	// Allowed is each token's softmax probability among the tokens the
+	// grammar allows (Probs where it allows any; 1 for the forced tokens).
+	Allowed []float64
 	// Margins is each token's top-1 minus top-2 logit among the tokens the
 	// grammar allows (+Inf for the forced tokens and where one is allowed).
 	Margins []float64
 	// Truncated reports a budget that ran out before the answer ended.
 	Truncated bool
+	// stop is the probability of the uncounted token that ended the answer
+	// (<|im_end|> or EOS), 0 when none did.
+	stop float64
+	// block is the index in Tokens of the <tool_call> that opens the call
+	// block, -1 without one.
+	block int
+}
+
+// Probability is the decode probability of the answer, which the engine's
+// confidence is the min of with the ConfidenceHead's score (llms.txt: "the
+// min of a post-hoc calibration head and the decode probability of the
+// call"; docs/FINDINGS.md F-062):
+//
+//   - an answer with a call block: the smallest probability of a block
+//     token, <tool_call> to </tool_call>, among the tokens the grammar
+//     allows (Allowed);
+//   - a respond answer: the geometric mean of every token's probability
+//     (Probs), the reasoning and the forced "<think>\n" (as 1) included,
+//     and of the uncounted <|im_end|> or EOS that ended it;
+//   - a truncated answer, or one without recorded probabilities: 1.
+func (a *Decoded) Probability() float64 {
+	if a.Truncated || len(a.Probs) == 0 {
+		return 1
+	}
+
+	if a.block < 0 || !a.leadingCall() {
+		var sum float64
+		for _, p := range a.Probs {
+			sum += math.Log(p)
+		}
+
+		n := len(a.Probs)
+		if a.stop > 0 {
+			sum += math.Log(a.stop)
+			n++
+		}
+
+		return math.Exp(sum / float64(n))
+	}
+
+	p := 1.0
+	for _, x := range a.Allowed[min(a.block, len(a.Allowed)):] {
+		p = min(p, x)
+	}
+
+	return p
+}
+
+// leadingCall reports whether the answer has the leading call block
+// Envelope parses: a <tool_call> elsewhere in the text, or in the
+// reasoning, makes it a respond answer.
+func (a *Decoded) leadingCall() bool {
+	_, rest := splitThink(a.Text)
+	_, ok := callBlock(rest)
+
+	return ok
+}
+
+// take appends the chosen token best of the logits row, with its
+// probability over row and among the tokens allowed (nil for any), its
+// margin over second, and whether it opens the call block.
+func (a *Decoded) take(row []float32, best, second int, allowed []int, opens bool) {
+	a.Tokens = append(a.Tokens, best)
+	a.Probs = append(a.Probs, softmaxAt(row, best))
+	a.Allowed = append(a.Allowed, softmaxAmong(row, best, allowed))
+	a.Margins = append(a.Margins, margin(row, best, second))
+
+	if opens && a.block < 0 {
+		a.block = len(a.Tokens) - 1
+	}
 }
 
 // Decoder decodes answers greedily, as the engine does.
@@ -91,11 +164,12 @@ func (d *Decoder) Decode(s *text.State, input []int, maxNew int, g *Grammar) (*D
 		return nil, errors.New("toolcall: no token budget")
 	}
 
-	out := &Decoded{}
+	out := &Decoded{block: -1}
 
 	forced := d.think[:min(len(d.think), maxNew)]
 	for range forced {
 		out.Probs = append(out.Probs, 1)
+		out.Allowed = append(out.Allowed, 1)
 		out.Margins = append(out.Margins, math.Inf(1))
 	}
 
@@ -113,18 +187,18 @@ func (d *Decoder) Decode(s *text.State, input []int, maxNew int, g *Grammar) (*D
 	c := &constraint{d: d, g: g}
 
 	for !out.Truncated {
-		best, second, err := c.choose(row)
+		best, second, allowed, err := c.choose(row)
 		if err != nil {
 			return nil, err
 		}
 
 		if best == d.end || best == d.eos {
+			out.stop = softmaxAmong(row, best, allowed)
+
 			break
 		}
 
-		out.Tokens = append(out.Tokens, best)
-		out.Probs = append(out.Probs, softmaxAt(row, best))
-		out.Margins = append(out.Margins, margin(row, best, second))
+		out.take(row, best, second, allowed, best == d.open && c.phase == afterThink)
 
 		if best == d.call {
 			break
@@ -164,9 +238,9 @@ func (d *Decoder) Decode(s *text.State, input []int, maxNew int, g *Grammar) (*D
 
 // Confidence is the ConfidenceHead's score of the conversation s holds after
 // Decode: the sigmoid of its logit pooled over every token fed, the turn's
-// closing <|im_end|> left out (docs/FINDINGS.md F-053). The engine's min
-// with the call's decode probability is not applied: the corpus never shows
-// it binding.
+// closing <|im_end|> left out (docs/FINDINGS.md F-053, F-062). The engine
+// reports the min of it and the answer's decode probability
+// (Decoded.Probability), which Normalised.Envelope takes.
 func (d *Decoder) Confidence(s *text.State) (float64, error) {
 	toks := s.Tokens()
 	if len(toks) < 2 {
@@ -239,22 +313,22 @@ func (c *constraint) allowed() ([]int, error) {
 }
 
 // choose are the most and the second most likely tokens of row the
-// grammar allows.
-func (c *constraint) choose(row []float32) (best, second int, err error) {
-	allowed, err := c.allowed()
+// grammar allows, and the tokens it allows (nil for any).
+func (c *constraint) choose(row []float32) (best, second int, allowed []int, err error) {
+	allowed, err = c.allowed()
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 
 	if allowed == nil {
 		best, second = top2(row)
 
-		return best, second, nil
+		return best, second, nil, nil
 	}
 
 	best, second = top2Of(row, allowed)
 
-	return best, second, nil
+	return best, second, allowed, nil
 }
 
 // took moves on past the token id.
@@ -323,6 +397,26 @@ func top2(row []float32) (best, second int) {
 	}
 
 	return best, second
+}
+
+// softmaxAmong is row[i]'s softmax probability among the tokens ids, over
+// all of row when ids is nil.
+func softmaxAmong(row []float32, i int, ids []int) float64 {
+	if ids == nil {
+		return softmaxAt(row, i)
+	}
+
+	hi := float64(row[ids[0]])
+	for _, id := range ids {
+		hi = max(hi, float64(row[id]))
+	}
+
+	var sum float64
+	for _, id := range ids {
+		sum += math.Exp(float64(row[id]) - hi)
+	}
+
+	return math.Exp(float64(row[i])-hi) / sum
 }
 
 // softmaxAt is softmax(row)[i].

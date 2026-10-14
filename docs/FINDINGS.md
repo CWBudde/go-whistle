@@ -5760,3 +5760,188 @@ re-render byte for byte.
   bound.
 - **The library's threads.** It runs on its default, the fast cores at most 4, which is 4 here (F-047); on a machine
   with fewer fast cores the library and the CLI at `--threads 4` would differ.
+
+## F-062 — Confidence: the min with the decode probability, the `respond` turn and the engine's 0.0000 (PLAN.md 11.4) (2026-10-14)
+
+**Question.** llms.txt: "`confidence` is the min of a post-hoc calibration head and the decode probability of the
+call"; upstream's confidence guide adds "the decoding probability of the call tokens themselves". F-053 ported the
+head (the sigmoid over the conversation as fed) and never saw the min bind. Three turns of the corpus that decode as
+the engine's stayed off under the engine's numerics (`NEEDLE_TEST_NUMERICS=int8`, F-060): the `respond` turn
+`timer_then_result/1` (0.9238 against 0.6369), `event_tomorrow` (0.2965 against 0.3399) and `catalogue_lock` (0.6960
+against 0.6294). And the engine scores 0.0000 on calls with object-valued arguments (F-057's Open) and on two grammar
+probes (F-055's Open). What is the decode probability, over which tokens, and does it bind? What does the `respond`
+turn pool or squash? Is the 0.0000 a rule in the envelope or a product of the score? What moves `event_tomorrow` and
+`catalogue_lock`? 11.4's Accept wants the confidence within 0.02 on every corpus turn decoded as the engine's, read
+under the engine's numerics.
+
+**The oracle.** `just oracle-text confidence` (`testdata/text/engine/confidence.json`, recorded twice and
+byte-identical): 199 probes and 258 answers over the corpus's tool sets and 13 new tools, through the CLI and
+`needle --serve` at `--threads 4`:
+
+| question    | probes | answers | what they cover                                                                                                                                                                                             |
+| ----------- | ------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `respond`   | 69     | 128     | chit-chat and questions with tools declared (15), a call then a tool result of eight shapes (object, error, string, boolean, array, nested object, `null`, `[]`; 49), third turns (5); 47 `respond` answers |
+| `object`    | 53     | 53      | a top-level object (required and optional, declared and free-form), a nested object, `{}`, arrays of objects, each request also over a twin with the object flattened to scalars                            |
+| `forced`    | 16     | 16      | integers above a maximum, decimals for an integer, enum options the request does not name, and the same tools with values the grammar lets through                                                          |
+| `decode`    | 23     | 23      | ambiguous and incomplete requests: no value, two alternatives, pronouns                                                                                                                                     |
+| `date`      | 20     | 20      | relative and explicit days around `event_tomorrow` (its request included) and for `get_weather`                                                                                                             |
+| `catalogue` | 18     | 18      | requests over the 17 catalogue tools, `catalogue_lock`'s included                                                                                                                                           |
+
+**Method.** As F-053 and F-060: the `.cact` weights decode every turn under the grammar as the engine does, in the
+float default (the dequantised weights in float32) and under the engine's numerics (packed, int8, the KV window with
+the static prefix as its sink). A hypothesis is compared on the turns decoded as the engine's (type, reasoning, and
+every call, dispatched and suppressed): 135 of the probes' 258 in float32, 148 under int8, with the corpus's turns
+(21 in float32 and int8 without the truncated one). The decoder now records each token's probability over the
+vocabulary (`Probs`) and among the tokens the grammar allows (`Allowed`), and the probability of the uncounted
+`<|im_end|>` or EOS that ends an answer; throwaway tests (none committed) pooled the head over other spans and on
+other weight paths and int8 sites. The call rule was also checked on the 498 answers of every other recorded set
+whose decode is the engine's (float32) and on its candidates under int8.
+
+### The `respond` turn
+
+The head scores every `respond` turn 0.84–0.96; the engine says 0.41–0.77 (47 answers, mean 0.62). On the `respond`
+turns decoded as the engine's (7 in float32, 8 under int8, the corpus's included):
+
+| hypothesis                                                           | float32: within 0.02 | mean abs | int8: within 0.02 | mean abs |
+| -------------------------------------------------------------------- | -------------------- | -------- | ----------------- | -------- |
+| the head over the conversation as fed (F-053)                        | 0 of 7               | 0.204    | 0 of 8            | 0.224    |
+| the head with the closing `<\|im_end\|>`                             | 0 of 7               | 0.204    | 0 of 8            | 0.224    |
+| the head over the prompt                                             | 0 of 7               | 0.201    | 0 of 8            | 0.235    |
+| the head over the turn                                               | 0 of 7               | 0.158    | 0 of 8            | 0.185    |
+| the head over the answer                                             | 0 of 7               | 0.457    | 0 of 8            | 0.455    |
+| the head up to `</think>`                                            | 0 of 7               | 0.203    | 0 of 8            | 0.224    |
+| the head without the history (the static prefix and the turn)        | 0 of 7               | 0.263    | 0 of 8            | 0.280    |
+| another squash: the head's logit over a fitted temperature (2.9)     | 1 of 7               | 0.058    | 1 of 8            | 0.072    |
+| a fixed value (the engine's mean, 0.62)                              | 2 of 7               | 0.090    | 2 of 8            | 0.095    |
+| the min with the product of the text's tokens                        | 0 of 7               | 0.586    | 0 of 8            | 0.564    |
+| the min with the geometric mean of the text                          | 0 of 7               | 0.072    | 0 of 8            | 0.091    |
+| the min with the geometric mean of the reasoning                     | 0 of 7               | 0.072    | 0 of 8            | 0.078    |
+| the min with the geometric mean of the answer, the forced tokens out | 3 of 7               | 0.031    | 3 of 8            | 0.034    |
+| the min with the geometric mean of the answer                        | 3 of 7               | 0.022    | 6 of 8            | 0.020    |
+| **the min with the geometric mean of the answer and its stop token** | **4 of 7**           | 0.021    | **5 of 8**        | 0.018    |
+| the product of the head and that mean                                | 1 of 7               | 0.080    | 1 of 8            | 0.079    |
+
+**Verdict: the decode probability of a `respond` answer is the geometric mean of its tokens' probabilities**: the
+forced `<think>\n` (as 1), the reasoning, the text, and the `<|im_end|>` that ends it. It binds on every `respond`
+turn, so the head plays no part there. `timer_then_result/1` comes out at 0.6545 (int8) and 0.6565 (float32) against
+0.6369. With and without the stop token the counts tie (9 of 15 over both numerics); its mean |Δ| is lower in both, so
+it is kept. No span of the head and no other squash comes near: the engine's `respond` score is a decode probability,
+not the head's.
+
+### The calls: the min with the decode probability
+
+On the call turns decoded as the engine's (the corpus and the probes):
+
+| hypothesis: the min of the head and, over the call block (`<tool_call>` … `</tool_call>`), | float32: within 0.02 | mean abs | int8: within 0.02 | mean abs | corpus turns lost (float32 / int8) |
+| ------------------------------------------------------------------------------------------ | -------------------- | -------- | ----------------- | -------- | ---------------------------------- |
+| nothing: the head alone (F-053)                                                            | 120 of 149           | 0.017    | 143 of 161        | 0.015    | —                                  |
+| the product of the token probabilities                                                     | 100 of 149           | 0.089    | 121 of 161        | 0.078    | 0 / 1                              |
+| their minimum                                                                              | 104 of 149           | 0.087    | 126 of 161        | 0.076    | 0 / 1                              |
+| their geometric mean                                                                       | 114 of 149           | 0.027    | 137 of 161        | 0.024    | 0 / 0                              |
+| the product among the allowed tokens                                                       | 115 of 149           | 0.019    | 136 of 161        | 0.018    | 0 / 0                              |
+| **the minimum among the allowed tokens**                                                   | **120 of 149**       | 0.018    | **142 of 161**    | 0.016    | 0 / 0                              |
+| the geometric mean among the allowed tokens (never binds)                                  | 120 of 149           | 0.017    | 143 of 161        | 0.015    | 0 / 0                              |
+| the geometric mean of the whole answer, as for `respond`                                   | 91 of 149            | 0.034    | 113 of 161        | 0.031    | 5 / 5                              |
+
+On all 498 answers of the recorded sets whose decode is the engine's (float32), the head alone is within 0.02 on 407,
+the minimum among the allowed tokens on 408. That minimum binds rarely, and where it does it lands on the engine's
+value from far off: `object_vacuum_opt_1` 0.5414 against 0.5336 (head 0.882), and under int8 on the other sets
+`by_n` 0.5071 against 0.5063 (head 0.839), `name_first_name` 0.5923 against 0.6033 (0.738), `bounds_max` 0.5756
+against 0.5728 (0.626), `quantity_two_calls` 0.3220 against 0.3111 (0.365); `phone_truncated` in float32 0.6883
+against 0.6706 (0.854). It costs three answers, one class: a decimal for an integer (`decimal_timer_0`,
+`decimal_timer_2`, `integer_decimal`: "2.5 minutes" → 2), where the model wants `.` after the digit, our grammar
+forbids it and the closing token binds at 0.59–0.76 while the engine reports the head's 0.84–0.92. The engine's
+grammar evidently lets the fraction through there (its integer value is cut afterwards), which the port's grammar does
+not; not ported. The probabilities over the whole vocabulary bind on calls the grammar routes or bounds (the routed
+trigger probes, `bounded_timer_120`) where the engine does not, so the engine renormalises over what its grammar
+allows.
+
+**Verdict: for an answer with a call block, the decode probability is the smallest probability of a block token
+among the tokens the grammar allows**, and the envelope reports the min of it and the head's score, which also decides
+the suppression below 0.1. The min binds, though rarely: not in the corpus.
+
+### The 0.0000
+
+The engine's answers alone (`object` and `forced` probes, the earlier sets):
+
+| the calls                                                                                                 | answers | 0.0000             |
+| --------------------------------------------------------------------------------------------------------- | ------- | ------------------ |
+| a top-level object with declared properties, written (`slot`, `party`, `snooze`)                          | 11      | 11                 |
+| the same, nested (`to.address`)                                                                           | 3       | 3 (two truncated)  |
+| a required free-form `{"type":"object"}`: `{}` (truncated), `{"quiet":"quiet mode"}`, `{"turbo":"turbo"}` | 3       | 1 (0.3304, 0.0910) |
+| an optional object of one enum: `{"mode":"quiet"}`, `{"mode":"turbo"}`                                    | 2       | 1 (0.5336)         |
+| an optional object of one string (`cap_nested`'s `meta`)                                                  | 1       | 0 (0.1849)         |
+| arrays of objects (`add_to_cart`; also `cap_nested`'s `notes`, above)                                     | 4       | 0                  |
+| the flattened twins and the one-product cart                                                              | 28      | 0                  |
+| an integer cut by `maximum`: 90 → 9, 75 → 55 / 120 → 12, 61 → 6                                           | 4       | 2 (0.9348, 0.9412) |
+| `ref` (F-055), `ground_nested_time`, `ground_nested_and_top` (F-057)                                      | 3       | 3                  |
+
+It is not a rule in the envelope: the same schema and shape score 0.5336 (`{"mode":"quiet"}`) and 0.0000
+(`{"mode":"turbo"}`), objects with content score 0.09–0.53, and scalars cut by a bound get it too. It is a product of
+the engine's decode, and the engine's decode inside objects is not ours: it writes strings no decode of ours writes
+(`"16:00}"`, `"Tom\","`, `"until":"}"`), and truncates three requests ours completes. Our probabilities do not
+reproduce it: among the allowed tokens the chosen one, the argmax, has a probability of at least 1/8192, never below
+0.00005; over the whole vocabulary the minimum gives 0.0000 on all 6 answers whose calls are the engine's and score
+0.0000, but also on 8 the engine scores 0.0048–0.94 (`bounded_timer_120` and `_61`, `bounded_lights_250`, five routed
+trigger probes). Not ported; open.
+
+### `event_tomorrow` and `catalogue_lock`
+
+Neither the span nor the decode probability moves them: the head over the conversation as fed is the best span on the
+134 turns decoded as the engine's under int8 in the corpus and the first recording of the probes (114 within 0.02;
+over the prompt 0, up to `</think>` 25, up to `<tool_call>` 17, over the answer 54), and the decode probability does
+not bind (0.89 and 0.88). Their neighbours are not off: under int8 the head is within 0.02 on 14 of the 16 `date`
+probes decoded as the engine's (`event_00`, the same request, and `weather_02` +0.030 are the others) and 13 of the 14
+`catalogue` probes (`catalogue_00`, the same request, the other), relative dates and the 17 tools included. Where int8
+enters:
+
+| corpus, int8 numerics                         | `event_tomorrow`  | `catalogue_lock` | within 0.02 of the turns decoded as the engine's                |
+| --------------------------------------------- | ----------------- | ---------------- | --------------------------------------------------------------- |
+| packed weights (the engine's numerics, F-060) | −0.043            | +0.067           | 20 of 22                                                        |
+| packed, the mHC input in int8 as well         | decodes otherwise | +0.060           | 14 of 19                                                        |
+| dequantised weights                           | −0.019            | +0.010           | 19 of 21 (`negation_only` +0.048, `extract_invoice` −0.020 out) |
+| dequantised, the mHC input in int8 as well    | decodes otherwise | +0.023           | 17 of 20                                                        |
+
+**Verdict:** the weight path's implementation noise of F-060 (the packed and the dequantised weights round some values
+before a quantisation to the neighbouring int8 code; per-answer logits 0.03 apart on average): on the dequantised
+weights both come within 0.02 and two others fall out, and the mHC input in int8, which F-060 left in float32, takes
+the counts down. No change to `internal/text`; open.
+
+### The port
+
+`Decoded.Allowed` (each token's probability among the allowed tokens) and `Decoded.Probability` (the min over the
+call block's `Allowed`, or for a `respond` answer the geometric mean of `Probs` and the stop token; 1 for a truncated
+answer and one without probabilities); `Normalised.Envelope` reports the min of the head's score and it, and
+suppresses below 0.1 on that. `Decoder.Confidence` stays the head's score. Model-free tests:
+`TestConfidenceDecodeProbability`, `TestConfidenceEnvelopeMin`, `TestConfidenceSoftmaxAmong`.
+`TestConfidenceMatchesEngine` decodes the probe set and requires 0.02 on every turn decoded as the engine's but the
+29 listed in float32 (the head off in float32, mostly within under int8; three `respond` turns; `object_table_3`'s
+0.0000; the two decimals), and under int8 a floor of 126 (128 of 148). `TestEnvelopeMatchesEngine`'s `confidenceOff`
+loses the `respond` turn and keeps the near-ties, `event_tomorrow`, `lights_and_lock` (float32 only) and
+`catalogue_lock`; it logs 11.4's Accept on the 25 corpus turns.
+
+### Counts
+
+| run                                                                 | float32 before | float32 after | int8 before | int8 after   |
+| ------------------------------------------------------------------- | -------------- | ------------- | ----------- | ------------ |
+| corpus, confidence within 0.02 (25 turns)                           | 19             | 20            | 20          | 21           |
+| corpus, of the turns decoded as the engine's                        | 18 of 22       | 19 of 22      | 19 of 22    | **20 of 22** |
+| `TestEnvelopeMatchesEngine`, confidence within 0.02 (36)            | 26             | 27            | 31          | 32           |
+| `TestConfidenceMatchesEngine`, of the turns decoded as the engine's | 103 of 135     | 106 of 135    | 125 of 148  | 128 of 148   |
+
+Every other engine test keeps its counts (float32: gates 193, validation 159 and 158, repair 85 and 77, grammar 10,
+window 13 of 22 in confidence). 11.4's Accept on the 25 corpus turns under int8: `type` and `function_calls` equal on
+24 (96 %), `reasoning` on 22 (88 %), `confidence` within 0.02 on 20 of the 22 turns decoded as the engine's; the two
+are `event_tomorrow` and `catalogue_lock`.
+
+### Open
+
+- **The 0.0000** on objects and cut integers: a product of the engine's own decode, which writes and truncates there
+  where ours does not; which of its probabilities reaches 0.0000 is not pinned.
+- **A decimal for an integer**: whether the engine's grammar lets the fraction through and cuts the value afterwards
+  (as its decode probability says) is not pinned by a call the CLI shows; the port's grammar forbids it, so the min binds
+  on three answers the engine scores by the head.
+- **`event_tomorrow` and `catalogue_lock`** under int8: the weight path's implementation noise (above); an instrument
+  with less noise, or the engine's own int8 kernels, would settle it.
+- **The `respond` mean**: with or without the stop token is not separable at 8 turns; three `respond` turns decoded as
+  the engine's stay 0.027–0.039 off.

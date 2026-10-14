@@ -68,9 +68,11 @@ func NoTools() *Envelope {
 // request input over the tools n, with the system facts system (whose
 // date: fact the repair resolves dates against), the conversation's earlier
 // inputs earlier (user turns and tool results, Conversation.Inputs) and the
-// confidence conf (Decoder.Confidence) (docs/FINDINGS.md F-054, F-056,
-// F-057):
+// ConfidenceHead's score conf (Decoder.Confidence) (docs/FINDINGS.md F-054,
+// F-056, F-057, F-062):
 //
+//   - the confidence is the min of conf and the answer's decode probability
+//     (Decoded.Probability), on every answer type;
 //   - a truncated answer fails with error_code "truncated" and no reasoning;
 //   - the reasoning is the text between "<think>\n" and "\n</think>";
 //   - an answer with a <tool_call>[…]</tool_call> block is a "call" (an
@@ -92,7 +94,7 @@ func NoTools() *Envelope {
 //     values and dates exempt; objects and arrays unchecked; the system
 //     facts ground nothing) and whether input negates.
 func (n *Normalised) Envelope(a *Decoded, input, system string, earlier []string, conf float64) (*Envelope, error) {
-	e := &Envelope{Type: "call", Success: true, Confidence: conf}
+	e := &Envelope{Type: "call", Success: true, Confidence: min(conf, a.Probability())}
 
 	if a.Truncated {
 		e.Success = false
@@ -140,7 +142,7 @@ func (n *Normalised) Envelope(a *Decoded, input, system string, earlier []string
 	neg := negated(input)
 	triggered := len(n.Triggered(input)) > 0 && !neg
 
-	if held == notWithheld && conf >= SuppressBelow || held != contradictionWithheld && triggered {
+	if held == notWithheld && e.Confidence >= SuppressBelow || held != contradictionWithheld && triggered {
 		e.FunctionCalls = out
 	} else {
 		e.SuppressedCalls = out

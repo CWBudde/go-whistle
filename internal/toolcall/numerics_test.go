@@ -138,20 +138,23 @@ func int8Floor(t *testing.T, name string, got, total, floor int) {
 // measured on arm64 (M5 Pro; docs/FINDINGS.md F-060), less one or two
 // turns (about 2 %) for another architecture's rounding at the near-ties.
 // The float32 numerics give, as listed turn by turn: reasoning 21 of 25
-// (TestDecodeMatchesEngine); calls 36, reasoning 29 and confidence 26 of
+// (TestDecodeMatchesEngine); calls 36, reasoning 29 and confidence 27 of
 // 36 (TestEnvelopeMatchesEngine); calls 159 and the split 158 of 171
 // (TestValidationMatchesEngine); 193 of 204 (TestGatesMatchesEngine);
 // calls 85 and reasoning 77 of 90 (TestRepairMatchesEngine); 10 of 15
-// (TestGrammarMatchesEngine).
+// (TestGrammarMatchesEngine); confidence 106 of the 135 turns decoded as
+// the engine's (TestConfidenceMatchesEngine). The confidence counts are
+// the min with the decode probability's (docs/FINDINGS.md F-062).
 const (
 	int8DecodeReasoning    = 20  // 21 of 25
 	int8EnvelopeCalls      = 34  // 35 of 36
 	int8EnvelopeReasoning  = 32  // 33 of 36
-	int8EnvelopeConfidence = 30  // 31 of 36
+	int8EnvelopeConfidence = 31  // 32 of 36
 	int8ValidationCalls    = 160 // 162 of 171
 	int8ValidationSplit    = 159 // 161 of 171
 	int8GatesEqual         = 192 // 194 of 204
 	int8RepairCalls        = 84  // 85 of 90
 	int8RepairReasoning    = 76  // 78 of 90
 	int8GrammarCalls       = 8   // 9 of 15
+	int8ConfidenceWithin   = 126 // 128 of the 148 turns decoded as the engine's
 )
