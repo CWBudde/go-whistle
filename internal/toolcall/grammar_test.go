@@ -737,6 +737,8 @@ func TestGrammarMatchesEngine(t *testing.T) {
 
 	readJSON(t, engineGrammar, &fx)
 
+	equal := 0
+
 	for _, pr := range fx.Probes {
 		turn := decodeTurns(t, d, m, p, fx.System, []byte(pr.Tools), []string{pr.Query}, 512)[0]
 
@@ -760,14 +762,20 @@ func TestGrammarMatchesEngine(t *testing.T) {
 		t.Logf("%-18s confidence %.4f engine %.4f  reasoning equal %-5v margin %.3f  %q", pr.ID, got.Confidence,
 			want.Confidence, think, margin, diff)
 
-		if why, listed := grammarCallsDiffer[pr.ID]; listed == (diff == "") {
-			t.Errorf("%s: calls %q (listed: %q)", pr.ID, diff, why)
+		if diff == "" {
+			equal++
+		}
+
+		if why, isListed := grammarCallsDiffer[pr.ID]; isListed == (diff == "") {
+			listedf(t, "%s: calls %q (listed: %q)", pr.ID, diff, why)
 		}
 
 		// A truncated answer has no reasoning.
 		truncated := want.ErrorCode != nil && *want.ErrorCode == "truncated"
 		if near := grammarReasoningNearTie[pr.ID]; !truncated && (near == think || near && margin > 0.06) {
-			t.Errorf("%s: reasoning equal %v at margin %.3f (listed as a near-tie: %v)", pr.ID, think, margin, near)
+			listedf(t, "%s: reasoning equal %v at margin %.3f (listed as a near-tie: %v)", pr.ID, think, margin, near)
 		}
 	}
+
+	int8Floor(t, "calls equal", equal, len(fx.Probes), int8GrammarCalls)
 }

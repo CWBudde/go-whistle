@@ -5314,3 +5314,251 @@ kernel). No existing test bound or fixture changed (the fixture helpers now take
 - **Under 40 × 10⁶ bytes.** The largest lever is the engram tables' norms, widened to float32 although the tables are
   only gathered (2.1 MiB). Keeping them as FP16 would need `cq` to widen lazily, which touches every kernel. The file
   buffer's unaliased 3.1 MiB could go with a mapping (F-037), at the cost of F-037's fault-after-`Close` hazard.
+
+## F-060 — The engine's int8 numerics on the text model, and its KV window of 256 with the static prefix kept (PLAN.md 11.5) (2026-10-14)
+
+**Question.** `needle3.cact` was post-trained for `act_bits` 8 and `kv_bits` 8, and its header holds `kv_window` 256.
+F-041 found where the engine applies int8 in Whistle, but the text model is another network (no encoder, a confidence
+head, five engram sites, 12:2 GQA at width 768). Where does the engine quantise the text model, and what does a KV
+window of 256 do to prompts that are mostly longer than 256 tokens? This is 11.5's second item; its Accept (the engine
+comparison with the `.cact` weights, speed and memory against the engine) is the next batch.
+
+### Upstream's rule
+
+`needle/model/quantize.py` (pin `af2654dffa`) is F-041's: `fake_quant` per row, s = max|x| / 127. `architecture.py`
+applies `_aq` (`fake_quant_act`) to the attention's input before q/k/v/gate, the gated output before `out_proj`, the
+engram rows before their projections, the mHC heads' input `rms_unit(stream)` and the LM head's input
+(`_aq(x) @ head.T`), and `maybe_quant_query` / `maybe_quant_kv` to the queries, keys and values per head after the
+norm and RoPE. The probe heads quantise no activation (`head_weight` quantises their weights).
+
+The window: `export.py`'s header doc says "kv_window is the sliding-window width the model was trained with … a model
+quantized for one must be RUN at it". `build_main` writes `effective_kv_window(config)`, the smaller of `kv_window`
+and `kv_budget_window`; the budget sizes the cache to 11.5 MiB (the 16 local layers at their band of 1024, the five
+engram sites, the rest for the four global layers: 3456 positions here), so the 256 is the configured window.
+`SimpleAttentionNetwork.hidden_cells(tokens, quant, window, sink)` builds the mask a window implies,
+`causal & padding & (recent | sink)` with `recent = (pos_q − pos_k) < window`, and the stack ANDs the band onto it on
+the local layers. The public code never calls it with a window, so which positions the engine keeps as the sink is
+not in it.
+
+### Method
+
+F-041's ρ = ⟨a − b, e − b⟩ / |a − b|² on one continuous instrument, the confidence logit: a with int8 at one site, b
+float32, e the logit of the engine's 4-decimal `confidence` clipped to [0.0005, 0.9995], one value per answer. The
+head pools every position, so it sees every site, and F-053 found it sensitive to the trunk's numerics. The answers
+are every recorded one of `cases.json` (25 turns), `triggers.json` (11), `validation.json` (171), `gates.json` (204),
+`repair.json` (90) and `grammar.json` (15), 516 in all. ρ uses the 386 whose decode equals the engine's (reasoning and
+calls, dispatched and suppressed, on the turn and every earlier one), teacher-forced: the float32 decode's tokens
+through `Forward` with the sites switched on. The standard error is the ratio estimator's over answers. Float32 is at
+a mean squared logit gap of 0.0623 to the engine (0.25 rms), F-047's thread noise included. A joint least-squares fit
+of e − b on the seven trunk sites' a − b (robust standard errors) separates correlated sites. The counts come from full
+decodes of the 516 answers: reasoning equal, calls equal (dispatched and suppressed, as `TestFloatGreedyAgainstEngine`)
+and confidence within 0.02. Throwaway tests on the dequantised `needle3.cact` (the packed one where a column says so)
+with fake-quantised activations computed all of this; none is committed.
+
+**Two weight paths.** The same sites on the packed weights give per-answer confidence logits 0.03 apart on average
+(at most 0.36) from the dequantised weights', although in float32 the two agree within 3.7e-6 (F-059). Where two
+implementations' values before a quantisation differ in the last bits, some round to the neighbouring code, and each
+such flip moves a value by a whole int8 step. That implementation noise is about a third of the int8 effect itself
+(0.08 rms), and the engine's own sums differ from both paths. So the mixes below are measured on both, and a site
+counts as the engine's only where both agree.
+
+### Where the engine quantises
+
+Each site alone, on the dequantised weights (S the mean squared logit change):
+
+| site, per row of                              | S       | ρ alone         | β jointly    | reasoning / calls / conf (of 516) | verdict                       |
+| --------------------------------------------- | ------- | --------------- | ------------ | --------------------------------- | ----------------------------- |
+| float32                                       | —       | —               | —            | 400 / 484 / 344                   | —                             |
+| keys per head, 48                             | 5.95e-3 | **1.04 ± 0.18** | 1.04 ± 0.18  | 418 / 487 / 387                   | the engine's                  |
+| values per head, 64                           | 1.39e-4 | 0.66 ± 0.94     | −0.37 ± 0.77 | 398 / 484 / 340                   | too small to read             |
+| queries per head, 48                          | 1.15e-3 | 0.21 ± 0.30     | 0.12 ± 0.34  | 401 / 484 / 356                   | too small to read             |
+| mHC input `rms_unit(stream)`, 3072            | 1.38e-3 | 0.40 ± 0.30     | 0.09 ± 0.29  | 397 / 486 / 344                   | too small to read             |
+| attention input (q/k/v/gate projections), 768 | 7.72e-4 | 0.87 ± 0.29     | 0.42 ± 0.37  | 393 / 482 / 350                   | not the engine's (the mixes)  |
+| gated output before `out_proj`, 768           | 2.32e-3 | −0.07 ± 0.17    | −0.01 ± 0.15 | 376 / 485 / 322                   | not the engine's              |
+| engram rows, 768                              | 4.87e-5 | 1.47 ± 0.99     | 1.92 ± 1.11  | 397 / 484 / 343                   | too small to read             |
+| LM head input, 768                            | 0       | —               | —            | 396 / 484 / 341                   | not the engine's (the counts) |
+| confidence head's pooled input, 3072          | 8.30e-2 | −0.06 ± 0.03    | —            | —                                 | not the engine's              |
+| the same per query, 768                       | 6.68e-2 | −0.04 ± 0.04    | —            | —                                 | not the engine's              |
+| the head's cells per position and row, 768    | 2.85e-2 | 0.11 ± 0.05     | —            | —                                 | not the engine's              |
+
+Only the keys move the logit enough to read alone. The mixes decide the small sites: if a site added to a mix were
+not the engine's, the mix's ρ would fall to about S(mix without it) / S(mix).
+
+| mix                                          | ρ, dequantised | ρ, packed       | gap², packed | reasoning / calls / conf (of 516) |
+| -------------------------------------------- | -------------- | --------------- | ------------ | --------------------------------- |
+| keys, values                                 | 1.00 ± 0.17    | 1.03 ± 0.16     | 0.0563       | 406 / 485 / 378                   |
+| **queries, keys, values** (the option)       | 0.86 ± 0.12    | **1.00 ± 0.14** | **0.0557**   | —                                 |
+| mHC, keys, values                            | 0.84 ± 0.12    | 0.76 ± 0.11     | 0.0580       | —                                 |
+| mHC, queries, keys, values (Whistle's sites) | 0.95 ± 0.08    | 0.78 ± 0.11     | 0.0580       | 417 / 486 / 401                   |
+| attention input, keys                        | 0.77 ± 0.13    | —               | —            | —                                 |
+| attention input, keys, values                | 0.73 ± 0.13    | —               | —            | —                                 |
+| Whistle's and the attention input            | 0.66 ± 0.10    | —               | —            | 404 / 475 / 364                   |
+| Whistle's and the engram rows                | 0.78 ± 0.08    | —               | —            | —                                 |
+| Whistle's and the LM head input              | —              | —               | —            | 410 / 486 / 396                   |
+| upstream's every site (`_aq` and the KV)     | 0.58 ± 0.11    | —               | —            | 385 / 483 / 327                   |
+
+(The counts are the dequantised weights'; the gap² of float32 is 0.0623.) The keys and values are the engine's on both
+paths, and the queries keep the mix at ρ 0.86 ± 0.12 and 1.00 ± 0.14, where an unrelated site would give 0.81 and
+0.88: kept, as `maybe_quant_query` "matching the native attention kernel" says. The mHC input, which the engine
+quantises in Whistle (F-041), splits: with the queries it lifts the dequantised mix to 0.95 ± 0.08 (0.76 if unrelated)
+but drops the packed one to 0.78 ± 0.11 (1.00 if the engine's), so the engine's outputs do not show it, and it stays
+float32. The attention input, 0.87 ± 0.29 alone, shares the keys' direction (0.42 ± 0.37 jointly) and takes every mix
+down (0.66–0.77); the engram rows take Whistle's mix to 0.78 ± 0.08; the LM head input, which only the logits see,
+costs answers: none is the engine's. The confidence head quantises nothing (ρ −0.06 to 0.11 at large S).
+
+### The KV window
+
+The corpus cannot see most hypotheses: no recorded answer runs more than 188 tokens past its static prefix (the
+prefixes are 50–1025 tokens, the sequences up to 1213), so a window of 256 that keeps the static prefix in view
+changes nothing on it (S = 0). `just oracle-text window` records 14 conversations, 22 answers, into
+`testdata/text/engine/window.json` (a second recording is byte-identical): over the corpus's assistant tools, a timer
+or a message request followed by 6, 22, 40 or 85 neutral filler sentences (about 90, 290, 520 and 1100 tokens), the
+same with the request last, and three-turn conversations whose third turn needs a timer length from the first turn or
+from the start of its own long text. The engine answers the requests 90 tokens back and loses every one further back:
+with the timer or the message first and 22 or 40 sentences after it, it calls a made-up `get_weather` for Chicago
+(22) or Mumbai (40), the same call for the timer and the message; the conversations' third turn sets a timer of 1, 2
+or 45 minutes instead of 25.
+
+Decoded as the engine does, in float32 on the dequantised weights:
+
+| hypothesis                                                      | corpus ρ (S)         | corpus reasoning / calls / conf | probes calls / reasoning / conf (of 22) |
+| --------------------------------------------------------------- | -------------------- | ------------------------------- | --------------------------------------- |
+| no KV window                                                    | —                    | 400 / 484 / 344                 | 12 / 5 / 7                              |
+| 256 on every layer                                              | 0.12 ± 0.04 (5.4e-2) | 303 / 293 / 199                 | 4 / 2 / 3                               |
+| 256, BOS kept                                                   | 0.10 ± 0.04 (5.0e-2) | 306 / 282 / 198                 | 4 / 2 / 3                               |
+| **256, the static prefix kept** (BOS … `</tools>`)              | S = 0                | as no window                    | **17 / 11 / 13**                        |
+| 256 past the first prompt (the first prompt kept)               | S = 0                | as no window                    | 12 / 5 / 8                              |
+| 256 after a full prefill of the first prompt                    | 0.10 ± 0.04 (3.7e-2) | —                               | 4 / 2 / 0                               |
+| 256 on the global layers only, the local band 1024              | 0.23 ± 0.08 (1.6e-2) | —                               | 6 / 2 / 0                               |
+| the same, the static prefix kept                                | S = 0                | as no window                    | 13 / 6 / 9                              |
+| 256 on the local layers instead of 1024, the global layers full | 0.11 ± 0.06 (2.6e-2) | —                               | 11 / 0 / 4                              |
+
+**Verdict: a KV window of 256 positions on every layer, with the static prefix kept in view**: the rendering up to
+`</tools>` that `needle_init` counts (F-048), BOS included, as the sink of upstream's `hidden_cells` mask, inside the
+local layers' band. It reproduces the four made-up weather calls with the engine's reasoning word for word and its
+confidence within 0.014, and the first conversation's 1-minute timer; no other hypothesis passes 13 of 22. Windows that
+cut the tools (no sink, BOS only, a full prefill then a hard window) lose about 100 of the corpus's reasoning and 190
+of its calls and move the confidence away from the engine (ρ 0.10–0.12, the gap from 0.062 to 0.10). The first prompt
+as the sink keeps the facts the engine loses in its first turn, and a window on the global layers alone keeps them
+through the local layers. The winner's five misses are the three probes past 1024 positions (where the band and the
+sink meet, Open) and two third turns (2 minutes for the pasta, 45 minutes); the `respond` turns' reasoning differs
+under every hypothesis (F-053).
+
+### What the option does
+
+`text.LoadWith(src, cfg, text.LoadOptions{...})` is new next to `Load`, which calls it with the zero options and stays
+as it was; `OpenOptions` is unchanged. The engine's numerics are Int8, the KV window of the header and the static
+prefix as the sink, `LoadOptions{Int8: true, KVWindow: cfg.KVWindow, SinkToken: id}` with `id` that of `</tools>`:
+
+- `Int8` sets `needle.Int8{Act: true, KV: true}` on every block: the queries, keys and values per head, with the
+  caches in int8 (F-041's `Int8Rows` and `AttendInt8`). The mHC stays float32.
+- `KVWindow` sets the new `needle.Attention.SetKVWindow` (and `Block.SetKVWindow`) on every layer; the local layers
+  keep their band. A query at p sees the keys max(0, p − 255) … p and the cache's sink, within the band.
+- `SinkToken` makes the sink the positions up to and including the first `</tools>`. Until that token is fed, every
+  position belongs to the sink, so the static prefix attends to all of itself, as the engine's prefill of it does and
+  as `Forward` over the whole sequence does. `text.State` sets the sink on its caches (`needle.KVCache.SetSink`), forks
+  keep it, and `Forward` runs the blocks as one `Extend` call on fresh caches when a KV window is set.
+- In `internal/needle` the int8 cache takes a window: `Extend` no longer refuses one, decoding steps run the new
+  `AttendInt8Spans` (two spans per query row, the sink's and the band's; `AttendInt8` is it with one span, bit for
+  bit), and the float paths gather the two spans for the softmax (`softmaxSpans`), the one-span path as before. The
+  caches keep every position; the window narrows what a position reads.
+
+Nothing changes with the options off. The float and packed numerics are `main`'s (`1a6ee32`) bit for bit: a throwaway
+test hashed the logits, the confidence over the whole sequence and three `Extend` steps on the five fixture cases,
+dequantised and packed, and both hashes equal `main`'s; so do the hashes of Whistle's `Transcribe` (text, language,
+timed words) and `Embed` on the 32 clips, float32 and `WithInt8()`, natively and under `purego`. The options on the
+dequantised weights give the throwaway measurements' logits exactly (mean |Δ| 0), and on the packed weights the
+packed measurements' (ρ 1.00 ± 0.14).
+
+**Tests.** `internal/needle`: `TestAttendInt8Spans` (two spans against float32 on the codes' values, nothing written
+outside them, one span equal to `AttendInt8` bit for bit), `TestAttentionInt8ExtendWindow` (the band on the int8
+cache with GQA and taps: one call, per row and splits across the window's edge, and a fork, against `Forward` within
+the int8 grid), `TestAttentionKVWindowMatchesReference` (the KV window and the sink against a float64 reference of
+`causal & band & (recent | sink)`, both attend paths, taps and band on and off), `TestAttentionInt8KVWindowSink`,
+`TestWindowSameBand` (a step on the float32 and on the int8 cache reads exactly its band and sink: corrupting every
+other row leaves it bit for bit), `TestAttentionKVWindowErrors`. `internal/text`: `TestLoadWithOptions`,
+`TestInt8Forward`, `TestInt8ExtendMatchesForward` (prompt then per token and uneven splits across the 256 window and
+the 1024 band, cosine ≥ 0.9999), `TestKVWindowSink` (with the sink the window cuts nothing on `long_tools`, bit for
+bit; without it, it does), `TestInt8CacheMemory`. `internal/toolcall`: `TestWindowMatchesEngine` and the switch below.
+
+### Counts
+
+`NEEDLE_TEST_NUMERICS` (`internal/toolcall`'s test helper) runs every engine test on the packed `needle3.cact` in
+float32 (`packed`) or with the engine's numerics (`int8`); unset, the tests are as before. Under `packed` every test
+holds its float32 list unchanged. Under `int8` a turn that differs from those lists is logged, and each test holds
+floors on its counts: the counts below, less one or two turns for another architecture's rounding. M5 Pro, arm64:
+
+| test (answers)                                                         | count                    | float32      | packed       | packed + int8 + window |
+| ---------------------------------------------------------------------- | ------------------------ | ------------ | ------------ | ---------------------- |
+| `TestFloatGreedyAgainstEngine` (24 first turns)                        | calls equal              | 20           | 24           | 23                     |
+| `TestDecodeMatchesEngine` (25)                                         | reasoning equal          | 21           | 21           | 21                     |
+| `TestEnvelopeMatchesEngine` (36, `respond` and `event_tomorrow` among) | calls equal              | 36           | 36           | 35                     |
+|                                                                        | reasoning equal          | 29           | 29           | **33**                 |
+|                                                                        | confidence within 0.02   | 26           | 26           | **31**                 |
+| `TestValidationMatchesEngine` (171)                                    | calls equal              | 159          | 159          | **162**                |
+|                                                                        | calls and split equal    | 158          | 158          | **161**                |
+| `TestGatesMatchesEngine` (204)                                         | calls and split equal    | 193          | 193          | 194                    |
+| `TestRepairMatchesEngine` (90)                                         | calls equal              | 85           | 85           | 85                     |
+|                                                                        | reasoning equal          | 77           | 77           | 78                     |
+| `TestGrammarMatchesEngine` (15)                                        | calls equal              | 10           | 10           | 9                      |
+| `TestWindowMatchesEngine` (22), with the window                        | calls / reasoning / conf | 17 / 11 / 13 | 17 / 11 / 13 | 17 / 11 / 12           |
+
+The float32 column's `TestFloatGreedyAgainstEngine` runs `needle3.safetensors`, the others the dequantised `.cact`; the
+window test adds the KV window to the float32 and packed models (without it, float32 has 12 / 5 / 7). Int8 brings the
+reasoning and the confidence closer to the engine's and keeps the calls: it decodes the five `alarm_*` turns, three gate
+probes and five validation probes, which float32 decodes differently at a near-tie, as the engine does, and loses
+`message_and_timer` (a margin of 0.005: "I'm running late" against the engine's "Running late"), `grammar`'s
+`date_free`, two gate probes and two validation probes the other way. Of the turns the envelope test lists as off in
+confidence (F-053), int8 brings `lights_and_lock` (0.3723 against 0.3703) and the near-ties within 0.02;
+`event_tomorrow` and the `respond` turn stay off. With Whistle's sites, the mHC input included, the same tests gave
+reasoning 18 of 25; calls 35, reasoning 25 and confidence 21 of 36; 161 and 160 of 171; 192 of 204; 86 and 82 of 90; 9
+of 15; 17 / 12 / 13 of 22. Such small counts swing by several answers with the implementation noise, which is why ρ over
+386 answers decides the sites.
+
+### Speed and memory
+
+`BenchmarkForwardLong` (the first 600 tokens of `long_tools`) and `BenchmarkExtendStepLong` (one token after them),
+and F-059's 120-token pair, M5 Pro, 15 threads, median of three 2 s runs at a load average of 6–8. The int8 model
+runs on the packed weights' exact kernel (F-059), as `packed` does:
+
+| median                | packed  | packed + int8 + window | packed, `LUT` |
+| --------------------- | ------- | ---------------------- | ------------- |
+| `Forward`, 600 tokens | 504 ms  | 535 ms (+6 %)          | 170 ms        |
+| `Extend` after 600    | 10.2 ms | **8.3 ms (−18 %)**     | 4.6 ms        |
+| `Forward`, 120 tokens | 171 ms  | 175 ms (+2.5 %)        | 47.7 ms       |
+| `Extend` after 120    | 7.8 ms  | 7.4 ms (−5 %)          | 2.1 ms        |
+
+A decoding step gains because `AttendInt8Spans` reads a quarter of the bytes on NEON (F-041) and the more so the
+longer the sequence; the forward pass pays for quantising the queries, keys and values. The exact CQ kernel, not the
+attention, sets both: `LUT` is 3× faster.
+
+The int8 caches take 4,800 bytes per position over the 20 layers (2 KV heads of 48 key and 64 value codes and a
+float32 scale each), against 17,920 in float32 (`TestInt8CacheMemory`): 4.6 MiB per 1000 positions against 17.1. That
+is what the positions need (`KVCache.Bytes`). What the heap retains is more, because `append` grows the backing arrays
+ahead (`KVCache.AllocatedBytes`): after the 1230-token prompt and 64 single-token steps, 1.27× for int8 and 1.20× for
+float32. The caches keep every position; one that dropped what the window and the sink no longer reach would hold at most the
+prefix and 256 positions, as the engine's budget does.
+
+### Recommendation
+
+Use `LoadOptions{Int8, KVWindow, SinkToken}` for 11.5's engine comparison: the KV window is not a numerics detail but
+decides which facts the model sees in long conversations, and only it reproduces the engine there; the int8 sites
+bring the reasoning and the confidence closer to the engine's without moving the calls, and make decoding faster.
+Keep the zero options the default for now: the engine tests' float32 lists were set on them, and whether the toolcall
+layer runs the engine's numerics by default is the Accept's decision.
+
+### Open
+
+- **Past 1024 positions.** The winner misses the three probes longer than 1024 tokens. Only the control among them,
+  the request last after 85 sentences (`timer_last_85`), comes out as the engine's at all, and only where the local
+  layers see 256 positions and the global layers more: the local layers at 256 instead of their band, or the global
+  layers alone at 256 with the prefix kept. How the engine's window, the local band and the sink combine past 1024
+  positions (here the band cuts the sink, as upstream's mask does) is not pinned.
+- **The window's edge.** The probes sit far from 256 (90 against 290 tokens); whether the engine keeps 256 positions
+  with the current one or 256 before it is not pinned.
+- **No `</tools>`.** Without tools there is no static prefix, and such a sequence keeps every position in the sink, so
+  no window applies; the engine without tools is not probed.
+- **The mHC input**, the values and the engram rows are too small to read alone, and the mHC input's mixes disagree
+  between the two weight paths. A larger answer set, or an instrument with less implementation noise, could settle
+  it; Whistle's encoder showed it clearly (F-041).
+- **Speed.** The packed path's exact kernel (F-059) dominates the forward pass; the int8 attention adds little.

@@ -1,0 +1,647 @@
+{
+  "engine": {
+    "engine_version": "3.2.0",
+    "platform": "macos-arm64",
+    "repo": "Cactus-Compute/needle3",
+    "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67"
+  },
+  "models": [
+    {
+      "repo": "Cactus-Compute/needle3",
+      "revision": "93e88ede867e4311c39151285e74df513e4b835b",
+      "file": "needle3.cact",
+      "sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38"
+    }
+  ],
+  "command": "needle --model needle3.cact --tools <tools> --system <system file> --threads 4 --prompt <query>; with more than one turn --serve, POST /complete per turn",
+  "system": "date: 2026-10-11 Sun 09:30",
+  "probes": [
+    {
+      "id": "timer_first_6",
+      "covers": "the timer's length and label first, then the filler",
+      "filler": 6,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Set a timer for 25 minutes for the bread. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. That is all for now."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "set_timer",
+              "arguments": {
+                "minutes": 25,
+                "label": "Bread"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "'25 minutes' -> minutes 25; label 'bread' from query.",
+          "confidence": 0.2862,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "message_first_6",
+      "covers": "the message's recipient and text first, then the filler",
+      "filler": 6,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Text Anna that dinner is ready at eight. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. Thanks."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "send_message",
+              "arguments": {
+                "recipient": "Anna",
+                "message": "Dinner is ready at eight"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "send_message: recipient 'Anna' from query, message 'dinner is ready at eight' from query.",
+          "confidence": 0.2906,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "timer_first_22",
+      "covers": "the timer's length and label first, then the filler",
+      "filler": 22,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Set a timer for 25 minutes for the bread. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. That is all for now."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Chicago",
+                "date": "2026-10-12"
+              }
+            }
+          ],
+          "reasoning": "Query asks for weather forecast for Chicago on October 12th. get_weather with location 'Chicago' and date '2026-10-12' from query.",
+          "confidence": 0.3476,
+          "validation": {
+            "ungrounded": ["get_weather.location"],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "message_first_22",
+      "covers": "the message's recipient and text first, then the filler",
+      "filler": 22,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Text Anna that dinner is ready at eight. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. Thanks."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Chicago",
+                "date": "2026-10-12"
+              }
+            }
+          ],
+          "reasoning": "Query asks for weather forecast for Chicago on October 12th. get_weather with location 'Chicago' and date '2026-10-12' from query.",
+          "confidence": 0.2295,
+          "validation": {
+            "ungrounded": ["get_weather.location"],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "timer_first_40",
+      "covers": "the timer's length and label first, then the filler",
+      "filler": 40,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Set a timer for 25 minutes for the bread. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. That is all for now."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Mumbai",
+                "date": "2026-10-05"
+              }
+            }
+          ],
+          "reasoning": "Query asks for weather forecast for Mumbai. location 'Mumbai' from query. date '2026-10-05' from system date.",
+          "confidence": 0.1267,
+          "validation": {
+            "ungrounded": ["get_weather.location"],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "message_first_40",
+      "covers": "the message's recipient and text first, then the filler",
+      "filler": 40,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Text Anna that dinner is ready at eight. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Thanks."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Mumbai",
+                "date": "2026-10-05"
+              }
+            }
+          ],
+          "reasoning": "Query asks for weather forecast for Mumbai. location 'Mumbai' from query. date '2026-10-05' from system date.",
+          "confidence": 0.1006,
+          "validation": {
+            "ungrounded": ["get_weather.location"],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "timer_first_85",
+      "covers": "the timer's length and label first, then the filler",
+      "filler": 85,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Set a timer for 25 minutes for the bread. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. That is all for now."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [
+            {
+              "name": "set_alarm",
+              "arguments": {
+                "time": "7:30 AM"
+              }
+            },
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Morning Run"
+              }
+            }
+          ],
+          "reasoning": "Reaches back to turn 2 (set_alarm 'Morning Run' at '7:30 AM') and turn 3 (set_alarm 'Morning Run' at '7:45 AM'). New query changes time to '7:30 AM' and label to 'Morning Run'. Also references turn 3 (get_weather for 'Morning Run') and turn 4 (get_weather for 'Morning Run').",
+          "confidence": 0.0086,
+          "validation": {
+            "ungrounded": ["set_alarm.time", "get_weather.location"],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "message_first_85",
+      "covers": "the message's recipient and text first, then the filler",
+      "filler": 85,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Text Anna that dinner is ready at eight. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Thanks."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [
+            {
+              "name": "set_alarm",
+              "arguments": {
+                "time": "7:30 AM"
+              }
+            },
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Morning Run"
+              }
+            }
+          ],
+          "reasoning": "Reaches back to turn 2 (set_alarm 'Morning Run' at '7:30 AM') and turn 3 (set_alarm 'Morning Run' at '7:30 AM'). New query changes time to '7:30 AM' and label to 'Morning Run'. Also references turn 3 (get_weather for 'Morning Run') and turn 4 (get_weather for 'Morning Run').",
+          "confidence": 0.006,
+          "validation": {
+            "ungrounded": ["set_alarm.time", "get_weather.location"],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "timer_last_22",
+      "covers": "the filler, then the timer's length and label (the control)",
+      "filler": 22,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. Set a timer for 25 minutes for the bread."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "set_timer",
+              "arguments": {
+                "minutes": 25,
+                "label": "Bread"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "Query asks for a 25-minute timer for bread. set_timer with minutes=25, label='bread'.",
+          "confidence": 0.3867,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "timer_last_85",
+      "covers": "the filler, then the timer's length and label (the control)",
+      "filler": 85,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Set a timer for 25 minutes for the bread."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [
+            {
+              "name": "set_timer",
+              "arguments": {
+                "minutes": 25,
+                "label": "Bread"
+              }
+            }
+          ],
+          "reasoning": "Reaches back to turn 2 (set_timer '2 minutes' for bread) and turn 3 (set_alarm '4:00' for bread). New query asks for a timer for 25 minutes for the bread.",
+          "confidence": 0.0773,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "earlier_turn_22",
+      "covers": "the timer's length in the first turn, the filler in the third",
+      "filler": 22,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Set a timer for 25 minutes for the bread.",
+        "{\"status\": \"started\"}",
+        "The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. Now set a second timer of the same length for the pasta."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "set_timer",
+              "arguments": {
+                "minutes": 25,
+                "label": "Bread"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "'25 minutes' -> minutes 25; label 'bread' from query.",
+          "confidence": 0.8437,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        },
+        {
+          "type": "respond",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "Timer started; confirm.",
+          "confidence": 0.7505
+        },
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "set_timer",
+              "arguments": {
+                "minutes": 1
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "Query asks for a second timer of 1 minute. minutes=1 from 'one minute'.",
+          "confidence": 0.7211,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "later_turn_22",
+      "covers": "the timer's length at the start of a long third turn",
+      "filler": 22,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "What's the weather in Lisbon today?",
+        "{\"forecast\": \"sunny\", \"high_c\": 24}",
+        "Set a timer for 25 minutes for the bread. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. That is all for now."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Lisbon",
+                "date": "2026-10-11"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "location 'Lisbon' from query; date '2026-10-11' from system date; get_weather tool.",
+          "confidence": 0.7776,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        },
+        {
+          "type": "respond",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "result high_c 24 -> respond.",
+          "confidence": 0.5569
+        },
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "set_timer",
+              "arguments": {
+                "minutes": 45
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "User wants a timer for 45 minutes. '45 minutes' -> minutes 45. Label 'pick up dog from the park' from query.",
+          "confidence": 0.7518,
+          "validation": {
+            "ungrounded": ["set_timer.minutes"],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "earlier_turn_40",
+      "covers": "the timer's length in the first turn, the filler in the third",
+      "filler": 40,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "Set a timer for 25 minutes for the bread.",
+        "{\"status\": \"started\"}",
+        "The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Now set a second timer of the same length for the pasta."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "set_timer",
+              "arguments": {
+                "minutes": 25,
+                "label": "Bread"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "'25 minutes' -> minutes 25; label 'bread' from query.",
+          "confidence": 0.8437,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        },
+        {
+          "type": "respond",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "Timer started; confirm.",
+          "confidence": 0.7505
+        },
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "set_timer",
+              "arguments": {
+                "minutes": 2,
+                "label": "Pasta"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "User wants a second timer for pasta. '2 minutes' -> minutes 2. 'pasta' -> label 'pasta'.",
+          "confidence": 0.9245,
+          "validation": {
+            "ungrounded": ["set_timer.minutes"],
+            "negation": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "later_turn_40",
+      "covers": "the timer's length at the start of a long third turn",
+      "filler": 40,
+      "tools": "[{\"name\":\"set_timer\",\"description\":\"Start a countdown timer\",\"parameters\":{\"type\":\"object\",\"properties\":{\"minutes\":{\"type\":\"integer\",\"description\":\"Duration in minutes\"},\"label\":{\"type\":\"string\",\"description\":\"What the timer is for\"}},\"required\":[\"minutes\"]}},{\"name\":\"set_alarm\",\"description\":\"Set an alarm clock\",\"parameters\":{\"type\":\"object\",\"properties\":{\"time\":{\"type\":\"string\",\"description\":\"Alarm time as HH:MM, 24-hour\"},\"label\":{\"type\":\"string\"}},\"required\":[\"time\"]}},{\"name\":\"send_message\",\"description\":\"Send a text message to a contact\",\"parameters\":{\"type\":\"object\",\"properties\":{\"recipient\":{\"type\":\"string\",\"description\":\"Contact name\"},\"message\":{\"type\":\"string\",\"description\":\"Message text\"}},\"required\":[\"recipient\",\"message\"]}},{\"name\":\"get_weather\",\"description\":\"Get the weather forecast for a place and day\",\"parameters\":{\"type\":\"object\",\"properties\":{\"location\":{\"type\":\"string\",\"description\":\"City name\"},\"date\":{\"type\":\"string\",\"format\":\"date\",\"description\":\"Day of the forecast\"}},\"required\":[\"location\"]}},{\"name\":\"create_event\",\"description\":\"Add an event to the calendar\",\"parameters\":{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"date\":{\"type\":\"string\",\"format\":\"date\"},\"time\":{\"type\":\"string\",\"description\":\"Start time as HH:MM, 24-hour\"},\"duration_minutes\":{\"type\":\"integer\"},\"location\":{\"type\":\"string\"}},\"required\":[\"title\",\"date\"]}}]",
+      "turns": [
+        "What's the weather in Lisbon today?",
+        "{\"forecast\": \"sunny\", \"high_c\": 24}",
+        "Set a timer for 25 minutes for the bread. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. Leaves gathered in small heaps by the side of the road. Somewhere a door creaked open and closed again. The café on the corner was setting out chairs and tables. A pair of ducks paddled along the edge of the pond. Light slowly reached the top of the tall chestnut trees. The postman greeted everyone he passed with a cheerful wave. In the distance, a train crossed the bridge over the valley. The smell of fresh bread drifted from the house next door. The garden behind the house was quiet in the early light. A few birds moved between the branches of the old apple tree. The neighbours were still asleep, and the street looked empty. Someone had left a blue bicycle leaning against the fence. The air smelled of wet grass and freshly turned soil. Swallows circled high above the rooftops to the east. On the windowsill, a row of small pots held herbs and flowers. The cat watched the birds from the porch with great patience. Further down the road, a bakery was opening its shutters. The church bell rang, and the sound carried over the roofs. A delivery van stopped briefly and drove on toward the market. Chalk drawings still covered the pavement near the school. The river ran high after the long autumn. Along the path, the hedges had grown thick and green. An elderly man walked his dog along the riverbank. The library across the square had put out a sign for its book sale. That is all for now."
+      ],
+      "answers": [
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "get_weather",
+              "arguments": {
+                "location": "Lisbon",
+                "date": "2026-10-11"
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "location 'Lisbon' from query; date '2026-10-11' from system date; get_weather tool.",
+          "confidence": 0.7776,
+          "validation": {
+            "ungrounded": [],
+            "negation": false
+          }
+        },
+        {
+          "type": "respond",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [],
+          "suppressed_calls": [],
+          "reasoning": "result high_c 24 -> respond.",
+          "confidence": 0.5569
+        },
+        {
+          "type": "call",
+          "success": true,
+          "error": null,
+          "error_code": null,
+          "reason": null,
+          "function_calls": [
+            {
+              "name": "set_timer",
+              "arguments": {
+                "minutes": 45
+              }
+            }
+          ],
+          "suppressed_calls": [],
+          "reasoning": "User wants to set a timer for 45 minutes. '45 minutes' -> minutes 45. No label given, so omit label.",
+          "confidence": 0.8797,
+          "validation": {
+            "ungrounded": ["set_timer.minutes"],
+            "negation": false
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -23,14 +23,18 @@ type call struct {
 	Arguments map[string]any `json:"arguments"`
 }
 
-// loadModel loads the text model at path, skipping without it.
+// loadModel loads the text model at path, skipping without it. The
+// switch NEEDLE_TEST_NUMERICS loads the packed needle3.cact instead, in
+// float32 or the engine's int8 numerics (numericsEnv, docs/FINDINGS.md
+// F-060).
 func loadModel(t *testing.T, path string) *text.Model {
 	t.Helper()
 
-	_, err := os.Stat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		t.Skipf("%s missing; run `just fetch-needle3`", path)
+	if n := testNumerics(t); n != numericsFloat {
+		return loadNumerics(t, n)
 	}
+
+	requireModel(t, path)
 
 	src, err := text.Open(path)
 	if err != nil {
@@ -43,6 +47,16 @@ func loadModel(t *testing.T, path string) *text.Model {
 	}
 
 	return m
+}
+
+// requireModel skips without the model file at path.
+func requireModel(t *testing.T, path string) {
+	t.Helper()
+
+	_, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		t.Skipf("%s missing; run `just fetch-needle3`", path)
+	}
 }
 
 // engineCase is one case of the engine corpus (testdata/text/engine).
@@ -264,6 +278,8 @@ func TestDecodeMatchesEngine(t *testing.T) {
 	readJSON(t, engineResponse, &responses)
 	readJSON(t, engineLibrary, &library)
 
+	var equal, total int
+
 	for _, c := range corpus.Cases {
 		for i, turn := range decodeCase(t, d, m, p, &corpus, c) {
 			a := turn.a
@@ -277,6 +293,11 @@ func TestDecodeMatchesEngine(t *testing.T) {
 
 			think := thinkOf(a.Text) == reasoning
 			margin := minMargin(a, 0, len(a.Tokens))
+			total++
+
+			if think {
+				equal++
+			}
 
 			t.Logf("%-20s turn %d  tokens %3d engine %3d  truncated %-5v  reasoning equal %-5v  min margin %.3f",
 				c.ID, i, len(a.Tokens), want, a.Truncated, think, margin)
@@ -284,19 +305,22 @@ func TestDecodeMatchesEngine(t *testing.T) {
 			switch {
 			case eng.ErrorCode == "truncated":
 				if !a.Truncated || len(a.Tokens) != want {
-					t.Errorf("%s: %d tokens, truncated %v; the engine truncates at %d", c.ID, len(a.Tokens), a.Truncated, want)
+					listedf(t, "%s: %d tokens, truncated %v; the engine truncates at %d", c.ID, len(a.Tokens), a.Truncated,
+						want)
 				}
 			case reasoningNearTie[c.ID]:
 				if think || margin > 0.06 {
-					t.Errorf("%s: listed as a near-tie, but reasoning equal %v at margin %.3f", c.ID, think, margin)
+					listedf(t, "%s: listed as a near-tie, but reasoning equal %v at margin %.3f", c.ID, think, margin)
 				}
 			case !think:
-				t.Errorf("%s turn %d: reasoning %q, engine %q", c.ID, i, thinkOf(a.Text), reasoning)
+				listedf(t, "%s turn %d: reasoning %q, engine %q", c.ID, i, thinkOf(a.Text), reasoning)
 			case countOff[c.ID] == (len(a.Tokens) == want):
-				t.Errorf("%s turn %d: %d tokens, engine %d (listed: %v)", c.ID, i, len(a.Tokens), want, countOff[c.ID])
+				listedf(t, "%s turn %d: %d tokens, engine %d (listed: %v)", c.ID, i, len(a.Tokens), want, countOff[c.ID])
 			}
 		}
 	}
+
+	int8Floor(t, "reasoning equal", equal, total, int8DecodeReasoning)
 }
 
 // TestFloatGreedyAgainstEngine is the decode half of PLAN.md 11.3's

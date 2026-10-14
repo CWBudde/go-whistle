@@ -116,13 +116,14 @@ func TestGatesMatchesEngine(t *testing.T) {
 				equal++
 			}
 
-			if why, listed := gatesDiffer[key]; listed == (diff == "") {
-				t.Errorf("%s: calls %q (listed: %q)", key, diff, why)
+			if why, isListed := gatesDiffer[key]; isListed == (diff == "") {
+				listedf(t, "%s: calls %q (listed: %q)", key, diff, why)
 			}
 		}
 	}
 
 	t.Logf("%d turns: calls and split equal on %d", total, equal)
+	int8Floor(t, "calls and split equal", equal, total, int8GatesEqual)
 }
 
 // gateCase is one model-free case of a grounding gate: the model's calls

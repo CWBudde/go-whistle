@@ -64,8 +64,9 @@ var reasoningDiffers = map[string]bool{
 }
 
 // envelopeTurn checks one turn's envelope against the engine's: every field,
-// the calls and the reasoning but on the turns listed.
-func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) {
+// the calls and the reasoning but on the turns listed. It returns whether
+// the calls, the reasoning and the confidence (within 0.02) agree.
+func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) (calls, reasoning, conf bool) {
 	t.Helper()
 
 	e := got.env
@@ -88,43 +89,45 @@ func envelopeTurn(t *testing.T, key string, got turnOut, want engineEnvelope) {
 
 	if g.Type != want.Type || g.Success != want.Success || !reflect.DeepEqual(g.Error, want.Error) ||
 		!reflect.DeepEqual(g.ErrorCode, want.ErrorCode) || !reflect.DeepEqual(g.Reason, want.Reason) {
-		t.Errorf("%s: %s %v %v %v %v, engine %s %v %v %v %v", key, g.Type, g.Success, g.Error, g.ErrorCode, g.Reason,
+		listedf(t, "%s: %s %v %v %v %v, engine %s %v %v %v %v", key, g.Type, g.Success, g.Error, g.ErrorCode, g.Reason,
 			want.Type, want.Success, want.Error, want.ErrorCode, want.Reason)
 	}
 
 	if len(g.Calls) != len(want.Calls) || len(g.Suppressed) != len(want.Suppressed) {
-		t.Errorf("%s: %d calls, %d suppressed; engine %d, %d", key, len(g.Calls), len(g.Suppressed),
+		listedf(t, "%s: %d calls, %d suppressed; engine %d, %d", key, len(g.Calls), len(g.Suppressed),
 			len(want.Calls), len(want.Suppressed))
 	}
 
 	d := diffCalls(append(g.Calls, g.Suppressed...), append(want.Calls, want.Suppressed...))
-	if why, listed := callsDiffer[key]; listed == (d == "") {
-		t.Errorf("%s: calls %q (listed: %q)", key, d, why)
+	if why, isListed := callsDiffer[key]; isListed == (d == "") {
+		listedf(t, "%s: calls %q (listed: %q)", key, d, why)
 	}
 
 	same := reflect.DeepEqual(g.Reasoning, want.Reasoning)
 	if near := reasoningDiffers[key]; near == same {
-		t.Errorf("%s: reasoning %v, engine %v (listed as a near-tie: %v)", key, g.Reasoning, want.Reasoning, near)
+		listedf(t, "%s: reasoning %v, engine %v (listed as a near-tie: %v)", key, g.Reasoning, want.Reasoning, near)
 	}
 
 	if (g.Validation == nil) != (want.Validation == nil) {
-		t.Errorf("%s: validation %v, engine %v", key, g.Validation, want.Validation)
+		listedf(t, "%s: validation %v, engine %v", key, g.Validation, want.Validation)
 	} else if g.Validation != nil {
 		if g.Validation.Negation != want.Validation.Negation {
-			t.Errorf("%s: negation %v, engine %v", key, g.Validation.Negation, want.Validation.Negation)
+			listedf(t, "%s: negation %v, engine %v", key, g.Validation.Negation, want.Validation.Negation)
 		}
 
 		same := reflect.DeepEqual(g.Validation.Ungrounded, want.Validation.Ungrounded)
-		if listed := ungroundedDiffers[key]; listed == same {
-			t.Errorf("%s: ungrounded %v, engine %v (listed: %v)", key, g.Validation.Ungrounded,
-				want.Validation.Ungrounded, listed)
+		if isListed := ungroundedDiffers[key]; isListed == same {
+			listedf(t, "%s: ungrounded %v, engine %v (listed: %v)", key, g.Validation.Ungrounded,
+				want.Validation.Ungrounded, isListed)
 		}
 	}
 
 	off := math.Abs(g.Confidence - want.Confidence)
-	if why, listed := confidenceOff[key]; listed == (off <= 0.02) {
-		t.Errorf("%s: confidence %.4f, engine %.4f (listed: %q)", key, g.Confidence, want.Confidence, why)
+	if why, isListed := confidenceOff[key]; isListed == (off <= 0.02) {
+		listedf(t, "%s: confidence %.4f, engine %.4f (listed: %q)", key, g.Confidence, want.Confidence, why)
 	}
+
+	return d == "", same, off <= 0.02
 }
 
 // TestEnvelopeMatchesEngine builds the envelope of every turn of the engine
@@ -164,16 +167,35 @@ func TestEnvelopeMatchesEngine(t *testing.T) {
 	readJSON(t, engineResponse, &responses)
 	readJSON(t, engineTriggers, &triggers)
 
+	var calls, reasoning, conf, total int
+
+	count := func(c, r, f bool) {
+		total++
+
+		for _, x := range []struct {
+			ok bool
+			n  *int
+		}{{c, &calls}, {r, &reasoning}, {f, &conf}} {
+			if x.ok {
+				*x.n++
+			}
+		}
+	}
+
 	for _, c := range corpus.Cases {
 		for i, turn := range decodeCase(t, d, m, p, &corpus, c) {
-			envelopeTurn(t, c.ID+"/"+string(rune('0'+i)), turn, responses[c.ID][i])
+			count(envelopeTurn(t, c.ID+"/"+string(rune('0'+i)), turn, responses[c.ID][i]))
 		}
 	}
 
 	for _, pr := range triggers.Probes {
 		turn := decodeTurns(t, d, m, p, triggers.System, []byte(pr.Tools), []string{pr.Query}, 512)[0]
-		envelopeTurn(t, pr.ID+"/0", turn, pr.Answer)
+		count(envelopeTurn(t, pr.ID+"/0", turn, pr.Answer))
 	}
+
+	int8Floor(t, "calls equal", calls, total, int8EnvelopeCalls)
+	int8Floor(t, "reasoning equal", reasoning, total, int8EnvelopeReasoning)
+	int8Floor(t, "confidence within 0.02", conf, total, int8EnvelopeConfidence)
 }
 
 // TestEnvelope covers the envelope's rules without the model.
