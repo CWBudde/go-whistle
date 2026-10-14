@@ -11,13 +11,18 @@ import (
 // State is one sequence's decoding state for Extend (docs/FINDINGS.md
 // F-022, F-026): the self-attention's KVCache per layer, the EngramCache
 // per engram site and the tokens so far. The local layers' caches keep
-// every position and attend to the last SlidingWindow of them. A state
-// belongs to the model that made it.
+// every position and attend to the last SlidingWindow of them; with
+// LoadOptions.KVWindow each layer attends to the last KVWindow and the
+// sink, which the state sets on its caches: every position until the sink
+// token is fed, then the positions up to it (docs/FINDINGS.md F-060). A
+// state belongs to the model that made it.
 type State struct {
-	model  *Model
-	kv     []needle.KVCache
-	engram []needle.EngramCache
-	tokens []int
+	model     *Model
+	kv        []needle.KVCache
+	engram    []needle.EngramCache
+	tokens    []int
+	sink      int  // the sink's positions (Model.sinkIn)
+	sinkFound bool // the sink token was fed, so sink is final
 }
 
 // NewState starts an empty sequence.
@@ -38,10 +43,12 @@ func (s *State) Tokens() []int { return slices.Clone(s.tokens) }
 // shared until either state appends to them (needle.KVCache.Fork).
 func (s *State) Fork() *State {
 	f := &State{
-		model:  s.model,
-		kv:     make([]needle.KVCache, len(s.kv)),
-		engram: make([]needle.EngramCache, len(s.engram)),
-		tokens: slices.Clip(s.tokens),
+		model:     s.model,
+		kv:        make([]needle.KVCache, len(s.kv)),
+		engram:    make([]needle.EngramCache, len(s.engram)),
+		tokens:    slices.Clip(s.tokens),
+		sink:      s.sink,
+		sinkFound: s.sinkFound,
 	}
 
 	for i := range s.kv {
@@ -92,6 +99,14 @@ func (m *Model) Extend(s *State, tokens []int) ([]float32, error) {
 	// headers are the old state.
 	kv, engram := slices.Clone(s.kv), slices.Clone(s.engram)
 
+	sink, found := s.sink, s.sinkFound
+	if !found && m.opts.KVWindow > 0 {
+		sink, found = m.sinkIn(tokens, off)
+		for l := range s.kv {
+			s.kv[l].SetSink(sink)
+		}
+	}
+
 	logits, err := m.extend(s, x, tokens)
 	if err != nil {
 		s.kv, s.engram = kv, engram
@@ -99,7 +114,7 @@ func (m *Model) Extend(s *State, tokens []int) ([]float32, error) {
 		return nil, err
 	}
 
-	s.tokens = append(s.tokens, tokens...)
+	s.tokens, s.sink, s.sinkFound = append(s.tokens, tokens...), sink, found
 
 	return logits, nil
 }
