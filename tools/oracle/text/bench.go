@@ -181,6 +181,11 @@ func cmdBench(ctx context.Context, cfg benchConfig, log io.Writer) error {
 		return fmt.Errorf("inputs: %w", err)
 	}
 
+	res.Responses, err = bench.FileSHA256(cfg.responses)
+	if err != nil {
+		return fmt.Errorf("inputs: %w", err)
+	}
+
 	cases, err := o.benchCases(cfg)
 	if err != nil {
 		return err

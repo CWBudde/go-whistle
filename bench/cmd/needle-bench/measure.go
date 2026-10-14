@@ -307,6 +307,16 @@ func inputs(cfg config, res *bench.TextGoResults) error {
 		return fmt.Errorf("inputs: %w", err)
 	}
 
+	res.Tokenizer, err = bench.FileSHA256(cfg.tokenizer)
+	if err != nil {
+		return fmt.Errorf("inputs: %w", err)
+	}
+
+	res.Responses, err = bench.FileSHA256(cfg.responses)
+	if err != nil {
+		return fmt.Errorf("inputs: %w", err)
+	}
+
 	return nil
 }
 

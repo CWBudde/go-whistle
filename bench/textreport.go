@@ -18,9 +18,9 @@ func RenderText(w io.Writer, g *TextGoResults, e *TextEngineResults, p Paths) er
 		"generated from `" + p.Go + "` (`just bench-text`) and `" + p.Engine + "`\n" +
 		"(`just oracle-text bench`); do not edit it by hand. Method and reading: `docs/FINDINGS.md` F-061.\n\n")
 
-	// The sides are compared only when they measured the same model and
-	// cases on the same machine.
-	same := g != nil && e != nil && SameMachine(g.Run.Machine, e.Run.Machine) && SameInputs(g.Run.Inputs, e.Run.Inputs)
+	// The sides are compared only when they measured the same model, cases
+	// and recorded answers on the same machine.
+	same := g != nil && e != nil && SameMachine(g.Run.Machine, e.Run.Machine) && SameTextInputs(g, e)
 
 	renderTextRuns(&b, g, e, same)
 	renderTextSpeed(&b, g, e, same)
@@ -39,9 +39,9 @@ func RenderText(w io.Writer, g *TextGoResults, e *TextEngineResults, p Paths) er
 // notComparableText is the text report's warning when the Go and the
 // engine results come from different machines or inputs.
 const notComparableText = "**The Go and the engine results are not comparable**: they come from different " +
-	"machines (CPU, cores, OS or architecture) or answered different inputs (model or cases), so this report " +
-	"does not compare them. Re-run `just bench-text` and `just oracle-text bench` on the same machine and inputs " +
-	"for the ratios."
+	"machines (CPU, cores, OS or architecture) or answered different inputs (model, cases or recorded answers), " +
+	"so this report does not compare them. Re-run `just bench-text` and `just oracle-text bench` on the same " +
+	"machine and inputs for the ratios."
 
 func renderTextRuns(b *strings.Builder, g *TextGoResults, e *TextEngineResults, same bool) {
 	var gr, er Run

@@ -89,7 +89,8 @@ func sampleText() (*TextGoResults, *TextEngineResults) {
 	machine := Machine{CPU: "CPU X", Cores: 8, OS: "os", Arch: "arm64"}
 	g := &TextGoResults{
 		Run:         Run{Date: "2026-10-14T10:00:00+02:00", Commit: "abc", Machine: machine, Inputs: sampleTextInputs},
-		Safetensors: "5a1e7e750a0c3d2b", GOMAXPROCS: 8, WarmUp: 1,
+		Safetensors: "5a1e7e750a0c3d2b", Tokenizer: "70e1c3a2b9d84f06", Responses: "4e5f6a7b8c9d0e1f", GOMAXPROCS: 8,
+		WarmUp: 1,
 		Modes: []TextGoMode{
 			{Mode: TextModeSafetensors, Answers: sampleTextSet(200, 100, 1000), FunctionCallsEqual: 20, MaxRSSLoadMiB: 700},
 			{Mode: TextModePacked, Answers: sampleTextSet(400, 110, 2000), FunctionCallsEqual: 24, HeapLoadMiB: 41.4},
@@ -99,7 +100,8 @@ func sampleText() (*TextGoResults, *TextEngineResults) {
 	}
 	e := &TextEngineResults{
 		Run: Run{Machine: machine, Inputs: sampleTextInputs}, Version: "3.2.0", Revision: "2ae11323dc000f5e", Threads: "4",
-		WarmUp: 1,
+		Responses: "4e5f6a7b8c9d0e1f",
+		WarmUp:    1,
 		CLI: TextEngineCLI{
 			Answers: sampleTextSet(100, 1500, 120), PeakRAM: Summary{N: 120, Median: 94.3, Max: 97.1},
 			MaxRSS: Summary{N: 120, Median: 94.0, Max: 96.8}, FunctionCallsEqual: 24,
@@ -154,6 +156,8 @@ func TestRenderTextNotComparable(t *testing.T) {
 	for _, change := range []func(*TextEngineResults){
 		func(e *TextEngineResults) { e.Run.Machine.CPU = "CPU Y" },
 		func(e *TextEngineResults) { e.Run.Inputs.Clips = "fedcba9876543210" },
+		func(e *TextEngineResults) { e.Responses = "f1e0d9c8b7a6f5e4" },
+		func(e *TextEngineResults) { e.Responses = "" },
 	} {
 		g, e := sampleText()
 		change(e)

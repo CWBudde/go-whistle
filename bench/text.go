@@ -173,11 +173,16 @@ type TextCase struct {
 type TextGoResults struct {
 	Run Run `json:"run"`
 	// Safetensors is the SHA-256 of needle3.safetensors, which the
-	// safetensors mode loads.
-	Safetensors string       `json:"safetensors_sha256"`
-	GOMAXPROCS  int          `json:"gomaxprocs"`
-	WarmUp      int          `json:"warm_up"` // untimed passes over the cases
-	Modes       []TextGoMode `json:"modes"`
+	// safetensors mode loads; Tokenizer that of the tokenizer the Go side
+	// encodes with (the engine's is inside needle3.cact, Run.Inputs.Model).
+	Safetensors string `json:"safetensors_sha256"`
+	Tokenizer   string `json:"tokenizer_sha256"`
+	// Responses is the SHA-256 of the engine's recorded answers the
+	// function_calls are counted against (responses.json).
+	Responses  string       `json:"responses_sha256"`
+	GOMAXPROCS int          `json:"gomaxprocs"`
+	WarmUp     int          `json:"warm_up"` // untimed passes over the cases
+	Modes      []TextGoMode `json:"modes"`
 }
 
 // The Go side's modes (needle-bench).
@@ -222,7 +227,11 @@ type TextEngineResults struct {
 	Version  string `json:"version"`
 	Revision string `json:"revision"`
 	Threads  string `json:"threads"` // the CLI's --threads
-	WarmUp   int    `json:"warm_up"` // untimed passes over the cases
+	// Responses is the SHA-256 of the recorded answers the engine's
+	// function_calls are checked against (responses.json), as on the Go
+	// side.
+	Responses string `json:"responses_sha256"`
+	WarmUp    int    `json:"warm_up"` // untimed passes over the cases
 	// CLI is the needle binary, one process per answer.
 	CLI TextEngineCLI `json:"cli"`
 	// Library is libneedle3 in the oracle's process, on its default
@@ -320,3 +329,10 @@ func canonicalCalls(raw json.RawMessage) ([]byte, bool) {
 // FileSHA256 is the SHA-256 of the file at path, in hex: the text bench's
 // fingerprints of the model files and the corpus.
 func FileSHA256(path string) (string, error) { return fileSHA256(path) }
+
+// SameTextInputs reports whether the text bench's two sides answered the
+// same inputs: the model, the cases and the recorded answers both count
+// function_calls against (docs/FINDINGS.md F-061).
+func SameTextInputs(g *TextGoResults, e *TextEngineResults) bool {
+	return SameInputs(g.Run.Inputs, e.Run.Inputs) && g.Responses != "" && g.Responses == e.Responses
+}
