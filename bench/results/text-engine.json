@@ -1,0 +1,615 @@
+{
+  "run": {
+    "date": "2026-10-14T17:04:59+02:00",
+    "commit": "fc77d28a18",
+    "machine": {
+      "cpu": "Apple M5 Pro",
+      "cores": 15,
+      "core_types": "5 Super + 10 Performance",
+      "memory_gib": 48,
+      "os": "macOS 27.0.1 (26A434)",
+      "arch": "arm64",
+      "go_version": "go1.27.1"
+    },
+    "inputs": {
+      "model_sha256": "c9d915eca282ed42d1a09b143b592adb4cc6744ffe2d294adf5cfc5548170c38",
+      "clips_sha256": "698aee1811a234af84dfc727a04e12240c23b65c73478ad41ce8893f0641eff0"
+    },
+    "load_avg_start": "8.37 6.66 6.04",
+    "load_avg_end": "5.95 6.33 5.97",
+    "seconds": 67
+  },
+  "version": "3.2.0",
+  "revision": "2ae11323dc000f5e70c49f7403efa6af12ba9e67",
+  "threads": "4",
+  "warm_up": 1,
+  "cli": {
+    "answers": {
+      "cases": 24,
+      "passes": 5,
+      "prefill_tokens": {
+        "n": 120,
+        "median": 332,
+        "p90": 1041,
+        "min": 126,
+        "max": 1049
+      },
+      "generated_tokens": {
+        "n": 120,
+        "median": 61,
+        "p90": 91,
+        "min": 8,
+        "max": 103
+      },
+      "ttft_ms": {
+        "n": 0,
+        "median": 0,
+        "p90": 0,
+        "min": 0,
+        "max": 0
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": 0,
+        "p90": 0,
+        "min": 0,
+        "max": 0
+      },
+      "reported_prefill_tps": {
+        "n": 120,
+        "median": 3699.2,
+        "p90": 4085.7,
+        "min": 2126.9,
+        "max": 4643.9
+      },
+      "decode_tps": {
+        "n": 120,
+        "median": 1704.4,
+        "p90": 1773.5,
+        "min": 1276.3,
+        "max": 1885.2
+      },
+      "wall_ms": {
+        "n": 120,
+        "median": 130.0647085,
+        "p90": 353.359958,
+        "min": 84.93175,
+        "max": 384.895458
+      }
+    },
+    "cases": [
+      {
+        "id": "timer_pasta",
+        "prefill_tokens": 332,
+        "generated_tokens": 42,
+        "ttft_ms": 0,
+        "decode_tps": 1710.7,
+        "wall_ms": 120.333458
+      },
+      {
+        "id": "alarm_morning",
+        "prefill_tokens": 330,
+        "generated_tokens": 60,
+        "ttft_ms": 0,
+        "decode_tps": 1733.8,
+        "wall_ms": 127.975125
+      },
+      {
+        "id": "message_and_timer",
+        "prefill_tokens": 338,
+        "generated_tokens": 66,
+        "ttft_ms": 0,
+        "decode_tps": 1745.7,
+        "wall_ms": 133.380125
+      },
+      {
+        "id": "lights_and_lock",
+        "prefill_tokens": 262,
+        "generated_tokens": 69,
+        "ttft_ms": 0,
+        "decode_tps": 1762.5,
+        "wall_ms": 118.375833
+      },
+      {
+        "id": "thermostat_decimal",
+        "prefill_tokens": 261,
+        "generated_tokens": 44,
+        "ttft_ms": 0,
+        "decode_tps": 1666.1,
+        "wall_ms": 102.52825
+      },
+      {
+        "id": "weather_friday",
+        "prefill_tokens": 333,
+        "generated_tokens": 59,
+        "ttft_ms": 0,
+        "decode_tps": 1673.9,
+        "wall_ms": 131.115209
+      },
+      {
+        "id": "event_tomorrow",
+        "prefill_tokens": 330,
+        "generated_tokens": 72,
+        "ttft_ms": 0,
+        "decode_tps": 1719.5,
+        "wall_ms": 135.519916
+      },
+      {
+        "id": "event_explicit",
+        "prefill_tokens": 346,
+        "generated_tokens": 103,
+        "ttft_ms": 0,
+        "decode_tps": 1690.1,
+        "wall_ms": 161.027125
+      },
+      {
+        "id": "event_no_year",
+        "prefill_tokens": 332,
+        "generated_tokens": 64,
+        "ttft_ms": 0,
+        "decode_tps": 1755.1,
+        "wall_ms": 129.968
+      },
+      {
+        "id": "offtopic_capital",
+        "prefill_tokens": 259,
+        "generated_tokens": 30,
+        "ttft_ms": 0,
+        "decode_tps": 1738.8,
+        "wall_ms": 94.531542
+      },
+      {
+        "id": "no_tool_pizza",
+        "prefill_tokens": 262,
+        "generated_tokens": 16,
+        "ttft_ms": 0,
+        "decode_tps": 1730.3,
+        "wall_ms": 85.702167
+      },
+      {
+        "id": "negation_door",
+        "prefill_tokens": 266,
+        "generated_tokens": 91,
+        "ttft_ms": 0,
+        "decode_tps": 1782.7,
+        "wall_ms": 128.275666
+      },
+      {
+        "id": "negation_only",
+        "prefill_tokens": 261,
+        "generated_tokens": 63,
+        "ttft_ms": 0,
+        "decode_tps": 1743.8,
+        "wall_ms": 114.28375
+      },
+      {
+        "id": "german_timer",
+        "prefill_tokens": 346,
+        "generated_tokens": 44,
+        "ttft_ms": 0,
+        "decode_tps": 1740.4,
+        "wall_ms": 123.492833
+      },
+      {
+        "id": "french_message",
+        "prefill_tokens": 351,
+        "generated_tokens": 62,
+        "ttft_ms": 0,
+        "decode_tps": 1698.2,
+        "wall_ms": 136.9935
+      },
+      {
+        "id": "spanish_lights_music",
+        "prefill_tokens": 283,
+        "generated_tokens": 98,
+        "ttft_ms": 0,
+        "decode_tps": 1736,
+        "wall_ms": 138.646334
+      },
+      {
+        "id": "extract_invoice",
+        "prefill_tokens": 126,
+        "generated_tokens": 77,
+        "ttft_ms": 0,
+        "decode_tps": 1802.9,
+        "wall_ms": 87.966
+      },
+      {
+        "id": "timer_then_result",
+        "prefill_tokens": 332,
+        "generated_tokens": 42,
+        "ttft_ms": 0,
+        "decode_tps": 1692.3,
+        "wall_ms": 119.167958
+      },
+      {
+        "id": "timer_budget",
+        "prefill_tokens": 332,
+        "generated_tokens": 8,
+        "ttft_ms": 0,
+        "decode_tps": 1700.6,
+        "wall_ms": 99.092875
+      },
+      {
+        "id": "catalogue_lock",
+        "prefill_tokens": 1038,
+        "generated_tokens": 36,
+        "ttft_ms": 0,
+        "decode_tps": 1382.7,
+        "wall_ms": 337.974333
+      },
+      {
+        "id": "catalogue_navigate",
+        "prefill_tokens": 1041,
+        "generated_tokens": 48,
+        "ttft_ms": 0,
+        "decode_tps": 1381.1,
+        "wall_ms": 353.04625
+      },
+      {
+        "id": "catalogue_translate",
+        "prefill_tokens": 1040,
+        "generated_tokens": 46,
+        "ttft_ms": 0,
+        "decode_tps": 1389.7,
+        "wall_ms": 348.329125
+      },
+      {
+        "id": "catalogue_email",
+        "prefill_tokens": 1049,
+        "generated_tokens": 74,
+        "ttft_ms": 0,
+        "decode_tps": 1307.7,
+        "wall_ms": 374.720458
+      },
+      {
+        "id": "catalogue_reminder",
+        "prefill_tokens": 1048,
+        "generated_tokens": 67,
+        "ttft_ms": 0,
+        "decode_tps": 1380.2,
+        "wall_ms": 369.073833
+      }
+    ],
+    "peak_ram_mb": {
+      "n": 120,
+      "median": 94.4,
+      "p90": 103,
+      "min": 90.2,
+      "max": 103.4
+    },
+    "max_rss_mib": {
+      "n": 120,
+      "median": 94.4140625,
+      "p90": 103,
+      "min": 90.1875,
+      "max": 103.40625
+    },
+    "function_calls_equal": 24
+  },
+  "library": {
+    "load_ms": {
+      "n": 5,
+      "median": 4.419083,
+      "p90": 7.486583,
+      "min": 4.353459,
+      "max": 7.486583
+    },
+    "init_ms": {
+      "n": 120,
+      "median": 66.9914995,
+      "p90": 274.148167,
+      "min": 17.563667,
+      "max": 278.689041
+    },
+    "complete_ms": {
+      "n": 120,
+      "median": 38.486438,
+      "p90": 60.997666,
+      "min": 8.286792,
+      "max": 67.176541
+    },
+    "answers": {
+      "cases": 24,
+      "passes": 5,
+      "prefill_tokens": {
+        "n": 120,
+        "median": 332,
+        "p90": 1041,
+        "min": 126,
+        "max": 1049
+      },
+      "generated_tokens": {
+        "n": 120,
+        "median": 61,
+        "p90": 91,
+        "min": 8,
+        "max": 103
+      },
+      "ttft_ms": {
+        "n": 120,
+        "median": 72.19385202125056,
+        "p90": 281.4975784426477,
+        "min": 25.14757889292122,
+        "max": 288.14405987292
+      },
+      "prefill_tps": {
+        "n": 120,
+        "median": 4598.54658560994,
+        "p90": 4731.581866557329,
+        "min": 3640.5400842295335,
+        "max": 5010.422694626387
+      },
+      "reported_prefill_tps": {
+        "n": 120,
+        "median": 3882.75,
+        "p90": 4148.6,
+        "min": 2372.5,
+        "max": 4827.4
+      },
+      "decode_tps": {
+        "n": 120,
+        "median": 1810.5500000000002,
+        "p90": 1886.4,
+        "min": 1358.2,
+        "max": 1950.9
+      },
+      "wall_ms": {
+        "n": 120,
+        "median": 105.8413335,
+        "p90": 314.12287499999996,
+        "min": 64.103958,
+        "max": 341.891667
+      }
+    },
+    "cases": [
+      {
+        "id": "timer_pasta",
+        "prefill_tokens": 332,
+        "generated_tokens": 42,
+        "ttft_ms": 71.86966322725819,
+        "decode_tps": 1857.6,
+        "wall_ms": 93.73166599999999
+      },
+      {
+        "id": "alarm_morning",
+        "prefill_tokens": 330,
+        "generated_tokens": 60,
+        "ttft_ms": 71.86568544428867,
+        "decode_tps": 1783.3,
+        "wall_ms": 105.32620800000001
+      },
+      {
+        "id": "message_and_timer",
+        "prefill_tokens": 338,
+        "generated_tokens": 66,
+        "ttft_ms": 74.07278561190643,
+        "decode_tps": 1840.4,
+        "wall_ms": 109.18704199999999
+      },
+      {
+        "id": "lights_and_lock",
+        "prefill_tokens": 262,
+        "generated_tokens": 69,
+        "ttft_ms": 57.257951069097885,
+        "decode_tps": 1885.3,
+        "wall_ms": 93.36729199999999
+      },
+      {
+        "id": "thermostat_decimal",
+        "prefill_tokens": 261,
+        "generated_tokens": 44,
+        "ttft_ms": 55.096514197931896,
+        "decode_tps": 1836.2,
+        "wall_ms": 78.37625
+      },
+      {
+        "id": "weather_friday",
+        "prefill_tokens": 333,
+        "generated_tokens": 59,
+        "ttft_ms": 72.05397727401038,
+        "decode_tps": 1803.1,
+        "wall_ms": 104.03104200000001
+      },
+      {
+        "id": "event_tomorrow",
+        "prefill_tokens": 330,
+        "generated_tokens": 72,
+        "ttft_ms": 72.33916709602852,
+        "decode_tps": 1795.9,
+        "wall_ms": 111.886875
+      },
+      {
+        "id": "event_explicit",
+        "prefill_tokens": 346,
+        "generated_tokens": 103,
+        "ttft_ms": 75.35397066771993,
+        "decode_tps": 1771.1,
+        "wall_ms": 132.09075
+      },
+      {
+        "id": "event_no_year",
+        "prefill_tokens": 332,
+        "generated_tokens": 64,
+        "ttft_ms": 72.58453865226971,
+        "decode_tps": 1776.4,
+        "wall_ms": 107.798124
+      },
+      {
+        "id": "offtopic_capital",
+        "prefill_tokens": 259,
+        "generated_tokens": 30,
+        "ttft_ms": 54.83872180474906,
+        "decode_tps": 1879.7,
+        "wall_ms": 70.17533399999999
+      },
+      {
+        "id": "no_tool_pizza",
+        "prefill_tokens": 262,
+        "generated_tokens": 16,
+        "ttft_ms": 56.958123902666514,
+        "decode_tps": 1822.4,
+        "wall_ms": 65.188125
+      },
+      {
+        "id": "negation_door",
+        "prefill_tokens": 266,
+        "generated_tokens": 91,
+        "ttft_ms": 57.81050780458994,
+        "decode_tps": 1849.7,
+        "wall_ms": 107.011209
+      },
+      {
+        "id": "negation_only",
+        "prefill_tokens": 261,
+        "generated_tokens": 63,
+        "ttft_ms": 55.17210676063516,
+        "decode_tps": 1880,
+        "wall_ms": 88.507834
+      },
+      {
+        "id": "german_timer",
+        "prefill_tokens": 346,
+        "generated_tokens": 44,
+        "ttft_ms": 74.98146516164994,
+        "decode_tps": 1835.4,
+        "wall_ms": 98.95025
+      },
+      {
+        "id": "french_message",
+        "prefill_tokens": 351,
+        "generated_tokens": 62,
+        "ttft_ms": 75.80625876623304,
+        "decode_tps": 1800.1,
+        "wall_ms": 109.863542
+      },
+      {
+        "id": "spanish_lights_music",
+        "prefill_tokens": 283,
+        "generated_tokens": 98,
+        "ttft_ms": 62.178159354656096,
+        "decode_tps": 1821.2,
+        "wall_ms": 115.60849999999999
+      },
+      {
+        "id": "extract_invoice",
+        "prefill_tokens": 126,
+        "generated_tokens": 77,
+        "ttft_ms": 25.585572538088858,
+        "decode_tps": 1916.3,
+        "wall_ms": 65.944417
+      },
+      {
+        "id": "timer_then_result",
+        "prefill_tokens": 332,
+        "generated_tokens": 42,
+        "ttft_ms": 72.05883079522478,
+        "decode_tps": 1859.6,
+        "wall_ms": 94.106583
+      },
+      {
+        "id": "timer_budget",
+        "prefill_tokens": 332,
+        "generated_tokens": 8,
+        "ttft_ms": 72.04859420353219,
+        "decode_tps": 1912.5,
+        "wall_ms": 75.817709
+      },
+      {
+        "id": "catalogue_lock",
+        "prefill_tokens": 1038,
+        "generated_tokens": 36,
+        "ttft_ms": 279.85535939400637,
+        "decode_tps": 1450.9,
+        "wall_ms": 304.023292
+      },
+      {
+        "id": "catalogue_navigate",
+        "prefill_tokens": 1041,
+        "generated_tokens": 48,
+        "ttft_ms": 279.6268053774061,
+        "decode_tps": 1463.5,
+        "wall_ms": 311.04775
+      },
+      {
+        "id": "catalogue_translate",
+        "prefill_tokens": 1040,
+        "generated_tokens": 46,
+        "ttft_ms": 281.4975784426477,
+        "decode_tps": 1459.4,
+        "wall_ms": 312.332168
+      },
+      {
+        "id": "catalogue_email",
+        "prefill_tokens": 1049,
+        "generated_tokens": 74,
+        "ttft_ms": 282.1496411914109,
+        "decode_tps": 1411.1,
+        "wall_ms": 333.88233199999996
+      },
+      {
+        "id": "catalogue_reminder",
+        "prefill_tokens": 1048,
+        "generated_tokens": 67,
+        "ttft_ms": 284.6161280332017,
+        "decode_tps": 1471.8,
+        "wall_ms": 328.79579199999995
+      }
+    ],
+    "cached": {
+      "cases": 24,
+      "passes": 5,
+      "prefill_tokens": {
+        "n": 120,
+        "median": 332,
+        "p90": 1041,
+        "min": 126,
+        "max": 1049
+      },
+      "generated_tokens": {
+        "n": 120,
+        "median": 61,
+        "p90": 91,
+        "min": 8,
+        "max": 103
+      },
+      "ttft_ms": {
+        "n": 120,
+        "median": 5.410182284829356,
+        "p90": 8.724021714902804,
+        "min": 4.236178223976045,
+        "max": 10.548160260930898
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": 0,
+        "p90": 0,
+        "min": 0,
+        "max": 0
+      },
+      "reported_prefill_tps": {
+        "n": 120,
+        "median": 3944.3999999999996,
+        "p90": 4261.8,
+        "min": 1981.4,
+        "max": 5009.6
+      },
+      "decode_tps": {
+        "n": 120,
+        "median": 1833.1999999999998,
+        "p90": 1915.3,
+        "min": 1339.1,
+        "max": 1970.3
+      },
+      "wall_ms": {
+        "n": 120,
+        "median": 38.5408335,
+        "p90": 58.999416999999994,
+        "min": 8.171001,
+        "max": 67.650875
+      }
+    },
+    "function_calls_equal": 24,
+    "cached_function_calls_equal": 24
+  }
+}
