@@ -633,10 +633,12 @@ func TestRepairMatchesEngine(t *testing.T) {
 
 		t.Logf("%-26s %-17s reasoning equal %-5v %q", pr.ID, pr.Rule, think, diff)
 
-		if why, listed := repairTurnDiffers[pr.ID]; listed == (diff == "") {
-			t.Errorf("%s: calls %q (listed: %q)", pr.ID, diff, why)
+		if why, isListed := repairTurnDiffers[pr.ID]; isListed == (diff == "") {
+			listedf(t, "%s: calls %q (listed: %q)", pr.ID, diff, why)
 		}
 	}
 
 	t.Logf("%d probes: calls equal on %d, reasoning equal on %d", len(fx.Probes), equal, reasoning)
+	int8Floor(t, "calls equal", equal, len(fx.Probes), int8RepairCalls)
+	int8Floor(t, "reasoning equal", reasoning, len(fx.Probes), int8RepairReasoning)
 }

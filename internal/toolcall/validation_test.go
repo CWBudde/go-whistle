@@ -138,8 +138,8 @@ func TestValidationMatchesEngine(t *testing.T) {
 				minMargin(turn.a, block, len(turn.a.Tokens)), got.Confidence, want.Confidence, len(got.Calls),
 				len(got.Suppressed), len(want.Calls), len(want.Suppressed), got.Validation, want.Validation, diff)
 
-			if why, listed := validationCallsDiffer[key]; listed == (diff == "") {
-				t.Errorf("%s: calls %q (listed: %q)", key, diff, why)
+			if why, isListed := validationCallsDiffer[key]; isListed == (diff == "") {
+				listedf(t, "%s: calls %q (listed: %q)", key, diff, why)
 			}
 
 			if diff != "" {
@@ -164,8 +164,8 @@ func TestValidationMatchesEngine(t *testing.T) {
 				split++
 			}
 
-			if why, listed := validationSplitDiffers[key]; listed == same {
-				t.Errorf("%s: %d calls, %d suppressed; engine %d, %d (listed: %q)", key, len(got.Calls),
+			if why, isListed := validationSplitDiffers[key]; isListed == same {
+				listedf(t, "%s: %d calls, %d suppressed; engine %d, %d (listed: %q)", key, len(got.Calls),
 					len(got.Suppressed), len(want.Calls), len(want.Suppressed), why)
 			}
 		}
@@ -173,6 +173,8 @@ func TestValidationMatchesEngine(t *testing.T) {
 
 	t.Logf("%d turns: negation checked on %d, calls equal on %d, of those ungrounded equal on %d and the split on %d",
 		total, negations, calls, ungrounded, split)
+	int8Floor(t, "calls equal", calls, total, int8ValidationCalls)
+	int8Floor(t, "calls and split equal", split, total, int8ValidationSplit)
 }
 
 // TestNegated covers the negation cues without the model: the spellings
