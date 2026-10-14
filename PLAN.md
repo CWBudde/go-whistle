@@ -703,7 +703,19 @@ Engine-only: fitted against `testdata/text/engine/`.
       under 40 MiB and 0.3 % over 40 × 10⁶ bytes). Whistle's lut kernel (`LUT: true`) is 3.5× faster on a 120-token
       forward but moves the confidence by up to 3.5e-4 and adds 15 MiB; the exact path is 3.4× slower than float32
       (F-059).
-- [ ] The engine's int8 activations and KV (`act_bits` 8, `kv_bits` 8, `Int8` of F-041) and its KV window of 256.
+- [x] The engine's int8 activations and KV (`act_bits` 8, `kv_bits` 8, `Int8` of F-041) and its KV window of 256.
+      (2026-10-14) — `text.LoadWith(src, cfg, LoadOptions{Int8, KVWindow, SinkToken})`, opt-in; `Load` and the float
+      and packed numerics unchanged. The int8 KV cache takes the sliding window and the KV window with a sink
+      (`Attention.SetKVWindow`, `KVCache.SetSink`, `AttendInt8Spans`). By F-041's ρ on the confidence logit over 386
+      answers, the engine quantises the queries, keys and values per head (the mix 0.86 ± 0.12 dequantised, 1.00 ±
+      0.14 packed), not the attention input, the gated output or the heads' inputs; the mHC input and the engram rows
+      are too small to read and stay float32. The KV window is 256 positions on every layer with the static prefix
+      (BOS … `</tools>`) kept in view: on `just oracle-text window` (`window.json`, 22 answers whose fact lies 90–1100
+      tokens back, byte-identical on a re-run) it gives the engine's calls on 17 (F-060: 12 without a window), and the
+      engine's made-up calls where the window cuts the fact (`TestWindowMatchesEngine`). Packed + int8 + window
+      against float32 (`NEEDLE_TEST_NUMERICS=int8`): reasoning 33 against 29 and confidence within 0.02 on 31 against
+      26 of 36 envelope turns, validation calls 162 against 159, gates 194 against 193, grammar 9 against 10. Open:
+      past 1024 positions, the window's edge, prompts without `</tools>` (F-060).
 - [ ] **Accept:** with the `.cact` weights, `function_calls` equal the engine's at least as often as with the float
       weights; memory and speed against the engine (`just bench`-style), packed weights under 40 MB.
 
