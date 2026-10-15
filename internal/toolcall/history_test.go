@@ -591,9 +591,9 @@ const (
 )
 
 // TestHistoryScans: the history does not count against --max. The engine
-// answers a conversation the same at every --max its turns fit alone,
-// although its history and --max together pass the context, and Turn
-// accepts every turn at each of them (docs/FINDINGS.md F-063).
+// answers a conversation the same at both ends of the scan, where its turns
+// fit alone although its history and --max together pass the context, and
+// Turn accepts every turn at each of them (docs/FINDINGS.md F-063).
 func TestHistoryScans(t *testing.T) {
 	p := loadTokenizer(t)
 
@@ -654,5 +654,34 @@ func TestHistoryScans(t *testing.T) {
 		if last <= fx.Context {
 			t.Errorf("%s: the scan's largest --max leaves the history %d positions of the context", sc.ID, last)
 		}
+	}
+}
+
+// TestHistoryIDs: every probe of history.json has its own id, which keys
+// its turns in the logs and in historyDiffer.
+func TestHistoryIDs(t *testing.T) {
+	var fx historyFile
+
+	readJSON(t, engineHistory, &fx)
+
+	seen := map[string]bool{}
+	check := func(id string) {
+		if seen[id] {
+			t.Errorf("id %q recorded twice", id)
+		}
+
+		seen[id] = true
+	}
+
+	for _, w := range fx.Wire {
+		check(w.ID)
+	}
+
+	for _, c := range fx.Conversations {
+		check(c.ID)
+	}
+
+	for _, sc := range fx.Scans {
+		check(sc.ID)
 	}
 }

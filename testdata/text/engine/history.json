@@ -5969,7 +5969,7 @@
       ]
     },
     {
-      "id": "hello_then_timer",
+      "id": "hello_refused_timer",
       "group": "refused",
       "covers": "a greeting, a refused turn, a request",
       "toolset": "assistant",

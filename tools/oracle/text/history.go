@@ -601,7 +601,7 @@ func refusedConversations(add addConversation) {
 		text("what's the weather in Lisbon today?"), long, text("and tomorrow?"))
 	r("first_then_timer", "a refused first turn, then a request", long, timerPasta)
 	r("first_then_hello", "a refused first turn, then a greeting", long, text("hello"))
-	r("hello_then_timer", "a greeting, a refused turn, a request", text("hello"), long,
+	r("hello_refused_timer", "a greeting, a refused turn, a request", text("hello"), long,
 		text("set a timer for 5 minutes"))
 	r("same_no_refusal", "the control of between_same without the refused turn", timerBread, sameLength)
 	r("first_twice_then_timer", "two refused first turns, then a request", long, long, timerPasta)
