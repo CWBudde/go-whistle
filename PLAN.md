@@ -576,6 +576,20 @@ shows (multi-turn, tool results, retrieval).
       Remains: how the engine drops earlier turns and renders the assistant's turns in the history (no count reports
       the history), how much of a cut turn it keeps, and its spelling of `<`, `&` and `>` in a tool result's strings
       (12 probes count more than the minified text) (F-051).
+      (2026-10-15) — partial: `just oracle-text history` (`history.json`, 30 wire probes, 107 conversations and a
+      `--max` scan, byte-identical on a re-run) reads the history from the later turns' answers and confidence. The
+      `<`, `&` and `>` counts were the engine's request parser, which reads Go's `<` escapes as their hex digits;
+      sent unescaped they count as the port renders them, so `TestConversationMatchesEngine` has 53 of 53 refusals.
+      `Decoder.Decode` leaves the answer open less its ending token and `Conversation.Turn` closes it before the next
+      turn: `<|im_end|>` after a call block before a tool result (F-052's form, kept for `timer_then_result`) and
+      after any other answer, `</tool_call><|im_end|>` after a call block before a user turn; a refused turn feeds
+      nothing. Without the flag an oversized turn is cut to its room and the conversation before it is dropped
+      (`Restarted`): a first turn keeps the last tokens of its rendering, a later one its markers. Under int8 the later
+      turns have the engine's reasoning on 52 and calls on 112 of 154, confidence within 0.02 on 37 of the 47 decoded
+      as the engine's, token counts on 41 of 41 (`TestHistoryMatchesEngine`; F-063). Remains: the tool result after a
+      call (the whole answer fits more turns in aggregate but breaks `timer_then_result`), the turn after a `respond`
+      answer (confidence off), the history after a truncated answer (the engine's decode under a small limit is not the
+      port's), and which positions the engine keeps past the context (the KV window hides them).
 - [x] Tool retrieval: nothing ranks the tools. `needle3.cact` has no embedding head, so engine 3.2.0 renders every
       declared tool (1–239 measured); its one limit is the 8192-token context, `toolcall.CheckPrefix`
       (`TestStaticPrefixPastFiveTools`, `TestRetrievalOff`) (F-049).
