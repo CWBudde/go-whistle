@@ -393,7 +393,9 @@ streaming rules; [`whistle/example_test.go`](whistle/example_test.go) has runnab
 
 The Needle 3 text model, which turns a request into tool calls, is the package
 `github.com/cwbudde/go-whistle/needle`. It mirrors upstream's Python `needle.Needle` (`Complete`, `Run` with Go
-tool functions, `Extract`, `Reset`) and answers with the engine's envelope, byte for byte in its JSON form. It runs
+tool functions, `Extract`, `Reset`) and answers with the engine's envelope, byte for byte in its JSON form, plus the
+Python client's year check in `validation.ungrounded`. Like the Python client it puts today's date in front of the
+system facts (`NoAutoDate` leaves them as given). It runs
 `needle3.cact` in the engine's int8 numerics by default; `just fetch-needle3` fetches the weights into
 `models/needle3`.
 
@@ -406,7 +408,7 @@ defer m.Close()
 
 tools := []byte(`[{"name":"set_timer","parameters":{"type":"object",` +
 	`"properties":{"minutes":{"type":"integer"}},"required":["minutes"]}}]`)
-a, err := m.NewAgent(tools, needle.AgentOptions{AutoDate: true})
+a, err := m.NewAgent(tools, needle.AgentOptions{})
 if err != nil {
 	log.Fatal(err)
 }

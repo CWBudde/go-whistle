@@ -6221,10 +6221,12 @@ the decoder's vocabulary mask is not written after `NewDecoder`, and each agent'
 
 - **The date fact.** Upstream's `Needle(auto_date=True)` puts `_with_date_fact(system)` in front of the system facts
   (`__init__.py` 190, 208, 458), and `extract` always builds its agent that way (639). The engine adds no date (F-047).
-  `AgentOptions.AutoDate` and `ExtractOptions.AutoDate` are off by default, so a default agent renders what the
-  engine's CLI and library render and its answers are the ones the fixtures pin; on, they call
-  `toolcall.WithDateFact` with `Now`. Rejected: on by default as in Python, which would put today's date into every
-  prompt and make the answers depend on the clock.
+  By the user's decision (2026-10-15) the API does as Python: an agent puts the date fact of `Now` (nil:
+  `time.Now`) in front of its system facts through `toolcall.WithDateFact`, and `Extract` always does, with no
+  option to leave it out, as upstream's `extract` has none. `AgentOptions.NoAutoDate` is `auto_date=False`: the
+  system facts as given, what the engine's CLI and library render; the engine tests set it, so their answers are the
+  ones the fixtures pin. Rejected (the first version of this change): off by default, which kept the prompt free of
+  the clock but made relative dates ("tomorrow") and the strict year check of a default agent differ from Python's.
 - **A history that outgrows the context.** F-063 leaves open which positions the engine drops past 8192. When the
   state plus the next turn passes the context, or the answer runs out of it while decoding (`text.ErrTooLong`), the
   agent drops the conversation and answers the turn alone after the static prefix, without the closing of the answer
@@ -6247,9 +6249,14 @@ the decoder's vocabulary mask is not written after `NewDecoder`, and each agent'
   call carries the caller's, so upstream's check misses every tool or field the engine renamed (`setAlarm`,
   `wakeTime`). The port maps them back (`Normalised.CallerName`, the new `CallerField`) and checks them under the
   caller's names, numbers that the query or the system facts write excepted (`_grounded_number_paths`, 345, 562).
-  Upstream also adds `_annotate_ungrounded`'s year failures to the first answer's validation (307, 585; later
-  answers are `ground=False`, 362); the port adds them to the strict check alone and returns the engine's envelope
-  unchanged, as `Complete` does. `RunOptions.Lenient` is `strict=False`.
+  Upstream also adds `_annotate_ungrounded`'s year failures to the answer's validation (307, 585): every
+  `complete`, `run`'s first answer and `extract`'s, not `run`'s later ones (`ground=False`, 362). By the user's
+  decision (2026-10-15) the port does the same, so `Complete`'s `validation.ungrounded` is the Python client's: the
+  engine's fields, then each call's dates whose year the conversation does not license as `tool.path` under the
+  caller's names, in call order, each call's paths sorted, none repeating one of the engine's; a validation is made
+  when the engine wrote none. The strict checks map only the engine's names to the caller's. The six environment
+  suites read that field (`_harness.py`), so 11.7's Accept needs it. Rejected (the first version): the engine's
+  envelope unchanged, the year check given to `Run`'s strict check alone. `RunOptions.Lenient` is `strict=False`.
 - **`Extract`'s fallback to suppressed calls.** Upstream returns the first of `function_calls`, else of
   `suppressed_calls` (647), so a call the engine withheld (below 0.1 or a grounding gate) still yields arguments; the
   port keeps that, nil when the answer has no call. The strict check is `_validate_extraction` (607): the dates whose
