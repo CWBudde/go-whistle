@@ -62,6 +62,7 @@ UPSTREAM_PIN = "af2654dffa"
 DATE_FACT = "date: 2026-10-11 Sun 09:30"
 WEIGHTS = os.path.join(ROOT, "models", "needle3", "needle3.cact")
 WEIGHTS_LOCK = os.path.join(ROOT, "internal", "hub", "needle3.lock.json")
+FETCH_ENGINE = os.path.join(ROOT, "scripts", "fetch-engine.sh")
 SUITES = ("data_capture", "kitchen_appliance", "media_player", "productivity", "smart_home", "wearable")
 GATES = (0.0, 0.4)
 TIMING_SUFFIXES = ("_tps", "_ms", "_mb")
@@ -75,7 +76,26 @@ def engine_dir():
         return os.path.join(ROOT, "engine", "macos-arm64"), "libneedle3.dylib"
     if system == "Linux" and machine in ("x86_64", "AMD64"):
         return os.path.join(ROOT, "engine", "linux-x86_64"), "libneedle3.so"
+    if system == "Linux" and machine in ("aarch64", "arm64"):
+        return os.path.join(ROOT, "engine", "linux-arm64"), "libneedle3.so"
     sys.exit(f"no engine for {system}/{machine}; run scripts/fetch-engine.sh")
+
+
+def check_engine(edir, pin):
+    """Exits unless engine/<platform>/PIN names the engine scripts/fetch-engine.sh pins (its REVISION and
+    ENGINE_VERSION) and this platform, so a fixture is never recorded with another engine release."""
+    with open(FETCH_ENGINE, encoding="utf-8") as f:
+        script = f.read()
+    want = {}
+    for key, var in (("revision", "REVISION"), ("engine_version", "ENGINE_VERSION")):
+        m = re.search(rf'^{var}="([^"]+)"$', script, re.MULTILINE)
+        if m is None:
+            sys.exit(f"{FETCH_ENGINE} pins no {var}")
+        want[key] = m.group(1)
+    want["platform"] = os.path.basename(edir)
+    problems = [f"{key}={pin.get(key)!r}, want {value!r}" for key, value in want.items() if pin.get(key) != value]
+    if problems:
+        sys.exit(f"{edir}/PIN is not the pinned engine (run scripts/fetch-engine.sh):\n  " + "\n  ".join(problems))
 
 
 def read_pin(path):
@@ -204,6 +224,7 @@ def main():
 
     edir, lib = engine_dir()
     pin = read_pin(os.path.join(edir, "PIN"))
+    check_engine(edir, pin)
     sha = weights_sha256()
     check_upstream(UPSTREAM)
 
