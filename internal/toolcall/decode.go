@@ -148,11 +148,13 @@ const (
 )
 
 // Decode feeds input (a turn's tokens: the static prefix and the first
-// turn, or a later turn) to s and decodes the answer within maxNew tokens.
-// It leaves s holding the answer as fed, its last generated token left out
-// (a closing </tool_call>, or the one that met the budget), and
-// <|im_end|>, as the engine keeps the assistant's turn in the history
-// (docs/FINDINGS.md F-052).
+// turn, or a later turn as Conversation.Turn renders it) to s and decodes
+// the answer within maxNew tokens. It leaves s holding the answer as the
+// engine feeds it while decoding: every token but the one that ended it (a
+// closing </tool_call>, the token that met the budget, or the <|im_end|> or
+// EOS the model chose), with the turn still open. The engine closes the
+// turn when the next one comes, which Conversation.Answered and Turn render
+// (docs/FINDINGS.md F-052, F-063).
 //
 // Under the grammar g (nil: none) the reasoning stays free; from
 // <tool_call> on, each token is the most likely one whose bytes keep g's
@@ -218,16 +220,6 @@ func (d *Decoder) Decode(s *text.State, input []int, maxNew int, g *Grammar) (*D
 		}
 	}
 
-	// <|im_end|> closes the turn in s. The answer's last token counts but is
-	// not fed, a closing </tool_call> as the token that meets the budget:
-	// only that history gives the engine's next answer (timer_then_result's
-	// tool-result turn) and confidence (timer_budget; docs/FINDINGS.md
-	// F-052, F-053).
-	_, err = d.m.Extend(s, []int{d.end})
-	if err != nil {
-		return nil, fmt.Errorf("toolcall: %w", err)
-	}
-
 	out.Text, err = d.p.Decode(out.Tokens)
 	if err != nil {
 		return nil, fmt.Errorf("toolcall: %w", err)
@@ -237,17 +229,16 @@ func (d *Decoder) Decode(s *text.State, input []int, maxNew int, g *Grammar) (*D
 }
 
 // Confidence is the ConfidenceHead's score of the conversation s holds after
-// Decode: the sigmoid of its logit pooled over every token fed, the turn's
-// closing <|im_end|> left out (docs/FINDINGS.md F-053, F-062). The engine
-// reports the min of it and the answer's decode probability
-// (Decoded.Probability), which Normalised.Envelope takes.
+// Decode: the sigmoid of its logit pooled over every token fed, the answer
+// less the token that ended it and without a closing <|im_end|>
+// (docs/FINDINGS.md F-053, F-062). The engine reports the min of it and the
+// answer's decode probability (Decoded.Probability), which
+// Normalised.Envelope takes.
 func (d *Decoder) Confidence(s *text.State) (float64, error) {
 	toks := s.Tokens()
-	if len(toks) < 2 {
+	if len(toks) < 1 {
 		return 0, errors.New("toolcall: confidence of an empty conversation")
 	}
-
-	toks = toks[:len(toks)-1]
 
 	out, err := d.m.Forward(toks, true)
 	if err != nil {

@@ -140,11 +140,12 @@ func int8Floor(t *testing.T, name string, got, total, floor int) {
 // The float32 numerics give, as listed turn by turn: reasoning 21 of 25
 // (TestDecodeMatchesEngine); calls 36, reasoning 29 and confidence 27 of
 // 36 (TestEnvelopeMatchesEngine); calls 159 and the split 158 of 171
-// (TestValidationMatchesEngine); 193 of 204 (TestGatesMatchesEngine);
-// calls 85 and reasoning 77 of 90 (TestRepairMatchesEngine); 10 of 15
-// (TestGrammarMatchesEngine); confidence 106 of the 135 turns decoded as
-// the engine's (TestConfidenceMatchesEngine). The confidence counts are
-// the min with the decode probability's (docs/FINDINGS.md F-062).
+// (TestValidationMatchesEngine); 194 of 204 (TestGatesMatchesEngine, 193
+// before docs/FINDINGS.md F-063); calls 85 and reasoning 77 of 90
+// (TestRepairMatchesEngine); 10 of 15 (TestGrammarMatchesEngine);
+// confidence 106 of the 135 turns decoded as the engine's
+// (TestConfidenceMatchesEngine). The confidence counts are the min with
+// the decode probability's (docs/FINDINGS.md F-062).
 const (
 	int8DecodeReasoning    = 20  // 21 of 25
 	int8EnvelopeCalls      = 34  // 35 of 36

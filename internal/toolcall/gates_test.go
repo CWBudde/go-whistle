@@ -26,7 +26,6 @@ var gatesDiffer = map[string]string{
 	"place_door/0":                  "reasoning at a near-tie (0.012); the port's model writes door \"up\"",
 	"quantity_hours/0":              "reasoning at a near-tie (0.035)",
 	"quantity_hourly/0":             "reasoning at a near-tie (0.049)",
-	"quantity_earlier_turn_other/1": "reasoning differs (min margin 0.292); the engine's model writes 20 minutes",
 	"origin_optional_destination/0": "reasoning at a near-tie (0.054)",
 	"polarity_never_13/0":           "reasoning at a near-tie (0.084)",
 	// A repair outside the gates: the engine writes the request's
