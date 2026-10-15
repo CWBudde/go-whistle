@@ -35,6 +35,8 @@ var fixtureFiles = []string{
 	"triggers.json: triggers, answers over tools with triggers and over no tools",
 	"confidence.json: confidence, answers that exercise the envelope's confidence (respond turns, object arguments, " +
 		"forced and guessed values, relative dates, the catalogue tools)",
+	"history.json: history, the request's escapes, conversations that need earlier turns, truncated, refused, " +
+		"cut and over-long turns, a --max scan",
 }
 
 // textManifest is testdata/text/engine/manifest.json: what produced responses.json, what the checks found, and the

@@ -25,9 +25,10 @@ check-tidy:
     go mod tidy
     git diff --exit-code go.mod
 
-# Run all tests
+# Run all tests (internal/toolcall replays every engine fixture on the text
+# model and takes over go test's default 10 minutes with the weights present)
 test:
-    go test -v ./...
+    go test -v -timeout 30m ./...
 
 # Run tests with race detector
 test-race:

@@ -30,7 +30,8 @@
     "audio.json: audio, answers to speech (needle3.cact + whistle.cact)",
     "embed.json, embed.safetensors: embed, needle_embed of short texts",
     "retrieval.json: retrieval, needle_init past 5 tools and up to the context budget, the tool index",
-    "confidence.json: confidence, answers that exercise the envelope's confidence (respond turns, object arguments, forced and guessed values, relative dates, the catalogue tools)"
+    "confidence.json: confidence, answers that exercise the envelope's confidence (respond turns, object arguments, forced and guessed values, relative dates, the catalogue tools)",
+    "history.json: history, the request's escapes, conversations that need earlier turns, truncated, refused, cut and over-long turns, a --max scan"
   ],
   "cases": 24,
   "turns": 25,

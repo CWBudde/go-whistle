@@ -116,13 +116,17 @@ func decodeTurns(t *testing.T, d *Decoder, m *text.Model, p *spm.Processor, syst
 
 	out := make([]turnOut, 0, len(inputs))
 
-	for i, in := range inputs {
+	for _, in := range inputs {
 		ids, err := conv.Turn(in, maxNew, true)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if i == 0 {
+		if conv.Restarted() {
+			s = m.NewState()
+		}
+
+		if s.Len() == 0 {
 			ids = append(StaticPrefix(p, system, n.JSON), ids...)
 		}
 
@@ -143,7 +147,7 @@ func decodeTurns(t *testing.T, d *Decoder, m *text.Model, p *spm.Processor, syst
 			t.Fatal(err)
 		}
 
-		conv.Answered(len(env.FunctionCalls))
+		conv.Answered(a, len(env.FunctionCalls))
 
 		out = append(out, turnOut{a: a, conf: conf, env: env})
 	}

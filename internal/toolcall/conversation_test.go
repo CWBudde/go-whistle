@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -52,7 +53,10 @@ var overflowError = regexp.MustCompile(`^input exceeds the context window \((\d+
 // answers' calls move the conversation as they moved the engine's
 // (docs/FINDINGS.md F-051). The refusals pin the first turn, later user
 // turns, tool results (compact JSON after a call), reset, and that a
-// refused turn still counts.
+// refused turn still counts. The probes went out through json.Marshal,
+// whose \u escapes of '<', '&' and '>' the engine reads as their hex
+// digits, so each input is replayed as the engine read it
+// (docs/FINDINGS.md F-063).
 func TestConversationMatchesEngine(t *testing.T) {
 	p := loadTokenizer(t)
 
@@ -71,10 +75,7 @@ func TestConversationMatchesEngine(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var (
-		refused      int
-		unidentified []string
-	)
+	refused := 0
 
 	for _, sc := range fx.Scenarios {
 		c := NewConversation(p, fx.System, tools, fx.Context)
@@ -91,14 +92,12 @@ func TestConversationMatchesEngine(t *testing.T) {
 				t.Fatalf("%s step %d: the rebuilt input is not the engine's", sc.ID, i)
 			}
 
-			ids, err := c.Turn(text, sc.Max, sc.Refuse)
+			ids, err := c.Turn(asRead(text, goEscaped), sc.Max, sc.Refuse)
 
 			if m := overflowError.FindStringSubmatch(st.Answer.Error); m != nil {
 				refused++
 
-				if !checkRefusal(t, sc.ID+" step "+strconv.Itoa(i), text, m, len(ids), err) {
-					unidentified = append(unidentified, sc.ID)
-				}
+				checkRefusal(t, sc.ID+" step "+strconv.Itoa(i), m, len(ids), err)
 
 				continue
 			}
@@ -113,38 +112,27 @@ func TestConversationMatchesEngine(t *testing.T) {
 				t.Errorf("%s step %d: turn of %d tokens past the room of %d", sc.ID, i, len(ids), c.Available(sc.Max))
 			}
 
-			c.Answered(len(st.Answer.Calls))
+			c.Answered(nil, len(st.Answer.Calls))
 		}
 	}
 
-	if refused-len(unidentified) < 25 {
-		t.Errorf("%d refused probes; the fixture does not pin the rendering", refused-len(unidentified))
+	if refused != 53 {
+		t.Errorf("%d refused probes, want 53", refused)
 	}
 
-	t.Logf("%d scenarios, %d refusals matched, %d with '<', '&' or '>' in a tool result unidentified: %v",
-		len(fx.Scenarios), refused-len(unidentified), len(unidentified), unidentified)
+	t.Logf("%d scenarios, %d refusals with the engine's numbers", len(fx.Scenarios), refused)
 }
 
 // checkRefusal compares Turn's result for a turn the engine refused, m
-// being the engine's error and its two counts. It returns false for a turn
-// whose length the engine's writing of '<', '&' and '>' in a tool result's
-// strings changes (F-051: not identified), where the engine counts more.
-func checkRefusal(t *testing.T, at, text string, m []string, got int, err error) bool {
+// being the engine's error and its two counts.
+func checkRefusal(t *testing.T, at string, m []string, got int, err error) {
 	t.Helper()
 
 	var oe *OverflowError
 	if !errors.As(err, &oe) || !errors.Is(err, ErrContextOverflow) {
 		t.Errorf("%s: engine refused %s, Turn gave %d tokens (%v)", at, m[0], got, err)
 
-		return true
-	}
-
-	if strings.ContainsAny(text, "<&>") && strconv.Itoa(oe.Tokens) != m[1] {
-		if n, _ := strconv.Atoi(m[1]); n <= oe.Tokens {
-			t.Errorf("%s: engine %s tokens, Turn %d", at, m[1], oe.Tokens)
-		}
-
-		return false
+		return
 	}
 
 	if strconv.Itoa(oe.Tokens) != m[1] || strconv.Itoa(oe.Available) != m[2] {
@@ -154,8 +142,6 @@ func checkRefusal(t *testing.T, at, text string, m []string, got int, err error)
 	if !strings.Contains(oe.Error(), m[0][len("input exceeds the context window"):]) {
 		t.Errorf("%s: %q", at, oe.Error())
 	}
-
-	return true
 }
 
 // TestConversationTrim: without --fail-input-overflow the engine answers
@@ -225,7 +211,7 @@ func TestConversation(t *testing.T) {
 		t.Errorf("first turn %q", got)
 	}
 
-	c.Answered(1)
+	c.Answered(nil, 1)
 
 	if got := render(` [ {"a": 1.50} ] `); got != "\n<|im_start|>tool\n<tool_result>[{\"a\":1.50}]</tool_result>"+tail {
 		t.Errorf("tool result %q", got)
@@ -235,7 +221,7 @@ func TestConversation(t *testing.T) {
 		t.Errorf("JSON after a tool result %q", got)
 	}
 
-	c.Answered(1)
+	c.Answered(nil, 1)
 
 	if got := render(`not json`); got != "\n<|im_start|>user\nnot json"+tail {
 		t.Errorf("text after a call %q", got)
@@ -284,4 +270,124 @@ func decode(t *testing.T, p *spm.Processor, ids []int) string {
 	}
 
 	return s
+}
+
+// TestConversationClosing: Turn closes the answer before it as the engine
+// does (docs/FINDINGS.md F-063): a call block before a tool result with
+// <|im_end|>, before a user turn with </tool_call><|im_end|>, any other
+// answer with <|im_end|>; a refused turn leaves the closing for the next
+// one, and the closing does not count towards the turn.
+func TestConversationClosing(t *testing.T) {
+	p := loadTokenizer(t)
+	c := NewConversation(p, "", `[]`, 8192)
+
+	id := func(piece string) int {
+		n, ok := p.PieceID(piece)
+		if !ok {
+			t.Fatalf("no piece %s", piece)
+		}
+
+		return n
+	}
+
+	end, call := id(imEnd), id(toolCallEnd)
+	callBlock := &Decoded{Tokens: []int{7, 8, call}}
+
+	turn := func(input string, maxNew int, refuse bool) []int {
+		t.Helper()
+
+		ids, err := c.Turn(input, maxNew, refuse)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return ids
+	}
+
+	starts := func(name string, ids []int, closing ...int) {
+		t.Helper()
+
+		if len(ids) < len(closing) || !slices.Equal(ids[:len(closing)], closing) ||
+			strings.HasPrefix(decode(t, p, ids[len(closing):]), imEnd) {
+			t.Errorf("%s: %q, want the closing %v first", name, decode(t, p, ids), closing)
+		}
+	}
+
+	starts("first turn", turn("set a timer", 512, true))
+	c.Answered(callBlock, 1)
+	starts("tool result after a call", turn(`{"ok":true}`, 512, true), end)
+	c.Answered(&Decoded{Tokens: []int{7, 8}}, 0)
+	starts("user turn after a respond answer", turn("thanks", 512, true), end)
+	c.Answered(&Decoded{Tokens: []int{7, call}}, 0)
+	starts("user turn after an empty or suppressed call block", turn(`{"ok":true}`, 512, true), call, end)
+	c.Answered(&Decoded{Tokens: []int{7, call}, Truncated: true}, 0)
+	starts("after a truncated answer", turn("go on", 512, true), end)
+
+	// A refused turn feeds nothing and keeps the closing; its count is the
+	// turn's alone.
+	c.Answered(callBlock, 1)
+
+	body := `[` + strings.Repeat(`{"a":1},`, 400) + `1]`
+	compact, _ := compactJSON(body)
+	bare := len(p.Encode("\n"+imStart+"tool\n"+toolResultBeg)) + len(p.Encode(compact)) +
+		len(p.Encode(toolResultEnd+imEnd+"\n"+imStart+"assistant\n"))
+
+	var oe *OverflowError
+
+	_, err := c.Turn(body, 7000, true)
+	if !errors.As(err, &oe) || oe.Tokens != bare || oe.Available != c.Available(7000) {
+		t.Errorf("the long tool result: %v, want %d tokens refused", err, bare)
+	}
+
+	starts("user turn after a call and a refused turn", turn("and now?", 512, true), call, end)
+
+	c.Answered(callBlock, 1)
+	c.Reset()
+	starts("first turn after a reset", turn("hello", 512, true))
+
+	c.Answered(nil, 1)
+	starts("a turn whose answer the caller closed", turn(`{"ok":true}`, 512, true))
+}
+
+// TestConversationCut: a turn longer than the room, without the flag, is
+// cut to the room and drops the conversation before it (docs/FINDINGS.md
+// F-063): a first turn keeps the last tokens of its rendering, its leading
+// newline cut first; a later turn keeps its markers, and the closing of the
+// answer before it goes with the history.
+func TestConversationCut(t *testing.T) {
+	p := loadTokenizer(t)
+	long := strings.Repeat("the weather was nice and we walked along the river. ", 40) + "Set a timer."
+	tail := p.Encode(imEnd + "\n" + imStart + "assistant\n")
+
+	c := NewConversation(p, "", `[]`, 8192)
+	maxNew := c.Available(0) - 120
+
+	ids, err := c.Turn(long, maxNew, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	whole := append(append(p.Encode("\n"), p.Encode(long)...), tail...)
+	if !c.Restarted() || !slices.Equal(ids, whole[len(whole)-120:]) {
+		t.Errorf("first turn: %d tokens, restarted %v, want the last 120 of %d", len(ids), c.Restarted(), len(whole))
+	}
+
+	ids, err = c.Turn("hello", maxNew, false)
+	if err != nil || c.Restarted() || len(ids) != len(p.Encode("hello"))+9 {
+		t.Errorf("a turn that fits: %d tokens, restarted %v, %v", len(ids), c.Restarted(), err)
+	}
+
+	end, _ := p.PieceID(toolCallEnd)
+	c.Answered(&Decoded{Tokens: []int{7, end}}, 1)
+
+	ids, err = c.Turn(long, maxNew, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	head := p.Encode("\n" + imStart + "user\n")
+	if !c.Restarted() || len(ids) != 120 || !slices.Equal(ids[:len(head)], head) ||
+		!slices.Equal(ids[len(ids)-len(tail):], tail) {
+		t.Errorf("later turn: %q, restarted %v", decode(t, p, ids), c.Restarted())
+	}
 }
