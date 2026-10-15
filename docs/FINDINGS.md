@@ -6195,11 +6195,11 @@ upstream's own functions return for it (run with Python 3.14 outside the reposit
 `Agent.Complete` is the internal pipeline's envelope byte for byte, and the counts against the engine are
 `TestEnvelopeMatchesEngine`'s under `NEEDLE_TEST_NUMERICS=int8`. (b) `TestHistoryMatchesEngine` in `needle/` replays
 `history.json` through one agent per conversation (`Reset` at a reset step, `FailInputOverflow` for the engine's flag)
-and counts as `internal/toolcall`'s test does, stopping a conversation where its `replayHistory` stops. Its seven
-`long` conversations take the replay from 8 minutes to half an hour (the confidence head reads the whole conversation
-every turn), so they run with `NEEDLE_TEST_NUMERICS=int8`, the switch of the int8 parity runs, and `just test` keeps
-under its 30 minutes; without them the counts are reasoning 27 and calls 71 of 92 later turns, the confidence 14 of 22.
-On arm64 (M5 Pro), with them:
+and counts as `internal/toolcall`'s test does, stopping a conversation where its `replayHistory` stops. The replay
+takes half an hour (the confidence head reads the whole conversation every turn), and next to `internal/toolcall`'s
+own replay it took `just test` past its 30 minutes; so it runs with `NEEDLE_TEST_NUMERICS=int8`, the switch of the
+int8 parity runs, and plain `go test` replays only the eight conversations with refused turns (13 seconds). On arm64
+(M5 Pro):
 
 | count                                                     | `internal/toolcall`, int8 | `needle` API, default numerics |
 | --------------------------------------------------------- | ------------------------- | ------------------------------ |

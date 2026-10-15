@@ -386,9 +386,10 @@ func (h *historyTally) add(x against, cut, later bool) {
 
 // int8Env is the switch of the repository's int8 parity runs
 // (internal/toolcall's numericsEnv). The API always runs the engine's
-// numerics; set to "int8", TestHistoryMatchesEngine also replays the seven
-// long conversations of 13 turns near the context, which take it from
-// minutes to half an hour.
+// numerics; set to "int8", TestHistoryMatchesEngine replays every
+// conversation of history.json, half an hour on an M5 Pro, where go test
+// alone replays the eight with refused turns, which keeps `just test` within
+// its limit.
 const int8Env = "NEEDLE_TEST_NUMERICS"
 
 // TestHistoryMatchesEngine replays every conversation of history.json
@@ -399,8 +400,8 @@ const int8Env = "NEEDLE_TEST_NUMERICS"
 // replayHistory it stops a conversation at the turn that would take it past
 // the context: the API answers that turn alone, a port choice the engine's
 // answers do not pin (docs/FINDINGS.md F-064), so it is logged, not
-// counted. The refused turns carry the engine's numbers. The long
-// conversations and the floors need int8Env.
+// counted. The refused turns carry the engine's numbers. All but the
+// conversations with refused turns, and the floors, need int8Env.
 func TestHistoryMatchesEngine(t *testing.T) {
 	if testing.Short() {
 		t.Skip("decodes the history probes")
@@ -425,7 +426,7 @@ func TestHistoryMatchesEngine(t *testing.T) {
 	full := os.Getenv(int8Env) == "int8"
 
 	for _, c := range fx.Conversations {
-		if c.Group == "long" && !full {
+		if c.Group != "refused" && !full {
 			continue
 		}
 
@@ -532,22 +533,15 @@ func TestHistoryMatchesEngine(t *testing.T) {
 		t.Errorf("%d refusals, want 8", refused)
 	}
 
-	// The floors: the counts measured on arm64 (M5 Pro) less two, those of
-	// internal/toolcall's int8 run with the long conversations, without
-	// them reasoning 27 and calls 71 of 92, the confidence 14 of 22.
-	floors := [3]int{25, 69, 12}
-	if full {
-		floors = [3]int{50, 110, 35}
-	}
-
-	if h.think < floors[0] || h.calls < floors[1] || h.within < floors[2] {
-		t.Errorf("below the floors (reasoning %d, calls %d, confidence %d)", floors[0], floors[1], floors[2])
-	}
-
 	if !full {
-		t.Logf("the long conversations run with %s=int8", int8Env)
+		t.Logf("the replay of every conversation runs with %s=int8", int8Env)
 
 		return
+	}
+
+	// internal/toolcall's int8 floors: the counts measured on arm64 less two.
+	if h.think < 50 || h.calls < 110 || h.within < 35 {
+		t.Errorf("below the int8 floors (reasoning 50, calls 110, confidence 35)")
 	}
 
 	if len(past) != 4 {
