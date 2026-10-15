@@ -221,9 +221,22 @@ func envelopeDiff(t *testing.T, got, want json.RawMessage) ([]string, float64) {
 		t.Fatal(err)
 	}
 
-	gc, _ := g["confidence"].(float64)
-	wc, _ := w["confidence"].(float64)
-	off := math.Abs(gc - wc)
+	// The tolerance applies only to two numbers. A confidence that is
+	// missing, null or not a number on either side is equal only when both
+	// sides have the same one; otherwise it is a mismatch at an infinite
+	// distance, so a lost field never passes as a 0.
+	off := math.Inf(1)
+	gv, gin := g["confidence"]
+	wv, win := w["confidence"]
+	gc, gnum := gv.(float64)
+	wc, wnum := wv.(float64)
+
+	switch {
+	case gnum && wnum:
+		off = math.Abs(gc - wc)
+	case gin == win && !gnum && !wnum && reflect.DeepEqual(gv, wv):
+		off = 0
+	}
 
 	var classes []string
 
@@ -266,6 +279,35 @@ func envelopeDiff(t *testing.T, got, want json.RawMessage) ([]string, float64) {
 	slices.Sort(classes)
 
 	return classes, off
+}
+
+// TestEnvironmentEnvelopeDiff pins the comparison: the confidence within 0.02
+// when both are numbers, and a missing, null or non-numeric confidence equal
+// only to the same one, never counted as a 0.
+func TestEnvironmentEnvelopeDiff(t *testing.T) {
+	const base = `{"type":"call","function_calls":[]`
+
+	for _, tc := range []struct {
+		name, got, want string
+		differs         bool
+	}{
+		{"within 0.02", base + `,"confidence":0.51}`, base + `,"confidence":0.5}`, false},
+		{"off by more", base + `,"confidence":0.53}`, base + `,"confidence":0.5}`, true},
+		{"missing against 0", base + `}`, base + `,"confidence":0.0}`, true},
+		{"0 against missing", base + `,"confidence":0.0}`, base + `}`, true},
+		{"null against 0", base + `,"confidence":null}`, base + `,"confidence":0.0}`, true},
+		{"string against 0", base + `,"confidence":"0"}`, base + `,"confidence":0.0}`, true},
+		{"null against missing", base + `,"confidence":null}`, base + `}`, true},
+		{"both missing", base + `}`, base + `}`, false},
+		{"both null", base + `,"confidence":null}`, base + `,"confidence":null}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			diff, _ := envelopeDiff(t, json.RawMessage(tc.got), json.RawMessage(tc.want))
+			if got := slices.Contains(diff, classConfidence); got != tc.differs {
+				t.Errorf("confidence differs = %v (classes %v), want %v", got, diff, tc.differs)
+			}
+		})
+	}
 }
 
 // environmentSubset is how many cases of each suite plain go test answers;
@@ -395,8 +437,9 @@ func TestEnvironmentsMatchEngine(t *testing.T) {
 	t.Logf("suites whose failing cases equal the engine's: gate 0.0 %d of 6, gate 0.4 %d of 6", sameFailed[0],
 		sameFailed[1])
 
-	if equal < 100 || sameVerdict[0] < 5 {
-		t.Errorf("below the floors: envelope equal on 100 (measured 102 of 192), the pass at gate 0.0 on 5 suites (measured 5 of 6)")
+	if equal < 100 || sameVerdict[0] < 5 || sameVerdict[1] < 5 {
+		t.Errorf("below the floors: envelope equal on %d (floor 100, measured 102 of 192), the pass at gate 0.0 on %d "+
+			"suites and at gate 0.4 on %d (floor 5 each, measured 5 of 6 each)", equal, sameVerdict[0], sameVerdict[1])
 	}
 }
 

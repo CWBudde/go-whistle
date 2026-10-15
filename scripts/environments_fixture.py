@@ -49,6 +49,7 @@ import json
 import os
 import platform
 import re
+import subprocess
 import sys
 
 os.environ["NEEDLE_TELEMETRY"] = "0"
@@ -86,6 +87,25 @@ def read_pin(path):
             if sep:
                 pin[key] = value
     return pin
+
+
+def check_upstream(root):
+    """Exits unless root is a git checkout at UPSTREAM_PIN without local changes under needle/, the package this
+    script imports and runs (as scripts/needle_fixtures.py checks its inputs)."""
+    try:
+        rev = subprocess.run(["git", "-C", root, "rev-parse", "HEAD"], capture_output=True, text=True,
+                             check=True).stdout.strip()
+        changes = subprocess.run(["git", "-C", root, "status", "--porcelain", "--", "needle"], capture_output=True,
+                                 text=True, check=True).stdout.splitlines()
+    except (OSError, subprocess.CalledProcessError):
+        sys.exit(f"{root} is not a git checkout of cactus-compute/needle at {UPSTREAM_PIN}")
+    problems = []
+    if not rev.startswith(UPSTREAM_PIN):
+        problems.append(f"{root} is at {rev}, not {UPSTREAM_PIN}")
+    if changes:
+        problems.append(f"{root} has local changes under needle/: " + ", ".join(changes[:5]))
+    if problems:
+        sys.exit("unpinned upstream:\n  " + "\n  ".join(problems))
 
 
 def weights_sha256():
@@ -185,6 +205,7 @@ def main():
     edir, lib = engine_dir()
     pin = read_pin(os.path.join(edir, "PIN"))
     sha = weights_sha256()
+    check_upstream(UPSTREAM)
 
     sys.path.insert(0, UPSTREAM)
     from needle.agent import fetch
