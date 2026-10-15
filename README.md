@@ -389,6 +389,46 @@ stop: committed ""
 The package documentation (`go doc github.com/cwbudde/go-whistle/whistle`) covers the options, the JSON forms and the
 streaming rules; [`whistle/example_test.go`](whistle/example_test.go) has runnable examples.
 
+### Tool calls: the `needle` package
+
+The Needle 3 text model, which turns a request into tool calls, is the package
+`github.com/cwbudde/go-whistle/needle`. It mirrors upstream's Python `needle.Needle` (`Complete`, `Run` with Go
+tool functions, `Extract`, `Reset`) and answers with the engine's envelope, byte for byte in its JSON form. It runs
+`needle3.cact` in the engine's int8 numerics by default; `just fetch-needle3` fetches the weights into
+`models/needle3`.
+
+```go
+m, err := needle.Load("models/needle3")
+if err != nil {
+	log.Fatal(err)
+}
+defer m.Close()
+
+tools := []byte(`[{"name":"set_timer","parameters":{"type":"object",` +
+	`"properties":{"minutes":{"type":"integer"}},"required":["minutes"]}}]`)
+a, err := m.NewAgent(tools, needle.AgentOptions{AutoDate: true})
+if err != nil {
+	log.Fatal(err)
+}
+
+// One turn: the envelope, with the calls under the caller's names.
+r, err := a.Complete("set a timer for 10 minutes", needle.CompleteOptions{})
+if err != nil {
+	log.Fatal(err)
+}
+js, _ := json.Marshal(r)
+fmt.Println(string(js))
+
+// The agent loop: run the calls, feed their results back, until no call is made.
+a.Reset()
+r, err = a.Run("set a timer for 10 minutes", map[string]needle.ToolFunc{
+	"set_timer": func(args json.RawMessage) (any, error) { return map[string]any{"started": true}, nil },
+}, needle.RunOptions{})
+```
+
+`go doc github.com/cwbudde/go-whistle/needle` covers the options, the conversation rules and the checks `Run` and
+`Extract` apply; [F-064](docs/FINDINGS.md#f-064--the-public-api-needleneedle-in-go-over-the-engines-envelope-and-where-it-departs-from-the-python-client-planmd-117-2026-10-15) lists where the API departs from the Python client.
+
 ## Parity with the engine
 
 Whistle's engine (`libneedle3`) is closed source, so this port is rebuilt from the published weights and checked

@@ -6171,3 +6171,105 @@ list drops the entry.
   cannot see them (above). The port refuses to decode past 8192 positions.
 - **A cut tool result**, and whether the engine still grounds later calls in the turns a cut dropped
   (`Conversation.Inputs` keeps them).
+
+## F-064 — The public API: `needle.Needle` in Go over the engine's envelope, and where it departs from the Python client (PLAN.md 11.7) (2026-10-15)
+
+**Question.** 11.7's first item asks for a Go API that mirrors upstream's Python `needle.Needle` (`Complete`, `Run`
+with Go tool functions, `Extract`, `Reset`) and returns the engine's envelope. The envelope is the engine's
+(F-047 to F-063); the Python client (`needle/__init__.py` at `af2654d`) adds a date fact, an agent loop with a strict
+check, and an extraction check on top of it. Which of those the port takes as they are, and what it decides where
+neither the client nor the engine's answers pin a behaviour. No oracle run: the choices below rest on upstream's
+public source and the fixtures already recorded.
+
+**The API.** `needle.Load(dir)` opens `needle3.cact` and `tokenizer.model` in the engine's numerics (packed, exact
+kernel, int8 activations and KV cache, the KV window of 256 with the static prefix as its sink: F-059, F-060);
+`WithoutInt8`, `WithLUT` and `WithFloatWeights` are the other numerics. `Model.NewAgent(tools, AgentOptions)` holds
+one conversation; `Agent.Complete` is the body of the tests' `decodeTurns` loop made production code
+(`Conversation.Turn`, `Decoder.Decode` under `GrammarFor`, `Decoder.Confidence`, `Normalised.Envelope`,
+`Conversation.Answered`). `Response.MarshalJSON` delegates to `toolcall.Envelope`'s byte-exact form and appends
+`"results"` for `Run`. `Run` and `Extract` sit on a small `completer` interface, so their loop, error results, strict
+checks and JSON are tested against scripted engine answers without the model, each scenario's expectation being what
+upstream's own functions return for it (run with Python 3.14 outside the repository, not at test time).
+
+**Measured.** (a) `TestCompleteMatchesPipeline`: every turn of the engine corpus (`cases.json`, 25 turns) through
+`Agent.Complete` is the internal pipeline's envelope byte for byte, and the counts against the engine are
+`TestEnvelopeMatchesEngine`'s under `NEEDLE_TEST_NUMERICS=int8`. (b) `TestHistoryMatchesEngine` in `needle/` replays
+`history.json` through one agent per conversation (`Reset` at a reset step, `FailInputOverflow` for the engine's flag)
+and counts as `internal/toolcall`'s test does, stopping a conversation where its `replayHistory` stops. Its seven
+`long` conversations take the replay from 8 minutes to half an hour (the confidence head reads the whole conversation
+every turn), so they run with `NEEDLE_TEST_NUMERICS=int8`, the switch of the int8 parity runs, and `just test` keeps
+under its 30 minutes; without them the counts are reasoning 27 and calls 71 of 92 later turns, the confidence 14 of 22.
+On arm64 (M5 Pro), with them:
+
+| count                                                     | `internal/toolcall`, int8 | `needle` API, default numerics |
+| --------------------------------------------------------- | ------------------------- | ------------------------------ |
+| corpus: type and `function_calls` equal                   | 24 of 25                  | 24 of 25 (all 25 byte-equal)   |
+| corpus: reasoning equal                                   | 22 of 25                  | 22 of 25                       |
+| corpus: confidence within 0.02 of the turns decoded alike | 20 of 22                  | 20 of 22                       |
+| history: later turns with the engine's reasoning          | 52 of 154                 | 52 of 154                      |
+| history: later turns with the engine's calls              | 112 of 154                | 112 of 154                     |
+| history: confidence within 0.02 of the 47 decoded alike   | 37                        | 37                             |
+| history: cut turns decoded as the engine's                | 11 of 37                  | 11 of 37                       |
+| history: refusals with the engine's numbers               | 8 of 8                    | 8 of 8                         |
+
+Several agents may share one `Model`: `TestConcurrentAgents` answers three requests at once as one after another,
+byte for byte, under `-race` (the weights and their kernels' scratch pools, the tokenizer and the decoder are shared;
+the decoder's vocabulary mask is not written after `NewDecoder`, and each agent's grammar guards its own cache). An
+`Agent` itself is one conversation and not safe for concurrent use.
+
+### Port choices
+
+- **The date fact.** Upstream's `Needle(auto_date=True)` puts `_with_date_fact(system)` in front of the system facts
+  (`__init__.py` 190, 208, 458), and `extract` always builds its agent that way (639). The engine adds no date (F-047).
+  `AgentOptions.AutoDate` and `ExtractOptions.AutoDate` are off by default, so a default agent renders what the
+  engine's CLI and library render and its answers are the ones the fixtures pin; on, they call
+  `toolcall.WithDateFact` with `Now`. Rejected: on by default as in Python, which would put today's date into every
+  prompt and make the answers depend on the clock.
+- **A history that outgrows the context.** F-063 leaves open which positions the engine drops past 8192. When the
+  state plus the next turn passes the context, or the answer runs out of it while decoding (`text.ErrTooLong`), the
+  agent drops the conversation and answers the turn alone after the static prefix, without the closing of the answer
+  before it: the rule `Conversation.Turn` applies to a cut turn (F-063). `Conversation.Inputs` keeps the dropped
+  turns, which still ground later calls, as after a cut. Rejected: an error (the engine answers those turns, the four
+  `long_*` conversations of `history.json`); reserving `--max` in the check (`state + turn + max > 8192`), since the
+  engine answers alike at both ends of the scan where history and `--max` together pass the context
+  (`TestHistoryScans`). On the four turns past the context (`long_cross/13`, `long_cross_refuse/13`,
+  `long_system_fact/13`, `long_turn_fact/14`) none of the API's answers is the engine's: alone, the model answers the
+  last request cleanly (`set_timer` 19 minutes at 0.539; the system's 7 minutes for the soup), while the engine's
+  reasonings still speak of the history ("History turned to set timer for cake. …", suppressed at 0.0549; 25 minutes
+  for the soup), so it keeps some of it in view. Which part stays open (F-063); the rule is a stopgap that keeps the
+  agent answering.
+- **`Run`'s grounding.** The loop is upstream's (327–364): an answer of type `call` with calls runs them, the step's
+  results go back as one turn written as `json.dumps(results)` (361; `toolcall.Dumps`, so `", "`, `": "` and
+  `\u` escapes past `~`), and the loop ends at an answer without calls or after `MaxSteps` (8). Unknown tools and
+  tool errors give `{"error": "unknown tool: name"}` and `{"error": message}` (354, 359). The strict check (339–350)
+  reads `_ungrounded_paths`, which groups the validation's `tool.field` names by tool, and looks them up by the
+  call's name; the engine writes them under the model's snake_case names (F-047's `invoice.total`, F-050) and the
+  call carries the caller's, so upstream's check misses every tool or field the engine renamed (`setAlarm`,
+  `wakeTime`). The port maps them back (`Normalised.CallerName`, the new `CallerField`) and checks them under the
+  caller's names, numbers that the query or the system facts write excepted (`_grounded_number_paths`, 345, 562).
+  Upstream also adds `_annotate_ungrounded`'s year failures to the first answer's validation (307, 585; later
+  answers are `ground=False`, 362); the port adds them to the strict check alone and returns the engine's envelope
+  unchanged, as `Complete` does. `RunOptions.Lenient` is `strict=False`.
+- **`Extract`'s fallback to suppressed calls.** Upstream returns the first of `function_calls`, else of
+  `suppressed_calls` (647), so a call the engine withheld (below 0.1 or a grounding gate) still yields arguments; the
+  port keeps that, nil when the answer has no call. The strict check is `_validate_extraction` (607): the dates whose
+  year the text does not license, the flagged fields that are neither numbers the text or the system facts write nor
+  licensed dates, and a negated request; the flagged names are mapped to the caller's as for `Run` (upstream's
+  `name.split(".", 1)[-1]`, 613, keeps the model's). The year failures that `_complete` adds for every dispatched
+  call (307) count as flagged too, so a later call's date fails the extraction of the first, and a suppressed call's
+  does not. `*ExtractionValidationError` lists the fields, sorted as Python's `sorted` sorts them.
+- **The Python helpers in Go.** `_source_years`, `_relative_cue`, `_walk_grounding`, `_NUMBER_TOKEN` and
+  `_DATE_FACT` use look-arounds and Unicode `\d`, `\s`, `\w`, `\b`, which RE2 lacks: `needle/grounding.go` matches the
+  rest with RE2 and checks the look-arounds and word boundaries by hand, the backtracking of a year's digits
+  included. Python's `str.lower` maps `İ` to `i` and a combining dot, and its `IGNORECASE` takes `ı` and `İ` for `i`;
+  RE2 and `strings.ToLower` do neither, so the port spells both out. A differential run of the Go helpers against
+  upstream's regexes on about 400 000 random strings (review of this change) found no other difference. 40
+  `_source_years`, 19 `_relative_cue`, 4 `_licensed_years`, 3 `_walk_grounding` and 10 `_grounded_number_paths`
+  cases,
+  13 `run` scenarios and 8 `_validate_extraction` cases equal upstream's results.
+- **Not ported.** The telemetry (`_track`), the warning after `UNRESET_TURNS` (4) queries without `reset()` (25, 276),
+  Pydantic models as schemas and tools, fine-tuned weights and their `confidence: None` (305; `Load` refuses weights
+  without a confidence head). A tool result that `encoding/json` writes differs from Python's where Go's encoding
+  differs: a `float64` of 1 is written `1`, not `1.0`, a map's keys come sorted, and NaN and the infinities come as
+  text (a struct, a `json.Number` or a `json.RawMessage` keeps order and literals). A panicking `ToolFunc` is not
+  recovered, where upstream turns any exception into `{"error": …}`.
