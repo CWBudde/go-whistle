@@ -33,9 +33,15 @@ func (s *script) complete(input string, _ int) (*toolcall.Envelope, error) {
 
 func (s *script) reset() { s.resets++ }
 
-// scripted is an agent over tools whose turns script answers.
+// scripted is an agent over tools whose turns script answers. Without a
+// clock it renders no date fact: the scenarios' expectations are what
+// upstream's functions return for the system facts as given.
 func scripted(t *testing.T, tools string, o AgentOptions, answers ...*toolcall.Envelope) (*Agent, *script) {
 	t.Helper()
+
+	if o.Now == nil {
+		o.NoAutoDate = true
+	}
 
 	a, err := newAgent([]byte(tools), o)
 	if err != nil {
@@ -157,9 +163,9 @@ func TestAgentNoTools(t *testing.T) {
 	}
 }
 
-// TestAgentSystem: AutoDate puts the date fact of Now in front of the
+// TestAgentSystem: by default the date fact of Now goes in front of the
 // system facts as upstream's _with_date_fact does, unless they hold a date
-// or are a JSON object; without it the facts stay as given.
+// or are a JSON object; with NoAutoDate the facts stay as given.
 func TestAgentSystem(t *testing.T) {
 	now := func() time.Time { return time.Date(2026, 10, 15, 12, 3, 0, 0, time.UTC) }
 
@@ -167,11 +173,11 @@ func TestAgentSystem(t *testing.T) {
 		o    AgentOptions
 		want string
 	}{
-		{AgentOptions{System: "home: Berlin"}, "home: Berlin"},
-		{AgentOptions{System: "home: Berlin", AutoDate: true, Now: now}, "date: 2026-10-15 Thu 12:03; home: Berlin"},
-		{AgentOptions{AutoDate: true, Now: now}, "date: 2026-10-15 Thu 12:03"},
-		{AgentOptions{System: "update: 2024-01-02", AutoDate: true, Now: now}, "update: 2024-01-02"},
-		{AgentOptions{System: `{"home":"Berlin"}`, AutoDate: true, Now: now}, `{"home":"Berlin"}`},
+		{AgentOptions{System: "home: Berlin", NoAutoDate: true}, "home: Berlin"},
+		{AgentOptions{System: "home: Berlin", Now: now}, "date: 2026-10-15 Thu 12:03; home: Berlin"},
+		{AgentOptions{Now: now}, "date: 2026-10-15 Thu 12:03"},
+		{AgentOptions{System: "update: 2024-01-02", Now: now}, "update: 2024-01-02"},
+		{AgentOptions{System: `{"home":"Berlin"}`, Now: now}, `{"home":"Berlin"}`},
 	} {
 		a, err := newAgent(nil, c.o)
 		if err != nil {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cwbudde/go-whistle/internal/toolcall"
@@ -239,5 +240,90 @@ func TestRunError(t *testing.T) {
 	_, err := a.Run("loop", map[string]ToolFunc{"t": func(json.RawMessage) (any, error) { return 1, nil }}, RunOptions{})
 	if err == nil {
 		t.Error("Run without the engine's second answer succeeded")
+	}
+}
+
+// TestCompleteAnnotates: Complete adds the Python client's year check to
+// the envelope as _annotate_ungrounded does (needle/__init__.py 585): a
+// date whose year the turns do not license goes into
+// validation.ungrounded as "tool.path" after the engine's fields and not
+// twice, a validation is made for it when the engine wrote none, and a
+// licensed date adds nothing.
+func TestCompleteAnnotates(t *testing.T) {
+	const bad, good = `{"title":"dinner","day":"2019-03-05"}`, `{"title":"dinner","day":"2025-03-05"}`
+
+	for _, c := range []struct {
+		args         string
+		engine       []string
+		noValidation bool
+		want         []string
+	}{
+		{bad, nil, false, []string{"event.day"}},
+		{bad, nil, true, []string{"event.day"}},
+		{bad, []string{"event.title"}, false, []string{"event.title", "event.day"}},
+		{bad, []string{"event.day"}, false, []string{"event.day"}},
+		{good, []string{"event.title"}, false, []string{"event.title"}},
+	} {
+		e := answer(one("event", c.args), c.engine...)
+		if c.noValidation {
+			e.Validation = nil
+		}
+
+		a, _ := scripted(t, "["+extractSchema+"]", AgentOptions{}, e)
+
+		r, err := a.Complete("dinner on 5 March 2025", CompleteOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if r.Validation == nil || !slices.Equal(r.Validation.Ungrounded, c.want) {
+			t.Errorf("%s %v: validation %+v, want ungrounded %v", c.args, c.engine, r.Validation, c.want)
+		}
+
+		js, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		want, err := json.Marshal(c.want)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !strings.Contains(string(js), `"ungrounded":`+string(want)) {
+			t.Errorf("%s %v: JSON %s, want ungrounded %s", c.args, c.engine, js, want)
+		}
+	}
+}
+
+// TestRunAnnotatesFirstAnswer: Run's first answer is annotated and its
+// date blocks the call, a later answer is not (upstream's ground=False)
+// and its call runs.
+func TestRunAnnotatesFirstAnswer(t *testing.T) {
+	const bad = `{"title":"dinner","day":"2019-03-05"}`
+
+	a, _ := scripted(t, "["+extractSchema+"]", AgentOptions{},
+		answer(one("event", bad)), answer(one("event", bad)), respond())
+
+	ran := 0
+
+	r, err := a.Run("dinner on 5 March 2025", map[string]ToolFunc{
+		"event": func(json.RawMessage) (any, error) {
+			ran++
+
+			return map[string]any{"ok": true}, nil
+		},
+	}, RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	js, err := json.Marshal(r.Results)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want := `[{"error":"ungrounded day"},{"ok":true}]`; string(js) != want || ran != 1 {
+		t.Errorf("results %s after %d runs, want %s after 1", js, ran, want)
 	}
 }

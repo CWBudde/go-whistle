@@ -3,6 +3,7 @@ package needle
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/cwbudde/go-whistle/internal/toolcall"
 )
@@ -157,5 +158,27 @@ func TestExtractCallerNames(t *testing.T) {
 	var ve *ExtractionValidationError
 	if !errors.As(err, &ve) || len(ve.Fields) != 1 || ve.Fields[0] != "eventTitle" {
 		t.Errorf("%v, want the field eventTitle alone", err)
+	}
+}
+
+// TestExtractDate: Extract's agent always has the date fact, as upstream's
+// extract builds its agent with auto_date=True, unless the system facts
+// hold a date already.
+func TestExtractDate(t *testing.T) {
+	now := func() time.Time { return time.Date(2026, 10, 15, 12, 3, 0, 0, time.UTC) }
+
+	for _, c := range []struct{ system, want string }{
+		{"", "date: 2026-10-15 Thu 12:03"},
+		{"home: Berlin", "date: 2026-10-15 Thu 12:03; home: Berlin"},
+		{"date: 2026-10-11 Sun 09:30", "date: 2026-10-11 Sun 09:30"},
+	} {
+		a, err := newAgent([]byte("["+extractSchema+"]"), ExtractOptions{System: c.system, Now: now}.agent())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if a.System() != c.want {
+			t.Errorf("system %q: %q, want %q", c.system, a.System(), c.want)
+		}
 	}
 }

@@ -254,7 +254,7 @@ func TestCompleteMatchesPipeline(t *testing.T) {
 		tools := corpus.Toolsets[c.Toolset]
 		want := pipeline(t, m, system, tools, inputs, maxNew)
 
-		a, err := m.NewAgent(tools, AgentOptions{System: system, FailInputOverflow: true})
+		a, err := m.NewAgent(tools, AgentOptions{System: system, NoAutoDate: true, FailInputOverflow: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -435,7 +435,7 @@ func TestHistoryMatchesEngine(t *testing.T) {
 			system = c.System
 		}
 
-		a, err := m.NewAgent(corpus.Toolsets[c.Toolset], AgentOptions{System: system, FailInputOverflow: c.Refuse})
+		a, err := m.NewAgent(corpus.Toolsets[c.Toolset], AgentOptions{System: system, NoAutoDate: true, FailInputOverflow: c.Refuse})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -564,7 +564,7 @@ func TestConcurrentAgents(t *testing.T) {
 	queries := []string{"set a timer for 5 minutes", "timer 20 min", "what is the weather"}
 
 	answer := func(q string) []byte {
-		a, err := m.NewAgent(tools, AgentOptions{})
+		a, err := m.NewAgent(tools, AgentOptions{NoAutoDate: true})
 		if err != nil {
 			t.Error(err)
 
@@ -625,7 +625,7 @@ func TestModelErrors(t *testing.T) {
 
 	tools := []byte(`[{"name":"set_timer","parameters":{"type":"object","properties":{"minutes":{"type":"integer"}}}}]`)
 
-	a, err := m.NewAgent(tools, AgentOptions{FailInputOverflow: true})
+	a, err := m.NewAgent(tools, AgentOptions{NoAutoDate: true, FailInputOverflow: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -641,7 +641,7 @@ func TestModelErrors(t *testing.T) {
 
 	huge := `[{"name":"t","description":"` + strings.Repeat("word ", 9000) + `"}]`
 
-	_, err = m.NewAgent([]byte(huge), AgentOptions{})
+	_, err = m.NewAgent([]byte(huge), AgentOptions{NoAutoDate: true})
 	if !errors.Is(err, ErrContextBudget) {
 		t.Errorf("tools past the context: %v", err)
 	}
@@ -656,7 +656,7 @@ func TestModelErrors(t *testing.T) {
 		t.Errorf("Complete after Close: %v", err)
 	}
 
-	_, err = m.NewAgent(tools, AgentOptions{})
+	_, err = m.NewAgent(tools, AgentOptions{NoAutoDate: true})
 	if !errors.Is(err, ErrClosed) {
 		t.Errorf("NewAgent after Close: %v", err)
 	}

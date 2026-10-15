@@ -63,7 +63,7 @@ func ExampleAgent_Run() { //nolint:testableexamples // needs the model, which go
 
 	defer func() { _ = m.Close() }()
 
-	a, err := m.NewAgent(tools, needle.AgentOptions{AutoDate: true})
+	a, err := m.NewAgent(tools, needle.AgentOptions{})
 	if err != nil {
 		log.Print(err)
 

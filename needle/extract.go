@@ -11,10 +11,12 @@ import (
 
 // ExtractOptions configure Extract.
 type ExtractOptions struct {
-	// System, AutoDate and Now are AgentOptions'.
-	System   string
-	AutoDate bool
-	Now      func() time.Time
+	// System are the system facts. The date fact of Now (nil is
+	// time.Now) always goes in front of them unless they hold a date or
+	// are a JSON object, as upstream's extract builds its agent
+	// (needle/__init__.py 639, auto_date=True).
+	System string
+	Now    func() time.Time
 	// MaxNewTokens is the answer's token limit; 0 is DefaultMaxNewTokens.
 	MaxNewTokens int
 	// Lenient returns the arguments without the strict check (upstream's
@@ -49,14 +51,17 @@ func (m *Model) Extract(text string, schema []byte, o ExtractOptions) (json.RawM
 		return nil, err
 	}
 
-	a, err := m.NewAgent(slices.Concat([]byte("["), schema, []byte("]")),
-		AgentOptions{System: o.System, AutoDate: o.AutoDate, Now: o.Now})
+	a, err := m.NewAgent(slices.Concat([]byte("["), schema, []byte("]")), o.agent())
 	if err != nil {
 		return nil, err
 	}
 
 	return a.extract(text, tool, o)
 }
+
+// agent are the options of Extract's agent: the system facts with the date
+// fact, which upstream's extract always adds.
+func (o ExtractOptions) agent() AgentOptions { return AgentOptions{System: o.System, Now: o.Now} }
 
 // ExtractInto is Extract decoding the arguments into v with
 // encoding/json. It reports whether there were any.
@@ -98,7 +103,7 @@ func extractTool(schema []byte) (any, error) {
 
 // extract is upstream's extract on the one-tool agent a.
 func (a *Agent) extract(text string, tool any, o ExtractOptions) (json.RawMessage, error) {
-	r, err := a.complete(text, maxNewTokens(o.MaxNewTokens))
+	r, err := a.complete(text, maxNewTokens(o.MaxNewTokens), true)
 	if err != nil {
 		return nil, err
 	}
@@ -118,12 +123,7 @@ func (a *Agent) extract(text string, tool any, o ExtractOptions) (json.RawMessag
 	}
 
 	if !o.Lenient {
-		var annotated []string
-		for _, paths := range a.yearFailures(r, text) {
-			annotated = append(annotated, paths...)
-		}
-
-		err := a.validateExtraction(text, tool, args, r, annotated)
+		err := a.validateExtraction(text, tool, args, r)
 		if err != nil {
 			return args, err
 		}
@@ -136,13 +136,12 @@ func (a *Agent) extract(text string, tool any, o ExtractOptions) (json.RawMessag
 // facts: the date fields whose year text does not license; the fields the
 // engine reports as ungrounded, and the paths annotated adds, that are
 // neither numbers text or the system facts write nor dates whose year text
-// licenses; and a negated request. annotated are the year failures that
-// upstream's _complete adds to the validation for every dispatched call
-// (_annotate_ungrounded), so a later call's date counts too. The engine
-// names its fields under the model's names, upstream compares them with
-// the caller's; the port maps them to the caller's (docs/FINDINGS.md
-// F-064).
-func (a *Agent) validateExtraction(text string, tool any, args json.RawMessage, r *Response, annotated []string) error {
+// licenses; and a negated request. The validation holds the year failures
+// that upstream's _complete adds for every dispatched call (annotate), so
+// a later call's date counts too. The engine names its fields under the
+// model's names, upstream compares them with the caller's; the port maps
+// the engine's to the caller's (docs/FINDINGS.md F-064).
+func (a *Agent) validateExtraction(text string, tool any, args json.RawMessage, r *Response) error {
 	argv := decodeJSON(args)
 	checked, failures := walkGrounding(tool, argv, licensedYears(sourceYears(text), a.system, relativeCue(text)))
 
@@ -151,12 +150,15 @@ func (a *Agent) validateExtraction(text string, tool any, args json.RawMessage, 
 	negation := false
 
 	if r.Validation != nil {
-		flagged, negation = r.Validation.Ungrounded, r.Validation.Negation
+		flagged, negation = r.Validation.Ungrounded[:r.engine], r.Validation.Negation
 	}
 
 	grounded := map[string]bool{}
 
-	paths := slices.Clone(annotated)
+	paths := make([]string, 0, len(r.annotated)+len(flagged))
+	for _, g := range r.annotated {
+		paths = append(paths, g.path)
+	}
 
 	for _, name := range flagged {
 		path := name

@@ -21,13 +21,14 @@ const DefaultMaxNewTokens = 512
 type AgentOptions struct {
 	// System are the system facts, rendered before the tools.
 	System string
-	// AutoDate puts the date fact "date: YYYY-MM-DD Day HH:MM" of Now in
-	// front of the system facts, unless they hold a date already or are a
-	// JSON object, as upstream's Python client does by default
-	// (auto_date=True). The engine adds no date (docs/FINDINGS.md F-047),
-	// and neither does an agent without it.
-	AutoDate bool
-	// Now is the clock of AutoDate; nil is time.Now.
+	// NoAutoDate leaves the system facts as given. By default the date
+	// fact "date: YYYY-MM-DD Day HH:MM" of Now goes in front of them,
+	// unless they hold a date already or are a JSON object, as upstream's
+	// Python client does (auto_date=True). The engine itself adds no date
+	// (docs/FINDINGS.md F-047), so NoAutoDate renders what the engine's
+	// CLI renders.
+	NoAutoDate bool
+	// Now is the clock of the date fact; nil is time.Now.
 	Now func() time.Time
 	// Stateless resets the conversation before every Complete and Run, as
 	// upstream's stateless=True does.
@@ -107,13 +108,8 @@ func newAgent(tools []byte, o AgentOptions) (*Agent, error) {
 	}
 
 	system := o.System
-	if o.AutoDate {
-		now := time.Now
-		if o.Now != nil {
-			now = o.Now
-		}
-
-		system = toolcall.WithDateFact(system, now())
+	if !o.NoAutoDate {
+		system = withDate(system, o.Now)
 	}
 
 	a := &Agent{system: system, schemas: map[string]any{}, years: map[int]bool{}, stateless: o.Stateless}
@@ -132,12 +128,23 @@ func newAgent(tools []byte, o AgentOptions) (*Agent, error) {
 	return a, nil
 }
 
+// withDate is upstream's _with_date_fact: the date fact of now (nil is
+// time.Now) in front of system, unless it holds a date or is a JSON object.
+func withDate(system string, now func() time.Time) string {
+	if now == nil {
+		now = time.Now
+	}
+
+	return toolcall.WithDateFact(system, now())
+}
+
 // System are the system facts the agent renders: AgentOptions.System with
-// the date fact when AutoDate added one.
+// the date fact unless NoAutoDate.
 func (a *Agent) System() string { return a.system }
 
 // Complete answers text as the next turn of the conversation and returns
-// the engine's envelope. A turn after an answer that called a tool is the
+// the engine's envelope with the Python client's year check in its
+// validation, as needle.Needle.complete does (annotate). A turn after an answer that called a tool is the
 // tool's result when text is JSON, a user turn otherwise
 // (docs/FINDINGS.md F-051). A refused turn (ErrContextOverflow) leaves the
 // conversation as it was; any other error starts it anew, as Reset does.
@@ -146,7 +153,7 @@ func (a *Agent) Complete(text string, o CompleteOptions) (*Response, error) {
 		a.Reset()
 	}
 
-	return a.complete(text, maxNewTokens(o.MaxNewTokens))
+	return a.complete(text, maxNewTokens(o.MaxNewTokens), true)
 }
 
 // Reset starts a new conversation over the same tools and system facts.
@@ -159,8 +166,9 @@ func (a *Agent) Reset() {
 }
 
 // complete is upstream's _complete: one turn, its years noted for the
-// checks.
-func (a *Agent) complete(input string, maxNew int) (*Response, error) {
+// checks and, when ground, the answer annotated with the dates whose year
+// they do not license (annotate).
+func (a *Agent) complete(input string, maxNew int, ground bool) (*Response, error) {
 	if a.m != nil && a.m.closed.Load() {
 		return nil, ErrClosed
 	}
@@ -183,7 +191,12 @@ func (a *Agent) complete(input string, maxNew int) (*Response, error) {
 		return nil, err
 	}
 
-	return newResponse(e, false), nil
+	r := newResponse(e, false)
+	if ground {
+		a.annotate(r, input)
+	}
+
+	return r, nil
 }
 
 func maxNewTokens(n int) int {
@@ -312,7 +325,8 @@ func (s *session) reset() {
 }
 
 // Response is the engine's envelope for one turn (docs/FINDINGS.md F-054,
-// F-062), and for Run the results of the tools it called.
+// F-062) with the Python client's year check in Validation (F-064), and for
+// Run the results of the tools it called.
 type Response struct {
 	// Type is "call" (an empty call is a refusal) or "respond".
 	Type    string
@@ -337,7 +351,9 @@ type Response struct {
 	// across its steps (an error as {"error": message}); nil for Complete.
 	Results []any
 
-	noTools bool // the engine's answer without tools, which has no error_code and reason
+	noTools   bool        // the engine's answer without tools, which has no error_code and reason
+	engine    int         // how many of Validation.Ungrounded are the engine's, the rest annotate's
+	annotated []grounding // the dates annotate added, under the caller's names
 }
 
 // Call is one function call.
@@ -365,6 +381,7 @@ func newResponse(e *toolcall.Envelope, noTools bool) *Response {
 
 	if e.Validation != nil {
 		r.Validation = &Validation{Ungrounded: e.Validation.Ungrounded, Negation: e.Validation.Negation}
+		r.engine = len(e.Validation.Ungrounded)
 	}
 
 	return r

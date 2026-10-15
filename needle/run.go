@@ -45,8 +45,8 @@ type RunOptions struct {
 // (docs/FINDINGS.md F-064). A call to a tool that tools does not have gets
 // {"error": "unknown tool: name"}. Unless Lenient, a call with a field the
 // engine's validation lists as ungrounded, or with a date whose year the
-// query does not license (the Python client's year check, on the first
-// answer only), gets {"error": "ungrounded field, …"} instead of running,
+// query does not license (the Python client's year check, which annotates
+// the first answer only), gets {"error": "ungrounded field, …"} instead of running,
 // but for fields that are numbers the query or the system facts write. The
 // returned Response is the last answer's, with Results holding every
 // result in call order.
@@ -62,12 +62,11 @@ func (a *Agent) Run(query string, tools map[string]ToolFunc, o RunOptions) (*Res
 
 	maxNew := maxNewTokens(o.MaxNewTokens)
 
-	r, err := a.complete(query, maxNew)
+	r, err := a.complete(query, maxNew, true)
 	if err != nil {
 		return nil, err
 	}
 
-	years := a.yearFailures(r, query)
 	results := []any{}
 
 	for range steps {
@@ -76,11 +75,6 @@ func (a *Agent) Run(query string, tools map[string]ToolFunc, o RunOptions) (*Res
 		}
 
 		ungrounded := a.ungroundedPaths(r)
-		for tool, paths := range years {
-			ungrounded[tool] = append(ungrounded[tool], paths...)
-		}
-
-		years = nil
 
 		step := make([]any, len(r.FunctionCalls))
 		for i, c := range r.FunctionCalls {
@@ -94,7 +88,7 @@ func (a *Agent) Run(query string, tools map[string]ToolFunc, o RunOptions) (*Res
 			return nil, err
 		}
 
-		r, err = a.complete(in, maxNew)
+		r, err = a.complete(in, maxNew, false)
 		if err != nil {
 			return nil, err
 		}
@@ -141,19 +135,24 @@ func (a *Agent) call(c Call, ungrounded []string, query string, tools map[string
 // errorResult is a call's result for an error.
 func errorResult(msg string) map[string]any { return map[string]any{"error": msg} }
 
-// ungroundedPaths is _ungrounded_paths: the fields the engine's validation
-// lists, by tool. The engine names them under the model's snake_case names
-// and upstream looks them up under the caller's, which misses every tool
-// and field the engine renamed; the port maps them to the caller's names
-// (docs/FINDINGS.md F-064).
+// ungroundedPaths is _ungrounded_paths: the fields the validation lists, by
+// tool. The engine names its fields under the model's snake_case names and
+// upstream looks them up under the caller's, which misses every tool and
+// field the engine renamed; the port maps them to the caller's names
+// (docs/FINDINGS.md F-064). The dates annotate added are the caller's
+// already.
 func (a *Agent) ungroundedPaths(r *Response) map[string][]string {
 	out := map[string][]string{}
+
+	for _, g := range r.annotated {
+		out[g.tool] = append(out[g.tool], g.path)
+	}
 
 	if r.Validation == nil || a.n == nil {
 		return out
 	}
 
-	for _, name := range r.Validation.Ungrounded {
+	for _, name := range r.Validation.Ungrounded[:r.engine] {
 		tool, field, _ := strings.Cut(name, ".")
 		caller := a.n.CallerName(tool)
 
@@ -168,18 +167,22 @@ func (a *Agent) ungroundedPaths(r *Response) map[string][]string {
 	return out
 }
 
-// yearFailures is the Python client's _annotate_ungrounded on the answer r
-// to text: the date fields of r's calls whose year the years written since
-// Reset do not license (licensedYears), by tool. Upstream adds them to the
-// validation of Run's first answer, which its strict check reads; the port
-// gives them to that check alone and leaves the envelope the engine's.
-func (a *Agent) yearFailures(r *Response, text string) map[string][]string {
+// grounding is a field of a call: the call's tool and the field's path.
+type grounding struct{ tool, path string }
+
+// annotate is the Python client's _annotate_ungrounded on the answer r to
+// text (needle/__init__.py 307, 585): the date fields of r's calls whose
+// year the years written since Reset do not license (licensedYears), in
+// call order and each call's paths sorted, go into the validation's
+// ungrounded fields as "tool.path" under the caller's names, after the
+// engine's and without repeating one of them. upstream annotates
+// complete's answer, Run's first and Extract's, not Run's later ones
+// (docs/FINDINGS.md F-064).
+func (a *Agent) annotate(r *Response, text string) {
 	years := licensedYears(a.years, a.system, relativeCue(text))
 	if len(r.FunctionCalls) == 0 || len(years) == 0 {
-		return nil
+		return
 	}
-
-	out := map[string][]string{}
 
 	for _, c := range r.FunctionCalls {
 		schema, ok := a.schemas[c.Name]
@@ -188,10 +191,26 @@ func (a *Agent) yearFailures(r *Response, text string) map[string][]string {
 		}
 
 		_, failures := walkGrounding(schema, decodeJSON(c.Arguments), years)
-		out[c.Name] = append(out[c.Name], slices.Sorted(maps.Keys(failures))...)
+		for _, path := range slices.Sorted(maps.Keys(failures)) {
+			r.annotated = append(r.annotated, grounding{c.Name, path})
+		}
 	}
 
-	return out
+	if len(r.annotated) == 0 {
+		return
+	}
+
+	if r.Validation == nil {
+		r.Validation = &Validation{}
+	}
+
+	engine := slices.Clone(r.Validation.Ungrounded)
+	for _, g := range r.annotated {
+		name := g.tool + "." + g.path
+		if !slices.Contains(engine, name) {
+			r.Validation.Ungrounded = append(r.Validation.Ungrounded, name)
+		}
+	}
 }
 
 // dumps is a step's results as upstream feeds them back,

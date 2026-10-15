@@ -32,7 +32,9 @@
 //	//  "function_calls":[{"name":"set_timer","arguments":{"minutes":10}}],"suppressed_calls":[],
 //	//  "reasoning":"…","confidence":…,"validation":{"ungrounded":[],"negation":false}}
 //
-// Response marshals to the engine's JSON byte for byte. Calls carry the caller's names; the engine renders snake_case
+// Response marshals to the engine's JSON byte for byte, with the Python client's year check added: a date whose year
+// the conversation does not license is listed in validation.ungrounded as "tool.path", as needle.Needle.complete
+// lists it. Calls carry the caller's names; the engine renders snake_case
 // names to the model and maps them back. Calls below a confidence of 0.1, or that a grounding gate withholds, come
 // as SuppressedCalls; a truncated answer fails with ErrorCode "truncated".
 //
@@ -44,8 +46,8 @@
 // turn alone, a port choice (docs/FINDINGS.md F-064). An empty tool list answers every request with the engine's
 // empty call.
 //
-// AutoDate puts today's date fact in front of the system facts, as the Python client does by default; the engine
-// itself adds no date, and neither does an agent without it.
+// By default today's date fact goes in front of the system facts, as the Python client does (auto_date=True), and
+// Extract always adds it; the engine itself adds no date, and NoAutoDate leaves the facts as given.
 //
 // # Run and Extract
 //
