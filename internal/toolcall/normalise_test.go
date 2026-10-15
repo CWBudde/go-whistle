@@ -443,3 +443,31 @@ func TestCallerArgsComposition(t *testing.T) {
 		}
 	}
 }
+
+// TestCallerField: a top-level field the envelope's validation names under
+// the model's names ("tool.field") comes back under the caller's, through
+// the renames of the parameters and of their allOf, anyOf and oneOf
+// branches; a field or tool the schema does not rename stays.
+func TestCallerField(t *testing.T) {
+	n, err := Normalise([]byte(`[{"name":"setAlarm","parameters":{"type":"object","properties":{` +
+		`"wakeTime":{"type":"string"},"label":{"type":"string"},"Label":{"type":"string"}},` +
+		`"anyOf":[{"properties":{"repeatDays":{"type":"array"}}}]}},` +
+		`{"name":"plain","parameters":true}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range []struct{ tool, field, want string }{
+		{"set_alarm", "wake_time", "wakeTime"},
+		{"set_alarm", "label", "label"},
+		{"set_alarm", "label_1", "Label"},
+		{"set_alarm", "repeat_days", "repeatDays"},
+		{"set_alarm", "unknown_field", "unknown_field"},
+		{"plain", "any_field", "any_field"},
+		{"unknown", "wake_time", "wake_time"},
+	} {
+		if got := n.CallerField(c.tool, c.field); got != c.want {
+			t.Errorf("CallerField(%s, %s) = %q, want %q", c.tool, c.field, got, c.want)
+		}
+	}
+}
