@@ -4584,6 +4584,7 @@ are listed as unidentified, where the engine counts more. `TestConversationTrim`
 - **The cut's size.** An oversized turn keeps its end; how many tokens it keeps is not measured. `Turn` keeps as many
   as fit.
 - **`<`, `&` and `>`** in a tool result's strings (above).
+- (2026-10-15) F-063 answers the escapes, the closing of the assistant's turn and the cut, and narrows the rest.
 
 ## F-052 — Decoding: a forced `<think>`, greedy, and which tokens the engine counts and feeds (PLAN.md 11.4) (2026-10-12)
 
@@ -5945,3 +5946,228 @@ are `event_tomorrow` and `catalogue_lock`.
   with less noise, or the engine's own int8 kernels, would settle it.
 - **The `respond` mean**: with or without the stop token is not separable at 8 turns; three `respond` turns decoded as
   the engine's stay 0.027–0.039 off.
+
+## F-063 — Multi-turn: the request's escapes, the assistant's turn in the history, refused, truncated and cut turns, and past the context (PLAN.md 11.3) (2026-10-15)
+
+**Question.** F-051 pinned the turns the engine adds and left four things open: how the engine spells `<`, `&` and
+`>` in a tool result's strings (12 probes of `turns.json` count more than the minified text), how it renders the
+assistant's turns in the history (F-052 fitted one conversation: the answer less its last token, then `<|im_end|>`),
+how it drops earlier turns to make room, and how much of a cut turn it keeps. No count reports the history, so the
+last three are read from the later turns' answers: their reasoning, their calls and the envelope's `confidence`, the
+min of the head over the conversation as fed and the decode probability (F-053, F-062), a continuous readout of what
+the engine fed.
+
+**The oracle.** `just oracle-text history` (`testdata/text/engine/history.json`, recorded twice and byte-identical, 29
+minutes a run) over `needle --serve` at `--threads 4`, and where a turn needs its own token limit through libneedle3's
+`needle_init` and `needle_complete` (the fixture keeps the generated-token count it returns). Every request body is
+written by hand: each rune as itself but where JSON requires an escape, or where a wire probe escapes it on purpose.
+
+| group       | conversations | what they cover                                                                                                                                                                                                                                                                        |
+| ----------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `wire`      | 30            | a tool result or a user turn of about a thousand tokens holding `<`, `&`, `>` or `<&>`, sent as Go's `json.Marshal` writes it and unescaped; `A`, `ü`, `é`, `/`, `'` and `€` sent as JSON escapes; refused at `--max 7000` with their length                                           |
+| `follow`    | 38            | two to five turns at `--max 512` whose later answer needs an earlier one (the same length or message again, a change, cancel, another city or room), after a call with and without its result, two calls, a `respond` answer, an empty and a suppressed call, a reset; three tool sets |
+| `truncated` | 17            | through the library: a first answer cut at 4 to 60 tokens, then a turn at 512; two `follow` conversations as the library runs them                                                                                                                                                     |
+| `refused`   | 8             | a turn `--fail-input-overflow` refuses (`--max 7000`) between two others, first, twice first, and the control without it                                                                                                                                                               |
+| `cut`       | 37            | without the flag, a turn of about 650 tokens where a turn has room for 120 or 200 (`--max` = 8192 − static prefix − room), the timer request starting −8 to +12 tokens around F-051's cut, as a first and as a later turn                                                              |
+| `long`      | 7             | 13 turns of about 510 tokens with their answers (about 7830 tokens), then a turn that passes 8192; a fact in the system text or the first turn and a last request that needs it; with and without the flag; two short controls                                                         |
+| scan        | 1             | a call, its result and a request for the same length at `--max` 7496 and 7850 (bisected; nothing between differs)                                                                                                                                                                      |
+
+**Method.** As F-052 and F-060: every conversation decoded turn by turn under the grammar with the `.cact` weights, in
+float32 (dequantised) and under the engine's numerics (`NEEDLE_TEST_NUMERICS=int8`: packed, int8, the KV window of
+256 with the static prefix as its sink), each hypothesis rebuilding the history it names before the next turn. A later
+turn is compared when every earlier turn of its conversation decoded as the engine's (type, reasoning and calls,
+dispatched and suppressed): "reasoning", "calls" and "within 0.02" count those turns, mean |Δ| is the confidence's
+mean absolute difference over them. Besides the new set, the multi-turn conversations already recorded
+(`timer_then_result`, `confidence.json`, `window.json`, `gates.json`, `validation.json`: 68 conversations, 80 later
+turns) were replayed the same way. Throwaway tests computed the fits; none is committed.
+
+### `<`, `&` and `>`: the request parser, not the rendering
+
+The 12 probes model-free, with the in-repo tokenizer, against the engine's counts: each of `<`, `&`, `>` alone costs 2
+tokens more than the port's count per repeated unit, `a & b` 3 more, `<&>` 8 more.
+
+| spelling of `<`, `&`, `>` in the tool result                                              | probes with the engine's count (of 12) |
+| ----------------------------------------------------------------------------------------- | -------------------------------------- |
+| as written (F-051's port)                                                                 | 0                                      |
+| JSON escapes `\u003c` `\u0026` `\u003e` (lower or upper hex), as Go's encoder writes them | 0                                      |
+| HTML entities (`&lt;` …), decimal (`&#60;`) and hex (`&#x3c;`) entities                   | 0                                      |
+| backslash-escaped (`\<`), C hex escapes (`\x3c`)                                          | 0                                      |
+| **the JSON escape without its backslash: `u003c`, `u0026`, `u003e`**                      | **12**                                 |
+
+The last spelling gives every count, the other 41 probes of `turns.json` unchanged. It is not a rendering: the oracle
+of F-051 posted each turn with Go's `json.Marshal`, which writes `<`, `&` and `>` as JSON escapes, and the engine read
+them as text. The wire probes settle it:
+
+| probe (150 or 200 repeated units)                                         | sent as `json.Marshal` writes it | sent unescaped | the port's count of the text  |
+| ------------------------------------------------------------------------- | -------------------------------- | -------------- | ----------------------------- |
+| tool result with `<`, `&` or `>`                                          | 1216                             | **916**        | 916                           |
+| tool result with `<&>`                                                    | 2416                             | **1216**       | 1216                          |
+| user turn with `<`, `&` or `>`                                            | 1409                             | **1009**       | 1009                          |
+| user turn with `<&>`                                                      | 3009                             | **1409**       | 1409                          |
+| tool result / user turn with `A`, `ü`, `é`, `/`, `'` sent as JSON escapes | 1216 / 1409                      | —              | as `u0041`, `u00fc` … written |
+| tool result / user turn with `€` sent as a JSON escape                    | 1066 / 1209                      | —              | as `u20ac` written            |
+
+**Verdict: the engine's `/complete` reads a JSON escape `\uXXXX` in the request body as the text `uXXXX`**: it drops the
+backslash and keeps the four hex digits, for every rune, in user turns as in tool results. `<`, `&` and `>` themselves
+count as written. Nothing changes in `Conversation`; `TestConversationMatchesEngine` replays `turns.json`'s inputs as
+the engine read them (`asRead`) and now requires all 53 refusals, and `TestHistoryWire` the 29 wire refusals (the
+thirtieth, the control `user_A_plain`, fits the room). No other recorded set sent `<`, `&` or `>` over the server (the
+one `&` of `repair.json` went through the CLI's `--prompt`), so no earlier fixture is affected. A Go server of the port
+that mimics `/complete` would have to reproduce the quirk; the history oracle writes its request bodies by hand.
+
+### The assistant's turn in the history
+
+How an answer ended changes what the engine feeds before the next turn. On the later turns of `follow`, `truncated`
+and `refused` (each turn compared only after earlier turns decoded as the engine's):
+
+| hypothesis: the assistant's turn in the history            | float32: compared | reasoning | calls | within 0.02 | mean abs | int8: compared | reasoning | calls | within 0.02 | mean abs |
+| ---------------------------------------------------------- | ----------------- | --------- | ----- | ----------- | -------- | -------------- | --------- | ----- | ----------- | -------- |
+| H0: the answer less its last token, `<\|im_end\|>` (F-052) | 51                | 12        | 40    | 8           | 0.112    | 51             | 11        | 39    | 10          | 0.118    |
+| H1: the whole answer, `<\|im_end\|>` (as trained)          | 53                | 27        | 47    | 18          | 0.083    | 52             | 25        | 45    | 21          | 0.079    |
+| **Hm: H0 before a tool result, H1 before a user turn**     | 51                | 23        | 45    | 17          | 0.090    | 51             | 24        | 43    | 21          | 0.090    |
+| H0 without `<\|im_end\|>`                                  | 51                | 9         | 43    | 10          | 0.115    | 51             | 10        | 42    | 12          | 0.112    |
+| the notes' form, the calls as dispatched (repaired)        | 53                | 24        | 45    | 17          | 0.087    | 52             | 20        | 43    | 12          | 0.097    |
+| the call block without the reasoning                       | 48                | 6         | 39    | 6           | 0.214    | 48             | 5         | 39    | 9           | 0.217    |
+| nothing of the answer                                      | 48                | 4         | 16    | 6           | 0.259    | 48             | 3         | 18    | 7           | 0.242    |
+| `<\|im_end\|>` alone                                       | 48                | 3         | 16    | 5           | 0.220    | 48             | 3         | 17    | 6           | 0.217    |
+
+and on the 80 later turns of the earlier sets (68 conversations; nearly all tool results after a call):
+
+| hypothesis      | float32: compared | reasoning | calls | within 0.02 | mean abs | int8: compared | reasoning | calls | within 0.02 | mean abs |
+| --------------- | ----------------- | --------- | ----- | ----------- | -------- | -------------- | --------- | ----- | ----------- | -------- |
+| H0 (F-052)      | 59                | 12        | 52    | 10          | 0.073    | 63             | 13        | 54    | 14          | 0.076    |
+| H1 (as trained) | 59                | 23        | 55    | 21          | 0.058    | 63             | 24        | 56    | 24          | 0.060    |
+| **Hm**          | 59                | 15        | 53    | 15          | 0.059    | 63             | 17        | 56    | 19          | 0.060    |
+
+The whole answer as trained (upstream's `render_example` writes the target as `<think>\n…\n</think>\n<tool_call>[…]</tool_call><|im_end|>`)
+fits the most later turns in both sets, but not `timer_then_result`: with `</tool_call>` fed its tool-result turn
+writes "Timer set; respond with end time." in float32 and, under int8, has the engine's reasoning at a confidence of
+0.6727 against 0.6369 (F-052's form: 0.6545); `confidence.json`'s `respond` turns after a tool result move 0.03–0.06
+above the engine's (e.g. `result_timer_7/1` 0.558 against 0.493). By the criterion of this item a hypothesis that
+breaks a corpus turn that passes today loses. The one that keeps `timer_then_result` and takes most of the gain is the
+split **Hm**: F-052's form before a tool result, the answer as trained before a user turn. It changes only call blocks
+followed by a user turn (after a call, an empty or suppressed call, a refused turn), and there it is the better fit:
+the turns after an empty call block, a suppressed call and a refused turn have the engine's reasoning and confidence
+under it and not under F-052's form.
+
+Each kind of previous answer (int8):
+
+| previous answer                   | verdict                                                                                                                                                                |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a call, then a tool result        | **F-052's form** (`timer_then_result`); the aggregate prefers the whole answer, so not pinned beyond that one turn (Open)                                              |
+| a call, then a user turn          | **the whole answer, `</tool_call><\|im_end\|>`** (Hm against H0 above: only these turns differ)                                                                        |
+| an empty or suppressed call block | **the whole answer** (2 of 2 and 4 of 4 within 0.02, mean abs 0.010 and 0.002, against 0 of 2 and 2 of 4 under F-052's form)                                           |
+| a `respond` answer                | the text and the `<\|im_end\|>` the model chose, as F-052's form and the whole answer both feed it; the turns after one stay off (0 of 3–4 within 0.02), not explained |
+| a refused turn                    | **nothing**: the earlier call then closes as before the turn that is fed (6 of 6 within 0.02, mean abs 0.004, H0: 3 of 6); the refused turn fed as a cut turn: 0 of 6  |
+| a truncated answer                | **not pinned** (below)                                                                                                                                                 |
+
+The notes' form with the repaired calls, the answer without its reasoning, F-052's form without `<|im_end|>`, nothing
+of the answer and `<|im_end|>` alone fit worse (above); an empty think block, the whole answer without `<|im_end|>` and
+the whole answer with a newline after it lose `timer_then_result`'s reasoning in both numerics; the roles `user`,
+`system` and `result` for the tool turn (one token each like `tool`, so F-051's counts cannot tell them apart) give 8
+to 10 of the follow conversations' 31 later turns the engine's reasoning against 13 for `tool` under the whole-answer
+history (int8), so `tool` stays.
+
+**Truncated answers.** At small per-turn limits the engine's decode is not the port's: at 30 tokens it writes the call
+with no reasoning (23 tokens), at 40 it stops the reasoning after "'25 minutes' -> minutes" and writes the call (25),
+at 45 and 60 it cuts two calls to one; the port truncates all of them. After a real truncation (4–25 tokens) the next
+answer depends on where the answer was cut (0.586 after 4 tokens, 0.556 after 10), so something of it stays; no
+history tried (the answer less its last token, the whole of it, without `<|im_end|>`, the answer or the whole turn
+rolled back, the next turn rendered as a first one) gives more than 1 of 5 such turns with the engine's reasoning or
+confidence. Since the truncated tokens are not the port's, they are not identified; F-052's form stays.
+
+### Making room: the turn's budget, the cut, and past the context
+
+**The history does not count against `--max`.** The scan answers byte-identically at `--max` 7496 and 7850, where the
+static prefix, the three turns and `--max` alone come to 8219 positions; the flag refuses a turn only when the turn
+alone passes context − static prefix − `--max` (F-051's M).
+
+**A cut turn.** Without the flag, a turn longer than M is cut to exactly M tokens and **the conversation before it is
+dropped**, the static prefix kept. On the cut probes (float32 / int8):
+
+| a turn cut to its room M (120 or 200)                                              | first turns (21): reasoning | calls  | within 0.02 | mean abs      | later turns (16): within 0.02       | mean abs             |
+| ---------------------------------------------------------------------------------- | --------------------------- | ------ | ----------- | ------------- | ----------------------------------- | -------------------- |
+| F-051's cut: the markers, the input's last M − markers tokens, the history kept    | 3 / 3                       | 4 / 4  | 4 / 4       | 0.243 / 0.234 | 0 / 0                               | 0.203 / 0.189        |
+| **C3: the last M tokens of the turn's rendering, the history dropped**             | **11 / 13**                 | 8 / 14 | **11 / 19** | 0.111 / 0.019 | 9 / 7                               | 0.120 / 0.215        |
+| C3 with one token fewer                                                            | 4 / 4                       | 2 / 5  | 5 / 7       | 0.241 / 0.174 | 7 / 7                               | 0.137 / 0.199        |
+| F-051's cut with one more input token (the `\n` kept)                              | — / 4                       | — / 5  | — / 4       | — / 0.193     | —                                   | —                    |
+| **C5: the markers kept, the input's last M − markers tokens, the history dropped** | as F-051's                  |        |             |               | **12 / 12**                         | **0.073 / 0.046**    |
+| C5 with one token fewer / more                                                     | as F-051's                  |        |             |               | — / 11, — / 11                      | — / 0.116, — / 0.086 |
+| BOS and the last tokens of the whole sequence (the static prefix dropped)          | — / 0                       | — / 0  | — / 6       | — / 0.189     | — / 12                              | — / 0.100            |
+| the history kept, the turn cut with its markers                                    | —                           | —      | —           | —             | passes the context (8193 positions) | —                    |
+
+(float32 / int8; "—": not run in that numerics.) No later cut turn has the engine's reasoning or calls under any
+hypothesis: both models guess.
+
+A first turn keeps the last M tokens of its rendering, its leading `\n` cut first with the input's start: one token
+fewer, or the `\n` kept with the same input, both fail at once (C3− and F-051+1). A later turn keeps its markers
+(`\n<|im_start|>user\n` … `<|im_end|>\n<|im_start|>assistant\n`) and the end of its input, after the static prefix
+alone: with the history kept the turn would pass the context, and its answer then follows the static prefix's open
+user message, where both models mostly degenerate into guessed calls near confidence 0 (the 200-token room cannot
+separate the hypotheses there; the 120-token room prefers the exact count, 4 of 7 within 0.02 against 2 and 3). How a
+tool result is cut was not probed; the port cuts it as a user turn.
+
+**Past the context.** A turn that takes the conversation past 8192 positions is answered, with and without the flag
+(no refusal, the same answer as the library's), and slowly: libneedle3 reports `prefill_tps` 86 and `decode_tps` 0.1
+for `long_cross`'s last turn (147 for `long_system_fact`'s), against about 1700 and 660 a turn earlier (the timings are
+dropped from the fixture), which reads as the context prefilled again for every token. The answer reads the
+current turn (`long_cross`: "History turned to set timer for cake.", `set_timer` 19 minutes, suppressed at 0.0549).
+Which positions the engine drops is not readable here:
+the KV window hides everything but the last 256 positions and the static prefix from the decode; the system fact the
+static prefix carries is not used at that distance even before the context is passed (`long_system_fact_near`: 4
+minutes for the system's 7, the short control 7), so it cannot show whether the static prefix survives; and the
+port's model takes no position past 8192 (`text.ErrTooLong`), so no hypothesis can be decoded at the turn itself.
+
+### Port
+
+- `Decoder.Decode` leaves the answer open, as the engine feeds it while decoding: every token but the one that ended
+  it, without `<|im_end|>`; `Decoder.Confidence` pools over all of it, which is F-053's span as before.
+- `Conversation.Answered(a, calls)` takes the decoded answer; `Turn` puts the closing in front of the next turn,
+  outside its count: `<|im_end|>` after a call block before a tool result and after any other answer,
+  `</tool_call><|im_end|>` after a call block before a user turn. A refused turn feeds nothing and leaves the closing
+  for the next one; `Reset` drops it.
+- `Turn` without the flag cuts an oversized turn to M as above and reports `Restarted`: the caller feeds the turn to a
+  state that holds the static prefix alone.
+
+Model-free: `TestConversationClosing`, `TestConversationCut`, `TestHistoryScans`, `TestHistoryWire`,
+`TestConversationMatchesEngine` (53 of 53). `TestHistoryMatchesEngine` replays all 107 conversations through
+`Conversation`, `Decoder` and `Envelope`; it names the reason of every turn that differs (an earlier turn differs, a
+near-tie below a margin of 0.1, a truncated answer before it, a tool result after a call) and lists the rest in
+`historyDiffer` (mostly cut turns whose answers degenerate in both engines); it stops a conversation before a turn
+that would pass the context.
+
+### Counts
+
+| `TestHistoryMatchesEngine`                                                                                 | float32                | int8                  |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------- | --------------------- |
+| later turns with the engine's reasoning                                                                    | 28 of 153              | 52 of 154             |
+| later turns with the engine's calls                                                                        | 76 of 153              | 112 of 154            |
+| later turns decoded as the engine's                                                                        | 24                     | 47                    |
+| of those, confidence within 0.02                                                                           | 13                     | 37                    |
+| cut turns decoded as the engine's (37)                                                                     | 8 (3 with F-051's cut) | 11                    |
+| token counts equal `needle_complete`'s (library turns decoded as the engine's)                             | 16 of 16               | 41 of 41              |
+| refusals with the engine's numbers                                                                         | 8 of 8                 | 8 of 8                |
+| misses: an earlier turn differs / near-tie / after a truncated answer / a tool result after a call / other | 103 / 18 / 8 / 18 / 26 | 78 / 24 / 7 / 14 / 20 |
+
+The four last turns of `long_cross`, `long_cross_refuse`, `long_system_fact` and `long_turn_fact` would pass 8192
+positions and are not replayed. Of the misses, most follow an earlier one in the 13-turn `long` conversations, whose
+filler turns rarely decode as the engine's in float32. The other ones, listed in `historyDiffer` for float32, are
+mostly cut turns where both models' answers degenerate into guessed calls near confidence 0. Under int8 the floors
+are 50, 110 and 35 (the counts less two).
+
+Every earlier engine test keeps its counts in float32 and under int8; `TestGatesMatchesEngine` gains
+`quantity_earlier_turn_other/1`, a user turn after a call (float32 194 of 204, was 193; int8 195, was 194), and its
+list drops the entry.
+
+### Open
+
+- **A tool result after a call**: F-052's form keeps `timer_then_result`, the whole answer fits more of the other turns
+  in aggregate; neither reproduces the engine's short "…; confirm." reasonings after a tool result. Another rendering of
+  the tool turn that counts the same (F-051 pins only its length) or the engine's own numerics may explain both.
+- **The turn after a `respond` answer** stays off in confidence (0 of 4 within 0.02 in both numerics).
+- **Truncated answers**: the engine's decode under a small limit (it shortens or drops the reasoning to fit the call)
+  is not the port's, so their history is not identified.
+- **Past the context**: whether the engine keeps the static prefix and which earlier positions it drops; the probes
+  cannot see them (above). The port refuses to decode past 8192 positions.
+- **A cut tool result**, and whether the engine still grounds later calls in the turns a cut dropped
+  (`Conversation.Inputs` keeps them).
