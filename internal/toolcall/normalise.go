@@ -442,6 +442,22 @@ func (n *Normalised) CallerArgs(name string, args []byte) ([]byte, error) {
 	return out, nil
 }
 
+// CallerField is the caller's name of a top-level field the model names
+// field in the tool it calls name, as Validation.Ungrounded writes them
+// ("tool.field"): the name CallerArgs gives the key in an arguments object
+// that holds it alone. A field the schema does not rename comes back as it
+// is.
+func (n *Normalised) CallerField(name, field string) string {
+	a := n.args[name]
+	if a == nil {
+		return field
+	}
+
+	caller, _ := lookup(a.applicable(map[string]any{field: nil}), field)
+
+	return caller
+}
+
 // Triggered are the model's names of the tools with a trigger that matches
 // input, in declaration order.
 func (n *Normalised) Triggered(input string) []string {

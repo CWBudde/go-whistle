@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -49,6 +50,37 @@ func ToolsJSON(raw []byte) (string, error) {
 	var b strings.Builder
 
 	writeValue(&b, v)
+
+	return b.String(), nil
+}
+
+// Dumps is Python's json.dumps(json.loads(raw)) with the default
+// arguments, as upstream's Needle.run serialises a step's tool results
+// before it feeds them back (needle/__init__.py, run): ", " between items,
+// ": " after a key, every rune past '~' and every control character as a
+// \u escape (a surrogate pair past U+FFFF), and numbers and key order as
+// ToolsJSON keeps them.
+func Dumps(raw []byte) (string, error) {
+	if !utf8.Valid(raw) {
+		return "", errors.New("toolcall: dumps: not valid UTF-8")
+	}
+
+	p := &pyParser{s: raw}
+
+	v, err := p.value()
+	if err != nil {
+		return "", fmt.Errorf("toolcall: dumps: %w", err)
+	}
+
+	p.space()
+
+	if p.i != len(p.s) {
+		return "", fmt.Errorf("toolcall: dumps: data after the JSON value at byte %d", p.i)
+	}
+
+	var b strings.Builder
+
+	dumpsStyle.value(&b, v)
 
 	return b.String(), nil
 }
@@ -256,19 +288,38 @@ func (p *pyParser) str() (string, error) {
 	return "", p.errorf("unterminated string")
 }
 
-func writeValue(b *strings.Builder, v any) {
+// pyStyle is how Python's json.dumps writes a value: the separators
+// between items and after a key, and whether ensure_ascii escapes every
+// rune past '~'.
+type pyStyle struct {
+	item, key string
+	ascii     bool
+}
+
+var (
+	// compactStyle is separators=(",", ":"), ensure_ascii=False, the
+	// prompt's (ToolsJSON).
+	compactStyle = pyStyle{item: ",", key: ":"}
+	// dumpsStyle is json.dumps' default (Dumps).
+	dumpsStyle = pyStyle{item: ", ", key: ": ", ascii: true}
+)
+
+// writeValue writes v in compactStyle.
+func writeValue(b *strings.Builder, v any) { compactStyle.value(b, v) }
+
+func (st pyStyle) value(b *strings.Builder, v any) {
 	switch t := v.(type) {
 	case *object:
 		b.WriteByte('{')
 
 		for i, k := range t.keys {
 			if i > 0 {
-				b.WriteByte(',')
+				b.WriteString(st.item)
 			}
 
-			writeString(b, k)
-			b.WriteByte(':')
-			writeValue(b, t.vals[k])
+			st.str(b, k)
+			b.WriteString(st.key)
+			st.value(b, t.vals[k])
 		}
 
 		b.WriteByte('}')
@@ -277,15 +328,15 @@ func writeValue(b *strings.Builder, v any) {
 
 		for i, e := range t {
 			if i > 0 {
-				b.WriteByte(',')
+				b.WriteString(st.item)
 			}
 
-			writeValue(b, e)
+			st.value(b, e)
 		}
 
 		b.WriteByte(']')
 	case string:
-		writeString(b, t)
+		st.str(b, t)
 	case json.Number:
 		b.WriteString(pyNumber(string(t)))
 	case bool:
@@ -298,35 +349,37 @@ func writeValue(b *strings.Builder, v any) {
 // writeString writes s as Python's json.dumps with ensure_ascii=False: '"'
 // and '\\' escaped, \n \r \t \b \f by name, other control characters as
 // \u00xx in lower case, everything else as is.
-func writeString(b *strings.Builder, s string) {
+func writeString(b *strings.Builder, s string) { compactStyle.str(b, s) }
+
+// str writes s as writeString does and, under ensure_ascii, every rune
+// past '~' as \uxxxx in lower case, one past U+FFFF as its surrogate pair.
+func (st pyStyle) str(b *strings.Builder, s string) {
 	b.WriteByte('"')
 
 	for _, r := range s {
-		switch r {
-		case '"':
-			b.WriteString(`\"`)
-		case '\\':
-			b.WriteString(`\\`)
-		case '\n':
-			b.WriteString(`\n`)
-		case '\r':
-			b.WriteString(`\r`)
-		case '\t':
-			b.WriteString(`\t`)
-		case '\b':
-			b.WriteString(`\b`)
-		case '\f':
-			b.WriteString(`\f`)
+		if e, ok := namedEscapes[r]; ok {
+			b.WriteString(e)
+
+			continue
+		}
+
+		switch {
+		case r < 0x20 || st.ascii && r > '~' && r <= 0xffff:
+			fmt.Fprintf(b, `\u%04x`, r)
+		case st.ascii && r > 0xffff:
+			hi, lo := utf16.EncodeRune(r)
+			fmt.Fprintf(b, `\u%04x\u%04x`, hi, lo)
 		default:
-			if r < 0x20 {
-				fmt.Fprintf(b, `\u%04x`, r)
-			} else {
-				b.WriteRune(r)
-			}
+			b.WriteRune(r)
 		}
 	}
 
 	b.WriteByte('"')
+}
+
+// namedEscapes are the escapes json.dumps writes by name.
+var namedEscapes = map[rune]string{
+	'"': `\"`, '\\': `\\`, '\n': `\n`, '\r': `\r`, '\t': `\t`, '\b': `\b`, '\f': `\f`,
 }
 
 // loneSurrogate reports an escaped surrogate (\uD800–\uDFFF) that is not

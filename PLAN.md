@@ -769,8 +769,26 @@ Engine-only: fitted against `testdata/text/engine/`.
 
 ### 11.7 Public API, CLI and parity corpus (a public `needle` package, `cmd/`; needs 11.4)
 
-- [ ] A Go API mirroring `needle.Needle` (`Complete`, `Run` with Go tool functions, `Extract`, `Reset`), returning the
+Note (2026-10-15): by the user's decision 11.7 goes ahead while 11.4 stays open (the gate is lifted for 11.7 only).
+The API defaults to the engine's numerics (packed `needle3.cact`, int8 activations and KV, the KV window) on the exact
+kernel, lives in a top-level `needle/`, and follows the Python client where it adds to the engine: the date fact by
+default, the year check in `validation.ungrounded` (F-064).
+
+- [x] A Go API mirroring `needle.Needle` (`Complete`, `Run` with Go tool functions, `Extract`, `Reset`), returning the
       engine's envelope.
+      (2026-10-15) — `needle.Load(dir)` (`WithFloatWeights`, `WithoutInt8`, `WithLUT`), `Model.NewAgent` with
+      `AgentOptions` (`System`, `NoAutoDate`, `Now`, `Stateless`, `FailInputOverflow`), `Agent.Complete`, `Reset`,
+      `Agent.Run` with a `ToolFunc` per tool, `Model.Extract`/`ExtractInto`/`Agent.Extract`; `Response` marshals to
+      the engine's envelope byte for byte. `Complete` is the tests' turn loop as production code: all 25 corpus turns
+      are the internal pipeline's envelope byte for byte, and against the engine 24/25 type and calls, 22/25
+      reasoning, 20/22 confidence, as `TestEnvelopeMatchesEngine` under int8 (`TestCompleteMatchesPipeline`);
+      `history.json` through the API gives `TestHistoryMatchesEngine`'s int8 numbers (52 and 112 of 154, 37 of 47, 11
+      of 37, 8 refusals; under `NEEDLE_TEST_NUMERICS=int8`). `Run` and `Extract` sit on a model-free seam: 13 `run`
+      scenarios and 8 `_validate_extraction` cases equal upstream's functions (`TestRunMatchesPython`,
+      `TestExtractMatchesPython`, `TestExtractLaterCalls`), with the Python client's grounding helpers in Go
+      (`grounding.go`). Several agents share one `Model` (`TestConcurrentAgents` under `-race`). Departures from the
+      Python client, each in F-064: renamed and OpenAI-form tools get the strict and year checks upstream misses, a
+      history past the context answers the turn alone (F-063 Open).
 - [ ] A CLI mirroring the engine's (`--tools`, `--system`, `--prompt`, `--max`, `--depth`, `--serve`).
 - [ ] The parity corpus: the six `needle/environments` suites (`TEST_CASES`) recorded with the engine.
 - [ ] **Accept:** the envelope JSON equals the engine's on ≥ 95 % of the corpus without the timings, and every
