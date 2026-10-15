@@ -5970,7 +5970,7 @@ written by hand: each rune as itself but where JSON requires an escape, or where
 | `refused`   | 8             | a turn `--fail-input-overflow` refuses (`--max 7000`) between two others, first, twice first, and the control without it                                                                                                                                                               |
 | `cut`       | 37            | without the flag, a turn of about 650 tokens where a turn has room for 120 or 200 (`--max` = 8192 − static prefix − room), the timer request starting −8 to +12 tokens around F-051's cut, as a first and as a later turn                                                              |
 | `long`      | 7             | 13 turns of about 510 tokens with their answers (about 7830 tokens), then a turn that passes 8192; a fact in the system text or the first turn and a last request that needs it; with and without the flag; two short controls                                                         |
-| scan        | 1             | a call, its result and a request for the same length at `--max` 7496 and 7850 (bisected; nothing between differs)                                                                                                                                                                      |
+| scan        | 1             | a call, its result and a request for the same length at `--max` 7496 and 7850 (the two ends only: they answer alike, so the scan samples nothing between)                                                                                                                              |
 
 **Method.** As F-052 and F-060: every conversation decoded turn by turn under the grammar with the `.cact` weights, in
 float32 (dequantised) and under the engine's numerics (`NEEDLE_TEST_NUMERICS=int8`: packed, int8, the KV window of
@@ -6078,9 +6078,9 @@ confidence. Since the truncated tokens are not the port's, they are not identifi
 
 ### Making room: the turn's budget, the cut, and past the context
 
-**The history does not count against `--max`.** The scan answers byte-identically at `--max` 7496 and 7850, where the
-static prefix, the three turns and `--max` alone come to 8219 positions; the flag refuses a turn only when the turn
-alone passes context − static prefix − `--max` (F-051's M).
+**The history does not count against `--max`.** The scan answers byte-identically at `--max` 7496 and 7850 (its two
+ends; the values between are not sampled), where the static prefix, the three turns and `--max` alone come to 8219
+positions; the flag refuses a turn only when the turn alone passes context − static prefix − `--max` (F-051's M).
 
 **A cut turn.** Without the flag, a turn longer than M is cut to exactly M tokens and **the conversation before it is
 dropped**, the static prefix kept. On the cut probes (float32 / int8):
