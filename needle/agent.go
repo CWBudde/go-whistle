@@ -116,8 +116,9 @@ func newAgent(tools []byte, o AgentOptions) (*Agent, error) {
 
 	list, _ := decodeJSON(tools).([]any)
 	for _, entry := range list {
-		if name, ok := asObject(entry)["name"].(string); ok {
-			a.schemas[name] = entry
+		tool := unwrapTool(entry)
+		if name, ok := asObject(tool)["name"].(string); ok {
+			a.schemas[name] = tool
 		}
 	}
 

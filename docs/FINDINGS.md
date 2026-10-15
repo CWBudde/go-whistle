@@ -6248,7 +6248,11 @@ the decoder's vocabulary mask is not written after `NewDecoder`, and each agent'
   call's name; the engine writes them under the model's snake_case names (F-047's `invoice.total`, F-050) and the
   call carries the caller's, so upstream's check misses every tool or field the engine renamed (`setAlarm`,
   `wakeTime`). The port maps them back (`Normalised.CallerName`, the new `CallerField`) and checks them under the
-  caller's names, numbers that the query or the system facts write excepted (`_grounded_number_paths`, 345, 562).
+  caller's names, numbers that the query or the system facts write excepted (`_grounded_number_paths`, 345, 562). A
+  tool in OpenAI's form (`{"type": "function", "function": {…}}`) is the same gap: upstream's `_tool_schemas` (217)
+  keeps the wrapper, so `_annotate_ungrounded` finds no `name` and `_schema_parameters` (410) no `parameters`, and its
+  year check never fires on such a tool, nor does `_validate_extraction`'s. By the user's decision (2026-10-15, from
+  Codex's review) the port reads such a tool's `function` object, as `Normalise` does, for both checks.
   Upstream also adds `_annotate_ungrounded`'s year failures to the answer's validation (307, 585): every
   `complete`, `run`'s first answer and `extract`'s, not `run`'s later ones (`ground=False`, 362). By the user's
   decision (2026-10-15) the port does the same, so `Complete`'s `validation.ungrounded` is the Python client's: the

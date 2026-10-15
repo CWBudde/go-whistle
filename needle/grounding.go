@@ -411,6 +411,19 @@ func checkYear(s, path string, years map[int]bool, checked, failures map[string]
 	}
 }
 
+// unwrapTool is an OpenAI-style tool's "function" object, as
+// toolcall.Normalise reads it, or the tool. Upstream's checks read the
+// wrapper and miss the name and the parameters inside it, so its year check
+// never fires on such a tool; the port checks it as the plain form
+// (docs/FINDINGS.md F-064).
+func unwrapTool(tool any) any {
+	if f, ok := asObject(tool)["function"].(map[string]any); ok {
+		return f
+	}
+
+	return tool
+}
+
 // schemaParameters is _schema_parameters for a schema given as JSON: its
 // "parameters" when it has them, else itself.
 func schemaParameters(schema any) any {

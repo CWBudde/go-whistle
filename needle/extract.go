@@ -98,7 +98,7 @@ func extractTool(schema []byte) (any, error) {
 		return nil, errors.New("needle: the extraction schema is not a JSON object")
 	}
 
-	return tool, nil
+	return unwrapTool(tool), nil
 }
 
 // extract is upstream's extract on the one-tool agent a.

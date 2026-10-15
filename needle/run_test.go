@@ -327,3 +327,31 @@ func TestRunAnnotatesFirstAnswer(t *testing.T) {
 		t.Errorf("results %s after %d runs, want %s after 1", js, ran, want)
 	}
 }
+
+// TestOpenAIFormChecked: a tool in OpenAI's form ({"type": "function",
+// "function": {…}}) gets the year check as its plain form does, in
+// Complete's validation and in Extract's, where upstream's checks read the
+// wrapper and miss it (docs/FINDINGS.md F-064).
+func TestOpenAIFormChecked(t *testing.T) {
+	const bad = `{"title":"dinner","day":"2019-03-05"}`
+
+	wrapped := `{"type":"function","function":` + extractSchema + `}`
+
+	a, _ := scripted(t, "["+wrapped+"]", AgentOptions{}, answer(one("event", bad)))
+
+	r, err := a.Complete("dinner on 5 March 2025", CompleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if r.Validation == nil || !slices.Equal(r.Validation.Ungrounded, []string{"event.day"}) {
+		t.Errorf("Complete: validation %+v, want ungrounded [event.day]", r.Validation)
+	}
+
+	_, err = scriptedExtract(t, wrapped, "", "dinner on 5 March 2025", answer(one("event", bad)), ExtractOptions{})
+
+	ve, ok := errors.AsType[*ExtractionValidationError](err)
+	if !ok || !slices.Equal(ve.Fields, []string{"day"}) {
+		t.Errorf("Extract: error %v, want an ExtractionValidationError for [day]", err)
+	}
+}
