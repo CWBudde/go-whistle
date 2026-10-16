@@ -47,7 +47,8 @@
 // empty call.
 //
 // By default today's date fact goes in front of the system facts, as the Python client does (auto_date=True), and
-// Extract always adds it; the engine itself adds no date, and NoAutoDate leaves the facts as given.
+// Extract always adds it; the engine itself adds no date, and NoAutoDate leaves the facts as given. Likewise the year
+// check in validation.ungrounded is the Python client's; NoYearCheck leaves the validation as the engine writes it.
 //
 // # Run and Extract
 //
