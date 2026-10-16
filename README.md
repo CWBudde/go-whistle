@@ -431,6 +431,8 @@ r, err = a.Run("set a timer for 10 minutes", map[string]needle.ToolFunc{
 `go doc github.com/cwbudde/go-whistle/needle` covers the options, the conversation rules and the checks `Run` and
 `Extract` apply; [F-064](docs/FINDINGS.md#f-064--the-public-api-needleneedle-in-go-over-the-engines-envelope-and-where-it-departs-from-the-python-client-planmd-117-2026-10-15) lists where the API departs from the Python client.
 
+The parity corpus is upstream's six `needle/environments` suites (192 cases), recorded with the engine through upstream's Python client (`testdata/text/engine/environments.json`); [F-065](docs/FINDINGS.md#f-065--the-parity-corpus-the-six-needleenvironments-suites-against-the-engine-planmd-117-2026-10-16) has the numbers.
+
 ## Parity with the engine
 
 Whistle's engine (`libneedle3`) is closed source, so this port is rebuilt from the published weights and checked

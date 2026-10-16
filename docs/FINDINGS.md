@@ -6284,3 +6284,137 @@ the decoder's vocabulary mask is not written after `NewDecoder`, and each agent'
   differs: a `float64` of 1 is written `1`, not `1.0`, a map's keys come sorted, and NaN and the infinities come as
   text (a struct, a `json.Number` or a `json.RawMessage` keeps order and literals). A panicking `ToolFunc` is not
   recovered, where upstream turns any exception into `{"error": …}`.
+
+## F-065 — The parity corpus: the six `needle/environments` suites against the engine (PLAN.md 11.7) (2026-10-16)
+
+**Question.** 11.7's last item records upstream's six pre-configured environments (`needle/environments` at
+`af2654dffa`: `data_capture`, `kitchen_appliance`, `media_player`, `productivity`, `smart_home`, `wearable`; five
+tools, a `SYSTEM` and 32 frozen `TEST_CASES` each, 9 of them `critical`) with the engine, and its Accept asks two
+things of the Go API: the envelope equals the engine's on ≥ 95 % of the corpus without the timings, and every suite
+passes exactly when the engine's passes. By the user's decisions (2026-10-16) the envelope counts as equal when every
+field but the timings is, the `confidence` within 0.02 (as 11.4 compares it): the bar is 183 of 192. "The engine's
+pass" is upstream's own `_harness.run_tests`.
+
+**Recording.** `scripts/environments_fixture.py` (standard library only; `NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 python3
+-I`, both set again inside and the client's `_track` a no-op) runs upstream's public Python client from
+`original/needle`, which reaches `libneedle3` 3.2.0 through ctypes: the library through the variable the client reads
+(`fetch.lib_path_env(3)`), the weights through a patched `_base_weights_path` (`models/needle3/needle3.cact`, its
+sha256 checked against `internal/hub/needle3.lock.json`). Each suite's agent is `needle.Needle(tools=TOOLS,
+system="date: 2026-10-11 Sun 09:30; " + SYSTEM)`, which is what `_with_date_fact` builds with that clock (it leaves a
+system holding `date:` alone), put into `_harness._agents` so that `run_tests` uses it; a wrapper around `complete`
+records each response as the client returns it (`_annotate_ungrounded` applied, the top-level `*_tps`, `*_ms`, `*_mb`
+keys dropped as the oracle's `isTimingKey` drops them). `run_tests` runs at the gates 0.0 and 0.4 ("the production
+contract"); the script keeps the line it prints and the bool it returns, and fails if the second run answers any case
+differently from the first. `testdata/text/engine/environments.json` holds per suite `system`, `system_text`, the tools
+as sent, the 32 cases with their responses and both outcomes. A run takes 13 seconds; two runs are byte-identical, and
+the two gates' runs answered alike every time: the engine is deterministic here, `needle_init` between suites
+included.
+
+**The Go side.** `needle/harness_test.go` ports `_harness.py`: `_fold` (`str.casefold` on strings, an integral float
+as an int), `_key` (`json.dumps(sort_keys=True)`, compared as canonical forms: encoding/json sorts the keys, a number
+literal without fraction or exponent stays an int, a float is written as the int it equals or as its shortest form),
+the drop rule (no calls when `validation.ungrounded` is non-empty or `negation` is true, or when `confidence` is below
+the gate), the comparison of the sorted keys, and the pass rule (`passed >= round(0.9·n)` with Python's half-to-even
+`round`, no critical failure). `golang.org/x/text` is not a dependency, so `casefold` is per rune
+`unicode.ToLower(unicode.ToUpper(r))`, Cherokee to its capitals, and the full foldings of `ß`, `ẞ`, `İ` and the Latin
+ligatures `ﬀ`–`ﬆ`. It leaves out CaseFolding.txt's other full foldings (`ŉ`, `ǰ`, `ẖ`–`ẚ`, the Greek letters with a
+diacritic or a iota subscript, the Armenian ligatures). The suites' calls and the engine's answers hold ASCII and `á`
+only. `TestEnvironmentCasefold` pins 13 strings and 8 key pairs against Python 3.14. Model-free and in CI:
+`TestEnvironmentHarnessMatchesUpstream` scores the recorded answers with the port and gets upstream's passed count,
+critical failures and bool at both gates for all six suites; `TestEnvironmentSystemText` renders each suite's
+`system_text` with `AgentOptions{System: SYSTEM, Now: 2026-10-11 09:30}`. With the weights,
+`TestEnvironmentsMatchEngine` builds one agent per suite and runs `Reset` then `Complete(query)` per case, as
+`run_tests` does. The corpus takes 305 seconds on arm64 (M5 Pro). As with
+`TestHistoryMatchesEngine`, the full corpus, the verdicts and their floors run under `NEEDLE_TEST_NUMERICS=int8`; plain
+`go test` answers the first four cases of each suite (55 seconds, 11 of 24 equal).
+
+**The engine's verdicts.** Upstream's harness passes no suite at the gate 0.0 and two at 0.4:
+
+| suite               | engine, gate 0.0        | engine, gate 0.4        | API, gate 0.0           | API, gate 0.4           | envelope equal |
+| ------------------- | ----------------------- | ----------------------- | ----------------------- | ----------------------- | -------------- |
+| `data_capture`      | 30/32, 1 critical, fail | 29/32, 0 critical, pass | 30/32, 1 critical, fail | 30/32, 0 critical, pass | 17 of 32       |
+| `kitchen_appliance` | 30/32, 1 critical, fail | 29/32, 0 critical, pass | 30/32, 0 critical, pass | 28/32, 0 critical, fail | 15 of 32       |
+| `media_player`      | 28/32, 1 critical, fail | 28/32, 0 critical, fail | 28/32, 1 critical, fail | 28/32, 0 critical, fail | 25 of 32       |
+| `productivity`      | 31/32, 1 critical, fail | 26/32, 0 critical, fail | 31/32, 1 critical, fail | 26/32, 0 critical, fail | 23 of 32       |
+| `smart_home`        | 27/32, 1 critical, fail | 28/32, 1 critical, fail | 26/32, 1 critical, fail | 26/32, 1 critical, fail | 8 of 32        |
+| `wearable`          | 29/32, 2 critical, fail | 31/32, 1 critical, fail | 29/32, 2 critical, fail | 31/32, 1 critical, fail | 14 of 32       |
+
+**The Accept, measured.** (1) The envelope equals the engine's on **102 of 192** (the bar: 183). Without the
+confidence check it would be 150. (2) The API's pass equals the engine's on **5 of 6** suites at the gate 0.0 and 5
+of 6 at 0.4; `kitchen_appliance` differs at both. The failing cases are the engine's in 4 suites at 0.0 and 3 at 0.4.
+Neither part of the Accept is met.
+The test's floors are these numbers (100 and 5, the measured counts less a margin for another architecture's
+near-ties). The 90 mismatching envelopes by class (a case can fall in several): calls 24, confidence 74 (48 of them
+alone), reasoning 24 (4 alone), validation 5 (1 alone), other fields 3.
+
+### The mismatches
+
+- **Confidence alone (48).** Of the 150 cases whose envelope is otherwise the engine's, 102 lie within 0.02. The miss
+  is one-sided: 43 of the 48 are higher than the engine's and only 5 lower. The miss grows with the score: 21 of 22
+  within 0.02 where the engine scores below 0.1, 18 of 22 at 0.1–0.4, 23 of 45 at 0.4–0.7 and 40 of 61 at 0.7 and
+  above. By suite the mean signed offset is +0.11 on `smart_home` (8 of 22 within), +0.013 to +0.020 on
+  `data_capture`, `kitchen_appliance` and `wearable`, and −0.004 and −0.003 on `media_player` (25 of 27) and
+  `productivity` (23 of 28). Examples: `smart_home/0` "turn on the kitchen lights" +0.198, `wearable/29` −0.382, and
+  `wearable/11` 0.9116 against 0.8166. The int8 activations do not cause it: a throwaway run with float32 activations
+  (`WithoutInt8`) has `smart_home` 8 of 22 within 0.02 (14 higher) and `wearable` 11 of 25 (13 higher), the same
+  picture. The corpus of F-062 (one short system fact, other tools) had 20 of 22 within 0.02. These suites differ
+  from it in a long `SYSTEM` behind the date fact and five tools with long descriptions, which the head reads.
+  Open.
+- **Reasoning (24; 4 alone).** Near-ties of the decode, the calls usually alike: `data_capture/13` and `/29` lack only
+  the final "." of the engine's reasoning, `media_player/3` says "query 'lofi beats' -> query …" for "'lofi beats' is a
+  genre query …", and `smart_home/1` and `/2` say "from query" where the engine says "from 'living room'". Seven of
+  them carry the call differences below.
+- **Dispatched against suppressed, same calls (14).** The port withholds where the engine dispatches, through its
+  guess gates (F-058). An enum option with an underscore that the request spells with a space: `living_room` for
+  "living room" (`smart_home/2`, `/10`, `/13`, the port at 0.86–0.90) and `coffee_maker` for "coffee maker"
+  (`kitchen_appliance/17`). The port's `unnamedEnum` does not take the spaced words as the option; the engine does.
+  An unnamed required `action` option: `start_robot_vacuum` `action: "dock"` for "lock the back door" (`smart_home/22`)
+  and `control_blinds` `action: "open"` for "play some jazz in the living room" (`/24`). The engine ships both at
+  0.18 and 0.23, so its enum gate does not fire on `action` here. And `log_water_intake` with `amount_ml: 500` for
+  "log my water intake from this morning" (`data_capture/20`): the port's `missingQuantity` withholds it, while the
+  engine ships it and lists `amount_ml` as ungrounded. Negated requests split both ways, the reasoning and calls
+  alike and `negation` true on both sides. The engine dispatches "don't log the 15.40 …", "never log 79.4 kg …",
+  "never dismiss notifications from Dr. Patel" and "do not close the living room blinds" (`data_capture/25`, `/27`,
+  `wearable/27`, `smart_home/26`), which the port's negation drop withholds. It withholds "don't preheat the oven to
+  220 …", "do not run the dishwasher on heavy today" and "do not turn the volume up to 90" (`kitchen_appliance/25`,
+  `/26`, `media_player/26`), which the port ships. Over all 18 negation cases the engine dispatches 9 and withholds 9.
+  Neither the confidence (0.24 dispatched, 0.81 withheld) nor whether the verb after the cue is in the tool's name
+  ("don't log" → `log_expense` ships, "don't set a timer" → `set_timer` is withheld) separates them. Open. `run_tests`
+  drops calls under `negation` either way, so these change envelopes, not verdicts.
+- **Out-of-bounds numbers (4).** Three requests whose number the bounds exclude end truncated in the engine:
+  `success` false, "tool call truncated: token budget exhausted", no calls and no `validation`, the reasoning
+  intact. They are "log my weight as 500 kg" (`weight_kg` a number in 20–300), "turn the fridge down to 3 degrees"
+  and "get the oven up to 300 degrees" (`set_oven` 50–250; `data_capture/28`, `kitchen_appliance/24`, `/28`). The
+  port's grammar writes an in-bound number instead (55, 75, 180) and dispatches it, flagged as ungrounded; these three
+  are the "other" class. Two such cases do not truncate in the engine either. In "log 9000 ml of water for today"
+  (max 5000) both write 900. In "set the thermostat to 40 degrees" (max 30) both write 20, but the engine scores
+  0.0000 and suppresses it while the port ships it at 0.7982 (`smart_home/29`): F-062's open 0.0000 on a bound-cut
+  integer. F-062 also saw the engine truncate requests the port completes, inside objects. Here it does so on
+  top-level scalars. Open.
+- **Different calls (6).** Decodes that part at a near-tie: `data_capture/18` `log_meal` against `log_expense`,
+  `kitchen_appliance/20` `label` "Oven" against "Timer" (the engine's "Timer" is a word of "start a timer …" and goes
+  unflagged, a critical failure the API does not share), `media_player/20` `level` 15 against 50, and
+  `productivity/18` and `/23` (other date phrases, all suppressed below 0.1). And `data_capture/19`: the same
+  reasoning ("'today' -> merchant 'today'"), but the engine's `log_expense` has no `merchant`. The engine drops a
+  `merchant` of "today" that the port keeps, a repair the port lacks (one case; open).
+- **Validation alone (1).** `kitchen_appliance/19` "set a cooking timer for the rice": both suppress `{"label": "Rice",
+"minutes": 1}`, and the engine lists no ungrounded field while the port lists `set_cooking_timer.minutes`. The
+  engine may read the article "a" as the 1; one case, open.
+
+**What decides the verdicts.** `kitchen_appliance` at 0.0: the engine fails its critical case 20 ("start a timer for
+25 minutes": an unflagged `label` "Timer"), the API its non-critical case 17 (the `coffee_maker` gate), so the API
+passes where the engine does not. At 0.4 the API loses case 17 as well and falls to 28 of 32 (the engine 29). In
+`smart_home` the `living_room` gate costs the API cases 2, 10 and 13. The suite fails on both sides through its
+critical case 28 ("dim the bedroom lights to 150 percent").
+
+**Also noted.** The fixture's responses pass through Python's `json.loads`, and the oracle's fixtures through Go's
+decoder. Neither keeps the engine's string escapes, so whether the engine writes `->` or `-\u003e` in a reasoning
+string is not recorded. `Response` writes `-\u003e` (`Envelope.MarshalJSON` uses `json.Marshal` per field, which
+escapes `<`, `>` and `&`). The comparison here is structural and unaffected. Open for a byte-level check.
+
+### Open
+
+The confidence bias above 0.4 on these suites; the engine's enum gate on `action` and its reading of an underscore
+option as spaced words; when the engine dispatches a negated call; its truncation of top-level out-of-bounds numbers;
+the dropped `merchant` "today"; the grounding of `minutes: 1` by "a timer". Each needs probes of its own before the
+port changes. `internal/toolcall` and the API are unchanged by this finding.
