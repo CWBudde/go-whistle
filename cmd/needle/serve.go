@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,10 +26,13 @@ const (
 
 // server answers one conversation over HTTP, one request at a time.
 type server struct {
-	mu      sync.Mutex // held while a request uses the agent
-	a       agent
-	maxNew  int
-	stopped bool // the model closes: refuse what still waits for mu
+	mu     sync.Mutex // held while a request uses the agent
+	a      agent
+	maxNew int
+	// refusing is set at once when shutdown begins, without waiting for mu:
+	// a request that gets mu after it, queued or new, answers 503 and does
+	// not reach the agent.
+	refusing atomic.Bool
 }
 
 func newServer(a agent, maxNew int) *server { return &server{a: a, maxNew: maxNew} }
@@ -74,7 +78,7 @@ func (s *server) complete(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.stopped {
+	if s.refusing.Load() {
 		writeError(w, http.StatusServiceUnavailable, "shutting down")
 
 		return
@@ -102,7 +106,7 @@ func (s *server) reset(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.stopped {
+	if s.refusing.Load() {
 		writeError(w, http.StatusServiceUnavailable, "shutting down")
 
 		return
@@ -112,11 +116,16 @@ func (s *server) reset(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, []byte("{\"ok\":true}\n"))
 }
 
-// stop waits for the running request and refuses the ones after it.
+// refuse makes every request that has not yet reached the agent answer
+// 503, at once.
+func (s *server) refuse() { s.refusing.Store(true) }
+
+// stop refuses the requests after the running one and waits for that one
+// to leave the agent; then no call runs in it and the model may close.
 func (s *server) stop() {
+	s.refuse()
 	s.mu.Lock()
-	s.stopped = true
-	s.mu.Unlock()
+	s.mu.Unlock() //nolint:staticcheck // SA2001: the lock only waits for the running request.
 }
 
 func writeJSON(w http.ResponseWriter, status int, js []byte) {
@@ -178,15 +187,19 @@ func (c *cli) serve(ctx context.Context, a agent, maxNew, port int) int {
 	// A second signal ends the process at once.
 	stopSignals()
 
-	// The running request finishes, the ones after it get 503; then no
-	// call runs in the agent, and the model may close whatever Shutdown
-	// returns.
-	s.stop()
+	// Refuse first, so that no queued request reaches the agent, then
+	// close the listener and wait for the open connections within
+	// shutdownTimeout. The running request finishes on its own (a turn is
+	// bounded by --max); stop waits for it to leave the agent, and then
+	// the model may close.
+	s.refuse()
 
 	sctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
 	defer cancel()
 
 	_ = srv.Shutdown(sctx)
+
+	s.stop()
 
 	return 0
 }

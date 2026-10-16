@@ -186,6 +186,73 @@ func TestServeSerialises(t *testing.T) {
 	}
 }
 
+// TestServeStopRefusesQueued: when stop begins while one turn runs and
+// another waits for the agent, the waiting one gets 503 and never reaches
+// the agent, and stop returns once the running turn has finished.
+func TestServeStopRefusesQueued(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	a := &fakeAgent{reply: func(string) (*needle.Response, error) {
+		close(entered)
+		<-release
+
+		return timerResponse(), nil
+	}}
+	s := newServer(a, 0)
+	srv := httptest.NewServer(s.handler())
+
+	defer srv.Close()
+
+	first := make(chan int, 1)
+
+	go func() {
+		status, _, _ := post(t, srv.URL+"/complete", `{"input": "first"}`)
+		first <- status
+	}()
+
+	<-entered
+
+	queued := make(chan int, 1)
+
+	go func() {
+		status, _, _ := post(t, srv.URL+"/complete", `{"input": "queued"}`)
+		queued <- status
+	}()
+
+	time.Sleep(50 * time.Millisecond) // the queued request waits for the agent
+
+	stopped := make(chan struct{})
+
+	go func() {
+		s.stop()
+		close(stopped)
+	}()
+
+	for !s.refusing.Load() {
+		time.Sleep(time.Millisecond)
+	}
+
+	select {
+	case <-stopped:
+		t.Fatal("stop returned while a turn still ran in the agent")
+	default:
+	}
+
+	close(release)
+	<-stopped
+
+	if status := <-first; status != http.StatusOK {
+		t.Errorf("the running turn: %d, want 200", status)
+	}
+
+	if status := <-queued; status != http.StatusServiceUnavailable {
+		t.Errorf("the queued turn: %d, want 503", status)
+	}
+
+	if inputs, _ := a.asked(); len(inputs) != 1 {
+		t.Errorf("the agent was asked %q, want only the running turn", inputs)
+	}
+}
+
 // banner is the line --serve writes on stderr once it listens.
 var banner = regexp.MustCompile(`^needle: serving on (http://127\.0\.0\.1:\d+)`)
 
