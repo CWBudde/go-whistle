@@ -789,7 +789,17 @@ default, the year check in `validation.ungrounded` (F-064).
       (`grounding.go`). Several agents share one `Model` (`TestConcurrentAgents` under `-race`). Departures from the
       Python client, each in F-064: renamed and OpenAI-form tools get the strict and year checks upstream misses, a
       history past the context answers the turn alone (F-063 Open).
-- [ ] A CLI mirroring the engine's (`--tools`, `--system`, `--prompt`, `--max`, `--depth`, `--serve`).
+- [x] A CLI mirroring the engine's (`--tools`, `--system`, `--prompt`, `--max`, `--depth`, `--serve`).
+      (2026-10-16) — `cmd/needle`, over the `needle` API with the system as given and the engine's validation
+      (`NoAutoDate`, the new `AgentOptions.NoYearCheck`): `--model`, `--tools`, `--system`, `--prompt`, `--max`,
+      `--depth`, `--threads`, `--fail-input-overflow`, `--serve` with `--port` (`POST /complete`, `POST /reset`, one
+      request at a time, queued ones refused with 503 at shutdown), `--tool-index` (accepted, writes nothing, as the
+      engine), `--audio`. `--prompt` on `cases.json` gives the API's counts against `responses.json` (24/25 type and
+      calls, 22/25 reasoning, 20/22 confidence; `TestPromptMatchesEngine`); `--serve` on `turns.json` returns all 53
+      refusals as the engine's envelope and 50 of 51 answered turns with the engine's calls and reasoning, 47 of 50
+      within 0.02 (`TestServeMatchesTurns`); the `--depth` refusals of `depth.json` and the trigger warnings of
+      `triggers.json` are the engine's bytes. As approved with the plan, `--depth` runs only 20 until 11.6, and a
+      second `--model` or `--audio` names 11.8 (F-066).
 - [x] The parity corpus: the six `needle/environments` suites (`TEST_CASES`) recorded with the engine.
       (2026-10-16) — `scripts/environments_fixture.py` runs upstream's own `_harness.run_tests` through upstream's
       Python client (libneedle3 3.2.0 via ctypes, telemetry off, the date pinned to `date: 2026-10-11 Sun 09:30`), after
