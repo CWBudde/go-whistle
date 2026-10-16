@@ -790,9 +790,22 @@ default, the year check in `validation.ungrounded` (F-064).
       Python client, each in F-064: renamed and OpenAI-form tools get the strict and year checks upstream misses, a
       history past the context answers the turn alone (F-063 Open).
 - [ ] A CLI mirroring the engine's (`--tools`, `--system`, `--prompt`, `--max`, `--depth`, `--serve`).
-- [ ] The parity corpus: the six `needle/environments` suites (`TEST_CASES`) recorded with the engine.
+- [x] The parity corpus: the six `needle/environments` suites (`TEST_CASES`) recorded with the engine.
+      (2026-10-16) — `scripts/environments_fixture.py` runs upstream's own `_harness.run_tests` through upstream's
+      Python client (libneedle3 3.2.0 via ctypes, telemetry off, the date pinned to `date: 2026-10-11 Sun 09:30`), after
+      checking the engine, the weights and the `original/needle` checkout against their pins. It records the 192
+      annotated envelopes and both `run_tests` verdicts (gates 0.0 and 0.4) in
+      `testdata/text/engine/environments.json`; two recordings are byte-identical. A Go port of the harness reproduces
+      upstream's recorded verdicts for all six suites at both gates (`TestEnvironmentHarnessMatchesUpstream`, in CI);
+      `TestEnvironmentsMatchEngine` replays the corpus through the API (F-065).
 - [ ] **Accept:** the envelope JSON equals the engine's on ≥ 95 % of the corpus without the timings, and every
       environment suite passes exactly when the engine's passes.
+      (2026-10-16) — by the user's decision the envelope comparison takes the confidence within 0.02, as 11.4 does,
+      and everything else equal. partial: under `NEEDLE_TEST_NUMERICS=int8` 102 of 192 envelopes are equal (the bar is
+      183; 150 without the confidence check), and the pass equals the engine's on 5 of 6 suites at gate 0.0 and 5 of 6
+      at 0.4 (`kitchen_appliance` differs at both). The misses are the confidence reading higher than the engine (74),
+      the guess and negation gates and the out-of-bounds numbers in `internal/toolcall` (calls 24, reasoning 24,
+      validation 5); F-065 lists them. The CLI is still open.
 
 ### 11.8 Audio in → tool calls out (`whistle/` + the text model; needs 11.7)
 
