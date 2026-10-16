@@ -6528,7 +6528,7 @@ Nothing below is recorded; each is the plain choice.
   413; an error of the model gets 500, after which the agent starts over, as after `Reset`. `/reset` ignores its body
   and answers `{"ok":true}`. Other methods and paths get Go's `ServeMux` 405 and 404 in plain text. After SIGINT or
   SIGTERM the running request finishes, the ones after it get 503, the server shuts down within 30 seconds and the model
-  closes.
+  closes; a second signal, or one outside `--serve`, ends the process at once.
 - **JSON escapes in a request** are read as JSON defines them. The engine reads `\uXXXX` as the text `uXXXX` (F-063),
   a quirk the port does not copy. A client that writes raw UTF-8 gets the same input in both. A client that escapes
   gets the engine's misreading there and the text it meant here: Go's `json.Marshal` escapes `<`, `&` and `>`, and

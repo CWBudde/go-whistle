@@ -142,9 +142,16 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, append(js, '\n'))
 }
 
-// serve answers the conversation of a on 127.0.0.1:port until ctx ends,
-// after a line on stderr that it serves.
+// serve answers the conversation of a on 127.0.0.1:port until ctx ends
+// or a signal of c.signals comes, after a line on stderr that it serves.
 func (c *cli) serve(ctx context.Context, a agent, maxNew, port int) int {
+	stopSignals := func() {}
+	if c.signals != nil {
+		ctx, stopSignals = c.signals(ctx)
+	}
+
+	defer stopSignals()
+
 	l, err := (&net.ListenConfig{}).Listen(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
 		return c.fail(err)
@@ -162,9 +169,14 @@ func (c *cli) serve(ctx context.Context, a agent, maxNew, port int) int {
 
 	select {
 	case err := <-done:
+		s.stop()
+
 		return c.fail(err)
 	case <-ctx.Done():
 	}
+
+	// A second signal ends the process at once.
+	stopSignals()
 
 	// The running request finishes, the ones after it get 503; then no
 	// call runs in the agent, and the model may close whatever Shutdown

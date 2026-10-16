@@ -89,16 +89,21 @@ func TestServeProtocol(t *testing.T) {
 		t.Errorf("a bad request reached the agent: %q", inputs)
 	}
 
-	status, _, got := post(t, srv.URL+"/complete", `{"input": "`+strings.Repeat("x", maxBody)+`"}`)
-	if status != http.StatusRequestEntityTooLarge || !strings.HasPrefix(got, `{"error":"`) {
-		t.Errorf("oversized body: %d %q, want 413", status, got)
+	// Through the handler: over a socket the server may close before the
+	// client has sent the whole body, and the client sees a reset.
+	rec := httptest.NewRecorder()
+	s.handler().ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/complete",
+		strings.NewReader(`{"input": "`+strings.Repeat("x", maxBody)+`"}`)))
+
+	if got := rec.Body.String(); rec.Code != http.StatusRequestEntityTooLarge || !strings.HasPrefix(got, `{"error":"`) {
+		t.Errorf("oversized body: %d %q, want 413", rec.Code, got)
 	}
 
 	a.reply = func(string) (*needle.Response, error) {
 		return nil, &needle.OverflowError{Tokens: 1407, Available: 878}
 	}
 
-	status, _, got = post(t, srv.URL+"/complete", `{"input": "long"}`)
+	status, _, got := post(t, srv.URL+"/complete", `{"input": "long"}`)
 	if want := `{"type":"call","success":false,"error":"input exceeds the context window (1407 tokens, 878 available)",` +
 		`"error_code":"context_overflow","reason":"runtime_failure","function_calls":[],"suppressed_calls":[],` +
 		`"reasoning":null,"confidence":0.0000}` + "\n"; status != http.StatusOK || got != want {
@@ -245,5 +250,56 @@ func TestServeRun(t *testing.T) {
 
 	if !h.model.closed || !h.model.opts.FailInputOverflow || !reflect.DeepEqual(h.model.agent.maxNew, []int{33}) {
 		t.Errorf("closed %v, options %+v, --max %v", h.model.closed, h.model.opts, h.model.agent.maxNew)
+	}
+}
+
+// TestServeSignal: a signal of c.signals ends --serve with exit 0 and the
+// model closed; serve stops listening for signals once one came.
+func TestServeSignal(t *testing.T) {
+	h := newHarness()
+	c := h.cli()
+
+	signal := make(chan context.CancelFunc, 1)
+	stopped := 0
+
+	var mu sync.Mutex
+
+	c.signals = func(ctx context.Context) (context.Context, context.CancelFunc) {
+		ctx, cancel := context.WithCancel(ctx)
+		signal <- cancel
+
+		return ctx, func() {
+			mu.Lock()
+			stopped++
+			mu.Unlock()
+			cancel()
+		}
+	}
+
+	pr, pw := io.Pipe()
+	c.stderr = pw
+	done := make(chan int, 1)
+
+	go func() {
+		done <- c.run(t.Context(), []string{"--serve", "--port", "0"})
+
+		_ = pw.Close()
+	}()
+
+	lines := bufio.NewScanner(pr)
+	for lines.Scan() && !banner.MatchString(lines.Text()) {
+	}
+
+	go func() { _, _ = io.Copy(io.Discard, pr) }()
+
+	(<-signal)()
+
+	code := <-done
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if code != 0 || !h.model.closed || stopped == 0 {
+		t.Errorf("exit %d, model closed %v, signals stopped %d times", code, h.model.closed, stopped)
 	}
 }

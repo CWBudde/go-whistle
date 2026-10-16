@@ -86,11 +86,13 @@ func modelDir(path string) (string, error) {
 }
 
 // cli is the needle command: where it writes, how it opens the model and
-// sets the thread count.
+// sets the thread count, and the signals that end --serve (nil: none, only
+// the context).
 type cli struct {
 	stdout, stderr io.Writer
 	open           func(path string) (model, error)
 	threads        func(n int)
+	signals        func(ctx context.Context) (context.Context, context.CancelFunc)
 }
 
 // value is a flag's text as given, checked after parsing so that every

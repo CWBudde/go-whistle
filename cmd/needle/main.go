@@ -27,16 +27,15 @@ import (
 )
 
 func main() {
-	// SIGINT or SIGTERM ends --serve: the running request finishes, the ones after it get 503, the model closes.
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-
 	c := &cli{
 		stdout: os.Stdout, stderr: os.Stderr, open: openNeedle,
 		threads: func(n int) { runtime.GOMAXPROCS(n) },
+		// SIGINT or SIGTERM ends --serve: the running request finishes, the ones after it get 503, the model
+		// closes. Elsewhere, and at a second signal, they end the process as Go does by default.
+		signals: func(ctx context.Context) (context.Context, context.CancelFunc) {
+			return signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+		},
 	}
 
-	code := c.run(ctx, os.Args[1:])
-
-	stop()
-	os.Exit(code)
+	os.Exit(c.run(context.Background(), os.Args[1:]))
 }
