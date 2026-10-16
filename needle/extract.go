@@ -22,6 +22,9 @@ type ExtractOptions struct {
 	// Lenient returns the arguments without the strict check (upstream's
 	// strict=False).
 	Lenient bool
+
+	// noYears is the NoYearCheck of the agent whose Extract this is.
+	noYears bool
 }
 
 // ExtractionValidationError is Extract's strict check failing
@@ -60,8 +63,11 @@ func (m *Model) Extract(text string, schema []byte, o ExtractOptions) (json.RawM
 }
 
 // agent are the options of Extract's agent: the system facts with the date
-// fact, which upstream's extract always adds.
-func (o ExtractOptions) agent() AgentOptions { return AgentOptions{System: o.System, Now: o.Now} }
+// fact, which upstream's extract always adds, and the NoYearCheck of the
+// agent whose Extract this is.
+func (o ExtractOptions) agent() AgentOptions {
+	return AgentOptions{System: o.System, Now: o.Now, NoYearCheck: o.noYears}
+}
 
 // ExtractInto is Extract decoding the arguments into v with
 // encoding/json. It reports whether there were any.
@@ -80,13 +86,14 @@ func (m *Model) ExtractInto(text string, schema []byte, v any, o ExtractOptions)
 }
 
 // Extract is Model.Extract with the agent's system facts, as upstream's
-// Needle.extract: o.System is not used. The conversation is not touched.
+// Needle.extract: o.System is not used. The agent's NoYearCheck carries
+// over. The conversation is not touched.
 func (a *Agent) Extract(text string, schema []byte, o ExtractOptions) (json.RawMessage, error) {
 	if a.m == nil {
 		return nil, errors.New("needle: the agent has no model")
 	}
 
-	o.System = a.system
+	o.System, o.noYears = a.system, a.noYears
 
 	return a.m.Extract(text, schema, o)
 }

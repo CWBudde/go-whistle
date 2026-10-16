@@ -38,6 +38,13 @@ type AgentOptions struct {
 	// --fail-input-overflow does. Without it the turn is cut to fit and
 	// the conversation before it dropped (docs/FINDINGS.md F-063).
 	FailInputOverflow bool
+	// NoYearCheck leaves validation.ungrounded as the engine writes it,
+	// without the Python client's year check (_annotate_ungrounded,
+	// docs/FINDINGS.md F-064), which the engine's CLI and library do not
+	// make. Run's strict check then reads the engine's fields alone;
+	// Extract (also Agent.Extract, which keeps this option) reads them plus
+	// its own temporal check (_temporal_grounding), which Lenient turns off.
+	NoYearCheck bool
 }
 
 // CompleteOptions configure Complete.
@@ -59,6 +66,7 @@ type Agent struct {
 	schemas   map[string]any       // the tools as given, by name (_tool_schemas)
 	years     map[int]bool         // the years the turns since Reset wrote (_seen_years)
 	stateless bool
+	noYears   bool // AgentOptions.NoYearCheck
 }
 
 // completer answers one turn of a conversation with the engine's envelope:
@@ -112,7 +120,10 @@ func newAgent(tools []byte, o AgentOptions) (*Agent, error) {
 		system = withDate(system, o.Now)
 	}
 
-	a := &Agent{system: system, schemas: map[string]any{}, years: map[int]bool{}, stateless: o.Stateless}
+	a := &Agent{
+		system: system, schemas: map[string]any{}, years: map[int]bool{}, stateless: o.Stateless,
+		noYears: o.NoYearCheck,
+	}
 
 	list, _ := decodeJSON(tools).([]any)
 	for _, entry := range list {
@@ -193,7 +204,7 @@ func (a *Agent) complete(input string, maxNew int, ground bool) (*Response, erro
 	}
 
 	r := newResponse(e, false)
-	if ground {
+	if ground && !a.noYears {
 		a.annotate(r, input)
 	}
 
