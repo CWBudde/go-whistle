@@ -6418,3 +6418,125 @@ The confidence bias above 0.4 on these suites; the engine's enum gate on `action
 option as spaced words; when the engine dispatches a negated call; its truncation of top-level out-of-bounds numbers;
 the dropped `merchant` "today"; the grounding of `minutes: 1` by "a timer". Each needs probes of its own before the
 port changes. `internal/toolcall` and the API are unchanged by this finding.
+
+## F-066 — The `needle` CLI: a drop-in for the engine's flags, `--serve`'s protocol, and the port's choices (PLAN.md 11.7) (2026-10-16)
+
+**Question.** 11.7's CLI item asks for a `needle` binary that takes the engine CLI's flags (`--tools`, `--system`,
+`--prompt`, `--max`, `--depth`, `--serve`) over the Go API of F-064. Which of its behaviours the recorded fixtures pin,
+and what the port decides where they do not. No engine run: the evidence is the fixtures' `command` headers and
+answers in `testdata/text/engine/` and F-047, F-049, F-054 and F-063. By the user's decisions (2026-10-16) it is a new
+`cmd/needle` binary, not a `whistle` subcommand, `--depth` runs only the full model until PLAN.md 11.6, and a second
+`--model` and `--audio` wait for PLAN.md 11.8.
+
+**What the fixtures pin, and the CLI does.**
+
+- **The flags** as the oracle drives them: `--model needle3.cact`, `--tools <file>`, `--system <file>`, `--threads N`,
+  `--prompt <query>`, `--max N` (512), `--depth N`, `--fail-input-overflow`, `--serve` with `--port N`,
+  `--tool-index <path>`, `--audio <clip>`.
+- **The system facts** come from the file as written: `date.json`'s `trailing_newline` answers differently from
+  `fixed_file`, so the newline is kept. A `--system` text that names no file answers as no `--system`
+  (`literal_text` is `no_system`'s answer, F-047). The CLI does the same and adds a line on stderr,
+  `needle: ignoring --system "…": not a readable file`; stdout is unchanged. Neither the CLI nor the library adds a
+  date fact (F-047), and neither adds the Python client's year check to `validation.ungrounded` (F-064). The agent is
+  made with `NoAutoDate` and the new `AgentOptions.NoYearCheck`, which skips `_annotate_ungrounded` and nothing else
+  (`TestNoYearCheck`).
+- **`--depth`** (`depth.json`): 0 and 1 exit 1 with `needle: --depth takes a layer count of 2 or more, not "0"`, byte
+  for byte (`TestDepthMatchesEngine`, model-free). 21 exits 1: the engine fails to load
+  (`failed to load .cact model`), and the CLI refuses before loading with
+  `cannot load <model>: --depth 21 is past the model's 20 layers`. 20 runs the full model, as no flag does
+  (`full_same_as_default`). 2 to 19 exit 1 with a message that names PLAN.md 11.6. Any other text gets the 0-and-1
+  message.
+- **Trigger warnings** (`triggers.json`): a trigger that does not compile is skipped with
+  `needle: ignoring invalid trigger for set_alarm: (` on stderr. The CLI prints one such line per entry of
+  `toolcall.Normalise`'s `Ignored` once the agent is made, and nothing for valid triggers: all 11 probes byte for byte
+  (`TestTriggerWarningsMatchEngine`, model-free). Which regexes compile is RE2's reading, as in F-054.
+- **`--tool-index`** (`retrieval.json`): the engine exits 0, writes no index and answers as without the flag, since
+  `needle3.cact` carries no embedding head (F-049). The CLI accepts the flag and ignores it (`TestToolIndexIgnored`;
+  `TestToolIndexMatchesEngine` with the weights: exit 0, no file, the engine's calls). A model with an embedding head
+  would need retrieval, which the port does not have (F-049 Open).
+- **A refused turn** (`--fail-input-overflow`; `turns.json`, `history.json`): over `--serve` the engine answers 200
+  with this envelope, without `validation`:
+
+  ```json
+  {
+    "type": "call",
+    "success": false,
+    "error": "input exceeds the context window (N tokens, M available)",
+    "error_code": "context_overflow",
+    "reason": "runtime_failure",
+    "function_calls": [],
+    "suppressed_calls": [],
+    "reasoning": null,
+    "confidence": 0.0
+  }
+  ```
+
+  The API's `*OverflowError` carries both numbers, and the CLI writes that envelope from it, for `--prompt` too
+  (exit 0).
+
+- **`--serve`**: the oracle waits for a stderr line containing `serving on`, posts `{"input": "…"}` to
+  `/complete` per turn and `{}` to `/reset`, and takes any status but 200 as an error (`tools/oracle/text/cli.go`).
+
+**Measured** (arm64, M5 Pro). The CLI runs on one load of the model in the engine's numerics, with the tools and the
+system facts written to files as the oracle wrote them:
+
+| test                         | what                                                                               | result                                                                                                       |
+| ---------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `TestPromptMatchesEngine`    | `cases.json`: 24 cases through `--prompt`, `timer_then_result`'s 2 turns `--serve` | type and `function_calls` 24 of 25, reasoning 22 of 25, confidence within 0.02 on 20 of 22: the API's counts |
+| `TestServeMatchesTurns`      | `turns.json`: 53 scenarios, one server each, at their `--max` and flag             | all 53 refusals equal as parsed JSON; of 51 answered turns 50 and 50 equal, 47 of 50 within 0.02             |
+| `TestToolIndexMatchesEngine` | `retrieval.json`'s CLI run                                                         | exit 0, no index written, the engine's calls                                                                 |
+
+The three take two to three minutes; the floors are the counts less one turn. Under `-race` they skip: the corpus
+alone ran past `go test`'s 10 minutes, and the server's lock is checked without the weights (`TestServeSerialises`).
+`turns.json` was recorded with Go's `json.Marshal` bodies, so the test sends each input as the engine read it (`<`,
+`&`, `>` as `u003c` …, F-063). The one answered turn that differs, `after_two_calls/0`, is the corpus's
+`message_and_timer`, which differs in the API too.
+
+### Port choices
+
+Nothing below is recorded; each is the plain choice.
+
+- **Flag parsing** is Go's `flag` package: `--name value`, `--name=value` and `-name`; `--serve` and
+  `--fail-input-overflow` take no value; the first argument that is not a flag is an error. `--prompt` and `--serve`
+  exclude each other, and one of them is required. `--port` without `--serve` is ignored. `-h` and `--help` print the
+  flags on stdout and exit 0.
+- **Exit codes**: 0 when the CLI answered, a truncated or refused envelope included (the oracle's `answer` requires
+  exit 0, and `timer_budget`'s truncated answer was recorded through it). 1 for every error, a wrong command line
+  included: the engine's only recorded command-line refusal, `--depth`, exits 1. `cmd/whistle`'s 2 for usage errors is
+  not taken over.
+- **Error texts** start with `needle: `, as the engine's do (the oracle sets argv[0] to `needle`), with the API's own
+  `needle: ` prefix printed once. Where nothing is recorded they follow the `--depth` message:
+  `--max takes a token count of 1 or more, not "0"` (the API would read 0 as 512),
+  `--threads takes a thread count of 1 or more`, `--port takes a port number of 0 to 65535`, and
+  `cannot load <model>: <reason>` after `depth.json`'s load error. `cannot read --tools: …` is an error, unlike
+  `--system`'s ignored path, whose handling the engine's answers pin.
+- **`--model`** defaults to `models/needle3/needle3.cact`, where `just fetch-needle3` puts it. It names
+  `needle3.cact` or its directory, which `needle.Load` opens. Another file name is refused, because `Load` reads
+  `needle3.cact` and `tokenizer.model` from one directory. Without `--tools` the agent has no tools and answers with
+  the engine's empty call, as `triggers.json`'s `no_tools` records for `[]`.
+- **`--threads N`** sets `GOMAXPROCS`; without it Go's default, all cores. The engine's library defaults to the fast
+  cores, at most 4, and its answers move with the thread count (F-047); the flag sets only the port's parallelism.
+- **Stdout** is the envelope as one line of JSON and a newline: `Response.MarshalJSON`'s field order and four-decimal
+  confidence, with `<`, `>` and `&` written as themselves rather than as `encoding/json`'s `\u003c`, `\u003e` and
+  `\u0026` (`TestEncode`). The fixtures pass through JSON decoders, so the engine's bytes (spacing, escapes, the
+  final newline) are not recorded (F-065, "Also noted"). A refusal's confidence is written `0.0000`.
+- **`--serve`** listens on 127.0.0.1, the oracle's address, at port 8080 by default (`whistle serve`'s), with `--port 0`
+  picking a free port. The banner on stderr is `needle: serving on http://127.0.0.1:8080 (POST /complete, POST /reset)`.
+  One agent holds the conversation and a mutex runs one request at a time (`TestServeSerialises`). `/complete` answers
+  200 with the envelope or the refusal. It answers 400 with `{"error": "…"}` to a body that is not `{"input": string}`:
+  not JSON, no `input`, `null`, not a string, or data after the object. Other fields are ignored. A body over 4 MiB gets
+  413; an error of the model gets 500, after which the agent starts over, as after `Reset`. `/reset` ignores its body
+  and answers `{"ok":true}`. Other methods and paths get Go's `ServeMux` 405 and 404 in plain text. After SIGINT or
+  SIGTERM the running request finishes, the ones after it get 503, the server shuts down within 30 seconds and the model
+  closes.
+- **JSON escapes in a request** are read as JSON defines them. The engine reads `\uXXXX` as the text `uXXXX` (F-063),
+  a quirk the port does not copy. A client that writes raw UTF-8 gets the same input in both. A client that escapes
+  gets the engine's misreading there and the text it meant here: Go's `json.Marshal` escapes `<`, `&` and `>`, and
+  Python's `json.dumps` escapes all non-ASCII by default. `TestServeProtocol` pins the reading.
+
+### Open
+
+The engine's bytes on stdout, its status codes and bodies for a bad `/complete` or `/reset` request, its handling of an
+unreadable `--tools` file, of unknown flags and of `--max 0`, and its default port, none of which the fixtures record.
+`--depth` below 20 (PLAN.md 11.6) and audio in (PLAN.md 11.8) wait for their items. `history.json` is not replayed
+through the CLI: the agent behind `--serve` is the API's, whose `TestHistoryMatchesEngine` replays it (F-064).

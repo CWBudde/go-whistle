@@ -433,6 +433,39 @@ r, err = a.Run("set a timer for 10 minutes", map[string]needle.ToolFunc{
 
 The parity corpus is upstream's six `needle/environments` suites (192 cases), recorded with the engine through upstream's Python client (`testdata/text/engine/environments.json`); [F-065](docs/FINDINGS.md#f-065--the-parity-corpus-the-six-needleenvironments-suites-against-the-engine-planmd-117-2026-10-16) has the numbers.
 
+### Tool calls on the command line: `needle`
+
+`cmd/needle` is the CLI on top of the package, a drop-in for the flags of the engine's `needle` binary (`--model`,
+`--tools`, `--system`, `--prompt`, `--max`, `--depth`, `--fail-input-overflow`, `--threads`, `--serve`, `--port`). It
+renders the system facts as given, without the date or the year check of the Python client, as the engine does. With
+the weights in `models/needle3` (`just fetch-needle3`, in a clone):
+
+```bash
+go install github.com/cwbudde/go-whistle/cmd/needle@latest
+printf '%s' '[{"name":"set_timer","description":"Start a countdown timer","parameters":{"type":"object","properties":{"minutes":{"type":"integer"},"label":{"type":"string"}},"required":["minutes"]}}]' > tools.json
+printf '%s' 'date: 2026-10-16 Fri 09:30' > system.txt
+needle --model models/needle3/needle3.cact --tools tools.json --system system.txt --prompt "set a timer for 10 minutes for the pasta"
+```
+
+```text
+{"type":"call","success":true,"error":null,"error_code":null,"reason":null,"function_calls":[{"name":"set_timer","arguments":{"label":"Pasta","minutes":10}}],"suppressed_calls":[],"reasoning":"'10 minutes' -> minutes 10; 'pasta' -> label 'pasta'.","confidence":0.9528,"validation":{"ungrounded":[],"negation":false}}
+```
+
+`--serve` keeps one conversation and answers it over HTTP on 127.0.0.1 (port 8080, `--port` picks another): each
+`POST /complete` with `{"input": "…"}` is the next turn (after a call, a JSON input is the call's result), and
+`POST /reset` starts over.
+
+```bash
+needle --tools tools.json --system system.txt --serve &
+curl -s 127.0.0.1:8080/complete -d '{"input": "set a timer for 10 minutes for the pasta"}'
+curl -s 127.0.0.1:8080/complete -d '{"input": "{\"status\": \"started\"}"}'
+curl -s -X POST 127.0.0.1:8080/reset
+```
+
+`needle --help` lists the flags. `--depth` runs the full model only and audio in (`--audio`, a second `--model`) is not
+ported yet; [F-066](docs/FINDINGS.md#f-066--the-needle-cli-a-drop-in-for-the-engines-flags---serves-protocol-and-the-ports-choices-planmd-117-2026-10-16)
+records the CLI's choices and its numbers against the engine.
+
 ## Parity with the engine
 
 Whistle's engine (`libneedle3`) is closed source, so this port is rebuilt from the published weights and checked
