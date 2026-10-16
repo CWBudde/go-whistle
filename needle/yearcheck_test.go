@@ -2,6 +2,7 @@ package needle
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
 	"testing"
 )
@@ -72,5 +73,56 @@ func TestNoYearCheck(t *testing.T) {
 
 	if want := `[{"ok":true}]`; string(js) != want {
 		t.Errorf("Run results %s, want %s", js, want)
+	}
+}
+
+// TestNoYearCheckExtract: Agent.Extract's agent keeps the NoYearCheck of
+// the agent it extracts for, so the extraction's validation.ungrounded is
+// the engine's, without the year check's field. The strict check itself
+// keeps upstream's temporal check (_temporal_grounding), which only
+// Lenient turns off, so the unlicensed date is still rejected.
+func TestNoYearCheckExtract(t *testing.T) {
+	if !(ExtractOptions{noYears: true}).agent().NoYearCheck || (ExtractOptions{}).agent().NoYearCheck {
+		t.Fatal("ExtractOptions.agent does not carry noYears into NoYearCheck")
+	}
+
+	const (
+		bad  = `{"title":"dinner","day":"2019-03-05"}`
+		text = "dinner on 5 March 2025"
+	)
+
+	tool, err := extractTool([]byte(extractSchema))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, noYears := range []bool{true, false} {
+		o := ExtractOptions{noYears: noYears}
+
+		a, _ := scripted(t, "["+extractSchema+"]", o.agent(), answer(one("event", bad)))
+
+		r, err := a.complete(text, maxNewTokens(0), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if flagged := r.Validation != nil && slices.Contains(r.Validation.Ungrounded, "event.day"); flagged == noYears {
+			t.Errorf("noYears %v: ungrounded %+v", noYears, r.Validation)
+		}
+
+		a, _ = scripted(t, "["+extractSchema+"]", o.agent(), answer(one("event", bad)))
+
+		args, err := a.extract(text, tool, o)
+		if !errors.As(err, new(*ExtractionValidationError)) {
+			t.Errorf("noYears %v: strict %s, %v; want the temporal check's *ExtractionValidationError", noYears, args, err)
+		}
+
+		o.Lenient = true
+		a, _ = scripted(t, "["+extractSchema+"]", o.agent(), answer(one("event", bad)))
+
+		args, err = a.extract(text, tool, o)
+		if err != nil || string(args) != bad {
+			t.Errorf("noYears %v: lenient %s, %v; want %s", noYears, args, err, bad)
+		}
 	}
 }

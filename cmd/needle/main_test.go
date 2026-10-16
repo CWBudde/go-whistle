@@ -161,6 +161,18 @@ func TestPrompt(t *testing.T) {
 	}
 }
 
+// TestPromptIgnoresPort: --port without --serve is ignored (F-066), so an
+// invalid one does not keep --prompt from answering.
+func TestPromptIgnoresPort(t *testing.T) {
+	for _, port := range []string{"invalid", "65536", "-1"} {
+		h := newHarness()
+
+		if code := h.run(t, "--prompt", "hi", "--port", port); code != 0 || h.stdout.String() != timerJSON {
+			t.Errorf("--port %s: exit %d, stdout %q, stderr %q", port, code, h.stdout, h.stderr)
+		}
+	}
+}
+
 // TestPromptDefaults: without flags but --prompt the CLI opens the
 // default model path, sends no tools and no system facts, answers at
 // --max 512 without refusing an oversized turn, and leaves the threads.

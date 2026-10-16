@@ -41,8 +41,9 @@ type AgentOptions struct {
 	// NoYearCheck leaves validation.ungrounded as the engine writes it,
 	// without the Python client's year check (_annotate_ungrounded,
 	// docs/FINDINGS.md F-064), which the engine's CLI and library do not
-	// make. Run's and Extract's strict checks then read the engine's
-	// fields alone.
+	// make. Run's strict check then reads the engine's fields alone;
+	// Extract (also Agent.Extract, which keeps this option) reads them plus
+	// its own temporal check (_temporal_grounding), which Lenient turns off.
 	NoYearCheck bool
 }
 

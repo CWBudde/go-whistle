@@ -249,7 +249,7 @@ func (o *options) check() error {
 	return nil
 }
 
-// checkNumbers checks --depth, --max, --threads and --port.
+// checkNumbers checks --depth, --max, --threads and, with --serve, --port.
 func (o *options) checkNumbers() error {
 	var ok bool
 
@@ -281,9 +281,12 @@ func (o *options) checkNumbers() error {
 		}
 	}
 
-	o.portNumber, ok = count(o.port, 0)
-	if !ok || o.portNumber > 65535 {
-		return fmt.Errorf("--port takes a port number of 0 to 65535, not %q", o.port.text)
+	// --port without --serve is ignored (F-066), so only --serve checks it.
+	if o.serve.set {
+		o.portNumber, ok = count(o.port, 0)
+		if !ok || o.portNumber > 65535 {
+			return fmt.Errorf("--port takes a port number of 0 to 65535, not %q", o.port.text)
+		}
 	}
 
 	return nil
